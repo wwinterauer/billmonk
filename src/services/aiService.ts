@@ -107,6 +107,9 @@ export async function extractReceiptData(file: File): Promise<ExtractionResult> 
   }
 }
 
+// Re-export learning pattern service for convenience
+export { extractReceiptDataWithLearning, findVendorIdByName } from './learningPatternService';
+
 /**
  * Creates default extraction result for manual entry
  */

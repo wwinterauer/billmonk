@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
-import { extractReceiptData, normalizeExtractionResult, fetchDescriptionSettings } from '@/services/aiService';
+import { extractReceiptData, normalizeExtractionResult, fetchDescriptionSettings, extractReceiptDataWithLearning, findVendorIdByName } from '@/services/aiService';
 import { matchOrCreateVendor, findOrCreateVendor, addVendorVariant, type MatchedVendor, type VendorSuggestion, type FindOrCreateVendorResult } from '@/services/vendorMatchingService';
 import { 
   generateFileHash, 
@@ -272,16 +272,31 @@ export function useReceipts() {
       onProgress?.(60, 'KI analysiert...');
       
       // Call AI extraction
-      const extracted = await extractReceiptData(file);
+      const baseExtracted = await extractReceiptData(file);
+      
+      // Try to find vendor ID by name for learning pattern application
+      const vendorName = baseExtracted.vendor_brand || baseExtracted.vendor;
+      let potentialVendorId: string | null = null;
+      
+      if (vendorName) {
+        potentialVendorId = await findVendorIdByName(vendorName, user.id);
+      }
+      
+      // Apply learned patterns if vendor is known
+      const extracted = await extractReceiptDataWithLearning(baseExtracted, user.id, potentialVendorId);
+      
+      // Check if learning was applied
+      const learningApplied = 'learning_applied' in extracted && extracted.learning_applied;
+      const learningWarnings = '_warnings' in extracted ? (extracted as { _warnings?: Array<{ field: string; message: string }> })._warnings : undefined;
       
       // Fetch user's description settings
       const descriptionSettings = await fetchDescriptionSettings(user.id);
       const normalized = normalizeExtractionResult(extracted, descriptionSettings);
 
-      onProgress?.(80, 'Lieferant zuordnen...');
+      onProgress?.(80, learningApplied ? 'Lernmuster angewendet...' : 'Lieferant zuordnen...');
 
       // Match or create vendor based on detected name
-      const vendorName = normalized.vendor_brand || normalized.vendor;
+      const finalVendorName = normalized.vendor_brand || normalized.vendor;
       
       // Prepare update data
       const updateData: Partial<Receipt> = {
@@ -303,8 +318,8 @@ export function useReceipts() {
       };
 
       // Use enhanced vendor matching with similarity check
-      if (vendorName && !options?.skipVendorMatching) {
-        const vendorResult = await findOrCreateVendor(user.id, vendorName, {
+      if (finalVendorName && !options?.skipVendorMatching) {
+        const vendorResult = await findOrCreateVendor(user.id, finalVendorName, {
           autoCreate: false,
           minSimilarity: 60
         });
@@ -325,7 +340,7 @@ export function useReceipts() {
             vendorDecision: {
               receiptId,
               extractedData: updateData,
-              detectedName: vendorName,
+              detectedName: finalVendorName,
               suggestions: vendorResult.suggestions
             }
           };
@@ -353,15 +368,15 @@ export function useReceipts() {
           }
         } else if (vendorResult.isNew) {
           // No match found and not auto-created - create new vendor
-          const newVendor = await createVendorForReceipt(vendorName);
+          const newVendor = await createVendorForReceipt(finalVendorName);
           if (newVendor) {
             updateData.vendor_id = newVendor.id;
             updateData.vendor = newVendor.display_name;
           }
         }
-      } else if (vendorName) {
+      } else if (finalVendorName) {
         // Skip vendor matching - use old behavior
-        const matchedVendor = await matchOrCreateVendor(vendorName, user.id);
+        const matchedVendor = await matchOrCreateVendor(finalVendorName, user.id);
         if (matchedVendor) {
           updateData.vendor_id = matchedVendor.id;
           updateData.vendor = matchedVendor.display_name;
@@ -379,6 +394,13 @@ export function useReceipts() {
               updateData.vat_amount = Number((grossAmount - updateData.amount_net).toFixed(2));
             }
           }
+        }
+      }
+      
+      // Log learning warnings if any
+      if (learningWarnings && learningWarnings.length > 0) {
+        for (const warning of learningWarnings) {
+          console.warn(`[Learning Warning] ${warning.field}: ${warning.message}`);
         }
       }
 
