@@ -99,12 +99,13 @@ import {
   DEFAULT_NAMING_SETTINGS,
   type NamingSettings 
 } from '@/lib/filenameUtils';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, GraduationCap } from 'lucide-react';
 import { useCorrectionTracking, type CorrectionData } from '@/hooks/useCorrectionTracking';
 import { LEARNABLE_FIELDS } from '@/types/learning';
 import { useVendorLearning } from '@/hooks/useVendorLearning';
 import { LearnableField } from './LearnableField';
 import { SaveWithLearningDialog, type FieldChange } from './SaveWithLearningDialog';
+import { ManualTrainingModal } from './ManualTrainingModal';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
@@ -202,6 +203,9 @@ export function ReceiptDetailPanel({
   const [fieldChanges, setFieldChanges] = useState<Record<string, FieldChange>>({});
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [rememberCorrections, setRememberCorrections] = useState(true);
+
+  // Manual training state
+  const [showManualTraining, setShowManualTraining] = useState(false);
 
   // Vendor learning data
   const { vendorLearning } = useVendorLearning(selectedVendorId);
@@ -1218,6 +1222,27 @@ export function ReceiptDetailPanel({
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
+
+                  {/* Manual Training Button - shown when confidence is low */}
+                  {selectedVendorId && (receipt?.ai_confidence ?? 0) < 0.7 && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowManualTraining(true)}
+                          className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                        >
+                          <GraduationCap className="w-4 h-4 mr-1" />
+                          KI trainieren
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Die KI-Erkennung war unsicher ({Math.round((receipt?.ai_confidence ?? 0) * 100)}%).</p>
+                        <p className="text-xs text-muted-foreground">Gib manuelle Hinweise um zukünftige Erkennungen zu verbessern.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
 
                 {/* Scrollable Form Area */}
@@ -1866,6 +1891,26 @@ export function ReceiptDetailPanel({
         onRememberChange={setRememberCorrections}
         onConfirm={executeSaveWithLearning}
       />
+
+      {/* Manual Training Modal */}
+      {selectedVendorId && (
+        <ManualTrainingModal
+          open={showManualTraining}
+          onOpenChange={setShowManualTraining}
+          vendorId={selectedVendorId}
+          vendorName={vendor || 'Unbekannt'}
+          currentValues={{
+            vendor,
+            invoice_number: invoiceNumber,
+            receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : '',
+            amount_gross: amountGross,
+            amount_net: calculatedValues.net.toFixed(2),
+            vat_amount: calculatedValues.vat.toFixed(2),
+            vat_rate: vatRate,
+            description,
+          }}
+        />
+      )}
     </>
   );
 }
