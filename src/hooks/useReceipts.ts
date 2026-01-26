@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
-import { extractReceiptData, normalizeExtractionResult, type ExtractionResult } from '@/services/aiService';
+import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
 
 export interface Receipt {
   id: string;
@@ -33,6 +34,8 @@ export interface ReceiptFilters {
   status?: string;
   month?: number;
   year?: number;
+  dateFrom?: string; // Format: YYYY-MM-DD
+  dateTo?: string;   // Format: YYYY-MM-DD
 }
 
 export type UploadStatus = 'pending' | 'uploading' | 'processing' | 'complete' | 'complete-manual' | 'error';
@@ -286,21 +289,30 @@ export function useReceipts() {
       .from('receipts')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .order('receipt_date', { ascending: false, nullsFirst: false });
 
     if (filters?.status) {
       query = query.eq('status', filters.status);
     }
 
-    if (filters?.year) {
+    // New date range filter (preferred over month/year)
+    if (filters?.dateFrom || filters?.dateTo) {
+      if (filters.dateFrom) {
+        query = query.gte('receipt_date', filters.dateFrom);
+      }
+      if (filters.dateTo) {
+        query = query.lte('receipt_date', filters.dateTo);
+      }
+    } else if (filters?.year) {
+      // Legacy month/year filter for backwards compatibility
       const startDate = new Date(filters.year, filters.month ? filters.month - 1 : 0, 1);
       const endDate = filters.month 
         ? new Date(filters.year, filters.month, 0)
         : new Date(filters.year, 11, 31);
       
       query = query
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString());
+        .gte('receipt_date', format(startDate, 'yyyy-MM-dd'))
+        .lte('receipt_date', format(endDate, 'yyyy-MM-dd'));
     }
 
     const { data, error } = await query;
