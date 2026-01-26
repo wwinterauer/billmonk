@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Upload, FileText, Calendar, Building2 } from 'lucide-react';
+import { Search, Upload, FileText, Calendar, Building2, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
@@ -13,7 +13,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
 
 interface BankTransaction {
   id: string;
@@ -24,10 +28,10 @@ interface BankTransaction {
 
 interface Receipt {
   id: string;
-  date: Date;
-  vendor: string;
-  amount: number;
-  thumbnail?: string;
+  receipt_date: string | null;
+  vendor: string | null;
+  amount_gross: number | null;
+  file_url: string | null;
 }
 
 interface ReceiptAssignmentModalProps {
@@ -38,15 +42,6 @@ interface ReceiptAssignmentModalProps {
   onUploadNew: () => void;
 }
 
-// Mock receipts for demonstration
-const mockReceipts: Receipt[] = [
-  { id: '1', date: new Date('2025-01-15'), vendor: 'Amazon', amount: 47.99 },
-  { id: '2', date: new Date('2025-01-14'), vendor: 'MediaMarkt', amount: 299.00 },
-  { id: '3', date: new Date('2025-01-12'), vendor: 'IKEA', amount: 156.80 },
-  { id: '4', date: new Date('2025-01-10'), vendor: 'Bauhaus', amount: 89.50 },
-  { id: '5', date: new Date('2025-01-08'), vendor: 'Office Depot', amount: 234.00 },
-];
-
 export function ReceiptAssignmentModal({
   open,
   onOpenChange,
@@ -54,25 +49,71 @@ export function ReceiptAssignmentModal({
   onAssign,
   onUploadNew,
 }: ReceiptAssignmentModalProps) {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
+
+  // Fetch unassigned receipts
+  const { data: receipts, isLoading } = useQuery({
+    queryKey: ['unassigned-receipts', transaction?.amount],
+    queryFn: async () => {
+      if (!user?.id || !transaction) return [];
+
+      const { data, error } = await supabase
+        .from('receipts')
+        .select('id, receipt_date, vendor, amount_gross, file_url')
+        .eq('user_id', user.id)
+        .is('bank_transaction_id', null)
+        .order('receipt_date', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      return data as Receipt[];
+    },
+    enabled: open && !!user?.id && !!transaction,
+  });
 
   if (!transaction) return null;
 
   // Filter receipts by search and similar amount (±10%)
-  const filteredReceipts = mockReceipts.filter((receipt) => {
-    const matchesSearch = receipt.vendor.toLowerCase().includes(searchQuery.toLowerCase());
-    const amountDiff = Math.abs(receipt.amount - Math.abs(transaction.amount));
+  const filteredReceipts = (receipts || []).filter((receipt) => {
+    // Search filter
+    const matchesSearch = !searchQuery || 
+      (receipt.vendor?.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    // Amount filter - within 10%
+    if (receipt.amount_gross === null) return matchesSearch;
+    
+    const amountDiff = Math.abs(receipt.amount_gross - Math.abs(transaction.amount));
     const withinRange = amountDiff <= Math.abs(transaction.amount) * 0.1;
+    
     return matchesSearch && withinRange;
   });
 
-  const handleAssign = () => {
+  // Also show all receipts that don't match the amount criteria
+  const otherReceipts = (receipts || []).filter((receipt) => {
+    const matchesSearch = !searchQuery || 
+      (receipt.vendor?.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    if (receipt.amount_gross === null) return false;
+    
+    const amountDiff = Math.abs(receipt.amount_gross - Math.abs(transaction.amount));
+    const withinRange = amountDiff <= Math.abs(transaction.amount) * 0.1;
+    
+    return matchesSearch && !withinRange;
+  });
+
+  const handleAssign = async () => {
     if (selectedReceipt) {
-      onAssign(transaction.id, selectedReceipt);
-      setSelectedReceipt(null);
-      setSearchQuery('');
-      onOpenChange(false);
+      setIsAssigning(true);
+      try {
+        await onAssign(transaction.id, selectedReceipt);
+      } finally {
+        setIsAssigning(false);
+        setSelectedReceipt(null);
+        setSearchQuery('');
+      }
     }
   };
 
@@ -80,6 +121,14 @@ export function ReceiptAssignmentModal({
     setSelectedReceipt(null);
     setSearchQuery('');
     onOpenChange(false);
+  };
+
+  const formatAmount = (amount: number | null) => {
+    if (amount === null) return '–';
+    return new Intl.NumberFormat('de-AT', { 
+      style: 'currency', 
+      currency: 'EUR' 
+    }).format(amount);
   };
 
   return (
@@ -116,8 +165,21 @@ export function ReceiptAssignmentModal({
         </div>
 
         {/* Receipt List */}
-        <div className="flex-1 overflow-y-auto min-h-[200px] space-y-2">
-          {filteredReceipts.length === 0 ? (
+        <div className="flex-1 overflow-y-auto min-h-[200px] space-y-4">
+          {isLoading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3 p-3 rounded-lg border">
+                  <Skeleton className="h-12 w-12 rounded" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                  <Skeleton className="h-4 w-16" />
+                </div>
+              ))}
+            </div>
+          ) : filteredReceipts.length === 0 && otherReceipts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
               <p>Keine passenden Belege gefunden</p>
@@ -125,34 +187,83 @@ export function ReceiptAssignmentModal({
             </div>
           ) : (
             <RadioGroup value={selectedReceipt || ''} onValueChange={setSelectedReceipt}>
-              {filteredReceipts.map((receipt) => (
-                <div
-                  key={receipt.id}
-                  className={cn(
-                    'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
-                    selectedReceipt === receipt.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                  )}
-                  onClick={() => setSelectedReceipt(receipt.id)}
-                >
-                  <RadioGroupItem value={receipt.id} id={receipt.id} />
-                  <div className="h-12 w-12 bg-muted rounded flex items-center justify-center flex-shrink-0">
-                    <FileText className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <Label htmlFor={receipt.id} className="font-medium cursor-pointer">
-                      {receipt.vendor}
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {format(receipt.date, 'dd.MM.yyyy', { locale: de })}
-                    </p>
-                  </div>
-                  <div className="font-semibold">
-                    {new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(receipt.amount)}
-                  </div>
+              {/* Matching receipts */}
+              {filteredReceipts.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Vorgeschlagen (±10% Betrag)
+                  </p>
+                  {filteredReceipts.map((receipt) => (
+                    <div
+                      key={receipt.id}
+                      className={cn(
+                        'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                        selectedReceipt === receipt.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      )}
+                      onClick={() => setSelectedReceipt(receipt.id)}
+                    >
+                      <RadioGroupItem value={receipt.id} id={receipt.id} />
+                      <div className="h-12 w-12 bg-muted rounded flex items-center justify-center flex-shrink-0">
+                        <FileText className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <Label htmlFor={receipt.id} className="font-medium cursor-pointer">
+                          {receipt.vendor || 'Unbekannter Lieferant'}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {receipt.receipt_date 
+                            ? format(new Date(receipt.receipt_date), 'dd.MM.yyyy', { locale: de })
+                            : 'Kein Datum'}
+                        </p>
+                      </div>
+                      <div className="font-semibold">
+                        {formatAmount(receipt.amount_gross)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+
+              {/* Other receipts */}
+              {otherReceipts.length > 0 && (
+                <div className="space-y-2 mt-4">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Weitere Belege
+                  </p>
+                  {otherReceipts.slice(0, 10).map((receipt) => (
+                    <div
+                      key={receipt.id}
+                      className={cn(
+                        'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                        selectedReceipt === receipt.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      )}
+                      onClick={() => setSelectedReceipt(receipt.id)}
+                    >
+                      <RadioGroupItem value={receipt.id} id={receipt.id} />
+                      <div className="h-12 w-12 bg-muted rounded flex items-center justify-center flex-shrink-0">
+                        <FileText className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <Label htmlFor={receipt.id} className="font-medium cursor-pointer">
+                          {receipt.vendor || 'Unbekannter Lieferant'}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {receipt.receipt_date 
+                            ? format(new Date(receipt.receipt_date), 'dd.MM.yyyy', { locale: de })
+                            : 'Kein Datum'}
+                        </p>
+                      </div>
+                      <div className="font-semibold text-muted-foreground">
+                        {formatAmount(receipt.amount_gross)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </RadioGroup>
           )}
         </div>
@@ -167,10 +278,17 @@ export function ReceiptAssignmentModal({
           </Button>
           <Button 
             onClick={handleAssign} 
-            disabled={!selectedReceipt}
+            disabled={!selectedReceipt || isAssigning}
             className="sm:order-3"
           >
-            Zuordnen
+            {isAssigning ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Zuordne...
+              </>
+            ) : (
+              'Zuordnen'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
