@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
+import Review from "./pages/Review";
 import Expenses from "./pages/Expenses";
 import BankImport from "./pages/BankImport";
 import Reconciliation from "./pages/Reconciliation";
@@ -48,7 +49,7 @@ const App = () => (
               path="/review" 
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <Review />
                 </ProtectedRoute>
               } 
             />
