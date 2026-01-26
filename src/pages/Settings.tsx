@@ -12,7 +12,8 @@ import {
   Loader2,
   Receipt,
   CreditCard,
-  Settings2
+  Settings2,
+  Tags,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,6 +37,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CategoryManagement } from '@/components/settings/CategoryManagement';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
@@ -398,37 +401,51 @@ const Settings = () => {
           <p className="text-muted-foreground">Verwalte deine Kontoeinstellungen und Präferenzen</p>
         </div>
 
-        {/* File Naming Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <FileText className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle>Umbenennungsregeln für Beleg-Export</CardTitle>
-                  <CardDescription>
-                    Definiere wie exportierte Belege benannt werden sollen
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Template Input */}
-              <div className="space-y-3">
-                <Label htmlFor="template">Dateiname-Vorlage</Label>
-                <Input
-                  ref={inputRef}
-                  id="template"
-                  value={settings.template}
-                  onChange={(e) => setSettings(prev => ({ ...prev, template: e.target.value }))}
-                  placeholder="{datum}_{lieferant}_{betrag}"
-                  className="font-mono"
-                />
+        {/* Tabs */}
+        <Tabs defaultValue="naming" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+            <TabsTrigger value="naming" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Umbenennung
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="gap-2">
+              <Tags className="h-4 w-4" />
+              Kategorien
+            </TabsTrigger>
+          </TabsList>
+
+          {/* File Naming Tab */}
+          <TabsContent value="naming">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <FileText className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle>Umbenennungsregeln für Beleg-Export</CardTitle>
+                      <CardDescription>
+                        Definiere wie exportierte Belege benannt werden sollen
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Template Input */}
+                  <div className="space-y-3">
+                    <Label htmlFor="template">Dateiname-Vorlage</Label>
+                    <Input
+                      ref={inputRef}
+                      id="template"
+                      value={settings.template}
+                      onChange={(e) => setSettings(prev => ({ ...prev, template: e.target.value }))}
+                      placeholder="{datum}_{lieferant}_{betrag}"
+                      className="font-mono"
+                    />
                 
                 {/* Placeholder Chips - Grouped */}
                 <div className="space-y-4">
@@ -670,6 +687,35 @@ const Settings = () => {
             </CardContent>
           </Card>
         </motion.div>
+      </TabsContent>
+
+      {/* Categories Tab */}
+      <TabsContent value="categories">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Tags className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>Ausgaben-Kategorien</CardTitle>
+                  <CardDescription>
+                    Verwalte die Kategorien für deine Belege
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <CategoryManagement />
+            </CardContent>
+          </Card>
+        </motion.div>
+      </TabsContent>
+    </Tabs>
       </div>
     </DashboardLayout>
   );

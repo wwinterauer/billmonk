@@ -189,8 +189,10 @@ export type Database = {
           created_at: string | null
           icon: string | null
           id: string
+          is_hidden: boolean | null
           is_system: boolean | null
           name: string
+          sort_order: number | null
           user_id: string | null
         }
         Insert: {
@@ -198,8 +200,10 @@ export type Database = {
           created_at?: string | null
           icon?: string | null
           id?: string
+          is_hidden?: boolean | null
           is_system?: boolean | null
           name: string
+          sort_order?: number | null
           user_id?: string | null
         }
         Update: {
@@ -207,8 +211,10 @@ export type Database = {
           created_at?: string | null
           icon?: string | null
           id?: string
+          is_hidden?: boolean | null
           is_system?: boolean | null
           name?: string
+          sort_order?: number | null
           user_id?: string | null
         }
         Relationships: [
