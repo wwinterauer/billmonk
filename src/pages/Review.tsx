@@ -387,7 +387,7 @@ const Review = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+      <div className="p-6 lg:p-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
@@ -485,9 +485,9 @@ const Review = () => {
               </CardHeader>
 
               <CardContent>
-                <div className="grid lg:grid-cols-5 gap-8">
+                <div className="grid lg:grid-cols-2 gap-8">
                   {/* Left Side - Image Preview */}
-                  <div className="lg:col-span-2">
+                  <div className="lg:col-span-1">
                     <div className="sticky top-6">
                       <div 
                         className={cn(
@@ -599,7 +599,7 @@ const Review = () => {
                   </div>
 
                   {/* Right Side - Form */}
-                  <div className="lg:col-span-3 space-y-6">
+                  <div className="lg:col-span-1 space-y-6">
                     {/* Vendor */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
