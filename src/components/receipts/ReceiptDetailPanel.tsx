@@ -6,7 +6,6 @@ import {
   ExternalLink,
   Loader2,
   Sparkles,
-  Info,
   FileText,
   ZoomIn,
   ZoomOut,
@@ -20,6 +19,12 @@ import {
   Check,
   RotateCcw,
   Copy,
+  Building,
+  Hash,
+  CalendarIcon as CalendarIconLucide,
+  Euro,
+  Percent,
+  MousePointer,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,9 +71,12 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
@@ -112,6 +120,18 @@ const PAYMENT_METHODS = [
   { value: 'Lastschrift', label: 'Lastschrift' },
 ];
 
+// Fields that can be selectively re-analyzed by AI
+const REANALYZABLE_FIELDS = [
+  { id: 'vendor', label: 'Lieferant', icon: Building },
+  { id: 'invoice_number', label: 'Rechnungsnummer', icon: Hash },
+  { id: 'receipt_date', label: 'Datum', icon: CalendarIconLucide },
+  { id: 'amount_gross', label: 'Bruttobetrag', icon: Euro },
+  { id: 'amount_net', label: 'Nettobetrag', icon: Euro },
+  { id: 'vat_rate', label: 'MwSt-Satz', icon: Percent },
+  { id: 'vat_amount', label: 'Vorsteuer', icon: Percent },
+  { id: 'description', label: 'Beschreibung', icon: FileText },
+] as const;
+
 export function ReceiptDetailPanel({ 
   receiptId, 
   open, 
@@ -139,6 +159,11 @@ export function ReceiptDetailPanel({
   const [hasUnsavedAiChanges, setHasUnsavedAiChanges] = useState(false);
   const [changedFields, setChangedFields] = useState<Record<string, { old: string; new: string }>>({});
   const [currentAiConfidence, setCurrentAiConfidence] = useState<number | null>(null);
+  
+  // Selective field reanalysis state
+  const [showFieldSelectDialog, setShowFieldSelectDialog] = useState(false);
+  const [selectedReanalysisFields, setSelectedReanalysisFields] = useState<string[]>([]);
+  const [showFullReanalyzeConfirm, setShowFullReanalyzeConfirm] = useState(false);
 
   // Filename editing state
   const [isEditingFilename, setIsEditingFilename] = useState(false);
@@ -464,9 +489,10 @@ export function ReceiptDetailPanel({
     toast({ title: 'Dateiname kopiert' });
   }, [displayFilename, toast]);
 
-  // AI Re-run handler
-  const handleRerunAI = async () => {
+  // AI Re-run handler - supports selective field reanalysis
+  const reanalyzeFields = async (fieldsToUpdate: string[]) => {
     if (!receipt?.file_url || isRerunning || !signedUrl || !user) return;
+    if (fieldsToUpdate.length === 0) return;
 
     setIsRerunning(true);
     setHasUnsavedAiChanges(false);
@@ -490,80 +516,46 @@ export function ReceiptDetailPanel({
         throw new Error('KI-Erkennung hat keine Daten zurückgegeben');
       }
 
-      // 3. Match or create vendor based on detected name
-      const vendorName = normalized.vendor_brand || normalized.vendor;
-      const matchedVendor = await matchOrCreateVendor(vendorName, user.id);
-
-      // 4. Track changed fields
+      // 3. Track changed fields
       const changes: Record<string, { old: string; new: string }> = {};
       
-      const compareAndUpdate = (field: string, oldVal: string, newVal: string | null, setter: (val: string) => void) => {
+      const shouldUpdate = (fieldId: string) => fieldsToUpdate.includes(fieldId);
+      
+      const compareAndUpdate = (fieldId: string, displayName: string, oldVal: string, newVal: string | null, setter: (val: string) => void) => {
+        if (!shouldUpdate(fieldId)) return;
         const newValue = newVal || '';
         if (oldVal !== newValue && newValue) {
-          changes[field] = { old: oldVal, new: newValue };
+          changes[displayName] = { old: oldVal || '-', new: newValue };
           setter(newValue);
         }
       };
 
-      compareAndUpdate('Lieferant (rechtlich)', vendor, normalized.vendor, setVendor);
-      compareAndUpdate('Markenname', vendorBrand, normalized.vendor_brand, setVendorBrand);
-      compareAndUpdate('Beschreibung', description, normalized.description, setDescription);
-      compareAndUpdate('Rechnungsnummer', invoiceNumber, normalized.invoice_number, setInvoiceNumber);
-      compareAndUpdate('Zahlungsart', paymentMethod, normalized.payment_method, setPaymentMethod);
-      
-      // Apply vendor matching: set vendor_id and use display_name
-      if (matchedVendor) {
-        setSelectedVendorId(matchedVendor.id);
-        if (matchedVendor.display_name !== vendor) {
-          compareAndUpdate('Lieferant', vendor, matchedVendor.display_name, setVendor);
-        }
+      // Update vendor if selected
+      if (shouldUpdate('vendor')) {
+        const vendorName = normalized.vendor_brand || normalized.vendor;
+        const matchedVendor = await matchOrCreateVendor(vendorName, user.id);
         
-        // Vendor default category ALWAYS takes precedence when set
-        if (matchedVendor.default_category) {
-          const categoryName = matchedVendor.default_category.name;
-          if (category !== categoryName) {
-            changes['Kategorie'] = { old: category || '-', new: `${categoryName} (Lieferanten-Standard)` };
-            setCategory(categoryName);
+        if (matchedVendor) {
+          setSelectedVendorId(matchedVendor.id);
+          if (matchedVendor.display_name !== vendor) {
+            changes['Lieferant'] = { old: vendor || '-', new: matchedVendor.display_name };
+            setVendor(matchedVendor.display_name);
+          }
+          if (normalized.vendor_brand) {
+            setVendorBrand(normalized.vendor_brand);
           }
         } else {
-          compareAndUpdate('Kategorie', category, normalized.category, setCategory);
-        }
-        
-        // Apply vendor default VAT rate if AI didn't detect one
-        if (matchedVendor.default_vat_rate !== null && normalized.vat_rate === null) {
-          const newRate = matchedVendor.default_vat_rate.toString();
-          if (vatRate !== newRate) {
-            changes['MwSt-Satz'] = { old: vatRate || '-', new: `${newRate}% (Lieferanten-Standard)` };
-            setVatRate(newRate);
-          }
-        } else if (normalized.vat_rate !== null) {
-          const newRate = normalized.vat_rate.toString();
-          if (vatRate !== newRate) {
-            changes['MwSt-Satz'] = { old: vatRate || '-', new: newRate + '%' };
-            setVatRate(newRate);
-          }
-        }
-      } else {
-        // No vendor matched - use AI values directly
-        compareAndUpdate('Kategorie', category, normalized.category, setCategory);
-        if (normalized.vat_rate !== null) {
-          const newRate = normalized.vat_rate.toString();
-          if (vatRate !== newRate) {
-            changes['MwSt-Satz'] = { old: vatRate || '-', new: newRate + '%' };
-            setVatRate(newRate);
+          compareAndUpdate('vendor', 'Lieferant', vendor, normalized.vendor, setVendor);
+          if (normalized.vendor_brand) {
+            setVendorBrand(normalized.vendor_brand);
           }
         }
       }
+
+      compareAndUpdate('description', 'Beschreibung', description, normalized.description, setDescription);
+      compareAndUpdate('invoice_number', 'Rechnungsnummer', invoiceNumber, normalized.invoice_number, setInvoiceNumber);
       
-      if (normalized.amount_gross !== null) {
-        const newAmount = normalized.amount_gross.toString();
-        if (amountGross !== newAmount) {
-          changes['Bruttobetrag'] = { old: amountGross || '-', new: newAmount };
-          setAmountGross(newAmount);
-        }
-      }
-      
-      if (normalized.receipt_date) {
+      if (shouldUpdate('receipt_date') && normalized.receipt_date) {
         const newDate = new Date(normalized.receipt_date);
         const oldDateStr = receiptDate ? format(receiptDate, 'dd.MM.yyyy') : '-';
         const newDateStr = format(newDate, 'dd.MM.yyyy');
@@ -572,8 +564,24 @@ export function ReceiptDetailPanel({
           setReceiptDate(newDate);
         }
       }
+      
+      if (shouldUpdate('amount_gross') && normalized.amount_gross !== null) {
+        const newAmount = normalized.amount_gross.toString();
+        if (amountGross !== newAmount) {
+          changes['Bruttobetrag'] = { old: amountGross || '-', new: newAmount };
+          setAmountGross(newAmount);
+        }
+      }
+      
+      if (shouldUpdate('vat_rate') && normalized.vat_rate !== null) {
+        const newRate = normalized.vat_rate.toString();
+        if (vatRate !== newRate) {
+          changes['MwSt-Satz'] = { old: vatRate || '-', new: newRate + '%' };
+          setVatRate(newRate);
+        }
+      }
 
-      // 5. Update confidence
+      // 4. Update confidence
       setCurrentAiConfidence(normalized.confidence);
       
       if (Object.keys(changes).length > 0) {
@@ -597,6 +605,16 @@ export function ReceiptDetailPanel({
       setIsRerunning(false);
     }
   };
+
+  // Reanalyze only fields that haven't been manually modified
+  const reanalyzeUnmodifiedFields = () => {
+    const modifiedFields = receipt?.user_modified_fields || [];
+    const unmodifiedFields = REANALYZABLE_FIELDS
+      .map(f => f.id)
+      .filter(id => !modifiedFields.includes(id));
+    reanalyzeFields(unmodifiedFields);
+  };
+
 
   // Fields that are tracked for manual modifications
   const TRACKABLE_FIELDS = [
@@ -889,7 +907,7 @@ export function ReceiptDetailPanel({
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button 
-                          variant="ghost" 
+                          variant="outline" 
                           size="sm" 
                           disabled={isRerunning || fileLoading}
                           className="gap-1"
@@ -899,18 +917,55 @@ export function ReceiptDetailPanel({
                           ) : (
                             <RefreshCw className="h-4 w-4" />
                           )}
-                          <ChevronDown className="h-3 w-3" />
+                          KI-Analyse
+                          <ChevronDown className="h-3 w-3 ml-1" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={handleRerunAI} disabled={isRerunning}>
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          Erneut analysieren
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem onClick={() => setShowFieldSelectDialog(true)}>
+                          <MousePointer className="h-4 w-4 mr-2" />
+                          Felder auswählen...
                         </DropdownMenuItem>
+                        
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                          <Info className="h-4 w-4 mr-2" />
-                          Verwendet Lovable AI
+                        
+                        <DropdownMenuItem onClick={() => reanalyzeFields(['invoice_number'])}>
+                          <Hash className="h-4 w-4 mr-2" />
+                          Nur Rechnungsnummer
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => reanalyzeFields(['amount_gross', 'amount_net', 'vat_amount', 'vat_rate'])}>
+                          <Euro className="h-4 w-4 mr-2" />
+                          Nur Beträge
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => reanalyzeFields(['receipt_date'])}>
+                          <CalendarIconLucide className="h-4 w-4 mr-2" />
+                          Nur Datum
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => reanalyzeFields(['description'])}>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Nur Beschreibung
+                        </DropdownMenuItem>
+                        
+                        <DropdownMenuSeparator />
+                        
+                        <DropdownMenuItem onClick={reanalyzeUnmodifiedFields}>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Nur unveränderte Felder
+                          {(receipt.user_modified_fields?.length || 0) > 0 && (
+                            <Badge variant="outline" className="ml-auto text-xs">
+                              {REANALYZABLE_FIELDS.length - (receipt.user_modified_fields?.length || 0)}
+                            </Badge>
+                          )}
+                        </DropdownMenuItem>
+                        
+                        <DropdownMenuSeparator />
+                        
+                        <DropdownMenuItem 
+                          onClick={() => setShowFullReanalyzeConfirm(true)} 
+                          className="text-orange-600 focus:text-orange-600"
+                        >
+                          <AlertTriangle className="h-4 w-4 mr-2" />
+                          Alles neu (überschreibt Korrekturen)
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -1336,6 +1391,148 @@ export function ReceiptDetailPanel({
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Field Selection Dialog for Re-analysis */}
+      <Dialog open={showFieldSelectDialog} onOpenChange={setShowFieldSelectDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Felder neu analysieren</DialogTitle>
+            <DialogDescription>
+              Wähle die Felder die neu erkannt werden sollen.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <div className="grid grid-cols-2 gap-2">
+              {REANALYZABLE_FIELDS.map(field => {
+                const Icon = field.icon;
+                const currentValue = receipt?.[field.id as keyof Receipt];
+                const isModified = receipt?.user_modified_fields?.includes(field.id);
+                const isSelected = selectedReanalysisFields.includes(field.id);
+                
+                return (
+                  <button
+                    key={field.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedReanalysisFields(prev =>
+                        prev.includes(field.id)
+                          ? prev.filter(f => f !== field.id)
+                          : [...prev, field.id]
+                      );
+                    }}
+                    className={cn(
+                      "flex items-start gap-2 p-3 border rounded-lg text-left transition-all",
+                      isSelected 
+                        ? "border-primary bg-primary/5" 
+                        : "hover:bg-muted"
+                    )}
+                  >
+                    <Checkbox 
+                      checked={isSelected} 
+                      className="mt-0.5 pointer-events-none" 
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <Icon className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-sm font-medium">{field.label}</span>
+                        {isModified && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Pencil className="w-3 h-3 text-orange-500" />
+                            </TooltipTrigger>
+                            <TooltipContent>Manuell bearbeitet</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {currentValue?.toString() || '(leer)'}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            
+            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setSelectedReanalysisFields(REANALYZABLE_FIELDS.map(f => f.id))}
+              >
+                Alle
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setSelectedReanalysisFields([])}
+              >
+                Keine
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setSelectedReanalysisFields(
+                  REANALYZABLE_FIELDS.filter(f => !receipt?.[f.id as keyof Receipt]).map(f => f.id)
+                )}
+              >
+                Nur leere
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setSelectedReanalysisFields(
+                  REANALYZABLE_FIELDS.filter(f => !receipt?.user_modified_fields?.includes(f.id)).map(f => f.id)
+                )}
+              >
+                Nur unveränderte
+              </Button>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFieldSelectDialog(false)}>
+              Abbrechen
+            </Button>
+            <Button 
+              onClick={() => {
+                reanalyzeFields(selectedReanalysisFields);
+                setShowFieldSelectDialog(false);
+              }}
+              disabled={selectedReanalysisFields.length === 0}
+            >
+              {selectedReanalysisFields.length} Feld(er) analysieren
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Full Re-analyze Confirmation */}
+      <AlertDialog open={showFullReanalyzeConfirm} onOpenChange={setShowFullReanalyzeConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="w-5 h-5" />
+              Alles neu analysieren?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              ALLE Felder werden überschrieben, auch deine manuellen Korrekturen.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                reanalyzeFields(REANALYZABLE_FIELDS.map(f => f.id));
+                setShowFullReanalyzeConfirm(false);
+              }}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              Ja, alles überschreiben
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
