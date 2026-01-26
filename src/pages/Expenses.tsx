@@ -44,6 +44,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -51,6 +52,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -259,6 +261,28 @@ const Expenses = () => {
     setDuplicateComparisonOpen(true);
   };
 
+  const markAsNotDuplicate = async (receiptId: string) => {
+    try {
+      await updateReceipt(receiptId, {
+        is_duplicate: false,
+        duplicate_of: null,
+        duplicate_score: null,
+        status: 'review'
+      } as Partial<Receipt>);
+      toast({
+        title: 'Aktualisiert',
+        description: 'Beleg ist kein Duplikat mehr',
+      });
+      loadReceipts();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Konnte Status nicht aktualisieren',
+      });
+    }
+  };
+
   // Load receipts
   const loadReceipts = async () => {
     setLoading(true);
@@ -314,12 +338,19 @@ const Expenses = () => {
   // Validate date range
   const isValidDateRange = !dateFrom || !dateTo || dateFrom <= dateTo;
 
+  // Duplicate count
+  const duplicateCount = useMemo(() => {
+    return receipts.filter(r => r.is_duplicate === true).length;
+  }, [receipts]);
+
   // Filter and sort receipts
   const filteredReceipts = useMemo(() => {
     let result = [...receipts];
 
-    // Status filter
-    if (statusFilter !== 'all') {
+    // Status filter - special handling for 'duplicate'
+    if (statusFilter === 'duplicate') {
+      result = result.filter(r => r.is_duplicate === true);
+    } else if (statusFilter !== 'all') {
       result = result.filter(r => r.status === statusFilter);
     }
 
@@ -823,9 +854,16 @@ const Expenses = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle Status</SelectItem>
-              {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+              {Object.entries(STATUS_CONFIG).filter(([key]) => key !== 'duplicate').map(([key, config]) => (
                 <SelectItem key={key} value={key}>{config.label}</SelectItem>
               ))}
+              <SelectSeparator />
+              <SelectItem value="duplicate">
+                <div className="flex items-center">
+                  <Copy className="w-4 h-4 mr-2 text-warning" />
+                  Duplikate {duplicateCount > 0 && `(${duplicateCount})`}
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
 
@@ -937,6 +975,43 @@ const Expenses = () => {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Duplicate Warning Card */}
+        {duplicateCount > 0 && statusFilter !== 'duplicate' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Card className="mb-4 border-warning/30 bg-warning/5">
+              <CardContent className="py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-warning/10 rounded-full">
+                      <Copy className="w-5 h-5 text-warning" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-warning">
+                        {duplicateCount} mögliche{duplicateCount === 1 ? 's' : ''} Duplikat{duplicateCount === 1 ? '' : 'e'} gefunden
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Überprüfe diese Belege und lösche Duplikate
+                      </p>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setStatusFilter('duplicate')}
+                    className="border-warning/30 text-warning hover:bg-warning/10"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    Alle anzeigen
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Bulk Actions */}
         {selectedIds.size > 0 && (
@@ -1223,27 +1298,65 @@ const Expenses = () => {
                           )}
                           {visibleColumns.has('status') && (
                             <TableCell>
-                              <Badge 
-                                variant="outline" 
-                                className={STATUS_CONFIG[receipt.status]?.color || ''}
-                              >
-                                {STATUS_CONFIG[receipt.status]?.label || receipt.status}
-                              </Badge>
+                              <div className="flex items-center gap-1.5">
+                                <Badge 
+                                  variant="outline" 
+                                  className={STATUS_CONFIG[receipt.status]?.color || ''}
+                                >
+                                  {STATUS_CONFIG[receipt.status]?.label || receipt.status}
+                                </Badge>
+                                {receipt.is_duplicate && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="bg-warning/10 text-warning border-warning/30 cursor-pointer text-xs"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (receipt.duplicate_of) {
+                                        openDuplicateComparison(receipt.id, receipt.duplicate_of);
+                                      }
+                                    }}
+                                  >
+                                    <Copy className="w-3 h-3 mr-1" />
+                                    {receipt.duplicate_score || 0}%
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                           )}
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
-                              {/* Duplicate indicator */}
+                              {/* Duplicate comparison button */}
                               {receipt.is_duplicate && receipt.duplicate_of && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-warning hover:text-warning"
-                                  onClick={() => openDuplicateComparison(receipt.id, receipt.duplicate_of!)}
-                                  title={`Duplikat (${receipt.duplicate_score || 0}%)`}
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-warning hover:text-warning hover:bg-warning/10"
+                                      title={`Duplikat (${receipt.duplicate_score || 0}%)`}
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => openDuplicateComparison(receipt.id, receipt.duplicate_of!)}>
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      Mit Original vergleichen
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => markAsNotDuplicate(receipt.id)}>
+                                      <X className="h-4 w-4 mr-2" />
+                                      Kein Duplikat
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                      className="text-destructive"
+                                      onClick={() => handleDeleteClick(receipt.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Duplikat löschen
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               )}
                               <Button
                                 variant="ghost"

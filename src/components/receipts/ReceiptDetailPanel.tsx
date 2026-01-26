@@ -892,6 +892,35 @@ export function ReceiptDetailPanel({
                 {/* Scrollable Form Area */}
                 <ScrollArea className="flex-1">
                   <div className="p-4 space-y-4">
+                    {/* Duplicate Warning */}
+                    {receipt?.is_duplicate && receipt?.duplicate_of && (
+                      <Alert className="bg-warning/10 border-warning/30">
+                        <Copy className="h-4 w-4 text-warning" />
+                        <AlertDescription className="text-warning">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">Mögliches Duplikat</p>
+                              <p className="text-sm opacity-80">
+                                {receipt.duplicate_score || 0}% Übereinstimmung mit einem anderen Beleg
+                              </p>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="border-warning/30 text-warning hover:bg-warning/10"
+                              onClick={() => {
+                                if (receipt.duplicate_of) {
+                                  window.location.href = `/expenses?duplicateCompare=${receipt.id}&original=${receipt.duplicate_of}`;
+                                }
+                              }}
+                            >
+                              Vergleichen
+                            </Button>
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
                     {/* Unsaved AI Changes Alert */}
                     {hasUnsavedAiChanges && Object.keys(changedFields).length > 0 && (
                       <Alert className="bg-amber-50 border-amber-200">
