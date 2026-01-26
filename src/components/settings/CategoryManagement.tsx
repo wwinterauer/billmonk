@@ -31,7 +31,6 @@ import {
   Wifi,
   Zap,
   FileText,
-  AlertCircle,
   RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -529,17 +528,15 @@ export function CategoryManagement() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      {!category.is_system && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDeleteClick(category)}
-                          title="Löschen"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteClick(category)}
+                        title="Löschen"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -684,18 +681,13 @@ export function CategoryManagement() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {selectedCategory?.is_system 
-                ? 'Standard-Kategorie kann nicht gelöscht werden'
+              {selectedCategory?.receipt_count && selectedCategory.receipt_count > 0
+                ? `Kategorie "${selectedCategory?.name}" wird verwendet`
                 : `Kategorie "${selectedCategory?.name}" löschen?`
               }
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {selectedCategory?.is_system ? (
-                <span className="flex items-start gap-2">
-                  <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                  Standard-Kategorien können nicht gelöscht werden. Du kannst sie aber ausblenden.
-                </span>
-              ) : selectedCategory?.receipt_count && selectedCategory.receipt_count > 0 ? (
+              {selectedCategory?.receipt_count && selectedCategory.receipt_count > 0 ? (
                 <div className="space-y-3">
                   <p>
                     Diese Kategorie wird von <strong>{selectedCategory.receipt_count} Beleg(en)</strong> verwendet.
@@ -732,29 +724,20 @@ export function CategoryManagement() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            {selectedCategory?.is_system ? (
-              <Button onClick={() => {
-                handleToggleVisibility(selectedCategory);
-                setDeleteDialogOpen(false);
-              }}>
-                Stattdessen ausblenden
-              </Button>
-            ) : (
-              <AlertDialogAction
-                onClick={handleDelete}
-                className="bg-destructive hover:bg-destructive/90"
-                disabled={
-                  saving || 
-                  (selectedCategory?.receipt_count && selectedCategory.receipt_count > 0 && !reassignCategory)
-                }
-              >
-                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {selectedCategory?.receipt_count && selectedCategory.receipt_count > 0 
-                  ? 'Verschieben & Löschen' 
-                  : 'Löschen'
-                }
-              </AlertDialogAction>
-            )}
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={
+                saving || 
+                (selectedCategory?.receipt_count && selectedCategory.receipt_count > 0 && !reassignCategory)
+              }
+            >
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {selectedCategory?.receipt_count && selectedCategory.receipt_count > 0 
+                ? 'Verschieben & Löschen' 
+                : 'Löschen'
+              }
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
