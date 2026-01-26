@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
+import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { supabase } from '@/integrations/supabase/client';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -59,7 +61,7 @@ type SortOption = 'receipt_count_desc' | 'receipt_count_asc' | 'total_amount_des
 type AdditionalFilter = 'all' | 'with_category' | 'without_category' | 'with_vat' | 'multiple_variants';
 
 export function VendorManagement() {
-  const { vendors, loading, addVendor, updateVendor, deleteVendor } = useVendors();
+  const { vendors, loading, addVendor, updateVendor, deleteVendor, fetchVendors } = useVendors();
   const { categories } = useCategories();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
@@ -82,6 +84,15 @@ export function VendorManagement() {
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [isBulkCategoryOpen, setIsBulkCategoryOpen] = useState(false);
   const [bulkCategoryId, setBulkCategoryId] = useState('');
+
+  // Delete dialog state
+  const [deleteOption, setDeleteOption] = useState<'keep' | 'move'>('keep');
+  const [moveToVendorId, setMoveToVendorId] = useState('');
+
+  // Merge dialog state
+  const [isMergeOpen, setIsMergeOpen] = useState(false);
+  const [mergeTargetId, setMergeTargetId] = useState('');
+  const [isMerging, setIsMerging] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -187,12 +198,92 @@ export function VendorManagement() {
     if (!deleteConfirmVendor) return;
 
     try {
+      // Handle receipts based on user choice
+      if (deleteConfirmVendor.receipt_count > 0) {
+        if (deleteOption === 'move' && moveToVendorId) {
+          // Move receipts to another vendor
+          await supabase
+            .from('receipts')
+            .update({ vendor_id: moveToVendorId })
+            .eq('vendor_id', deleteConfirmVendor.id);
+        } else {
+          // Keep receipts, just remove vendor link
+          await supabase
+            .from('receipts')
+            .update({ vendor_id: null })
+            .eq('vendor_id', deleteConfirmVendor.id);
+        }
+      }
+
       await deleteVendor(deleteConfirmVendor.id);
       toast.success('Lieferant gelöscht');
       setDeleteConfirmVendor(null);
+      setDeleteOption('keep');
+      setMoveToVendorId('');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Fehler beim Löschen');
     }
+  };
+
+  const handleMerge = async () => {
+    if (!mergeTargetId || selectedVendors.length < 2) return;
+
+    setIsMerging(true);
+    try {
+      const targetVendor = vendors.find(v => v.id === mergeTargetId);
+      const sourceVendors = vendors.filter(v => selectedVendors.includes(v.id) && v.id !== mergeTargetId);
+
+      if (!targetVendor) {
+        throw new Error('Ziel-Lieferant nicht gefunden');
+      }
+
+      // Collect all detected_names
+      const allDetectedNames = [
+        ...targetVendor.detected_names,
+        ...sourceVendors.flatMap(v => v.detected_names),
+        ...sourceVendors.map(v => v.display_name) // Add display names as detected names
+      ];
+      const uniqueNames = [...new Set(allDetectedNames)];
+
+      // Update target vendor with combined detected_names
+      await supabase
+        .from('vendors')
+        .update({ detected_names: uniqueNames })
+        .eq('id', mergeTargetId);
+
+      // Move all receipts from source vendors to target
+      for (const source of sourceVendors) {
+        await supabase
+          .from('receipts')
+          .update({ vendor_id: mergeTargetId })
+          .eq('vendor_id', source.id);
+      }
+
+      // Delete source vendors
+      await supabase
+        .from('vendors')
+        .delete()
+        .in('id', sourceVendors.map(v => v.id));
+
+      toast.success(`${sourceVendors.length + 1} Lieferanten zusammengeführt`);
+      setIsMergeOpen(false);
+      setMergeTargetId('');
+      setSelectedVendors([]);
+      fetchVendors(); // Refresh data
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Fehler beim Zusammenführen');
+    } finally {
+      setIsMerging(false);
+    }
+  };
+
+  const openMergeDialog = () => {
+    if (selectedVendors.length < 2) {
+      toast.error('Bitte wähle mindestens 2 Lieferanten zum Zusammenführen');
+      return;
+    }
+    setMergeTargetId('');
+    setIsMergeOpen(true);
   };
 
   const getCategory = (categoryId: string | null): Category | null => {
@@ -484,6 +575,12 @@ export function VendorManagement() {
                 {selectedVendors.length} ausgewählt
               </span>
               <div className="flex-1" />
+              {selectedVendors.length >= 2 && (
+                <Button variant="outline" size="sm" onClick={openMergeDialog}>
+                  <Merge className="w-4 h-4 mr-1" />
+                  Zusammenführen
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => setIsBulkCategoryOpen(true)}>
                 <Tag className="w-4 h-4 mr-1" />
                 Kategorie setzen
@@ -919,29 +1016,138 @@ export function VendorManagement() {
       </Dialog>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteConfirmVendor} onOpenChange={() => setDeleteConfirmVendor(null)}>
+      <AlertDialog open={!!deleteConfirmVendor} onOpenChange={(open) => {
+        if (!open) {
+          setDeleteConfirmVendor(null);
+          setDeleteOption('keep');
+          setMoveToVendorId('');
+        }
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Lieferant löschen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Möchtest du den Lieferanten "{deleteConfirmVendor?.display_name}" wirklich löschen?
-              {deleteConfirmVendor?.receipt_count && deleteConfirmVendor.receipt_count > 0 && (
-                <span className="block mt-2 text-amber-600">
-                  <AlertCircle className="h-4 w-4 inline mr-1" />
-                  Dieser Lieferant ist mit {deleteConfirmVendor.receipt_count} Beleg(en) verknüpft.
-                  Die Belege bleiben erhalten, aber der Lieferant wird entfernt.
-                </span>
-              )}
+            <AlertDialogTitle>Lieferant löschen</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                {deleteConfirmVendor?.receipt_count && deleteConfirmVendor.receipt_count > 0 ? (
+                  <div className="space-y-4">
+                    <p>
+                      Dieser Lieferant hat <strong>{deleteConfirmVendor.receipt_count} Belege</strong>. 
+                      Was soll mit diesen passieren?
+                    </p>
+
+                    <RadioGroup value={deleteOption} onValueChange={(v) => setDeleteOption(v as 'keep' | 'move')}>
+                      <div className="flex items-start space-x-2">
+                        <RadioGroupItem value="keep" id="keep" className="mt-1" />
+                        <Label htmlFor="keep" className="font-normal cursor-pointer">
+                          Belege behalten (Lieferant-Text bleibt, Verknüpfung wird entfernt)
+                        </Label>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <RadioGroupItem value="move" id="move" className="mt-1" />
+                        <Label htmlFor="move" className="font-normal cursor-pointer">
+                          Belege anderem Lieferanten zuordnen
+                        </Label>
+                      </div>
+                    </RadioGroup>
+
+                    {deleteOption === 'move' && (
+                      <Select value={moveToVendorId} onValueChange={setMoveToVendorId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Ziel-Lieferant wählen..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vendors
+                            .filter(v => v.id !== deleteConfirmVendor.id)
+                            .map(v => (
+                              <SelectItem key={v.id} value={v.id}>
+                                {v.display_name} ({v.receipt_count} Belege)
+                              </SelectItem>
+                            ))
+                          }
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                ) : (
+                  <p>Möchtest du "{deleteConfirmVendor?.display_name}" wirklich löschen?</p>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteOption === 'move' && !moveToVendorId}
+            >
               Löschen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Merge Dialog */}
+      <Dialog open={isMergeOpen} onOpenChange={(open) => {
+        if (!open) {
+          setIsMergeOpen(false);
+          setMergeTargetId('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lieferanten zusammenführen</DialogTitle>
+            <DialogDescription>
+              {selectedVendors.length} Lieferanten werden zusammengeführt. 
+              Wähle den Namen der beibehalten werden soll.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label>Ziel-Lieferant (wird beibehalten)</Label>
+              <Select value={mergeTargetId} onValueChange={setMergeTargetId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Lieferant wählen..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendors
+                    .filter(v => selectedVendors.includes(v.id))
+                    .map(v => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.display_name} ({v.receipt_count} Belege)
+                      </SelectItem>
+                    ))
+                  }
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground font-medium">Nach dem Zusammenführen:</p>
+              <ul className="text-sm text-muted-foreground mt-2 space-y-1">
+                <li>• Alle erkannten Varianten werden kombiniert</li>
+                <li>• Alle Belege werden dem Ziel zugeordnet</li>
+                <li>• Die anderen Lieferanten werden gelöscht</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsMergeOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleMerge} disabled={!mergeTargetId || isMerging}>
+              {isMerging ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+              ) : (
+                <Merge className="h-4 w-4 mr-2" />
+              )}
+              Zusammenführen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
