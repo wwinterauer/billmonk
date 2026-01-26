@@ -31,7 +31,7 @@ const TRUNCATE_OPTIONS = [
   { value: '...', label: '... (drei Punkte)' },
   { value: ' etc.', label: ' etc.' },
   { value: ' u.a.', label: ' u.a.' },
-  { value: '', label: '(nichts)' },
+  { value: '__none__', label: '(nichts)' },
 ];
 
 const SAMPLE_ITEMS = [
@@ -214,8 +214,8 @@ export function DescriptionSettings() {
       <div className="space-y-2">
         <Label>Kürzungs-Anzeige</Label>
         <Select
-          value={settings.truncate_suffix}
-          onValueChange={(value) => updateSetting('truncate_suffix', value)}
+          value={settings.truncate_suffix === '' ? '__none__' : settings.truncate_suffix}
+          onValueChange={(value) => updateSetting('truncate_suffix', value === '__none__' ? '' : value)}
         >
           <SelectTrigger className="w-[200px]">
             <SelectValue />
