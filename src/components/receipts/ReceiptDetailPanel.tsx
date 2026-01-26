@@ -257,14 +257,9 @@ export function ReceiptDetailPanel({
           className="w-full sm:max-w-[800px] p-0 flex flex-col"
         >
           <SheetHeader className="px-6 py-4 border-b">
-            <div className="flex items-center justify-between">
-              <SheetTitle className="text-lg font-semibold">
-                {loading ? 'Beleg laden...' : 'Beleg-Details'}
-              </SheetTitle>
-              <Button variant="ghost" size="icon" onClick={onClose}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <SheetTitle className="text-lg font-semibold">
+              {loading ? 'Beleg laden...' : 'Beleg-Details'}
+            </SheetTitle>
           </SheetHeader>
 
           {loading ? (
@@ -319,29 +314,58 @@ export function ReceiptDetailPanel({
                         </div>
                       ) : fileUrl ? (
                         isImage ? (
-                          <img
-                            src={fileUrl}
-                            alt={receipt.file_name || 'Beleg'}
-                            className={cn(
-                              "transition-transform duration-300",
-                              isZoomed ? "scale-150" : "max-w-full max-h-[500px] object-contain"
+                          <>
+                            <img
+                              src={fileUrl}
+                              alt={receipt.file_name || 'Beleg'}
+                              className={cn(
+                                "transition-transform duration-300",
+                                isZoomed ? "scale-150" : "max-w-full max-h-[500px] object-contain"
+                              )}
+                              crossOrigin="anonymous"
+                              onError={() => {
+                                setFileError('Bild konnte nicht geladen werden');
+                                setFileUrl(null);
+                              }}
+                            />
+                            {!isZoomed && (
+                              <div className="absolute bottom-2 right-2 bg-background/80 rounded p-1">
+                                <ZoomIn className="h-4 w-4 text-muted-foreground" />
+                              </div>
                             )}
-                            crossOrigin="anonymous"
-                            onError={() => {
-                              setFileError('Bild konnte nicht geladen werden');
-                              setFileUrl(null);
-                            }}
-                          />
+                          </>
                         ) : isPdf ? (
-                          <iframe
-                            src={fileUrl}
-                            className="w-full h-[500px] border-0"
-                            title="PDF Preview"
-                          />
+                          <div className="flex flex-col items-center justify-center h-full p-8">
+                            <FileText className="h-20 w-20 text-muted-foreground mb-4" />
+                            <p className="text-foreground font-medium mb-2">{receipt.file_name}</p>
+                            <p className="text-muted-foreground text-sm mb-6">PDF-Vorschau nicht verfügbar</p>
+                            <div className="flex gap-2">
+                              <Button variant="outline" size="sm" asChild>
+                                <a href={fileUrl} download={receipt.file_name} target="_blank" rel="noopener noreferrer">
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Herunterladen
+                                </a>
+                              </Button>
+                              <Button variant="outline" size="sm" asChild>
+                                <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+                                  <ExternalLink className="h-4 w-4 mr-2" />
+                                  In neuem Tab öffnen
+                                </a>
+                              </Button>
+                            </div>
+                          </div>
                         ) : (
                           <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
                             <FileText className="h-16 w-16" />
                             <p>Vorschau nicht verfügbar</p>
+                            {fileUrl && (
+                              <Button variant="outline" size="sm" asChild>
+                                <a href={fileUrl} download={receipt.file_name} target="_blank" rel="noopener noreferrer">
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Herunterladen
+                                </a>
+                              </Button>
+                            )}
                           </div>
                         )
                       ) : (
@@ -349,31 +373,6 @@ export function ReceiptDetailPanel({
                           <FileText className="h-16 w-16" />
                           <p>Keine Datei vorhanden</p>
                         </div>
-                      )}
-
-                      {isImage && !isZoomed && fileUrl && !fileLoading && !fileError && (
-                        <div className="absolute bottom-2 right-2 bg-background/80 rounded p-1">
-                          <ZoomIn className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2">
-                      {fileUrl && (
-                        <>
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={fileUrl} download={receipt.file_name} target="_blank" rel="noopener noreferrer">
-                              <Download className="h-4 w-4 mr-2" />
-                              Download
-                            </a>
-                          </Button>
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={fileUrl} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-4 w-4 mr-2" />
-                              In neuem Tab öffnen
-                            </a>
-                          </Button>
-                        </>
                       )}
                     </div>
 
