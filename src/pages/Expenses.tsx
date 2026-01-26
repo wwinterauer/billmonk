@@ -25,6 +25,10 @@ import {
   Loader2,
   RotateCcw,
   Settings2,
+  ScanSearch,
+  AlertTriangle,
+  CheckCircle,
+  GitCompare,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, startOfQuarter, endOfQuarter } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -87,6 +91,10 @@ import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Copy } from 'lucide-react';
+import { checkForDuplicates, type DuplicateCheckResult } from '@/services/duplicateDetectionService';
+import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useAuth } from '@/contexts/AuthContext';
 
 type SortField = 'receipt_date' | 'vendor' | 'invoice_number' | 'amount_gross';
 type SortDirection = 'asc' | 'desc';
@@ -159,6 +167,7 @@ const Expenses = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
+  const { user } = useAuth();
   const { getReceipts, updateReceipt, deleteReceipt, processReceiptWithAI } = useReceipts();
   const { categories } = useCategories();
 
@@ -236,6 +245,19 @@ const Expenses = () => {
     originalId: null
   });
 
+  // Manual duplicate check state
+  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
+  const [checkProgress, setCheckProgress] = useState({ current: 0, total: 0 });
+  interface FoundDuplicate {
+    duplicate: Receipt;
+    originalId: string;
+    score: number;
+    matchType: DuplicateCheckResult['matchType'];
+    matchReasons: string[];
+  }
+  const [foundDuplicates, setFoundDuplicates] = useState<FoundDuplicate[]>([]);
+  const [showDuplicateResults, setShowDuplicateResults] = useState(false);
+
   const openReceiptDetail = (id: string) => {
     setSelectedReceiptId(id);
     setDetailPanelOpen(true);
@@ -279,6 +301,154 @@ const Expenses = () => {
         variant: 'destructive',
         title: 'Fehler',
         description: 'Konnte Status nicht aktualisieren',
+      });
+    }
+  };
+
+  // Manual duplicate check function
+  const startDuplicateCheck = async () => {
+    if (!user?.id) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Benutzer nicht angemeldet',
+      });
+      return;
+    }
+
+    setIsCheckingDuplicates(true);
+    setFoundDuplicates([]);
+
+    try {
+      // Get all receipts in the selected date range that are not already marked as duplicates
+      const { data: receiptsToCheck, error } = await supabase
+        .from('receipts')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_duplicate', false)
+        .order('receipt_date', { ascending: false });
+
+      if (error) throw error;
+
+      const receiptsList = receiptsToCheck || [];
+      setCheckProgress({ current: 0, total: receiptsList.length });
+
+      const duplicatesFound: FoundDuplicate[] = [];
+
+      // Check each receipt
+      for (let i = 0; i < receiptsList.length; i++) {
+        const receipt = receiptsList[i];
+        setCheckProgress({ current: i + 1, total: receiptsList.length });
+
+        // Check for duplicates (only against older receipts)
+        const result = await checkForDuplicates(
+          user.id,
+          receipt.file_hash,
+          {
+            vendor: receipt.vendor,
+            amount_gross: receipt.amount_gross,
+            receipt_date: receipt.receipt_date,
+            invoice_number: receipt.invoice_number
+          },
+          receipt.id
+        );
+
+        if (result.isDuplicate && result.score >= 70 && result.duplicateOf) {
+          duplicatesFound.push({
+            duplicate: receipt as Receipt,
+            originalId: result.duplicateOf,
+            score: result.score,
+            matchType: result.matchType,
+            matchReasons: result.matchReasons
+          });
+
+          // Mark as duplicate in DB
+          await supabase
+            .from('receipts')
+            .update({
+              is_duplicate: true,
+              duplicate_of: result.duplicateOf,
+              duplicate_score: result.score,
+              duplicate_checked_at: new Date().toISOString()
+            })
+            .eq('id', receipt.id);
+        } else {
+          // Mark as checked
+          await supabase
+            .from('receipts')
+            .update({
+              duplicate_checked_at: new Date().toISOString()
+            })
+            .eq('id', receipt.id);
+        }
+      }
+
+      setFoundDuplicates(duplicatesFound);
+
+      if (duplicatesFound.length > 0) {
+        setShowDuplicateResults(true);
+      } else {
+        toast({
+          title: 'Keine Duplikate gefunden',
+          description: 'Alle Belege im Zeitraum sind einzigartig',
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler bei der Duplikat-Prüfung',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+      console.error(error);
+    } finally {
+      setIsCheckingDuplicates(false);
+      loadReceipts();
+    }
+  };
+
+  // Bulk mark as not duplicate
+  const bulkMarkAsNotDuplicate = async () => {
+    try {
+      for (const id of selectedIds) {
+        await updateReceipt(id, {
+          is_duplicate: false,
+          duplicate_of: null,
+          duplicate_score: null,
+          status: 'review'
+        } as Partial<Receipt>);
+      }
+      const count = selectedIds.size;
+      setSelectedIds(new Set());
+      toast({ title: `${count} Belege als "Kein Duplikat" markiert` });
+      loadReceipts();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    }
+  };
+
+  // Bulk delete duplicates
+  const bulkDeleteDuplicates = async () => {
+    try {
+      for (const id of selectedIds) {
+        const receipt = receipts.find(r => r.id === id);
+        if (receipt?.file_url) {
+          await supabase.storage.from('receipts').remove([receipt.file_url.replace(/^.*\/receipts\//, '')]);
+        }
+        await deleteReceipt(id);
+      }
+      const count = selectedIds.size;
+      setSelectedIds(new Set());
+      toast({ title: `${count} Duplikate gelöscht` });
+      loadReceipts();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
       });
     }
   };
@@ -927,6 +1097,21 @@ const Expenses = () => {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Duplicate Check Button */}
+          <Button 
+            variant="outline"
+            onClick={startDuplicateCheck}
+            disabled={isCheckingDuplicates || loading}
+            title="Duplikate im gesamten Belegbestand suchen"
+          >
+            {isCheckingDuplicates ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <ScanSearch className="w-4 h-4 mr-2" />
+            )}
+            Duplikate prüfen
+          </Button>
         </motion.div>
 
         {/* Stats Cards */}
@@ -1104,6 +1289,32 @@ const Expenses = () => {
               <Trash2 className="h-4 w-4 mr-1" />
               Löschen
             </Button>
+
+            {/* Duplicate-specific bulk actions */}
+            {statusFilter === 'duplicate' && (
+              <>
+                <div className="h-4 w-px bg-border" />
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={bulkMarkAsNotDuplicate}
+                  disabled={bulkActionLoading !== null}
+                  className="border-warning/50 text-warning hover:bg-warning/10"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Kein Duplikat
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="destructive"
+                  onClick={bulkDeleteDuplicates}
+                  disabled={bulkActionLoading !== null}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Duplikate löschen
+                </Button>
+              </>
+            )}
           </motion.div>
         )}
 
@@ -1526,6 +1737,123 @@ const Expenses = () => {
         originalId={duplicateComparisonIds.originalId}
         onRefresh={loadReceipts}
       />
+
+      {/* Duplicate Check Progress Overlay */}
+      {isCheckingDuplicates && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <Card className="w-[400px]">
+            <CardContent className="pt-6">
+              <div className="text-center mb-4">
+                <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4 text-primary" />
+                <p className="font-medium">Prüfe Belege auf Duplikate...</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {checkProgress.current} von {checkProgress.total} Belegen
+                </p>
+              </div>
+              
+              <Progress 
+                value={checkProgress.total > 0 ? (checkProgress.current / checkProgress.total) * 100 : 0} 
+                className="h-2"
+              />
+              
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                Dies kann bei vielen Belegen etwas dauern
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Duplicate Results Dialog */}
+      <Dialog open={showDuplicateResults} onOpenChange={setShowDuplicateResults}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Copy className="w-5 h-5 text-warning" />
+              Duplikat-Prüfung abgeschlossen
+            </DialogTitle>
+            <DialogDescription>
+              {foundDuplicates.length === 0 
+                ? 'Alle Belege wurden geprüft' 
+                : `${foundDuplicates.length} mögliche Duplikate wurden gefunden`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {foundDuplicates.length === 0 ? (
+              <div className="text-center py-8">
+                <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                <p className="font-medium">Keine Duplikate gefunden</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Alle Belege im gewählten Zeitraum sind einzigartig
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-4 p-3 bg-warning/10 rounded-lg border border-warning/20">
+                  <AlertTriangle className="w-5 h-5 text-warning" />
+                  <p className="text-warning">
+                    <strong>{foundDuplicates.length} mögliche Duplikate</strong> gefunden
+                  </p>
+                </div>
+                
+                <div className="max-h-[400px] overflow-y-auto space-y-2">
+                  {foundDuplicates.map((item, i) => (
+                    <div 
+                      key={i}
+                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{item.duplicate.vendor || 'Unbekannt'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.duplicate.receipt_date || '–'} • € {item.duplicate.amount_gross?.toFixed(2) || '0.00'}
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {item.matchReasons.map((reason, j) => (
+                            <Badge key={j} variant="outline" className="text-xs">
+                              {reason}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 ml-2">
+                        <Badge className="bg-warning/10 text-warning border-warning/20">
+                          {item.score}%
+                        </Badge>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setShowDuplicateResults(false);
+                            openDuplicateComparison(item.duplicate.id, item.originalId);
+                          }}
+                        >
+                          <GitCompare className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDuplicateResults(false)}>
+              Schließen
+            </Button>
+            {foundDuplicates.length > 0 && (
+              <Button onClick={() => {
+                setShowDuplicateResults(false);
+                setStatusFilter('duplicate');
+              }}>
+                Duplikate anzeigen
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };
