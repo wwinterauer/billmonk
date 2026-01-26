@@ -99,6 +99,7 @@ export function ReceiptDetailPanel({
   const [vendor, setVendor] = useState('');
   const [description, setDescription] = useState('');
   const [receiptDate, setReceiptDate] = useState<Date | undefined>();
+  const [invoiceNumber, setInvoiceNumber] = useState('');
   const [category, setCategory] = useState('');
   const [amountGross, setAmountGross] = useState('');
   const [vatRate, setVatRate] = useState('20');
@@ -152,6 +153,7 @@ export function ReceiptDetailPanel({
           setVendor(data.vendor || '');
           setDescription(data.description || '');
           setReceiptDate(data.receipt_date ? new Date(data.receipt_date) : undefined);
+          setInvoiceNumber(data.invoice_number || '');
           setCategory(data.category || '');
           setAmountGross(data.amount_gross?.toString() || '');
           setVatRate(data.vat_rate?.toString() || '20');
@@ -186,6 +188,7 @@ export function ReceiptDetailPanel({
         vendor: vendor || null,
         description: description || null,
         receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null,
+        invoice_number: invoiceNumber || null,
         category: category || null,
         amount_gross: parseFloat(amountGross) || null,
         amount_net: calculatedValues.net || null,
@@ -461,6 +464,16 @@ export function ReceiptDetailPanel({
                             />
                           </PopoverContent>
                         </Popover>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="invoiceNumber">Rechnungsnummer</Label>
+                        <Input
+                          id="invoiceNumber"
+                          value={invoiceNumber}
+                          onChange={(e) => setInvoiceNumber(e.target.value)}
+                          placeholder="z.B. RE-2024-001"
+                        />
                       </div>
 
                       <div>

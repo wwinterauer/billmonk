@@ -319,6 +319,7 @@ export type Database = {
           file_type: string | null
           file_url: string | null
           id: string
+          invoice_number: string | null
           notes: string | null
           payment_method: string | null
           receipt_date: string | null
@@ -343,6 +344,7 @@ export type Database = {
           file_type?: string | null
           file_url?: string | null
           id?: string
+          invoice_number?: string | null
           notes?: string | null
           payment_method?: string | null
           receipt_date?: string | null
@@ -367,6 +369,7 @@ export type Database = {
           file_type?: string | null
           file_url?: string | null
           id?: string
+          invoice_number?: string | null
           notes?: string | null
           payment_method?: string | null
           receipt_date?: string | null

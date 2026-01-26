@@ -9,7 +9,10 @@ import {
   Hash,
   File,
   Info,
-  Loader2
+  Loader2,
+  Receipt,
+  CreditCard,
+  Settings2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +45,7 @@ interface NamingSettings {
   removeSpecialChars: boolean;
   lowercase: boolean;
   dateFormat: string;
+  emptyFieldHandling: 'keep' | 'replace' | 'remove';
 }
 
 const DEFAULT_SETTINGS: NamingSettings = {
@@ -50,35 +54,85 @@ const DEFAULT_SETTINGS: NamingSettings = {
   replaceSpaces: true,
   removeSpecialChars: true,
   lowercase: false,
-  dateFormat: 'YYYY-MM-DD',
+  dateFormat: 'YYYYMMDD',
+  emptyFieldHandling: 'remove',
 };
 
-const PLACEHOLDERS = [
-  { key: '{datum}', label: 'Datum', description: 'Belegdatum (Format nach Auswahl)', icon: Calendar },
-  { key: '{datum_de}', label: 'Datum DE', description: 'Belegdatum (DD.MM.YYYY)', icon: Calendar },
-  { key: '{lieferant}', label: 'Lieferant', description: 'Name des Lieferanten', icon: Tag },
-  { key: '{betrag}', label: 'Betrag', description: 'Bruttobetrag', icon: DollarSign },
-  { key: '{kategorie}', label: 'Kategorie', description: 'Kategorie des Belegs', icon: FolderOpen },
-  { key: '{nummer}', label: 'Nummer', description: 'Fortlaufende Nummer', icon: Hash },
-  { key: '{original}', label: 'Original', description: 'Original-Dateiname (ohne Endung)', icon: File },
+interface PlaceholderGroup {
+  title: string;
+  placeholders: {
+    key: string;
+    label: string;
+    description: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }[];
+}
+
+const PLACEHOLDER_GROUPS: PlaceholderGroup[] = [
+  {
+    title: 'Datum',
+    placeholders: [
+      { key: '{datum}', label: 'Datum', description: 'Belegdatum (Format laut Einstellung)', icon: Calendar },
+      { key: '{jahr}', label: 'Jahr', description: 'Jahr 4-stellig (2024)', icon: Calendar },
+      { key: '{jahr2}', label: 'Jahr 2-St.', description: 'Jahr 2-stellig (24)', icon: Calendar },
+      { key: '{monat}', label: 'Monat', description: 'Monat 2-stellig (01-12)', icon: Calendar },
+      { key: '{tag}', label: 'Tag', description: 'Tag 2-stellig (01-31)', icon: Calendar },
+    ],
+  },
+  {
+    title: 'Beleg-Infos',
+    placeholders: [
+      { key: '{lieferant}', label: 'Lieferant', description: 'Name des Lieferanten', icon: Tag },
+      { key: '{betrag}', label: 'Betrag', description: 'Bruttobetrag (z.B. 125.50)', icon: DollarSign },
+      { key: '{betrag_int}', label: 'Betrag Int', description: 'Bruttobetrag ohne Dezimal (z.B. 12550)', icon: DollarSign },
+      { key: '{kategorie}', label: 'Kategorie', description: 'Kategorie des Belegs', icon: FolderOpen },
+      { key: '{rechnungsnummer}', label: 'Rechnungs-Nr.', description: 'Rechnungsnummer (falls vorhanden)', icon: Receipt },
+      { key: '{zahlungsart}', label: 'Zahlungsart', description: 'Zahlungsart des Belegs', icon: CreditCard },
+    ],
+  },
+  {
+    title: 'System',
+    placeholders: [
+      { key: '{nummer}', label: 'Nummer', description: 'Fortlaufende Nummer (001, 002, ...)', icon: Hash },
+      { key: '{original}', label: 'Original', description: 'Original-Dateiname (ohne Endung)', icon: File },
+    ],
+  },
 ];
 
 const DATE_FORMATS = [
+  { value: 'YYYYMMDD', label: 'YYYYMMDD', example: '20240115' },
+  { value: 'YYMMDD', label: 'YYMMDD', example: '240115' },
   { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD', example: '2024-01-15' },
   { value: 'DD.MM.YYYY', label: 'DD.MM.YYYY', example: '15.01.2024' },
   { value: 'DD-MM-YYYY', label: 'DD-MM-YYYY', example: '15-01-2024' },
-  { value: 'YYYYMMDD', label: 'YYYYMMDD', example: '20240115' },
+  { value: 'DD.MM.YY', label: 'DD.MM.YY', example: '15.01.24' },
+];
+
+const EMPTY_FIELD_OPTIONS = [
+  { value: 'keep', label: 'Platzhalter leer lassen' },
+  { value: 'replace', label: "Platzhalter mit 'k.A.' ersetzen" },
+  { value: 'remove', label: 'Platzhalter komplett entfernen' },
 ];
 
 // Example data for preview
-const EXAMPLE_DATA = {
+const EXAMPLE_DATA_FULL = {
   datum: '2024-01-15',
-  datum_de: '15.01.2024',
   lieferant: 'Müller GmbH',
-  betrag: '125.50',
+  betrag: 125.50,
   kategorie: 'Büromaterial',
-  nummer: '001',
+  rechnungsnummer: 'RE-2024-001',
+  zahlungsart: 'Überweisung',
   original: 'Rechnung_2024',
+};
+
+const EXAMPLE_DATA_PARTIAL = {
+  datum: '2024-01-20',
+  lieferant: 'Amazon',
+  betrag: 45.99,
+  kategorie: 'Software',
+  rechnungsnummer: null,
+  zahlungsart: null,
+  original: 'scan_001',
 };
 
 const Settings = () => {
@@ -114,6 +168,7 @@ const Settings = () => {
             removeSpecialChars: savedSettings.removeSpecialChars !== undefined ? Boolean(savedSettings.removeSpecialChars) : DEFAULT_SETTINGS.removeSpecialChars,
             lowercase: savedSettings.lowercase !== undefined ? Boolean(savedSettings.lowercase) : DEFAULT_SETTINGS.lowercase,
             dateFormat: (savedSettings.dateFormat as string) || DEFAULT_SETTINGS.dateFormat,
+            emptyFieldHandling: (savedSettings.emptyFieldHandling as NamingSettings['emptyFieldHandling']) || DEFAULT_SETTINGS.emptyFieldHandling,
           });
         }
       } catch (error) {
@@ -139,6 +194,7 @@ const Settings = () => {
         removeSpecialChars: settings.removeSpecialChars,
         lowercase: settings.lowercase,
         dateFormat: settings.dateFormat,
+        emptyFieldHandling: settings.emptyFieldHandling,
       };
       
       const { error } = await supabase
@@ -215,43 +271,92 @@ const Settings = () => {
       result = result.toLowerCase();
     }
 
+    // Clean up multiple underscores that may result from empty placeholders
+    result = result.replace(/_+/g, '_').replace(/^_|_$/g, '');
+
     return result;
   };
 
   // Format date according to selected format
   const formatDate = (dateStr: string, format: string): string => {
     const [year, month, day] = dateStr.split('-');
+    const year2 = year.slice(2);
     switch (format) {
       case 'DD.MM.YYYY':
         return `${day}.${month}.${year}`;
       case 'DD-MM-YYYY':
         return `${day}-${month}-${year}`;
+      case 'DD.MM.YY':
+        return `${day}.${month}.${year2}`;
       case 'YYYYMMDD':
         return `${year}${month}${day}`;
+      case 'YYMMDD':
+        return `${year2}${month}${day}`;
       case 'YYYY-MM-DD':
       default:
         return dateStr;
     }
   };
 
+  // Get date parts
+  const getDateParts = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-');
+    return { year, year2: year.slice(2), month, day };
+  };
+
+  // Handle empty field based on settings
+  const handleEmptyField = (value: string | null | undefined, placeholder: string): string => {
+    if (value) return value;
+    
+    switch (settings.emptyFieldHandling) {
+      case 'replace':
+        return 'k.A.';
+      case 'remove':
+        return '';
+      case 'keep':
+      default:
+        return '';
+    }
+  };
+
   // Generate preview filename
-  const previewFilename = useMemo(() => {
+  const generatePreviewFilename = (exampleData: typeof EXAMPLE_DATA_FULL | typeof EXAMPLE_DATA_PARTIAL, index: number): string => {
     let result = settings.template;
 
-    // Replace placeholders with example data
-    const formattedDate = formatDate(EXAMPLE_DATA.datum, settings.dateFormat);
+    // Date placeholders
+    const formattedDate = formatDate(exampleData.datum, settings.dateFormat);
+    const dateParts = getDateParts(exampleData.datum);
+    
     result = result.replace(/{datum}/g, formattedDate);
-    result = result.replace(/{datum_de}/g, EXAMPLE_DATA.datum_de);
-    result = result.replace(/{lieferant}/g, EXAMPLE_DATA.lieferant);
-    result = result.replace(/{betrag}/g, EXAMPLE_DATA.betrag);
-    result = result.replace(/{kategorie}/g, EXAMPLE_DATA.kategorie);
-    result = result.replace(/{nummer}/g, EXAMPLE_DATA.nummer);
-    result = result.replace(/{original}/g, EXAMPLE_DATA.original);
+    result = result.replace(/{jahr}/g, dateParts.year);
+    result = result.replace(/{jahr2}/g, dateParts.year2);
+    result = result.replace(/{monat}/g, dateParts.month);
+    result = result.replace(/{tag}/g, dateParts.day);
+
+    // Beleg-Info placeholders
+    result = result.replace(/{lieferant}/g, handleEmptyField(exampleData.lieferant, '{lieferant}'));
+    result = result.replace(/{betrag}/g, exampleData.betrag.toFixed(2));
+    result = result.replace(/{betrag_int}/g, Math.round(exampleData.betrag * 100).toString());
+    result = result.replace(/{kategorie}/g, handleEmptyField(exampleData.kategorie, '{kategorie}'));
+    result = result.replace(/{rechnungsnummer}/g, handleEmptyField(exampleData.rechnungsnummer, '{rechnungsnummer}'));
+    result = result.replace(/{zahlungsart}/g, handleEmptyField(exampleData.zahlungsart, '{zahlungsart}'));
+
+    // System placeholders
+    result = result.replace(/{nummer}/g, String(index).padStart(3, '0'));
+    result = result.replace(/{original}/g, exampleData.original);
 
     // Apply transformations
     result = applyTransformations(result);
 
     return result + '.pdf';
+  };
+
+  // Generate preview filenames
+  const previewFilenames = useMemo(() => {
+    return {
+      full: generatePreviewFilename(EXAMPLE_DATA_FULL, 1),
+      partial: generatePreviewFilename(EXAMPLE_DATA_PARTIAL, 2),
+    };
   }, [settings]);
 
   if (loading) {
@@ -305,39 +410,46 @@ const Settings = () => {
                   className="font-mono"
                 />
                 
-                {/* Placeholder Chips */}
-                <div className="flex flex-wrap gap-2">
-                  {PLACEHOLDERS.map((placeholder) => (
-                    <Tooltip key={placeholder.key}>
-                      <TooltipTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 gap-1.5 text-xs"
-                          onClick={() => insertPlaceholder(placeholder.key)}
-                        >
-                          <placeholder.icon className="h-3.5 w-3.5" />
-                          {placeholder.label}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p><strong>{placeholder.key}</strong></p>
-                        <p className="text-muted-foreground">{placeholder.description}</p>
-                      </TooltipContent>
-                    </Tooltip>
+                {/* Placeholder Chips - Grouped */}
+                <div className="space-y-4">
+                  {PLACEHOLDER_GROUPS.map((group) => (
+                    <div key={group.title} className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">{group.title}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {group.placeholders.map((placeholder) => (
+                          <Tooltip key={placeholder.key}>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5 text-xs"
+                                onClick={() => insertPlaceholder(placeholder.key)}
+                              >
+                                <placeholder.icon className="h-3.5 w-3.5" />
+                                {placeholder.label}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p><strong>{placeholder.key}</strong></p>
+                              <p className="text-muted-foreground">{placeholder.description}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
 
               {/* Date Format */}
               <div className="space-y-3">
-                <Label>Datumsformat</Label>
+                <Label>Datumsformat für {'{datum}'}</Label>
                 <Select
                   value={settings.dateFormat}
                   onValueChange={(value) => setSettings(prev => ({ ...prev, dateFormat: value }))}
                 >
-                  <SelectTrigger className="w-[250px]">
+                  <SelectTrigger className="w-[280px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -441,6 +553,28 @@ const Settings = () => {
                 </div>
               </div>
 
+              {/* Empty Field Handling */}
+              <div className="space-y-3">
+                <Label>Bei leeren Feldern</Label>
+                <Select
+                  value={settings.emptyFieldHandling}
+                  onValueChange={(value: NamingSettings['emptyFieldHandling']) => 
+                    setSettings(prev => ({ ...prev, emptyFieldHandling: value }))
+                  }
+                >
+                  <SelectTrigger className="w-[320px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EMPTY_FIELD_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Live Preview */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
@@ -450,23 +584,41 @@ const Settings = () => {
                       <Info className="h-4 w-4 text-muted-foreground" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
-                      <p>Beispiel-Beleg:</p>
-                      <p className="text-muted-foreground">
-                        Lieferant: {EXAMPLE_DATA.lieferant}<br />
-                        Datum: {EXAMPLE_DATA.datum_de}<br />
-                        Betrag: €{EXAMPLE_DATA.betrag}
-                      </p>
+                      <p>Zeigt wie Dateien basierend auf deiner Vorlage benannt werden.</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
-                <div className="p-4 bg-muted/50 rounded-lg border">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-8 w-8 text-muted-foreground flex-shrink-0" />
-                    <div className="min-w-0">
-                      <p className="font-mono text-sm break-all">{previewFilename}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Basierend auf Beispiel-Beleg: {EXAMPLE_DATA.lieferant}, {EXAMPLE_DATA.datum_de}, €{EXAMPLE_DATA.betrag}
-                      </p>
+                
+                <div className="space-y-3">
+                  {/* Example 1: All fields present */}
+                  <div className="p-4 bg-muted/50 rounded-lg border">
+                    <div className="flex items-start gap-3">
+                      <FileText className="h-8 w-8 text-green-600 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Beispiel 1: Alle Felder vorhanden
+                        </p>
+                        <p className="font-mono text-sm break-all text-foreground">{previewFilenames.full}</p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {EXAMPLE_DATA_FULL.lieferant} | {EXAMPLE_DATA_FULL.datum} | €{EXAMPLE_DATA_FULL.betrag.toFixed(2)} | {EXAMPLE_DATA_FULL.rechnungsnummer}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Example 2: Some fields missing */}
+                  <div className="p-4 bg-muted/50 rounded-lg border">
+                    <div className="flex items-start gap-3">
+                      <FileText className="h-8 w-8 text-yellow-600 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Beispiel 2: Rechnungsnummer fehlt
+                        </p>
+                        <p className="font-mono text-sm break-all text-foreground">{previewFilenames.partial}</p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {EXAMPLE_DATA_PARTIAL.lieferant} | {EXAMPLE_DATA_PARTIAL.datum} | €{EXAMPLE_DATA_PARTIAL.betrag.toFixed(2)} | <span className="italic">keine Rechnungs-Nr.</span>
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -477,14 +629,19 @@ const Settings = () => {
                 <Button 
                   onClick={handleSave}
                   disabled={saving}
-                  className="gradient-primary hover:opacity-90"
+                  className="min-w-[120px]"
                 >
                   {saving ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Speichern...
+                    </>
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Speichern
+                    </>
                   )}
-                  Speichern
                 </Button>
               </div>
             </CardContent>
