@@ -21,9 +21,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useToast } from '@/hooks/use-toast';
-import { useReceipts, type UploadProgress, type UploadStatus, type Receipt, type DuplicateInfo } from '@/hooks/useReceipts';
+import { useReceipts, type UploadProgress, type UploadStatus, type Receipt, type DuplicateInfo, type MatchedVendor, type VendorSuggestion } from '@/hooks/useReceipts';
+import { VendorSelectionDialog } from '@/components/receipts/VendorSelectionDialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertDialog,
@@ -46,11 +49,27 @@ interface FileUpload extends UploadProgress {
   duplicateScore?: number;
 }
 
+interface VendorDecisionQueueItem {
+  uploadId: string;
+  receiptId: string;
+  extractedData: Partial<Receipt>;
+  detectedName: string;
+  suggestions: VendorSuggestion[];
+}
+
 const Upload = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploads, setUploads] = useState<Map<string, FileUpload>>(new Map());
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [duplicateInfo, setDuplicateInfo] = useState<DuplicateInfo | null>(null);
+  
+  // Vendor selection states
+  const [showVendorSelectionDialog, setShowVendorSelectionDialog] = useState(false);
+  const [vendorDecisionQueue, setVendorDecisionQueue] = useState<VendorDecisionQueueItem[]>([]);
+  const [currentVendorDecision, setCurrentVendorDecision] = useState<VendorDecisionQueueItem | null>(null);
+  const [applyToAll, setApplyToAll] = useState(false);
+  const [isProcessingVendor, setIsProcessingVendor] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -59,7 +78,8 @@ const Upload = () => {
     uploadAndProcessReceipt, 
     checkExactDuplicate, 
     generateFileHash,
-    ALLOWED_TYPES, 
+    finalizeReceiptWithVendor,
+    createVendorForReceipt,
     MAX_FILE_SIZE, 
     MAX_FILES 
   } = useReceipts();
@@ -237,6 +257,44 @@ const Upload = () => {
         duplicateOfId: options?.duplicateOfId,
       });
 
+      // Check if vendor decision is needed
+      if (result.vendorDecision) {
+        // Add to vendor decision queue
+        const queueItem: VendorDecisionQueueItem = {
+          uploadId: upload.id,
+          receiptId: result.vendorDecision.receiptId,
+          extractedData: result.vendorDecision.extractedData,
+          detectedName: result.vendorDecision.detectedName,
+          suggestions: result.vendorDecision.suggestions
+        };
+
+        setVendorDecisionQueue(prev => [...prev, queueItem]);
+        
+        // Update upload status to waiting for vendor selection
+        setUploads(prev => {
+          const updated = new Map(prev);
+          const current = updated.get(upload.id);
+          if (current) {
+            updated.set(upload.id, { 
+              ...current, 
+              status: 'processing',
+              progress: 85,
+              statusText: 'Lieferant auswählen...',
+              receipt: result.receipt,
+              aiConfidence: result.aiConfidence,
+            });
+          }
+          return updated;
+        });
+
+        // Show vendor selection dialog if not already open
+        if (!showVendorSelectionDialog && !currentVendorDecision) {
+          showNextVendorDecision();
+        }
+        
+        return;
+      }
+
       // Check if content-based duplicate was detected
       const hasDuplicate = result.duplicateCheck?.isDuplicate;
       const finalStatus: UploadStatus = hasDuplicate 
@@ -311,6 +369,227 @@ const Upload = () => {
     }
   };
 
+  // Vendor selection handlers
+  const showNextVendorDecision = () => {
+    setVendorDecisionQueue(prev => {
+      if (prev.length === 0) {
+        setShowVendorSelectionDialog(false);
+        setCurrentVendorDecision(null);
+        return prev;
+      }
+      
+      const [next, ...rest] = prev;
+      setCurrentVendorDecision(next);
+      setShowVendorSelectionDialog(true);
+      setApplyToAll(false);
+      return rest;
+    });
+  };
+
+  const handleSelectExistingVendor = async (vendor: MatchedVendor) => {
+    if (!currentVendorDecision) return;
+    
+    setIsProcessingVendor(true);
+    
+    try {
+      // Get items with same detected name for "apply to all" feature
+      const sameNameItems = applyToAll 
+        ? vendorDecisionQueue.filter(q => q.detectedName === currentVendorDecision.detectedName)
+        : [];
+      
+      // Process current item
+      await finalizeReceiptWithVendor(
+        currentVendorDecision.receiptId,
+        currentVendorDecision.extractedData,
+        vendor,
+        currentVendorDecision.detectedName
+      );
+      
+      // Update upload status
+      updateUploadStatus(currentVendorDecision.uploadId);
+      
+      // Process same-name items if "apply to all"
+      if (applyToAll && sameNameItems.length > 0) {
+        for (const item of sameNameItems) {
+          await finalizeReceiptWithVendor(
+            item.receiptId,
+            item.extractedData,
+            vendor,
+            item.detectedName
+          );
+          updateUploadStatus(item.uploadId);
+        }
+        
+        // Remove processed items from queue
+        setVendorDecisionQueue(prev => 
+          prev.filter(q => q.detectedName !== currentVendorDecision.detectedName)
+        );
+        
+        toast({
+          title: 'Lieferant zugeordnet',
+          description: `${sameNameItems.length + 1} Belege "${vendor.display_name}" zugeordnet`,
+        });
+      } else {
+        toast({
+          title: 'Lieferant zugeordnet',
+          description: `Beleg "${vendor.display_name}" zugeordnet`,
+        });
+      }
+      
+      // Show next vendor decision or close dialog
+      setTimeout(showNextVendorDecision, 300);
+      
+    } catch (error) {
+      console.error('Error selecting vendor:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Lieferant konnte nicht zugeordnet werden',
+      });
+    } finally {
+      setIsProcessingVendor(false);
+    }
+  };
+
+  const handleCreateNewVendor = async () => {
+    if (!currentVendorDecision) return;
+    
+    setIsProcessingVendor(true);
+    
+    try {
+      // Create new vendor
+      const newVendor = await createVendorForReceipt(currentVendorDecision.detectedName);
+      
+      if (!newVendor) {
+        throw new Error('Vendor creation failed');
+      }
+      
+      // Get items with same detected name for "apply to all" feature
+      const sameNameItems = applyToAll 
+        ? vendorDecisionQueue.filter(q => q.detectedName === currentVendorDecision.detectedName)
+        : [];
+      
+      // Process current item
+      await finalizeReceiptWithVendor(
+        currentVendorDecision.receiptId,
+        currentVendorDecision.extractedData,
+        newVendor
+      );
+      
+      // Update upload status
+      updateUploadStatus(currentVendorDecision.uploadId);
+      
+      // Process same-name items if "apply to all"
+      if (applyToAll && sameNameItems.length > 0) {
+        for (const item of sameNameItems) {
+          await finalizeReceiptWithVendor(
+            item.receiptId,
+            item.extractedData,
+            newVendor
+          );
+          updateUploadStatus(item.uploadId);
+        }
+        
+        // Remove processed items from queue
+        setVendorDecisionQueue(prev => 
+          prev.filter(q => q.detectedName !== currentVendorDecision.detectedName)
+        );
+        
+        toast({
+          title: 'Neuer Lieferant erstellt',
+          description: `${sameNameItems.length + 1} Belege "${newVendor.display_name}" zugeordnet`,
+        });
+      } else {
+        toast({
+          title: 'Neuer Lieferant erstellt',
+          description: `"${newVendor.display_name}" angelegt und zugeordnet`,
+        });
+      }
+      
+      // Show next vendor decision or close dialog
+      setTimeout(showNextVendorDecision, 300);
+      
+    } catch (error) {
+      console.error('Error creating vendor:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Lieferant konnte nicht erstellt werden',
+      });
+    } finally {
+      setIsProcessingVendor(false);
+    }
+  };
+
+  const handleSkipVendorSelection = async () => {
+    if (!currentVendorDecision) return;
+    
+    setIsProcessingVendor(true);
+    
+    try {
+      // Finalize without vendor
+      await finalizeReceiptWithVendor(
+        currentVendorDecision.receiptId,
+        currentVendorDecision.extractedData,
+        null
+      );
+      
+      // Update upload status
+      setUploads(prev => {
+        const updated = new Map(prev);
+        const current = updated.get(currentVendorDecision.uploadId);
+        if (current) {
+          updated.set(currentVendorDecision.uploadId, { 
+            ...current, 
+            status: 'complete',
+            progress: 100,
+            statusText: 'Ohne Lieferant',
+          });
+        }
+        return updated;
+      });
+      
+      toast({
+        title: 'Beleg gespeichert',
+        description: 'Ohne Lieferanten-Zuordnung',
+      });
+      
+      // Show next vendor decision or close dialog
+      setTimeout(showNextVendorDecision, 300);
+      
+    } catch (error) {
+      console.error('Error skipping vendor:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Beleg konnte nicht gespeichert werden',
+      });
+    } finally {
+      setIsProcessingVendor(false);
+    }
+  };
+
+  const updateUploadStatus = (uploadId: string) => {
+    setUploads(prev => {
+      const updated = new Map(prev);
+      const current = updated.get(uploadId);
+      if (current) {
+        updated.set(uploadId, { 
+          ...current, 
+          status: 'complete',
+          progress: 100,
+          statusText: `KI: ${Math.round((current.aiConfidence || 0) * 100)}%`,
+        });
+      }
+      return updated;
+    });
+  };
+
+  // Count same-name items in queue for "apply to all" feature
+  const sameNameCount = currentVendorDecision 
+    ? vendorDecisionQueue.filter(q => q.detectedName === currentVendorDecision.detectedName).length
+    : 0;
+
   const handleProceedWithDuplicate = async () => {
     if (!duplicateInfo) return;
     
@@ -322,7 +601,7 @@ const Upload = () => {
     );
     
     if (uploadEntry) {
-      const [id, upload] = uploadEntry;
+      const [_id, upload] = uploadEntry;
       await uploadFile(upload, {
         skipDuplicateCheck: true,
         markAsDuplicate: true,
@@ -805,6 +1084,34 @@ const Upload = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Vendor Selection Dialog */}
+        <VendorSelectionDialog
+          open={showVendorSelectionDialog}
+          onOpenChange={(open) => {
+            if (!open) handleSkipVendorSelection();
+          }}
+          detectedName={currentVendorDecision?.detectedName || ''}
+          suggestions={currentVendorDecision?.suggestions || []}
+          onSelectExisting={handleSelectExistingVendor}
+          onCreateNew={handleCreateNewVendor}
+          onSkip={handleSkipVendorSelection}
+          isLoading={isProcessingVendor}
+        />
+
+        {/* Apply to all checkbox in dialog - shown when multiple items have same vendor */}
+        {showVendorSelectionDialog && sameNameCount > 0 && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] bg-card border rounded-lg shadow-lg p-3 flex items-center gap-2">
+            <Checkbox 
+              id="applyToAll" 
+              checked={applyToAll}
+              onCheckedChange={(checked) => setApplyToAll(checked === true)}
+            />
+            <Label htmlFor="applyToAll" className="text-sm">
+              Für alle {sameNameCount + 1} Belege mit "{currentVendorDecision?.detectedName}" übernehmen
+            </Label>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
