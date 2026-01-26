@@ -1143,6 +1143,66 @@ export function ExportFormatDialog({
                 </div>
               )}
 
+              {/* Folder Selection */}
+              {supportsDirectoryPicker && (
+                <div className="space-y-2">
+                  <Label>Zielordner</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant={exportFolder === 'downloads' ? 'default' : 'outline'}
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => {
+                          setExportFolder('downloads');
+                          setSelectedFolderHandle(null);
+                          setSelectedFolderName('');
+                        }}
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Downloads
+                      </Button>
+                      <Button
+                        variant={exportFolder === 'custom' ? 'default' : 'outline'}
+                        size="sm"
+                        className="flex-1"
+                        onClick={async () => {
+                          await selectFolder();
+                          setExportFolder('custom');
+                        }}
+                      >
+                        <FolderOpen className="w-4 h-4 mr-2" />
+                        Ordner wählen
+                      </Button>
+                    </div>
+                    {exportFolder === 'custom' && selectedFolderName && (
+                      <div className="flex items-center gap-2 p-2 bg-muted/50 rounded border text-sm">
+                        <Folder className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="truncate">{selectedFolderName}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="ml-auto h-6 w-6 p-0"
+                          onClick={selectFolder}
+                        >
+                          <Settings className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
+                    {exportFolder === 'custom' && selectedFolderHandle && (
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="includeSubfolder" className="text-xs">Unterordner erstellen (nach Zeitraum)</Label>
+                        <Switch
+                          id="includeSubfolder"
+                          checked={includeSubfolder}
+                          onCheckedChange={setIncludeSubfolder}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Options */}
               <div className="space-y-3">
                 {exportFormat !== 'zip' && (
