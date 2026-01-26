@@ -14,7 +14,11 @@ import {
   Check,
   Filter,
   Sparkles,
-  CalendarIcon
+  CalendarIcon,
+  Download,
+  FileSpreadsheet,
+  FileDown,
+  Archive
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, startOfQuarter, endOfQuarter } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -38,6 +42,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Table,
   TableBody,
   TableCell,
@@ -60,6 +70,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
 import { useCategories } from '@/hooks/useCategories';
 import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
+import { ExportDialog, exportAsCSV, exportAsExcel } from '@/components/exports/ExportDialog';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -157,6 +168,9 @@ const Expenses = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [receiptToDelete, setReceiptToDelete] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  // Export dialog state
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Detail panel state
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
@@ -436,13 +450,43 @@ const Expenses = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <h1 className="text-2xl font-bold text-foreground">Alle Ausgaben</h1>
-          <Button 
-            className="gradient-primary hover:opacity-90"
-            onClick={() => navigate('/upload')}
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Beleg hochladen
-          </Button>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportieren
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setExportDialogOpen(true)}>
+                  <Archive className="h-4 w-4 mr-2" />
+                  Als ZIP herunterladen (umbenannt)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  exportAsCSV(filteredReceipts);
+                  toast({ title: 'CSV exportiert', description: `${filteredReceipts.length} Belege exportiert.` });
+                }}>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Als CSV exportieren
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  exportAsExcel(filteredReceipts);
+                  toast({ title: 'Excel exportiert', description: `${filteredReceipts.length} Belege exportiert.` });
+                }}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Als Excel exportieren
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button 
+              className="gradient-primary hover:opacity-90"
+              onClick={() => navigate('/upload')}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Beleg hochladen
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -905,6 +949,13 @@ const Expenses = () => {
         open={detailPanelOpen}
         onClose={closeReceiptDetail}
         onUpdate={loadReceipts}
+      />
+
+      {/* Export Dialog */}
+      <ExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        receipts={filteredReceipts}
       />
     </DashboardLayout>
   );
