@@ -12,7 +12,10 @@ import {
   AlertCircle,
   Sparkles,
   Clock,
-  PenLine
+  PenLine,
+  AlertTriangle,
+  Eye,
+  Copy
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,21 +23,46 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useToast } from '@/hooks/use-toast';
-import { useReceipts, type UploadProgress, type UploadStatus, type Receipt } from '@/hooks/useReceipts';
+import { useReceipts, type UploadProgress, type UploadStatus, type Receipt, type DuplicateInfo } from '@/hooks/useReceipts';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { format } from 'date-fns';
+import { de } from 'date-fns/locale';
 
 interface FileUpload extends UploadProgress {
   file: File;
   previewUrl?: string;
+  fileHash?: string;
+  isDuplicate?: boolean;
+  duplicateScore?: number;
 }
 
 const Upload = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploads, setUploads] = useState<Map<string, FileUpload>>(new Map());
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [duplicateInfo, setDuplicateInfo] = useState<DuplicateInfo | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { validateFiles, uploadAndProcessReceipt, ALLOWED_TYPES, MAX_FILE_SIZE, MAX_FILES } = useReceipts();
+  const { 
+    validateFiles, 
+    uploadAndProcessReceipt, 
+    checkExactDuplicate, 
+    generateFileHash,
+    ALLOWED_TYPES, 
+    MAX_FILE_SIZE, 
+    MAX_FILES 
+  } = useReceipts();
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -118,8 +146,8 @@ const Upload = () => {
     }
   };
 
-  const uploadFile = async (upload: FileUpload) => {
-    // Update status to uploading
+  const uploadFile = async (upload: FileUpload, options?: { skipDuplicateCheck?: boolean; markAsDuplicate?: boolean; duplicateOfId?: string; fileHash?: string }) => {
+    // Update status to checking for duplicates
     setUploads(prev => {
       const updated = new Map(prev);
       const current = updated.get(upload.id);
@@ -127,14 +155,66 @@ const Upload = () => {
         updated.set(upload.id, { 
           ...current, 
           status: 'uploading', 
-          progress: 5,
-          statusText: 'Wird hochgeladen...'
+          progress: 2,
+          statusText: 'Prüfe auf Duplikate...'
         });
       }
       return updated;
     });
 
     try {
+      // Generate hash for duplicate check
+      const fileHash = options?.fileHash || await generateFileHash(upload.file);
+
+      // Check for exact duplicates (same file hash) BEFORE upload
+      if (!options?.skipDuplicateCheck && !options?.markAsDuplicate) {
+        const existingReceipt = await checkExactDuplicate(fileHash);
+        
+        if (existingReceipt) {
+          // Show duplicate dialog
+          setDuplicateInfo({
+            type: 'exact',
+            original: existingReceipt,
+            file: upload.file,
+            fileHash: fileHash,
+          });
+          setShowDuplicateDialog(true);
+          
+          // Mark upload as duplicate in UI
+          setUploads(prev => {
+            const updated = new Map(prev);
+            const current = updated.get(upload.id);
+            if (current) {
+              updated.set(upload.id, { 
+                ...current, 
+                status: 'pending',
+                progress: 0,
+                statusText: 'Duplikat gefunden',
+                fileHash: fileHash,
+              });
+            }
+            return updated;
+          });
+          return;
+        }
+      }
+
+      // Update status to uploading
+      setUploads(prev => {
+        const updated = new Map(prev);
+        const current = updated.get(upload.id);
+        if (current) {
+          updated.set(upload.id, { 
+            ...current, 
+            status: 'uploading', 
+            progress: 5,
+            statusText: 'Wird hochgeladen...',
+            fileHash: fileHash,
+          });
+        }
+        return updated;
+      });
+
       const result = await uploadAndProcessReceipt(upload.file, (progress, statusText) => {
         setUploads(prev => {
           const updated = new Map(prev);
@@ -150,12 +230,23 @@ const Upload = () => {
           }
           return updated;
         });
+      }, {
+        fileHash,
+        skipDuplicateCheck: options?.skipDuplicateCheck,
+        markAsDuplicate: options?.markAsDuplicate,
+        duplicateOfId: options?.duplicateOfId,
       });
 
-      const finalStatus: UploadStatus = result.aiSuccess ? 'complete' : 'complete-manual';
-      const finalStatusText = result.aiSuccess 
-        ? `KI: ${Math.round((result.aiConfidence || 0) * 100)}%` 
-        : 'Manuelle Eingabe';
+      // Check if content-based duplicate was detected
+      const hasDuplicate = result.duplicateCheck?.isDuplicate;
+      const finalStatus: UploadStatus = hasDuplicate 
+        ? 'complete' 
+        : (result.aiSuccess ? 'complete' : 'complete-manual');
+      const finalStatusText = hasDuplicate
+        ? `Duplikat (${result.duplicateCheck?.score}%)`
+        : (result.aiSuccess 
+          ? `KI: ${Math.round((result.aiConfidence || 0) * 100)}%` 
+          : 'Manuelle Eingabe');
 
       setUploads(prev => {
         const updated = new Map(prev);
@@ -167,13 +258,21 @@ const Upload = () => {
             progress: 100,
             statusText: finalStatusText,
             receipt: result.receipt,
-            aiConfidence: result.aiConfidence
+            aiConfidence: result.aiConfidence,
+            isDuplicate: hasDuplicate,
+            duplicateScore: result.duplicateCheck?.score,
           });
         }
         return updated;
       });
 
-      if (result.aiSuccess) {
+      if (hasDuplicate) {
+        toast({
+          title: 'Mögliches Duplikat erkannt',
+          description: `${result.duplicateCheck?.matchReasons.join(', ')} (${result.duplicateCheck?.score}%)`,
+          variant: 'default',
+        });
+      } else if (result.aiSuccess) {
         toast({
           title: 'Beleg analysiert',
           description: `${truncateFileName(upload.fileName, 25)} - bitte überprüfen`,
@@ -210,6 +309,51 @@ const Upload = () => {
         description: `${truncateFileName(upload.fileName, 25)}: ${errorMessage}`,
       });
     }
+  };
+
+  const handleProceedWithDuplicate = async () => {
+    if (!duplicateInfo) return;
+    
+    setShowDuplicateDialog(false);
+    
+    // Find the upload entry for this file
+    const uploadEntry = Array.from(uploads.entries()).find(
+      ([_, u]) => u.file === duplicateInfo.file
+    );
+    
+    if (uploadEntry) {
+      const [id, upload] = uploadEntry;
+      await uploadFile(upload, {
+        skipDuplicateCheck: true,
+        markAsDuplicate: true,
+        duplicateOfId: duplicateInfo.original.id,
+        fileHash: duplicateInfo.fileHash,
+      });
+    }
+    
+    setDuplicateInfo(null);
+  };
+
+  const handleViewOriginal = () => {
+    if (duplicateInfo?.original.id) {
+      navigate(`/expenses?receipt=${duplicateInfo.original.id}`);
+    }
+    setShowDuplicateDialog(false);
+    setDuplicateInfo(null);
+  };
+
+  const handleCancelDuplicate = () => {
+    // Remove the pending upload
+    if (duplicateInfo) {
+      const uploadEntry = Array.from(uploads.entries()).find(
+        ([_, u]) => u.file === duplicateInfo.file
+      );
+      if (uploadEntry) {
+        removeUpload(uploadEntry[0]);
+      }
+    }
+    setShowDuplicateDialog(false);
+    setDuplicateInfo(null);
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -258,6 +402,15 @@ const Upload = () => {
   };
 
   const getStatusIcon = (upload: FileUpload) => {
+    // Check for duplicate status
+    if (upload.isDuplicate) {
+      return (
+        <div className="h-8 w-8 rounded-full bg-warning flex items-center justify-center">
+          <Copy className="h-4 w-4 text-warning-foreground" />
+        </div>
+      );
+    }
+
     switch (upload.status) {
       case 'uploading':
         return <Loader2 className="h-5 w-5 text-primary animate-spin" />;
@@ -291,6 +444,15 @@ const Upload = () => {
   };
 
   const getStatusBadge = (upload: FileUpload) => {
+    // Show duplicate badge
+    if (upload.isDuplicate && upload.duplicateScore) {
+      return (
+        <Badge variant="secondary" className="text-xs bg-warning/20 text-warning-foreground border-warning/30">
+          Duplikat ({upload.duplicateScore}%)
+        </Badge>
+      );
+    }
+
     if (upload.status === 'complete' && upload.aiConfidence !== undefined) {
       const confidence = upload.aiConfidence;
       let variant: 'default' | 'secondary' | 'destructive' | 'outline' = 'default';
@@ -569,6 +731,80 @@ const Upload = () => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Duplicate Warning Dialog */}
+        <AlertDialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-warning">
+                <AlertTriangle className="w-5 h-5" />
+                Duplikat erkannt
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Diese Datei wurde bereits hochgeladen.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            
+            {duplicateInfo && (
+              <div className="py-4">
+                <div className="p-4 bg-muted/50 rounded-lg border">
+                  <p className="text-sm font-medium mb-3">Vorhandener Beleg:</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Datei:</span>
+                      <span className="font-medium truncate max-w-[200px]">
+                        {duplicateInfo.original.file_name || '–'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Lieferant:</span>
+                      <span className="font-medium">
+                        {duplicateInfo.original.vendor || '–'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Betrag:</span>
+                      <span className="font-medium">
+                        {duplicateInfo.original.amount_gross 
+                          ? `€ ${duplicateInfo.original.amount_gross.toFixed(2)}` 
+                          : '–'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Datum:</span>
+                      <span className="font-medium">
+                        {duplicateInfo.original.receipt_date 
+                          ? format(new Date(duplicateInfo.original.receipt_date), 'dd.MM.yyyy', { locale: de })
+                          : '–'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <AlertDialogCancel onClick={handleCancelDuplicate}>
+                Abbrechen
+              </AlertDialogCancel>
+              <Button 
+                variant="outline"
+                onClick={handleViewOriginal}
+                className="flex items-center gap-2"
+              >
+                <Eye className="w-4 h-4" />
+                Original anzeigen
+              </Button>
+              <AlertDialogAction
+                onClick={handleProceedWithDuplicate}
+                className="bg-warning text-warning-foreground hover:bg-warning/90"
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Trotzdem hochladen
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );
