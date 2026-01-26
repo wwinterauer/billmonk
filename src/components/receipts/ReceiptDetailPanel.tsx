@@ -10,6 +10,7 @@ import {
   Info,
   FileText,
   ZoomIn,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -89,6 +90,8 @@ export function ReceiptDetailPanel({
   const [saving, setSaving] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [fileLoading, setFileLoading] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
 
@@ -114,11 +117,28 @@ export function ReceiptDetailPanel({
     };
   }, [amountGross, vatRate]);
 
+  // Load file URL helper
+  const loadFileUrl = async (filePath: string) => {
+    setFileLoading(true);
+    setFileError(null);
+    try {
+      const url = await getReceiptFileUrl(filePath);
+      setFileUrl(url);
+    } catch (error) {
+      console.error('Failed to load file URL:', error);
+      setFileError(error instanceof Error ? error.message : 'Fehler beim Laden der Vorschau');
+      setFileUrl(null);
+    } finally {
+      setFileLoading(false);
+    }
+  };
+
   // Load receipt data
   useEffect(() => {
     if (!receiptId || !open) {
       setReceipt(null);
       setFileUrl(null);
+      setFileError(null);
       return;
     }
 
@@ -140,8 +160,7 @@ export function ReceiptDetailPanel({
 
           // Load file URL
           if (data.file_url) {
-            const url = await getReceiptFileUrl(data.file_url);
-            setFileUrl(url);
+            await loadFileUrl(data.file_url);
           }
         }
       } catch (error) {
@@ -273,9 +292,32 @@ export function ReceiptDetailPanel({
                         isZoomed && "cursor-zoom-out",
                         !isZoomed && isImage && "cursor-zoom-in"
                       )}
-                      onClick={() => isImage && setIsZoomed(!isZoomed)}
+                      onClick={() => isImage && !fileLoading && !fileError && setIsZoomed(!isZoomed)}
                     >
-                      {fileUrl ? (
+                      {fileLoading ? (
+                        <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
+                          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                          <p>Vorschau wird geladen...</p>
+                        </div>
+                      ) : fileError ? (
+                        <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
+                          <AlertTriangle className="h-12 w-12 text-warning" />
+                          <p className="text-center">{fileError}</p>
+                          {receipt.file_url && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                loadFileUrl(receipt.file_url!);
+                              }}
+                            >
+                              <Loader2 className={cn("h-4 w-4 mr-2", fileLoading && "animate-spin")} />
+                              Erneut versuchen
+                            </Button>
+                          )}
+                        </div>
+                      ) : fileUrl ? (
                         isImage ? (
                           <img
                             src={fileUrl}
@@ -284,6 +326,11 @@ export function ReceiptDetailPanel({
                               "transition-transform duration-300",
                               isZoomed ? "scale-150" : "max-w-full max-h-[500px] object-contain"
                             )}
+                            crossOrigin="anonymous"
+                            onError={() => {
+                              setFileError('Bild konnte nicht geladen werden');
+                              setFileUrl(null);
+                            }}
                           />
                         ) : isPdf ? (
                           <iframe
@@ -304,7 +351,7 @@ export function ReceiptDetailPanel({
                         </div>
                       )}
 
-                      {isImage && !isZoomed && (
+                      {isImage && !isZoomed && fileUrl && !fileLoading && !fileError && (
                         <div className="absolute bottom-2 right-2 bg-background/80 rounded p-1">
                           <ZoomIn className="h-4 w-4 text-muted-foreground" />
                         </div>
@@ -315,7 +362,7 @@ export function ReceiptDetailPanel({
                       {fileUrl && (
                         <>
                           <Button variant="outline" size="sm" asChild>
-                            <a href={fileUrl} download={receipt.file_name}>
+                            <a href={fileUrl} download={receipt.file_name} target="_blank" rel="noopener noreferrer">
                               <Download className="h-4 w-4 mr-2" />
                               Download
                             </a>
