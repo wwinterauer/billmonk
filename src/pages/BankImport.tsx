@@ -34,7 +34,13 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useBankImport, parseCsvFile, ParsedTransaction, ParseResult } from '@/hooks/useBankImport';
+import { ImportPreviewModal } from '@/components/bank-import/ImportPreviewModal';
 import { ImportResultDialog } from '@/components/bank-import/ImportResultDialog';
+import { ImportHistoryTable } from '@/components/bank-import/ImportHistoryTable';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 
 const banks = [
   { value: 'erste-sparkasse', label: 'Erste Bank / Sparkasse' },
@@ -56,6 +62,9 @@ const steps = [
 
 export default function BankImport() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedBank, setSelectedBank] = useState<string>('');
@@ -63,12 +72,20 @@ export default function BankImport() {
   const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
+  
+  const [isParsing, setIsParsing] = useState(false);
+  const [parseResult, setParseResult] = useState<ParseResult | null>(null);
+  const [duplicateCount, setDuplicateCount] = useState(0);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | undefined>();
+  
   const [showResultDialog, setShowResultDialog] = useState(false);
   const [importResult, setImportResult] = useState({
-    totalTransactions: 0,
-    expenses: 0,
-    income: 0,
+    imported: 0,
+    skippedIncome: 0,
+    skippedDuplicates: 0,
     possibleMatches: 0,
   });
 
@@ -123,42 +140,212 @@ export default function BankImport() {
 
   const handleRemoveFile = () => {
     setFile(null);
+    setParseResult(null);
   };
 
-  const handleImport = async () => {
-    if (!file) {
+  // Check for duplicates in database
+  const checkDuplicates = async (transactions: ParsedTransaction[]): Promise<number> => {
+    if (!user?.id || transactions.length === 0) return 0;
+    
+    let duplicates = 0;
+    
+    // Check in batches to avoid too many queries
+    for (const tx of transactions) {
+      const { count } = await supabase
+        .from('bank_transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('transaction_date', format(tx.date, 'yyyy-MM-dd'))
+        .eq('amount', tx.amount)
+        .eq('description', tx.description);
+      
+      if (count && count > 0) duplicates++;
+    }
+    
+    return duplicates;
+  };
+
+  // Parse CSV and show preview
+  const handleParseAndPreview = async () => {
+    if (!file || !selectedBank) return;
+    
+    setIsParsing(true);
+    
+    try {
+      const result = await parseCsvFile(file, selectedBank);
+      
+      if (!result.success && result.transactions.length === 0) {
+        toast({
+          title: 'Datei konnte nicht gelesen werden',
+          description: result.errors[0] || 'Unbekannter Fehler beim Parsen.',
+          variant: 'destructive',
+        });
+        setIsParsing(false);
+        return;
+      }
+      
+      // Filter by date range if specified
+      let filteredTransactions = result.transactions;
+      if (dateFrom) {
+        filteredTransactions = filteredTransactions.filter(t => t.date >= dateFrom);
+      }
+      if (dateTo) {
+        filteredTransactions = filteredTransactions.filter(t => t.date <= dateTo);
+      }
+      
+      const filteredResult: ParseResult = {
+        ...result,
+        transactions: filteredTransactions,
+        totalRows: filteredTransactions.length,
+        expenses: filteredTransactions.filter(t => t.isExpense).length,
+        income: filteredTransactions.filter(t => !t.isExpense).length,
+      };
+      
+      setParseResult(filteredResult);
+      
+      // Check for duplicates if option is enabled
+      let duplicates = 0;
+      if (skipDuplicates) {
+        duplicates = await checkDuplicates(filteredTransactions.filter(t => !onlyExpenses || t.isExpense));
+        setDuplicateCount(duplicates);
+      }
+      
+      setShowPreviewModal(true);
+    } catch (error) {
       toast({
-        title: 'Keine Datei ausgewählt',
-        description: 'Bitte lade zuerst eine CSV-Datei hoch.',
+        title: 'Fehler beim Lesen',
+        description: error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.',
         variant: 'destructive',
       });
-      return;
+    } finally {
+      setIsParsing(false);
     }
+  };
 
-    if (!selectedBank) {
-      toast({
-        title: 'Bank nicht ausgewählt',
-        description: 'Bitte wähle deine Bank aus.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
+  // Import transactions to database
+  const handleConfirmImport = async () => {
+    if (!parseResult || !user?.id || !file) return;
+    
     setIsImporting(true);
-
-    // Simulate import process
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // Mock result
-    setImportResult({
-      totalTransactions: 42,
-      expenses: 38,
-      income: 4,
-      possibleMatches: 12,
-    });
-
-    setIsImporting(false);
-    setShowResultDialog(true);
+    
+    try {
+      // Filter transactions based on options
+      let transactionsToImport = parseResult.transactions;
+      if (onlyExpenses) {
+        transactionsToImport = transactionsToImport.filter(t => t.isExpense);
+      }
+      
+      const total = transactionsToImport.length;
+      let imported = 0;
+      let skippedDuplicates = 0;
+      const skippedIncome = onlyExpenses ? parseResult.income : 0;
+      
+      // Create import batch record first
+      const dateFromValue = transactionsToImport.length > 0
+        ? format(new Date(Math.min(...transactionsToImport.map(t => t.date.getTime()))), 'yyyy-MM-dd')
+        : null;
+      const dateToValue = transactionsToImport.length > 0
+        ? format(new Date(Math.max(...transactionsToImport.map(t => t.date.getTime()))), 'yyyy-MM-dd')
+        : null;
+      
+      const { data: importBatch, error: batchError } = await supabase
+        .from('bank_imports')
+        .insert({
+          user_id: user.id,
+          file_name: file.name,
+          total_rows: parseResult.totalRows,
+          date_from: dateFromValue,
+          date_to: dateToValue,
+        })
+        .select()
+        .single();
+      
+      if (batchError) throw batchError;
+      
+      // Import transactions
+      for (let i = 0; i < transactionsToImport.length; i++) {
+        const tx = transactionsToImport[i];
+        setImportProgress({ current: i + 1, total });
+        
+        // Check for duplicate if enabled
+        if (skipDuplicates) {
+          const { count } = await supabase
+            .from('bank_transactions')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('transaction_date', format(tx.date, 'yyyy-MM-dd'))
+            .eq('amount', tx.amount)
+            .eq('description', tx.description);
+          
+          if (count && count > 0) {
+            skippedDuplicates++;
+            continue;
+          }
+        }
+        
+        // Insert transaction
+        const { error: txError } = await supabase
+          .from('bank_transactions')
+          .insert({
+            user_id: user.id,
+            transaction_date: format(tx.date, 'yyyy-MM-dd'),
+            value_date: tx.valueDate ? format(tx.valueDate, 'yyyy-MM-dd') : null,
+            description: tx.description,
+            amount: tx.amount,
+            is_expense: tx.isExpense,
+            status: 'unmatched',
+            import_batch_id: importBatch.id,
+            raw_data: tx.rawData,
+          });
+        
+        if (txError) {
+          console.error('Transaction insert error:', txError);
+          continue;
+        }
+        
+        imported++;
+      }
+      
+      // Update import batch with final counts
+      await supabase
+        .from('bank_imports')
+        .update({
+          imported_rows: imported,
+          skipped_rows: skippedDuplicates + skippedIncome,
+        })
+        .eq('id', importBatch.id);
+      
+      // Check for possible matches with receipts
+      const { count: matchCount } = await supabase
+        .from('receipts')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .is('bank_transaction_id', null);
+      
+      setImportResult({
+        imported,
+        skippedIncome,
+        skippedDuplicates,
+        possibleMatches: matchCount || 0,
+      });
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['bank-imports'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+      
+      setShowPreviewModal(false);
+      setShowResultDialog(true);
+      
+    } catch (error) {
+      toast({
+        title: 'Import fehlgeschlagen',
+        description: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsImporting(false);
+      setImportProgress(undefined);
+    }
   };
 
   const handleImportAnother = () => {
@@ -167,6 +354,8 @@ export default function BankImport() {
     setSelectedBank('');
     setDateFrom(undefined);
     setDateTo(undefined);
+    setParseResult(null);
+    setDuplicateCount(0);
   };
 
   return (
@@ -383,13 +572,13 @@ export default function BankImport() {
                   <Button 
                     className="w-full" 
                     size="lg"
-                    onClick={handleImport}
-                    disabled={isImporting || !file || !selectedBank}
+                    onClick={handleParseAndPreview}
+                    disabled={isParsing || !file || !selectedBank}
                   >
-                    {isImporting ? (
+                    {isParsing ? (
                       <>
                         <div className="h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
-                        Importiere...
+                        Analysiere...
                       </>
                     ) : (
                       'Importieren'
@@ -397,6 +586,15 @@ export default function BankImport() {
                   </Button>
                 </CardContent>
               </Card>
+            </motion.div>
+
+            {/* Import History */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.3 }}
+            >
+              <ImportHistoryTable />
             </motion.div>
           </div>
 
@@ -463,6 +661,21 @@ export default function BankImport() {
           </div>
         </div>
       </div>
+
+      {/* Import Preview Modal */}
+      {parseResult && (
+        <ImportPreviewModal
+          open={showPreviewModal}
+          onOpenChange={setShowPreviewModal}
+          parseResult={parseResult}
+          onlyExpenses={onlyExpenses}
+          skipDuplicates={skipDuplicates}
+          duplicateCount={duplicateCount}
+          onConfirmImport={handleConfirmImport}
+          isImporting={isImporting}
+          importProgress={importProgress}
+        />
+      )}
 
       {/* Import Result Dialog */}
       <ImportResultDialog

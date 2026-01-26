@@ -1,4 +1,4 @@
-import { CheckCircle, ArrowRight, RefreshCw } from 'lucide-react';
+import { CheckCircle, ArrowRight, RefreshCw, Circle, Lightbulb } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
@@ -9,9 +9,9 @@ import {
 import { Button } from '@/components/ui/button';
 
 interface ImportResult {
-  totalTransactions: number;
-  expenses: number;
-  income: number;
+  imported: number;
+  skippedIncome: number;
+  skippedDuplicates: number;
   possibleMatches: number;
 }
 
@@ -40,30 +40,47 @@ export function ImportResultDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex flex-col items-center text-center">
-            <div className="h-16 w-16 rounded-full bg-success/10 flex items-center justify-center mb-4">
-              <CheckCircle className="h-8 w-8 text-success" />
+            <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-4">
+              <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
             </div>
             <DialogTitle className="text-xl">Import erfolgreich!</DialogTitle>
           </div>
         </DialogHeader>
         
         <div className="space-y-3 py-4">
-          <div className="flex justify-between items-center py-2 border-b border-border">
-            <span className="text-muted-foreground">Buchungen gefunden</span>
-            <span className="font-semibold">{result.totalTransactions}</span>
+          <div className="flex items-center gap-3 py-2">
+            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+            <span className="text-foreground">
+              <strong>{result.imported}</strong> Buchungen importiert
+            </span>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-border">
-            <span className="text-muted-foreground">Ausgaben (Abbuchungen)</span>
-            <span className="font-semibold">{result.expenses}</span>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b border-border">
-            <span className="text-muted-foreground">Einnahmen (ignoriert)</span>
-            <span className="font-semibold text-muted-foreground">{result.income}</span>
-          </div>
-          <div className="flex justify-between items-center py-2 bg-primary/5 rounded-lg px-3 -mx-3">
-            <span className="text-primary font-medium">Mögliche Matches mit Belegen</span>
-            <span className="font-bold text-primary">{result.possibleMatches}</span>
-          </div>
+          
+          {result.skippedIncome > 0 && (
+            <div className="flex items-center gap-3 py-2">
+              <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              <span className="text-muted-foreground">
+                {result.skippedIncome} Einnahmen ignoriert
+              </span>
+            </div>
+          )}
+          
+          {result.skippedDuplicates > 0 && (
+            <div className="flex items-center gap-3 py-2">
+              <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              <span className="text-muted-foreground">
+                {result.skippedDuplicates} Duplikate übersprungen
+              </span>
+            </div>
+          )}
+          
+          {result.possibleMatches > 0 && (
+            <div className="flex items-center gap-3 py-2 bg-primary/5 rounded-lg px-3 -mx-3">
+              <Lightbulb className="h-5 w-5 text-primary flex-shrink-0" />
+              <span className="text-primary font-medium">
+                {result.possibleMatches} mögliche Matches mit Belegen
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-2 pt-2">
