@@ -226,7 +226,7 @@ export function ExportFormatDialog({
   }, [selectedTemplate]);
 
   // Folder selection handler
-  const selectFolder = async () => {
+  const selectFolder = async (): Promise<boolean> => {
     try {
       const handle = await (window as unknown as { showDirectoryPicker: (options?: { mode?: string; startIn?: string }) => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker({
         mode: 'readwrite',
@@ -235,15 +235,24 @@ export function ExportFormatDialog({
       
       setSelectedFolderHandle(handle);
       setSelectedFolderName(handle.name);
+      setExportFolder('custom');
       toast({ title: `Ordner "${handle.name}" ausgewählt` });
+      return true;
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
         console.error('Fehler bei Ordner-Auswahl:', error);
+        
+        // Check if it's an iframe security error
+        const isSecurityError = (error as Error).name === 'SecurityError';
         toast({
           variant: 'destructive',
           title: 'Ordner konnte nicht ausgewählt werden',
+          description: isSecurityError 
+            ? 'Ordnerauswahl funktioniert nur in einem eigenen Tab. Öffne die App in einem neuen Tab.'
+            : undefined,
         });
       }
+      return false;
     }
   };
 
@@ -1166,10 +1175,7 @@ export function ExportFormatDialog({
                         variant={exportFolder === 'custom' ? 'default' : 'outline'}
                         size="sm"
                         className="flex-1"
-                        onClick={async () => {
-                          await selectFolder();
-                          setExportFolder('custom');
-                        }}
+                        onClick={() => selectFolder()}
                       >
                         <FolderOpen className="w-4 h-4 mr-2" />
                         Ordner wählen
