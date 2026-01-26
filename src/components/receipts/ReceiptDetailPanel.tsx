@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
-  X,
   Download,
   ExternalLink,
   Loader2,
@@ -10,7 +9,7 @@ import {
   Info,
   FileText,
   ZoomIn,
-  AlertTriangle,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +51,7 @@ import { useReceipts, type Receipt } from '@/hooks/useReceipts';
 import { useCategories } from '@/hooks/useCategories';
 import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
@@ -82,16 +82,17 @@ export function ReceiptDetailPanel({
   onUpdate 
 }: ReceiptDetailPanelProps) {
   const { toast } = useToast();
-  const { getReceipt, getReceiptFileUrl, updateReceipt, deleteReceipt } = useReceipts();
+  const { getReceipt, updateReceipt, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
 
   // State
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
-  const [fileError, setFileError] = useState<string | null>(null);
+  const [fileError, setFileError] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
 
@@ -118,28 +119,87 @@ export function ReceiptDetailPanel({
     };
   }, [amountGross, vatRate]);
 
-  // Load file URL helper
-  const loadFileUrl = async (filePath: string) => {
-    setFileLoading(true);
-    setFileError(null);
-    try {
-      const url = await getReceiptFileUrl(filePath);
-      setFileUrl(url);
-    } catch (error) {
-      console.error('Failed to load file URL:', error);
-      setFileError(error instanceof Error ? error.message : 'Fehler beim Laden der Vorschau');
-      setFileUrl(null);
-    } finally {
-      setFileLoading(false);
+  // File type detection
+  const isImage = useMemo(() => {
+    const imageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    const fileType = receipt?.file_type?.toLowerCase() || '';
+    const fileName = receipt?.file_name?.toLowerCase() || '';
+    return imageExts.some(ext => fileType === ext || fileName.endsWith('.' + ext));
+  }, [receipt?.file_type, receipt?.file_name]);
+
+  const isPdf = useMemo(() => {
+    const fileType = receipt?.file_type?.toLowerCase() || '';
+    const fileName = receipt?.file_name?.toLowerCase() || '';
+    return fileType === 'pdf' || fileName.endsWith('.pdf');
+  }, [receipt?.file_type, receipt?.file_name]);
+
+  // Load file as Blob URL
+  useEffect(() => {
+    let isMounted = true;
+    let blobUrl: string | null = null;
+
+    async function loadPreview() {
+      if (!receipt?.file_url) return;
+
+      setFileLoading(true);
+      setFileError(false);
+
+      try {
+        // 1. Get signed URL
+        const { data: signedData, error: signedError } = await supabase.storage
+          .from('receipts')
+          .createSignedUrl(receipt.file_url, 3600);
+
+        if (signedError || !signedData?.signedUrl) {
+          throw new Error('Could not get signed URL');
+        }
+
+        if (!isMounted) return;
+        setSignedUrl(signedData.signedUrl);
+
+        // 2. Fetch file as blob
+        const response = await fetch(signedData.signedUrl);
+        if (!response.ok) {
+          throw new Error('Could not fetch file');
+        }
+
+        const blob = await response.blob();
+        if (!isMounted) return;
+
+        // 3. Create blob URL
+        blobUrl = URL.createObjectURL(blob);
+        setPreviewBlobUrl(blobUrl);
+
+      } catch (error) {
+        console.error('Preview load error:', error);
+        if (isMounted) {
+          setFileError(true);
+        }
+      } finally {
+        if (isMounted) {
+          setFileLoading(false);
+        }
+      }
     }
-  };
+
+    loadPreview();
+
+    // Cleanup: revoke blob URL when component unmounts or file changes
+    return () => {
+      isMounted = false;
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
+  }, [receipt?.file_url]);
 
   // Load receipt data
   useEffect(() => {
     if (!receiptId || !open) {
       setReceipt(null);
-      setFileUrl(null);
-      setFileError(null);
+      setPreviewBlobUrl(null);
+      setSignedUrl(null);
+      setFileError(false);
       return;
     }
 
@@ -159,11 +219,6 @@ export function ReceiptDetailPanel({
           setVatRate(data.vat_rate?.toString() || '20');
           setPaymentMethod(data.payment_method || '');
           setNotes(data.notes || '');
-
-          // Load file URL
-          if (data.file_url) {
-            await loadFileUrl(data.file_url);
-          }
         }
       } catch (error) {
         toast({
@@ -178,6 +233,24 @@ export function ReceiptDetailPanel({
 
     loadReceipt();
   }, [receiptId, open]);
+
+  // Download/Open handlers using signedUrl
+  const handleDownload = () => {
+    if (signedUrl && receipt?.file_name) {
+      const link = document.createElement('a');
+      link.href = signedUrl;
+      link.download = receipt.file_name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleOpenInNewTab = () => {
+    if (signedUrl) {
+      window.open(signedUrl, '_blank');
+    }
+  };
 
   const handleSave = async (newStatus?: 'approved' | 'rejected') => {
     if (!receipt) return;
@@ -249,9 +322,6 @@ export function ReceiptDetailPanel({
     }).format(value);
   };
 
-  const isImage = receipt?.file_type && ['jpg', 'jpeg', 'png', 'webp'].includes(receipt.file_type.toLowerCase());
-  const isPdf = receipt?.file_type?.toLowerCase() === 'pdf';
-
   return (
     <>
       <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -295,41 +365,34 @@ export function ReceiptDetailPanel({
                       {fileLoading ? (
                         <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
                           <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                          <p>Vorschau wird geladen...</p>
+                          <p>Lade Vorschau...</p>
                         </div>
                       ) : fileError ? (
                         <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
-                          <AlertTriangle className="h-12 w-12 text-warning" />
-                          <p className="text-center">{fileError}</p>
-                          {receipt.file_url && (
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                loadFileUrl(receipt.file_url!);
-                              }}
-                            >
-                              <Loader2 className={cn("h-4 w-4 mr-2", fileLoading && "animate-spin")} />
-                              Erneut versuchen
+                          <AlertCircle className="h-12 w-12 text-muted-foreground" />
+                          <p className="text-center text-foreground mb-2">Vorschau konnte nicht geladen werden</p>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={handleDownload}>
+                              <Download className="h-4 w-4 mr-2" />
+                              Herunterladen
                             </Button>
-                          )}
+                            <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              In neuem Tab
+                            </Button>
+                          </div>
                         </div>
-                      ) : fileUrl ? (
+                      ) : previewBlobUrl ? (
                         isImage ? (
                           <>
                             <img
-                              src={fileUrl}
+                              src={previewBlobUrl}
                               alt={receipt.file_name || 'Beleg'}
                               className={cn(
                                 "transition-transform duration-300",
                                 isZoomed ? "scale-150" : "max-w-full max-h-[500px] object-contain"
                               )}
-                              crossOrigin="anonymous"
-                              onError={() => {
-                                setFileError('Bild konnte nicht geladen werden');
-                                setFileUrl(null);
-                              }}
+                              onError={() => setFileError(true)}
                             />
                             {!isZoomed && (
                               <div className="absolute bottom-2 right-2 bg-background/80 rounded p-1">
@@ -338,37 +401,28 @@ export function ReceiptDetailPanel({
                             )}
                           </>
                         ) : isPdf ? (
-                          <div className="flex flex-col items-center justify-center h-full p-8">
-                            <FileText className="h-20 w-20 text-muted-foreground mb-4" />
-                            <p className="text-foreground font-medium mb-2">{receipt.file_name}</p>
-                            <p className="text-muted-foreground text-sm mb-6">PDF-Vorschau nicht verfügbar</p>
-                            <div className="flex gap-2">
-                              <Button variant="outline" size="sm" asChild>
-                                <a href={fileUrl} download={receipt.file_name} target="_blank" rel="noopener noreferrer">
-                                  <Download className="h-4 w-4 mr-2" />
-                                  Herunterladen
-                                </a>
-                              </Button>
-                              <Button variant="outline" size="sm" asChild>
-                                <a href={fileUrl} target="_blank" rel="noopener noreferrer">
-                                  <ExternalLink className="h-4 w-4 mr-2" />
-                                  In neuem Tab öffnen
-                                </a>
-                              </Button>
-                            </div>
+                          <div className="h-[400px] w-full">
+                            <embed
+                              src={previewBlobUrl}
+                              type="application/pdf"
+                              className="w-full h-full"
+                            />
                           </div>
                         ) : (
                           <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
                             <FileText className="h-16 w-16" />
-                            <p>Vorschau nicht verfügbar</p>
-                            {fileUrl && (
-                              <Button variant="outline" size="sm" asChild>
-                                <a href={fileUrl} download={receipt.file_name} target="_blank" rel="noopener noreferrer">
-                                  <Download className="h-4 w-4 mr-2" />
-                                  Herunterladen
-                                </a>
+                            <p className="font-medium text-foreground">{receipt?.file_name}</p>
+                            <p className="text-sm">Vorschau nicht verfügbar</p>
+                            <div className="flex gap-2">
+                              <Button variant="outline" size="sm" onClick={handleDownload}>
+                                <Download className="h-4 w-4 mr-2" />
+                                Herunterladen
                               </Button>
-                            )}
+                              <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                In neuem Tab
+                              </Button>
+                            </div>
                           </div>
                         )
                       ) : (
