@@ -1,15 +1,18 @@
 import { useState, useMemo } from 'react';
-import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge, Download, Loader2 } from 'lucide-react';
+import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge, Download, Loader2, ArrowLeftRight, Users, ScanSearch, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { importVendorsFromReceipts } from '@/services/vendorMatchingService';
+import { findVendorDuplicates, type VendorDuplicateCandidate } from '@/services/vendorDuplicateService';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -99,6 +102,12 @@ export function VendorManagement() {
 
   // Import state
   const [isImporting, setIsImporting] = useState(false);
+
+  // Duplicate check state
+  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
+  const [vendorDuplicates, setVendorDuplicates] = useState<VendorDuplicateCandidate[]>([]);
+  const [showDuplicateResults, setShowDuplicateResults] = useState(false);
+  const [duplicateSensitivity, setDuplicateSensitivity] = useState(70);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -313,6 +322,87 @@ export function VendorManagement() {
     }
   };
 
+  // Vendor duplicate check
+  const startVendorDuplicateCheck = async () => {
+    setIsCheckingDuplicates(true);
+
+    try {
+      const duplicates = findVendorDuplicates(filteredVendors, duplicateSensitivity);
+      setVendorDuplicates(duplicates);
+      setShowDuplicateResults(true);
+
+      if (duplicates.length === 0) {
+        toast.success('Keine ähnlichen Lieferanten gefunden');
+      }
+    } catch (error) {
+      toast.error('Fehler bei der Duplikat-Prüfung');
+      console.error(error);
+    } finally {
+      setIsCheckingDuplicates(false);
+    }
+  };
+
+  // Dismiss a single duplicate from the list
+  const dismissDuplicate = (index: number) => {
+    setVendorDuplicates(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Open merge dialog for a specific duplicate pair
+  const openMergePairDialog = (duplicate: Vendor, original: Vendor) => {
+    setSelectedVendors([duplicate.id, original.id]);
+    setMergeTargetId(original.id);
+    setIsMergeOpen(true);
+    setShowDuplicateResults(false);
+  };
+
+  // Merge all suggested duplicates
+  const mergeAllSuggested = async () => {
+    if (vendorDuplicates.length === 0) return;
+
+    setIsMerging(true);
+    try {
+      for (const item of vendorDuplicates) {
+        const targetVendor = item.matchingVendor;
+        const sourceVendor = item.vendor;
+
+        // Collect all detected_names
+        const allDetectedNames = [
+          ...targetVendor.detected_names,
+          ...sourceVendor.detected_names,
+          sourceVendor.display_name
+        ];
+        const uniqueNames = [...new Set(allDetectedNames)];
+
+        // Update target vendor with combined detected_names
+        await supabase
+          .from('vendors')
+          .update({ detected_names: uniqueNames })
+          .eq('id', targetVendor.id);
+
+        // Move all receipts from source vendor to target
+        await supabase
+          .from('receipts')
+          .update({ vendor_id: targetVendor.id })
+          .eq('vendor_id', sourceVendor.id);
+
+        // Delete source vendor
+        await supabase
+          .from('vendors')
+          .delete()
+          .eq('id', sourceVendor.id);
+      }
+
+      toast.success(`${vendorDuplicates.length} Duplikate zusammengeführt`);
+      setShowDuplicateResults(false);
+      setVendorDuplicates([]);
+      fetchVendors();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Fehler beim Zusammenführen');
+    } finally {
+      setIsMerging(false);
+    }
+  };
+
   const getCategory = (categoryId: string | null): Category | null => {
     if (!categoryId) return null;
     return categories.find(c => c.id === categoryId) || null;
@@ -481,6 +571,18 @@ export function VendorManagement() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={startVendorDuplicateCheck} 
+            disabled={isCheckingDuplicates || filteredVendors.length < 2}
+          >
+            {isCheckingDuplicates ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <ScanSearch className="h-4 w-4 mr-2" />
+            )}
+            Duplikate prüfen
+          </Button>
           <Button variant="outline" onClick={handleImportFromReceipts} disabled={isImporting}>
             {isImporting ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1192,6 +1294,159 @@ export function VendorManagement() {
               )}
               Zusammenführen
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vendor Duplicate Results Dialog */}
+      <Dialog open={showDuplicateResults} onOpenChange={setShowDuplicateResults}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-warning" />
+              Ähnliche Lieferanten gefunden
+            </DialogTitle>
+            <DialogDescription>
+              Prüfe diese Lieferanten und führe sie bei Bedarf zusammen
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Sensitivity Slider */}
+          <div className="flex items-center gap-4 py-2 px-1">
+            <Label className="text-sm whitespace-nowrap">Mindest-Ähnlichkeit:</Label>
+            <Slider
+              value={[duplicateSensitivity]}
+              onValueChange={([v]) => setDuplicateSensitivity(v)}
+              min={50}
+              max={95}
+              step={5}
+              className="flex-1"
+            />
+            <span className="text-sm font-medium w-12">{duplicateSensitivity}%</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={startVendorDuplicateCheck}
+              disabled={isCheckingDuplicates}
+            >
+              {isCheckingDuplicates ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Neu prüfen'
+              )}
+            </Button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {vendorDuplicates.length === 0 ? (
+              <div className="text-center py-12">
+                <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
+                <p className="font-medium">Keine ähnlichen Lieferanten gefunden</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Alle Lieferanten sind ausreichend unterschiedlich
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {vendorDuplicates.map((item, i) => (
+                  <Card key={i} className="border-warning/30">
+                    <CardContent className="py-4">
+                      <div className="flex items-start gap-4">
+                        {/* Left Side: Possible Duplicate */}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
+                              Mögliches Duplikat
+                            </Badge>
+                          </div>
+                          <p className="font-medium">{item.vendor.display_name}</p>
+                          {item.vendor.legal_name && (
+                            <p className="text-sm text-muted-foreground">{item.vendor.legal_name}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {item.vendor.receipt_count} Belege • {formatCurrency(item.vendor.total_amount || 0)}
+                          </p>
+                        </div>
+
+                        {/* Center: Similarity */}
+                        <div className="flex flex-col items-center px-4">
+                          <div className={`
+                            w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold
+                            ${item.score >= 90 ? 'bg-destructive/10 text-destructive' :
+                              item.score >= 80 ? 'bg-warning/10 text-warning' :
+                              'bg-yellow-100 text-yellow-700'}
+                          `}>
+                            {item.score}%
+                          </div>
+                          <ArrowLeftRight className="w-4 h-4 text-muted-foreground my-2" />
+                          <div className="flex flex-wrap gap-1 justify-center max-w-[120px]">
+                            {item.matchReasons.slice(0, 2).map((reason, j) => (
+                              <Badge key={j} variant="outline" className="text-xs">
+                                {reason}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Right Side: Original */}
+                        <div className="flex-1 text-right">
+                          <div className="flex items-center justify-end gap-2 mb-1">
+                            <Badge variant="outline" className="bg-success/10 text-success border-success/30">
+                              Vorgeschlagenes Ziel
+                            </Badge>
+                          </div>
+                          <p className="font-medium">{item.matchingVendor.display_name}</p>
+                          {item.matchingVendor.legal_name && (
+                            <p className="text-sm text-muted-foreground">{item.matchingVendor.legal_name}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {item.matchingVendor.receipt_count} Belege • {formatCurrency(item.matchingVendor.total_amount || 0)}
+                          </p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex flex-col gap-2 ml-4">
+                          <Button
+                            size="sm"
+                            onClick={() => openMergePairDialog(item.vendor, item.matchingVendor)}
+                          >
+                            <Merge className="w-4 h-4 mr-1" />
+                            Zusammenführen
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => dismissDuplicate(i)}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Ignorieren
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="border-t pt-4">
+            <div className="flex items-center gap-2 mr-auto text-sm text-muted-foreground">
+              {vendorDuplicates.length} mögliche Duplikate
+            </div>
+            <Button variant="outline" onClick={() => setShowDuplicateResults(false)}>
+              Schließen
+            </Button>
+            {vendorDuplicates.length > 0 && (
+              <Button onClick={mergeAllSuggested} disabled={isMerging}>
+                {isMerging ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Merge className="w-4 h-4 mr-2" />
+                )}
+                Alle zusammenführen
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
