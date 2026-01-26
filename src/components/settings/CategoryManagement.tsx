@@ -32,6 +32,7 @@ import {
   Zap,
   FileText,
   RotateCcw,
+  Flower2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -103,6 +104,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Zap,
   FileText,
   FolderOpen,
+  Flower2,
 };
 
 const AVAILABLE_ICONS = Object.keys(ICON_MAP);
