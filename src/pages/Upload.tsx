@@ -9,7 +9,10 @@ import {
   Check,
   Loader2,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  Clock,
+  PenLine
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +20,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useToast } from '@/hooks/use-toast';
-import { useReceipts, type UploadProgress, type Receipt } from '@/hooks/useReceipts';
+import { useReceipts, type UploadProgress, type UploadStatus, type Receipt } from '@/hooks/useReceipts';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface FileUpload extends UploadProgress {
@@ -31,7 +34,7 @@ const Upload = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { validateFiles, uploadReceipt, ALLOWED_TYPES, MAX_FILE_SIZE, MAX_FILES } = useReceipts();
+  const { validateFiles, uploadAndProcessReceipt, ALLOWED_TYPES, MAX_FILE_SIZE, MAX_FILES } = useReceipts();
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -75,7 +78,7 @@ const Upload = () => {
 
     // Check total count including existing pending/uploading files
     const pendingCount = Array.from(uploads.values()).filter(
-      u => u.status === 'pending' || u.status === 'uploading'
+      u => u.status === 'pending' || u.status === 'uploading' || u.status === 'processing'
     ).length;
 
     if (pendingCount + validFiles.length > MAX_FILES) {
@@ -99,6 +102,7 @@ const Upload = () => {
         fileSize: file.size,
         progress: 0,
         status: 'pending',
+        statusText: 'Warten...',
         file,
         previewUrl: createPreviewUrl(file),
       };
@@ -120,22 +124,38 @@ const Upload = () => {
       const updated = new Map(prev);
       const current = updated.get(upload.id);
       if (current) {
-        updated.set(upload.id, { ...current, status: 'uploading', progress: 5 });
+        updated.set(upload.id, { 
+          ...current, 
+          status: 'uploading', 
+          progress: 5,
+          statusText: 'Wird hochgeladen...'
+        });
       }
       return updated;
     });
 
     try {
-      const receipt = await uploadReceipt(upload.file, (progress) => {
+      const result = await uploadAndProcessReceipt(upload.file, (progress, statusText) => {
         setUploads(prev => {
           const updated = new Map(prev);
           const current = updated.get(upload.id);
           if (current) {
-            updated.set(upload.id, { ...current, progress });
+            const status: UploadStatus = progress < 50 ? 'uploading' : 'processing';
+            updated.set(upload.id, { 
+              ...current, 
+              progress,
+              status,
+              statusText: statusText || current.statusText
+            });
           }
           return updated;
         });
       });
+
+      const finalStatus: UploadStatus = result.aiSuccess ? 'complete' : 'complete-manual';
+      const finalStatusText = result.aiSuccess 
+        ? `KI: ${Math.round((result.aiConfidence || 0) * 100)}%` 
+        : 'Manuelle Eingabe';
 
       setUploads(prev => {
         const updated = new Map(prev);
@@ -143,18 +163,28 @@ const Upload = () => {
         if (current) {
           updated.set(upload.id, { 
             ...current, 
-            status: 'complete', 
+            status: finalStatus, 
             progress: 100,
-            receipt 
+            statusText: finalStatusText,
+            receipt: result.receipt,
+            aiConfidence: result.aiConfidence
           });
         }
         return updated;
       });
 
-      toast({
-        title: 'Beleg hochgeladen',
-        description: `${truncateFileName(upload.fileName, 25)} wurde erfolgreich gespeichert.`,
-      });
+      if (result.aiSuccess) {
+        toast({
+          title: 'Beleg analysiert',
+          description: `${truncateFileName(upload.fileName, 25)} - bitte überprüfen`,
+        });
+      } else {
+        toast({
+          title: 'Beleg hochgeladen',
+          description: `${truncateFileName(upload.fileName, 25)} - bitte manuell ausfüllen`,
+          variant: 'default',
+        });
+      }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
@@ -167,6 +197,7 @@ const Upload = () => {
             ...current, 
             status: 'error', 
             progress: 0,
+            statusText: 'Fehler',
             error: errorMessage 
           });
         }
@@ -218,26 +249,34 @@ const Upload = () => {
   };
 
   const uploadsArray = Array.from(uploads.values());
-  const completedCount = uploadsArray.filter(u => u.status === 'complete').length;
-  const isAnyUploading = uploadsArray.some(u => u.status === 'uploading');
-  const canRemove = (status: UploadProgress['status']) => status !== 'uploading';
+  const completedCount = uploadsArray.filter(u => u.status === 'complete' || u.status === 'complete-manual').length;
+  const isAnyProcessing = uploadsArray.some(u => u.status === 'uploading' || u.status === 'processing');
+  const canRemove = (status: UploadStatus) => status !== 'uploading' && status !== 'processing';
 
   const handleContinue = () => {
-    toast({
-      title: 'Belege werden verarbeitet',
-      description: `${completedCount} Beleg(e) werden von der KI analysiert...`,
-    });
-    navigate('/review');
+    navigate('/expenses');
   };
 
   const getStatusIcon = (upload: FileUpload) => {
     switch (upload.status) {
       case 'uploading':
         return <Loader2 className="h-5 w-5 text-primary animate-spin" />;
+      case 'processing':
+        return (
+          <div className="relative">
+            <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+          </div>
+        );
       case 'complete':
         return (
           <div className="h-8 w-8 rounded-full bg-success flex items-center justify-center">
             <Check className="h-4 w-4 text-success-foreground" />
+          </div>
+        );
+      case 'complete-manual':
+        return (
+          <div className="h-8 w-8 rounded-full bg-warning flex items-center justify-center">
+            <PenLine className="h-4 w-4 text-warning-foreground" />
           </div>
         );
       case 'error':
@@ -247,8 +286,47 @@ const Upload = () => {
           </div>
         );
       default:
-        return <Loader2 className="h-5 w-5 text-muted-foreground" />;
+        return <Clock className="h-5 w-5 text-muted-foreground" />;
     }
+  };
+
+  const getStatusBadge = (upload: FileUpload) => {
+    if (upload.status === 'complete' && upload.aiConfidence !== undefined) {
+      const confidence = upload.aiConfidence;
+      let variant: 'default' | 'secondary' | 'destructive' | 'outline' = 'default';
+      
+      if (confidence >= 0.8) {
+        variant = 'default';
+      } else if (confidence >= 0.5) {
+        variant = 'secondary';
+      } else {
+        variant = 'destructive';
+      }
+
+      return (
+        <Badge variant={variant} className="text-xs">
+          KI: {Math.round(confidence * 100)}%
+        </Badge>
+      );
+    }
+
+    if (upload.status === 'complete-manual') {
+      return (
+        <Badge variant="outline" className="text-xs">
+          Manuelle Eingabe
+        </Badge>
+      );
+    }
+
+    if (upload.statusText && (upload.status === 'uploading' || upload.status === 'processing')) {
+      return (
+        <span className="text-xs text-muted-foreground">
+          {upload.statusText}
+        </span>
+      );
+    }
+
+    return null;
   };
 
   const getThumbnail = (upload: FileUpload) => {
@@ -329,6 +407,10 @@ const Upload = () => {
                 <p className="text-sm text-muted-foreground mt-4">
                   PDF, JPG, PNG, WebP bis {MAX_FILE_SIZE / 1024 / 1024}MB • Max. {MAX_FILES} Dateien
                 </p>
+                <div className="flex items-center justify-center gap-2 mt-4 text-sm text-primary">
+                  <Sparkles className="h-4 w-4" />
+                  <span>KI-Erkennung analysiert automatisch Lieferant, Betrag & MwSt</span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -407,16 +489,16 @@ const Upload = () => {
                     <CardTitle className="text-lg">Hochgeladene Dateien</CardTitle>
                     {completedCount > 0 && (
                       <p className="text-sm text-muted-foreground mt-1">
-                        {completedCount} Beleg{completedCount !== 1 ? 'e' : ''} hochgeladen
+                        {completedCount} Beleg{completedCount !== 1 ? 'e' : ''} verarbeitet
                       </p>
                     )}
                   </div>
-                  {completedCount > 0 && !isAnyUploading && (
+                  {completedCount > 0 && !isAnyProcessing && (
                     <Button 
                       className="gradient-primary hover:opacity-90"
                       onClick={handleContinue}
                     >
-                      Zur Überprüfung
+                      Zur Übersicht
                     </Button>
                   )}
                 </CardHeader>
@@ -432,6 +514,8 @@ const Upload = () => {
                           flex items-center gap-4 p-4 rounded-lg transition-colors
                           ${upload.status === 'error' 
                             ? 'bg-destructive/10 border border-destructive/20' 
+                            : upload.status === 'complete-manual'
+                            ? 'bg-warning/10 border border-warning/20'
                             : 'bg-muted/30'
                           }
                         `}
@@ -439,14 +523,22 @@ const Upload = () => {
                         {getThumbnail(upload)}
                         
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-foreground truncate">
-                            {truncateFileName(upload.fileName)}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-foreground truncate">
+                              {truncateFileName(upload.fileName)}
+                            </p>
+                            {getStatusBadge(upload)}
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             {formatFileSize(upload.fileSize)}
                           </p>
-                          {upload.status === 'uploading' && (
-                            <Progress value={upload.progress} className="h-1.5 mt-2" />
+                          {(upload.status === 'uploading' || upload.status === 'processing') && (
+                            <div className="mt-2">
+                              <Progress value={upload.progress} className="h-1.5" />
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {upload.progress < 50 ? 'Upload' : 'KI-Analyse'}: {upload.progress}%
+                              </p>
+                            </div>
                           )}
                           {upload.status === 'error' && upload.error && (
                             <p className="text-sm text-destructive mt-1 flex items-center gap-1">
