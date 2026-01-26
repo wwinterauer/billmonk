@@ -78,11 +78,13 @@ import { useReceipts, type Receipt } from '@/hooks/useReceipts';
 import { useCategories } from '@/hooks/useCategories';
 import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
 import { ReceiptPreviewDialog } from '@/components/receipts/ReceiptPreviewDialog';
+import { DuplicateComparisonModal } from '@/components/receipts/DuplicateComparisonModal';
 import { ExportDialog, exportAsCSV, exportAsExcel } from '@/components/exports/ExportDialog';
 import { ExportTemplateEditor } from '@/components/exports/ExportTemplateEditor';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { Copy } from 'lucide-react';
 
 type SortField = 'receipt_date' | 'vendor' | 'invoice_number' | 'amount_gross';
 type SortDirection = 'asc' | 'desc';
@@ -108,12 +110,13 @@ const INVOICE_FILTER_OPTIONS = [
 
 const ITEMS_PER_PAGE = 20;
 
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   pending: { label: 'Wird verarbeitet', color: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' },
   processing: { label: 'In Bearbeitung', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
   review: { label: 'Überprüfen', color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
   approved: { label: 'Freigegeben', color: 'bg-green-500/10 text-green-600 border-green-500/20' },
   rejected: { label: 'Abgelehnt', color: 'bg-red-500/10 text-red-600 border-red-500/20' },
+  duplicate: { label: 'Duplikat', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
 };
 
 type DateRangePreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'thisYear' | 'lastYear' | 'all' | 'custom';
@@ -224,6 +227,13 @@ const Expenses = () => {
   const [previewReceiptId, setPreviewReceiptId] = useState<string | null>(null);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
 
+  // Duplicate comparison state
+  const [duplicateComparisonOpen, setDuplicateComparisonOpen] = useState(false);
+  const [duplicateComparisonIds, setDuplicateComparisonIds] = useState<{ duplicateId: string | null; originalId: string | null }>({
+    duplicateId: null,
+    originalId: null
+  });
+
   const openReceiptDetail = (id: string) => {
     setSelectedReceiptId(id);
     setDetailPanelOpen(true);
@@ -242,6 +252,11 @@ const Expenses = () => {
   const closeReceiptPreview = () => {
     setPreviewDialogOpen(false);
     setPreviewReceiptId(null);
+  };
+
+  const openDuplicateComparison = (duplicateId: string, originalId: string) => {
+    setDuplicateComparisonIds({ duplicateId, originalId });
+    setDuplicateComparisonOpen(true);
   };
 
   // Load receipts
@@ -1218,6 +1233,18 @@ const Expenses = () => {
                           )}
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
+                              {/* Duplicate indicator */}
+                              {receipt.is_duplicate && receipt.duplicate_of && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-warning hover:text-warning"
+                                  onClick={() => openDuplicateComparison(receipt.id, receipt.duplicate_of!)}
+                                  title={`Duplikat (${receipt.duplicate_score || 0}%)`}
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -1376,6 +1403,15 @@ const Expenses = () => {
       <ExportTemplateEditor
         open={exportEditorOpen}
         onClose={() => setExportEditorOpen(false)}
+      />
+
+      {/* Duplicate Comparison Modal */}
+      <DuplicateComparisonModal
+        open={duplicateComparisonOpen}
+        onOpenChange={setDuplicateComparisonOpen}
+        duplicateId={duplicateComparisonIds.duplicateId}
+        originalId={duplicateComparisonIds.originalId}
+        onRefresh={loadReceipts}
       />
     </DashboardLayout>
   );

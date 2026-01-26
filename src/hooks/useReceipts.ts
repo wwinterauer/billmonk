@@ -17,7 +17,7 @@ export interface Receipt {
   file_url: string | null;
   file_name: string | null;
   file_type: string | null;
-  status: 'pending' | 'processing' | 'review' | 'approved' | 'rejected';
+  status: 'pending' | 'processing' | 'review' | 'approved' | 'rejected' | 'duplicate';
   vendor: string | null;
   vendor_brand: string | null;
   vendor_id: string | null;
@@ -37,6 +37,12 @@ export interface Receipt {
   ai_processed_at: string | null;
   bank_transaction_id: string | null;
   custom_filename: string | null;
+  // Duplicate detection fields
+  file_hash: string | null;
+  is_duplicate: boolean | null;
+  duplicate_of: string | null;
+  duplicate_score: number | null;
+  duplicate_checked_at: string | null;
   created_at: string;
   updated_at: string;
 }
