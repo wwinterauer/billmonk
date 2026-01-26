@@ -10,6 +10,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
+import BankImport from "./pages/BankImport";
+import Reconciliation from "./pages/Reconciliation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,10 +60,18 @@ const App = () => (
               } 
             />
             <Route 
-              path="/matching" 
+              path="/reconciliation" 
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <Reconciliation />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/bank-import" 
+              element={
+                <ProtectedRoute>
+                  <BankImport />
                 </ProtectedRoute>
               } 
             />

@@ -12,7 +12,8 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  User
+  User,
+  FileUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +32,8 @@ const navigation = [
   { name: 'Belege hochladen', href: '/upload', icon: Upload },
   { name: 'Review', href: '/review', icon: CheckCircle, badge: 5 },
   { name: 'Alle Ausgaben', href: '/expenses', icon: Receipt },
-  { name: 'Kontoabgleich', href: '/matching', icon: Building2 },
+  { name: 'Kontoabgleich', href: '/reconciliation', icon: Building2 },
+  { name: 'Konto-Import', href: '/bank-import', icon: FileUp },
   { name: 'Berichte', href: '/reports', icon: BarChart3 },
   { name: 'Einstellungen', href: '/settings', icon: Settings },
 ];
