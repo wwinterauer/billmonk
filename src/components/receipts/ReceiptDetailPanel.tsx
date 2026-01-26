@@ -390,14 +390,25 @@ export function ReceiptDetailPanel({
   const handleVendorSelect = useCallback((vendorData: {
     id: string;
     display_name: string;
+    legal_name: string | null;
     default_category_id: string | null;
     default_vat_rate: number | null;
     default_category: { id: string; name: string; color: string | null } | null;
   }) => {
-    setVendor(vendorData.display_name);
+    // Set legal name as the main vendor field (or display_name as fallback)
+    const legalName = vendorData.legal_name || vendorData.display_name;
+    setVendor(legalName);
     setSelectedVendorId(vendorData.id);
 
-    const applied: string[] = [];
+    const applied: string[] = ['Lieferant'];
+
+    // Set brand name if different from legal name
+    if (vendorData.legal_name && vendorData.display_name !== vendorData.legal_name) {
+      setVendorBrand(vendorData.display_name);
+      applied.push('Markenname');
+    } else {
+      setVendorBrand('');
+    }
 
     // Apply default category if not already set
     if (vendorData.default_category && !category) {
@@ -411,11 +422,9 @@ export function ReceiptDetailPanel({
       applied.push('MwSt-Satz');
     }
 
-    if (applied.length > 0) {
-      toast({
-        title: `${applied.join(' und ')} vom Lieferanten übernommen`,
-      });
-    }
+    toast({
+      title: `${applied.join(', ')} vom Lieferanten übernommen`,
+    });
   }, [category, vatRate, toast]);
 
   // Download/Open handlers using signedUrl
