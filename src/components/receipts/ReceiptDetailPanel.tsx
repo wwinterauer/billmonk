@@ -100,6 +100,8 @@ import {
   type NamingSettings 
 } from '@/lib/filenameUtils';
 import { AlertTriangle } from 'lucide-react';
+import { useCorrectionTracking, type CorrectionData } from '@/hooks/useCorrectionTracking';
+import { LEARNABLE_FIELDS } from '@/types/learning';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
@@ -145,6 +147,7 @@ export function ReceiptDetailPanel({
   const { user } = useAuth();
   const { getReceipt, updateReceipt, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
+  const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -757,6 +760,39 @@ export function ReceiptDetailPanel({
       }
 
       await updateReceipt(receipt.id, updateData as Partial<Receipt>);
+
+      // Track corrections for AI learning (only if vendor is assigned)
+      if (selectedVendorId) {
+        const corrections: CorrectionData[] = [];
+        
+        for (const field of LEARNABLE_FIELDS) {
+          const fieldId = field.id;
+          const originalValue = originalReceipt[fieldId as keyof Receipt];
+          const newValue = currentValues[fieldId];
+          
+          // Normalize values for comparison
+          const normalizedOriginal = originalValue === undefined ? null : originalValue;
+          const normalizedNew = newValue === undefined ? null : newValue;
+          
+          if (String(normalizedOriginal || '') !== String(normalizedNew || '')) {
+            corrections.push({
+              fieldName: fieldId,
+              detectedValue: normalizedOriginal,
+              correctedValue: normalizedNew,
+              receiptId: receipt.id,
+              vendorId: selectedVendorId
+            });
+          }
+        }
+        
+        if (corrections.length > 0) {
+          // Track corrections for AI learning
+          trackCorrections(corrections);
+        } else {
+          // No corrections = AI was correct, track successful prediction
+          trackSuccessfulPrediction(receipt.id, selectedVendorId);
+        }
+      }
 
       // Reset AI changes state
       setHasUnsavedAiChanges(false);
