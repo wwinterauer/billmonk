@@ -14,7 +14,8 @@ import {
   Save,
   SkipForward,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -94,6 +95,8 @@ const Review = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     vendor: '',
@@ -134,17 +137,24 @@ const Review = () => {
 
   // Load image for current receipt
   const loadImage = async (receipt: Receipt) => {
+    setImageLoading(true);
+    setImageError(null);
+    setImageUrl(null);
+    
     if (receipt.file_url) {
       try {
         const url = await getReceiptFileUrl(receipt.file_url);
         setImageUrl(url);
       } catch (error) {
         console.error('Failed to load image:', error);
+        setImageError(error instanceof Error ? error.message : 'Fehler beim Laden der Vorschau');
         setImageUrl(null);
       }
     } else {
-      setImageUrl(null);
+      setImageError('Keine Datei vorhanden');
     }
+    
+    setImageLoading(false);
   };
 
   // Populate form with receipt data
@@ -479,15 +489,53 @@ const Review = () => {
                     <div className="sticky top-6">
                       <div 
                         className="relative aspect-[3/4] bg-muted rounded-lg overflow-hidden cursor-pointer group"
-                        onClick={() => setLightboxOpen(true)}
+                        onClick={() => imageUrl && setLightboxOpen(true)}
                       >
-                        {imageUrl ? (
+                        {imageLoading ? (
+                          <div className="flex flex-col items-center justify-center h-full">
+                            <Loader2 className="h-10 w-10 animate-spin text-primary mb-2" />
+                            <p className="text-sm text-muted-foreground">Vorschau wird geladen...</p>
+                          </div>
+                        ) : imageError ? (
+                          <div className="flex flex-col items-center justify-center h-full p-4">
+                            <AlertTriangle className="h-12 w-12 text-warning mb-3" />
+                            <p className="text-sm text-muted-foreground text-center mb-4">{imageError}</p>
+                            {currentReceipt?.file_url && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (currentReceipt) {
+                                    loadImage(currentReceipt);
+                                  }
+                                }}
+                              >
+                                <Loader2 className={cn("h-4 w-4 mr-2", imageLoading && "animate-spin")} />
+                                Erneut versuchen
+                              </Button>
+                            )}
+                          </div>
+                        ) : imageUrl ? (
                           <>
-                            <img 
-                              src={imageUrl} 
-                              alt={currentReceipt?.file_name || 'Beleg'}
-                              className="w-full h-full object-contain"
-                            />
+                            {currentReceipt?.file_type?.toLowerCase() === 'pdf' ? (
+                              <iframe 
+                                src={imageUrl}
+                                title="PDF Vorschau"
+                                className="w-full h-full border-0"
+                              />
+                            ) : (
+                              <img 
+                                src={imageUrl} 
+                                alt={currentReceipt?.file_name || 'Beleg'}
+                                className="w-full h-full object-contain"
+                                crossOrigin="anonymous"
+                                onError={() => {
+                                  setImageError('Bild konnte nicht geladen werden');
+                                  setImageUrl(null);
+                                }}
+                              />
+                            )}
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <ZoomIn className="h-8 w-8 text-white" />
                             </div>
@@ -502,16 +550,29 @@ const Review = () => {
                       <p className="text-sm text-muted-foreground mt-2 truncate text-center">
                         {currentReceipt?.file_name}
                       </p>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="w-full mt-2"
-                        onClick={() => setLightboxOpen(true)}
-                        disabled={!imageUrl}
-                      >
-                        <ZoomIn className="h-4 w-4 mr-2" />
-                        Vergrößern
-                      </Button>
+                      <div className="flex gap-2 mt-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => setLightboxOpen(true)}
+                          disabled={!imageUrl || imageLoading}
+                        >
+                          <ZoomIn className="h-4 w-4 mr-2" />
+                          Vergrößern
+                        </Button>
+                        {imageUrl && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            asChild
+                          >
+                            <a href={imageUrl} download={currentReceipt?.file_name} target="_blank" rel="noopener noreferrer">
+                              <Download className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -826,17 +887,51 @@ const Review = () => {
         <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
           <DialogContent className="max-w-4xl h-[90vh]">
             <DialogHeader>
-              <DialogTitle>{currentReceipt?.file_name}</DialogTitle>
+              <DialogTitle className="flex items-center justify-between">
+                <span className="truncate">{currentReceipt?.file_name}</span>
+                {imageUrl && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    asChild
+                    className="ml-2"
+                  >
+                    <a href={imageUrl} download={currentReceipt?.file_name} target="_blank" rel="noopener noreferrer">
+                      <Download className="h-4 w-4 mr-2" />
+                      Download
+                    </a>
+                  </Button>
+                )}
+              </DialogTitle>
             </DialogHeader>
             <div className="flex-1 overflow-auto flex items-center justify-center">
               {imageUrl ? (
-                <img 
-                  src={imageUrl} 
-                  alt={currentReceipt?.file_name || 'Beleg'}
-                  className="max-w-full max-h-full object-contain"
-                />
+                currentReceipt?.file_type?.toLowerCase() === 'pdf' ? (
+                  <iframe 
+                    src={imageUrl}
+                    title="PDF Vorschau"
+                    className="w-full h-full border-0"
+                  />
+                ) : (
+                  <img 
+                    src={imageUrl} 
+                    alt={currentReceipt?.file_name || 'Beleg'}
+                    className="max-w-full max-h-full object-contain"
+                    crossOrigin="anonymous"
+                    onError={() => {
+                      toast({
+                        variant: 'destructive',
+                        title: 'Bild konnte nicht geladen werden',
+                        description: 'Bitte versuchen Sie es erneut oder laden Sie die Datei herunter.',
+                      });
+                    }}
+                  />
+                )
               ) : (
-                <div className="text-muted-foreground">Keine Vorschau verfügbar</div>
+                <div className="flex flex-col items-center gap-4 text-muted-foreground">
+                  <FileText className="h-16 w-16" />
+                  <p>Keine Vorschau verfügbar</p>
+                </div>
               )}
             </div>
           </DialogContent>
