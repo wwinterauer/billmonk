@@ -14,6 +14,7 @@ import Review from "./pages/Review";
 import Expenses from "./pages/Expenses";
 import BankImport from "./pages/BankImport";
 import Reconciliation from "./pages/Reconciliation";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -89,7 +90,7 @@ const App = () => (
               path="/settings" 
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <Settings />
                 </ProtectedRoute>
               } 
             />
