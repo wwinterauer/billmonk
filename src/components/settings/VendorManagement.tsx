@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +48,9 @@ const VAT_RATES = [
   { value: '0', label: '0%' },
 ];
 
+type SortOption = 'receipt_count_desc' | 'receipt_count_asc' | 'total_amount_desc' | 'total_amount_asc' | 'name_asc' | 'name_desc' | 'created_desc';
+type AdditionalFilter = 'all' | 'with_category' | 'without_category' | 'with_vat' | 'multiple_variants';
+
 export function VendorManagement() {
   const { vendors, loading, addVendor, updateVendor, deleteVendor } = useVendors();
   const { categories } = useCategories();
@@ -54,6 +58,12 @@ export function VendorManagement() {
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [deleteConfirmVendor, setDeleteConfirmVendor] = useState<Vendor | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<SortOption>('receipt_count_desc');
+  const [additionalFilter, setAdditionalFilter] = useState<AdditionalFilter>('all');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -148,12 +158,90 @@ export function VendorManagement() {
     return category?.name || '-';
   };
 
+  const getCategoryColor = (categoryId: string | null) => {
+    if (!categoryId) return null;
+    const category = categories.find(c => c.id === categoryId);
+    return category?.color || null;
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('de-DE', {
       style: 'currency',
       currency: 'EUR',
     }).format(amount);
   };
+
+  const resetFilters = () => {
+    setSearchQuery('');
+    setCategoryFilter('all');
+    setSortBy('receipt_count_desc');
+    setAdditionalFilter('all');
+  };
+
+  // Filter and sort vendors
+  const filteredVendors = useMemo(() => {
+    let result = [...vendors];
+
+    // Text search
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(v =>
+        v.display_name.toLowerCase().includes(query) ||
+        v.legal_name?.toLowerCase().includes(query) ||
+        v.detected_names.some(n => n.toLowerCase().includes(query)) ||
+        v.notes?.toLowerCase().includes(query)
+      );
+    }
+
+    // Category filter
+    if (categoryFilter === 'none') {
+      result = result.filter(v => !v.default_category_id);
+    } else if (categoryFilter !== 'all') {
+      result = result.filter(v => v.default_category_id === categoryFilter);
+    }
+
+    // Additional filters
+    switch (additionalFilter) {
+      case 'with_category':
+        result = result.filter(v => v.default_category_id);
+        break;
+      case 'without_category':
+        result = result.filter(v => !v.default_category_id);
+        break;
+      case 'with_vat':
+        result = result.filter(v => v.default_vat_rate !== null);
+        break;
+      case 'multiple_variants':
+        result = result.filter(v => v.detected_names.length > 1);
+        break;
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'receipt_count_desc':
+          return b.receipt_count - a.receipt_count;
+        case 'receipt_count_asc':
+          return a.receipt_count - b.receipt_count;
+        case 'total_amount_desc':
+          return b.total_amount - a.total_amount;
+        case 'total_amount_asc':
+          return a.total_amount - b.total_amount;
+        case 'name_asc':
+          return a.display_name.localeCompare(b.display_name);
+        case 'name_desc':
+          return b.display_name.localeCompare(a.display_name);
+        case 'created_desc':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [vendors, searchQuery, categoryFilter, additionalFilter, sortBy]);
+
+  const hasActiveFilters = searchQuery || categoryFilter !== 'all' || additionalFilter !== 'all';
 
   if (loading) {
     return (
@@ -191,69 +279,191 @@ export function VendorManagement() {
           </Button>
         </div>
       ) : (
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Rechtlicher Name</TableHead>
-                <TableHead>Standardkategorie</TableHead>
-                <TableHead>MwSt.</TableHead>
-                <TableHead className="text-right">Belege</TableHead>
-                <TableHead className="text-right">Gesamt</TableHead>
-                <TableHead className="w-[100px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {vendors.map((vendor) => (
-                <TableRow key={vendor.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {vendor.display_name}
-                      {vendor.website && (
-                        <a
-                          href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
+        <>
+          {/* Filter Bar */}
+          <div className="flex flex-wrap items-center gap-4 p-4 bg-muted/30 rounded-lg">
+            {/* Search Field */}
+            <div className="flex-1 min-w-[250px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Suche nach Name, Varianten, Notizen..."
+                  className="pl-10 pr-10"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  >
+                    <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Category Filter */}
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Alle Kategorien" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle Kategorien</SelectItem>
+                <SelectItem value="none">Ohne Kategorie</SelectItem>
+                <Separator className="my-1" />
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    <span className="flex items-center">
+                      {cat.color && (
+                        <span
+                          className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
+                          style={{ backgroundColor: cat.color }}
+                        />
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {vendor.legal_name || '-'}
-                  </TableCell>
-                  <TableCell>{getCategoryName(vendor.default_category_id)}</TableCell>
-                  <TableCell>
-                    {vendor.default_vat_rate !== null ? `${vendor.default_vat_rate}%` : '-'}
-                  </TableCell>
-                  <TableCell className="text-right">{vendor.receipt_count}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(vendor.total_amount)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(vendor)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteConfirmVendor(vendor)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                      {cat.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Sort */}
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Sortieren nach..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="receipt_count_desc">Meiste Belege</SelectItem>
+                <SelectItem value="receipt_count_asc">Wenigste Belege</SelectItem>
+                <SelectItem value="total_amount_desc">Höchster Umsatz</SelectItem>
+                <SelectItem value="total_amount_asc">Niedrigster Umsatz</SelectItem>
+                <SelectItem value="name_asc">Name A-Z</SelectItem>
+                <SelectItem value="name_desc">Name Z-A</SelectItem>
+                <SelectItem value="created_desc">Neueste zuerst</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Additional Filters */}
+            <Select value={additionalFilter} onValueChange={(v) => setAdditionalFilter(v as AdditionalFilter)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Weitere Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle anzeigen</SelectItem>
+                <SelectItem value="with_category">Mit Standard-Kategorie</SelectItem>
+                <SelectItem value="without_category">Ohne Standard-Kategorie</SelectItem>
+                <SelectItem value="with_vat">Mit Standard-MwSt</SelectItem>
+                <SelectItem value="multiple_variants">Mehrere Varianten</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Reset Filters */}
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={resetFilters}>
+                <RotateCcw className="w-4 h-4 mr-1" />
+                Zurücksetzen
+              </Button>
+            )}
+          </div>
+
+          {/* Results Info */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {filteredVendors.length} von {vendors.length} Lieferanten
+              {searchQuery && <span> für "{searchQuery}"</span>}
+            </p>
+          </div>
+
+          {/* Table */}
+          {filteredVendors.length === 0 ? (
+            <div className="text-center py-12 border rounded-lg bg-muted/30">
+              <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">Keine Ergebnisse</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Keine Lieferanten gefunden, die deinen Filterkriterien entsprechen.
+              </p>
+              <Button variant="outline" onClick={resetFilters}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Filter zurücksetzen
+              </Button>
+            </div>
+          ) : (
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Rechtlicher Name</TableHead>
+                    <TableHead>Standardkategorie</TableHead>
+                    <TableHead>MwSt.</TableHead>
+                    <TableHead className="text-right">Belege</TableHead>
+                    <TableHead className="text-right">Gesamt</TableHead>
+                    <TableHead className="w-[100px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredVendors.map((vendor) => (
+                    <TableRow key={vendor.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {vendor.display_name}
+                          {vendor.website && (
+                            <a
+                              href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {vendor.legal_name || '-'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getCategoryColor(vendor.default_category_id) && (
+                            <span
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: getCategoryColor(vendor.default_category_id)! }}
+                            />
+                          )}
+                          {getCategoryName(vendor.default_category_id)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {vendor.default_vat_rate !== null ? `${vendor.default_vat_rate}%` : '-'}
+                      </TableCell>
+                      <TableCell className="text-right">{vendor.receipt_count}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(vendor.total_amount)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(vendor)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteConfirmVendor(vendor)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </>
       )}
 
       {/* Add/Edit Dialog */}
