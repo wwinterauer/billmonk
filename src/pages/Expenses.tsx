@@ -29,6 +29,8 @@ import {
   AlertTriangle,
   CheckCircle,
   GitCompare,
+  Square,
+  RefreshCw,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, startOfQuarter, endOfQuarter } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -56,6 +58,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -95,6 +98,7 @@ import { Copy } from 'lucide-react';
 import { checkForDuplicates, type DuplicateCheckResult } from '@/services/duplicateDetectionService';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
 import { useAuth } from '@/contexts/AuthContext';
 
 type SortField = 'receipt_date' | 'vendor' | 'invoice_number' | 'amount_gross';
@@ -686,6 +690,14 @@ const Expenses = () => {
   // Bulk action states
   const [bulkActionLoading, setBulkActionLoading] = useState<'approve' | 'reject' | 'review' | 'ai' | 'duplicateCheck' | null>(null);
   const [aiProgress, setAiProgress] = useState<{ current: number; total: number } | null>(null);
+  const [showBulkReanalyzeConfirm, setShowBulkReanalyzeConfirm] = useState(false);
+
+  // Fields that can be reanalyzed
+  const REANALYZABLE_FIELDS = [
+    'vendor', 'invoice_number', 'receipt_date', 
+    'amount_gross', 'amount_net', 'vat_rate', 'vat_amount', 
+    'description'
+  ] as const;
 
   // Check selected receipts for duplicates
   const startSelectedDuplicateCheck = async () => {
@@ -940,6 +952,148 @@ const Expenses = () => {
       setBulkActionLoading(null);
       setAiProgress(null);
     }
+  };
+
+  // Bulk AI reanalyze with modes
+  const bulkReanalyze = async (mode: 'smart' | 'empty' | 'full') => {
+    setBulkActionLoading('ai');
+    const selectedReceiptsList = receipts.filter(r => selectedIds.has(r.id));
+    const total = selectedReceiptsList.length;
+    
+    setAiProgress({ current: 0, total });
+
+    const results = { success: 0, skipped: 0, failed: 0 };
+
+    for (let i = 0; i < selectedReceiptsList.length; i++) {
+      const receipt = selectedReceiptsList[i];
+      setAiProgress({ current: i + 1, total });
+
+      try {
+        if (!receipt.file_url) {
+          results.skipped++;
+          continue;
+        }
+
+        // Determine which fields to analyze based on mode
+        let fieldsToAnalyze: string[];
+
+        switch (mode) {
+          case 'smart':
+            // Only fields the user has NOT manually modified
+            fieldsToAnalyze = REANALYZABLE_FIELDS
+              .filter(id => !receipt.user_modified_fields?.includes(id));
+            break;
+          
+          case 'empty':
+            // Only empty fields
+            fieldsToAnalyze = REANALYZABLE_FIELDS
+              .filter(id => {
+                const value = receipt[id as keyof Receipt];
+                return !value || value === '';
+              });
+            break;
+          
+          case 'full':
+            // All fields
+            fieldsToAnalyze = [...REANALYZABLE_FIELDS];
+            break;
+        }
+
+        if (fieldsToAnalyze.length === 0) {
+          results.skipped++;
+          continue;
+        }
+
+        // Fetch the file from storage
+        const { data: fileData, error: downloadError } = await supabase.storage
+          .from('receipts')
+          .download(receipt.file_url.replace(/^.*\/receipts\//, ''));
+
+        if (downloadError || !fileData) {
+          results.failed++;
+          continue;
+        }
+
+        // Create a File object from the blob
+        const file = new File([fileData], receipt.file_name || 'receipt', {
+          type: receipt.file_type || 'application/pdf',
+        });
+
+        // Run AI extraction
+        const extracted = await extractReceiptData(file);
+        const normalized = normalizeExtractionResult(extracted);
+
+        // Build updates only for selected fields
+        const updates: Record<string, unknown> = {};
+        for (const fieldId of fieldsToAnalyze) {
+          const newValue = normalized[fieldId as keyof typeof normalized];
+          if (newValue !== undefined && newValue !== null) {
+            updates[fieldId] = newValue;
+          }
+        }
+
+        if (Object.keys(updates).length > 0) {
+          // Update database
+          await supabase
+            .from('receipts')
+            .update({
+              ...updates,
+              ai_confidence: normalized.confidence,
+              ai_processed_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', receipt.id);
+
+          // Update local state
+          setReceipts(prev => prev.map(r =>
+            r.id === receipt.id 
+              ? { ...r, ...updates, ai_confidence: normalized.confidence } as Receipt
+              : r
+          ));
+
+          results.success++;
+        } else {
+          results.skipped++;
+        }
+      } catch (error) {
+        console.error(`Fehler bei Beleg ${receipt.id}:`, error);
+        results.failed++;
+      }
+    }
+
+    // Feedback
+    const modeLabels = {
+      smart: 'Intelligente Analyse',
+      empty: 'Leere Felder gefüllt',
+      full: 'Komplett-Analyse'
+    };
+
+    if (results.success > 0) {
+      toast({
+        title: `${modeLabels[mode]} abgeschlossen`,
+        description: `✓ ${results.success} aktualisiert${results.skipped > 0 ? ` · ${results.skipped} übersprungen` : ''}${results.failed > 0 ? ` · ${results.failed} fehlgeschlagen` : ''}`,
+      });
+    } else if (results.skipped === total) {
+      toast({
+        title: 'Keine Änderungen',
+        description: mode === 'smart' 
+          ? 'Alle Felder wurden bereits manuell bearbeitet'
+          : mode === 'empty' 
+            ? 'Alle Felder haben bereits Werte'
+            : 'Keine Daten zu aktualisieren',
+      });
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Analyse fehlgeschlagen',
+        description: `${results.failed} Belege konnten nicht analysiert werden`,
+      });
+    }
+
+    setBulkActionLoading(null);
+    setAiProgress(null);
+    setSelectedIds(new Set());
+    loadReceipts();
   };
 
   const handleBulkDelete = async () => {
@@ -1372,26 +1526,64 @@ const Expenses = () => {
               Ablehnen
             </Button>
             
-            {/* Re-run AI */}
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={handleBulkRerunAI}
-              disabled={bulkActionLoading !== null}
-              className="border-violet-500/50 text-violet-600 hover:bg-violet-50 hover:text-violet-700"
-            >
-              {bulkActionLoading === 'ai' ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  {aiProgress && `${aiProgress.current}/${aiProgress.total}`}
-                </>
-              ) : (
-                <>
-                  <RotateCcw className="h-4 w-4 mr-1" />
-                  KI neu starten
-                </>
-              )}
-            </Button>
+            {/* Re-run AI with modes */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  disabled={bulkActionLoading !== null}
+                  className="border-violet-500/50 text-violet-600 hover:bg-violet-50 hover:text-violet-700"
+                >
+                  {bulkActionLoading === 'ai' ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      {aiProgress && `${aiProgress.current}/${aiProgress.total}`}
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-1" />
+                      KI-Analyse
+                      <ChevronDown className="h-4 w-4 ml-1" />
+                    </>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64">
+                <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                  Analyse-Modus
+                </DropdownMenuLabel>
+                
+                <DropdownMenuItem onClick={() => bulkReanalyze('smart')}>
+                  <Sparkles className="w-4 h-4 mr-2 text-primary" />
+                  <div className="flex-1">
+                    <p className="font-medium">Intelligent</p>
+                    <p className="text-xs text-muted-foreground">Schützt manuell bearbeitete Felder</p>
+                  </div>
+                </DropdownMenuItem>
+                
+                <DropdownMenuItem onClick={() => bulkReanalyze('empty')}>
+                  <Square className="w-4 h-4 mr-2 text-blue-500" />
+                  <div className="flex-1">
+                    <p className="font-medium">Nur leere Felder</p>
+                    <p className="text-xs text-muted-foreground">Füllt nur fehlende Werte</p>
+                  </div>
+                </DropdownMenuItem>
+                
+                <DropdownMenuSeparator />
+                
+                <DropdownMenuItem 
+                  onClick={() => setShowBulkReanalyzeConfirm(true)}
+                  className="text-orange-600 focus:text-orange-600"
+                >
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  <div className="flex-1">
+                    <p className="font-medium">Komplett neu</p>
+                    <p className="text-xs text-orange-400">Überschreibt alle Felder</p>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
             {/* Duplicate Check for selected */}
             <Button 
@@ -1880,6 +2072,60 @@ const Expenses = () => {
         originalId={duplicateComparisonIds.originalId}
         onRefresh={loadReceipts}
       />
+
+      {/* Bulk AI Reanalyze Confirmation Dialog */}
+      <AlertDialog open={showBulkReanalyzeConfirm} onOpenChange={setShowBulkReanalyzeConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="w-5 h-5" />
+              {selectedIds.size} Belege komplett neu analysieren?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              ALLE Felder werden überschrieben, auch manuelle Korrekturen wie 
+              Lieferanten-Namen oder Rechnungsnummern. Dies kann einige Minuten dauern.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                bulkReanalyze('full');
+                setShowBulkReanalyzeConfirm(false);
+              }}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              Ja, alles überschreiben
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk AI Progress Overlay */}
+      {bulkActionLoading === 'ai' && aiProgress && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <Card className="w-[400px]">
+            <CardContent className="pt-6">
+              <div className="text-center mb-4">
+                <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4 text-primary" />
+                <p className="font-medium">Analysiere Belege...</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {aiProgress.current} von {aiProgress.total}
+                </p>
+              </div>
+              
+              <Progress 
+                value={(aiProgress.current / aiProgress.total) * 100} 
+                className="h-2"
+              />
+              
+              <p className="text-xs text-muted-foreground mt-3 text-center">
+                Dies kann einige Minuten dauern
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Duplicate Check Progress Overlay */}
       {isCheckingDuplicates && (
