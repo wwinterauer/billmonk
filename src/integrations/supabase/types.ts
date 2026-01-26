@@ -408,6 +408,7 @@ export type Database = {
           status: string | null
           updated_at: string | null
           user_id: string
+          user_modified_fields: string[] | null
           vat_amount: number | null
           vat_rate: number | null
           vendor: string | null
@@ -443,6 +444,7 @@ export type Database = {
           status?: string | null
           updated_at?: string | null
           user_id: string
+          user_modified_fields?: string[] | null
           vat_amount?: number | null
           vat_rate?: number | null
           vendor?: string | null
@@ -478,6 +480,7 @@ export type Database = {
           status?: string | null
           updated_at?: string | null
           user_id?: string
+          user_modified_fields?: string[] | null
           vat_amount?: number | null
           vat_rate?: number | null
           vendor?: string | null

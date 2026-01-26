@@ -43,6 +43,8 @@ export interface Receipt {
   duplicate_of: string | null;
   duplicate_score: number | null;
   duplicate_checked_at: string | null;
+  // Tracking modified fields
+  user_modified_fields: string[] | null;
   created_at: string;
   updated_at: string;
 }
