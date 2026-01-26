@@ -13,6 +13,7 @@ export interface Receipt {
   file_type: string | null;
   status: 'pending' | 'processing' | 'review' | 'approved' | 'rejected';
   vendor: string | null;
+  vendor_brand: string | null;
   description: string | null;
   amount_gross: number | null;
   amount_net: number | null;
@@ -199,6 +200,7 @@ export function useReceipts() {
       // Update receipt with extracted data
       const updated = await updateReceipt(receiptId, {
         vendor: normalized.vendor,
+        vendor_brand: normalized.vendor_brand,
         description: normalized.description,
         amount_gross: normalized.amount_gross,
         amount_net: normalized.amount_net,
@@ -210,6 +212,7 @@ export function useReceipts() {
         invoice_number: normalized.invoice_number,
         ai_confidence: normalized.confidence,
         ai_raw_response: normalized as unknown as Json,
+        ai_processed_at: new Date().toISOString(),
         status: 'review',
       });
 

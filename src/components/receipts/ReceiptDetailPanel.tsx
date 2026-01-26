@@ -116,6 +116,7 @@ export function ReceiptDetailPanel({
 
   // Form state
   const [vendor, setVendor] = useState('');
+  const [vendorBrand, setVendorBrand] = useState('');
   const [description, setDescription] = useState('');
   const [receiptDate, setReceiptDate] = useState<Date | undefined>();
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -229,6 +230,7 @@ export function ReceiptDetailPanel({
           setReceipt(data);
           // Populate form
           setVendor(data.vendor || '');
+          setVendorBrand(data.vendor_brand || '');
           setDescription(data.description || '');
           setReceiptDate(data.receipt_date ? new Date(data.receipt_date) : undefined);
           setInvoiceNumber(data.invoice_number || '');
@@ -307,7 +309,8 @@ export function ReceiptDetailPanel({
         }
       };
 
-      compareAndUpdate('Lieferant', vendor, normalized.vendor, setVendor);
+      compareAndUpdate('Lieferant (rechtlich)', vendor, normalized.vendor, setVendor);
+      compareAndUpdate('Markenname', vendorBrand, normalized.vendor_brand, setVendorBrand);
       compareAndUpdate('Beschreibung', description, normalized.description, setDescription);
       compareAndUpdate('Rechnungsnummer', invoiceNumber, normalized.invoice_number, setInvoiceNumber);
       compareAndUpdate('Kategorie', category, normalized.category, setCategory);
@@ -372,6 +375,7 @@ export function ReceiptDetailPanel({
       // Build update data
       const updateData: Record<string, unknown> = {
         vendor: vendor || null,
+        vendor_brand: vendorBrand || null,
         description: description || null,
         receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null,
         invoice_number: invoiceNumber || null,
@@ -664,14 +668,35 @@ export function ReceiptDetailPanel({
 
                     {/* Form Fields */}
                     <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="vendor">Lieferant</Label>
-                        <Input
-                          id="vendor"
-                          value={vendor}
-                          onChange={(e) => setVendor(e.target.value)}
-                          placeholder="z.B. Amazon, MediaMarkt..."
-                        />
+                      {/* Vendor fields - show brand if different from legal name */}
+                      <div className="space-y-3">
+                        <div>
+                          <Label htmlFor="vendor">
+                            {vendorBrand && vendorBrand !== vendor ? 'Firmenname (rechtlich)' : 'Lieferant'}
+                          </Label>
+                          <Input
+                            id="vendor"
+                            value={vendor}
+                            onChange={(e) => setVendor(e.target.value)}
+                            placeholder="z.B. Media Markt E-Business GmbH"
+                          />
+                        </div>
+                        
+                        {/* Show brand name field if exists or vendor has legal suffix */}
+                        {(vendorBrand || vendor.match(/(GmbH|AG|e\.U\.|OG|KG|Ltd\.|S\.à r\.l\.)/i)) && (
+                          <div>
+                            <Label htmlFor="vendorBrand" className="text-muted-foreground">
+                              Markenname (falls abweichend)
+                            </Label>
+                            <Input
+                              id="vendorBrand"
+                              value={vendorBrand}
+                              onChange={(e) => setVendorBrand(e.target.value)}
+                              placeholder="z.B. MediaMarkt"
+                              className="text-muted-foreground"
+                            />
+                          </div>
+                        )}
                       </div>
 
                       <div>
