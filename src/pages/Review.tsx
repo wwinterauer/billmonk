@@ -15,7 +15,8 @@ import {
   SkipForward,
   Loader2,
   AlertTriangle,
-  Download
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -519,26 +520,44 @@ const Review = () => {
                         ) : imageUrl ? (
                           <>
                             {currentReceipt?.file_type?.toLowerCase() === 'pdf' ? (
-                              <iframe 
-                                src={imageUrl}
-                                title="PDF Vorschau"
-                                className="w-full h-full border-0"
-                              />
+                              <div className="flex flex-col items-center justify-center h-full p-6">
+                                <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+                                <p className="text-foreground font-medium mb-2 text-center truncate max-w-full">
+                                  {currentReceipt?.file_name}
+                                </p>
+                                <p className="text-muted-foreground text-sm mb-4">PDF-Vorschau nicht verfügbar</p>
+                                <div className="flex gap-2">
+                                  <Button variant="outline" size="sm" asChild>
+                                    <a href={imageUrl} download={currentReceipt?.file_name} target="_blank" rel="noopener noreferrer">
+                                      <Download className="h-4 w-4 mr-2" />
+                                      Herunterladen
+                                    </a>
+                                  </Button>
+                                  <Button variant="outline" size="sm" asChild>
+                                    <a href={imageUrl} target="_blank" rel="noopener noreferrer">
+                                      <ExternalLink className="h-4 w-4 mr-2" />
+                                      Öffnen
+                                    </a>
+                                  </Button>
+                                </div>
+                              </div>
                             ) : (
-                              <img 
-                                src={imageUrl} 
-                                alt={currentReceipt?.file_name || 'Beleg'}
-                                className="w-full h-full object-contain"
-                                crossOrigin="anonymous"
-                                onError={() => {
-                                  setImageError('Bild konnte nicht geladen werden');
-                                  setImageUrl(null);
-                                }}
-                              />
+                              <>
+                                <img 
+                                  src={imageUrl} 
+                                  alt={currentReceipt?.file_name || 'Beleg'}
+                                  className="w-full h-full object-contain"
+                                  crossOrigin="anonymous"
+                                  onError={() => {
+                                    setImageError('Bild konnte nicht geladen werden');
+                                    setImageUrl(null);
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <ZoomIn className="h-8 w-8 text-white" />
+                                </div>
+                              </>
                             )}
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <ZoomIn className="h-8 w-8 text-white" />
-                            </div>
                           </>
                         ) : (
                           <div className="flex flex-col items-center justify-center h-full">
@@ -907,11 +926,27 @@ const Review = () => {
             <div className="flex-1 overflow-auto flex items-center justify-center">
               {imageUrl ? (
                 currentReceipt?.file_type?.toLowerCase() === 'pdf' ? (
-                  <iframe 
-                    src={imageUrl}
-                    title="PDF Vorschau"
-                    className="w-full h-full border-0"
-                  />
+                  <div className="flex flex-col items-center justify-center h-full p-8">
+                    <FileText className="h-24 w-24 text-muted-foreground mb-6" />
+                    <p className="text-foreground font-medium mb-2 text-lg">
+                      {currentReceipt?.file_name}
+                    </p>
+                    <p className="text-muted-foreground mb-6">PDF-Vorschau nicht verfügbar</p>
+                    <div className="flex gap-3">
+                      <Button variant="outline" asChild>
+                        <a href={imageUrl} download={currentReceipt?.file_name} target="_blank" rel="noopener noreferrer">
+                          <Download className="h-4 w-4 mr-2" />
+                          Herunterladen
+                        </a>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <a href={imageUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          In neuem Tab öffnen
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
                   <img 
                     src={imageUrl} 
