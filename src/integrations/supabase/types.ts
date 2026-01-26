@@ -340,6 +340,7 @@ export type Database = {
         Row: {
           company_name: string | null
           created_at: string | null
+          description_settings: Json | null
           email: string
           first_name: string | null
           id: string
@@ -352,6 +353,7 @@ export type Database = {
         Insert: {
           company_name?: string | null
           created_at?: string | null
+          description_settings?: Json | null
           email: string
           first_name?: string | null
           id: string
@@ -364,6 +366,7 @@ export type Database = {
         Update: {
           company_name?: string | null
           created_at?: string | null
+          description_settings?: Json | null
           email?: string
           first_name?: string | null
           id?: string
@@ -398,6 +401,7 @@ export type Database = {
           id: string
           invoice_number: string | null
           is_duplicate: boolean | null
+          line_items_raw: Json | null
           notes: string | null
           payment_method: string | null
           receipt_date: string | null
@@ -432,6 +436,7 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           is_duplicate?: boolean | null
+          line_items_raw?: Json | null
           notes?: string | null
           payment_method?: string | null
           receipt_date?: string | null
@@ -466,6 +471,7 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           is_duplicate?: boolean | null
+          line_items_raw?: Json | null
           notes?: string | null
           payment_method?: string | null
           receipt_date?: string | null

@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
-import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
+import { extractReceiptData, normalizeExtractionResult, fetchDescriptionSettings } from '@/services/aiService';
 import { matchOrCreateVendor, findOrCreateVendor, addVendorVariant, type MatchedVendor, type VendorSuggestion, type FindOrCreateVendorResult } from '@/services/vendorMatchingService';
 import { 
   generateFileHash, 
@@ -271,7 +271,10 @@ export function useReceipts() {
       
       // Call AI extraction
       const extracted = await extractReceiptData(file);
-      const normalized = normalizeExtractionResult(extracted);
+      
+      // Fetch user's description settings
+      const descriptionSettings = await fetchDescriptionSettings(user.id);
+      const normalized = normalizeExtractionResult(extracted, descriptionSettings);
 
       onProgress?.(80, 'Lieferant zuordnen...');
 

@@ -56,7 +56,7 @@ Antworte IMMER und AUSSCHLIESSLICH mit validem JSON ohne zusätzliche Erklärung
 {
   "vendor": "Offizieller/rechtlicher Firmenname des Lieferanten",
   "vendor_brand": "Markenname/Handelsname falls abweichend vom rechtlichen Namen (sonst null)",
-  "description": "Kurze Beschreibung was gekauft wurde (max 100 Zeichen)",
+  "description": "Zusammenfassung aller Rechnungspositionen (max 100 Zeichen)",
   "amount_gross": Bruttobetrag als Zahl,
   "amount_net": Nettobetrag als Zahl (falls erkennbar, sonst null),
   "vat_amount": MwSt-Betrag als Zahl (falls erkennbar, sonst null),
@@ -78,8 +78,23 @@ WICHTIGE REGELN FÜR LIEFERANT/VENDOR:
   2. MITTLERE PRIORITÄT: Rechnungskopf mit vollständigem Firmennamen, Adressblock des Absenders
   3. NIEDRIGE PRIORITÄT: Logo-Text (Logos zeigen oft nur Markennamen)
 - "vendor_brand" = Markenname wenn abweichend (z.B. Logo zeigt "MediaMarkt" aber rechtlich "Media Markt E-Business GmbH")
+
+WICHTIGE REGELN FÜR BESCHREIBUNG/POSITIONEN:
+- Fasse ALLE Rechnungspositionen in einer kurzen, aussagekräftigen Beschreibung zusammen
+- Maximal 100 Zeichen
+- Trenne mehrere Positionen mit Komma
+- Beispiele:
+  - "Büromaterial, Druckerpapier A4, Kugelschreiber"
+  - "Monatsmiete Büro Jänner 2024"
+  - "Webhosting, Domain-Verlängerung"
+  - "Beratungsleistung IT-Security (8h)"
+  - "Kaffeevollautomat Wartung, Reinigungstabletten"
+- Bei sehr vielen Positionen: Die wichtigsten/teuersten zuerst, dann "u.a." oder "etc."
+- KEINE Preise in der Beschreibung
+- KEINE Währungssymbole
+- Beschreibe WAS gekauft wurde, nicht WER der Lieferant ist
   
-BEISPIELE:
+BEISPIELE FÜR VENDOR:
 - Logo: 'Amazon' → Fuß: 'Amazon EU S.à r.l.' → vendor: "Amazon EU S.à r.l.", vendor_brand: "Amazon"
 - Logo: 'IKEA' → Fuß: 'IKEA Austria GmbH' → vendor: "IKEA Austria GmbH", vendor_brand: null (gleich)
 - Logo: 'BILLA' → Fuß: 'REWE International AG' → vendor: "REWE International AG", vendor_brand: "BILLA"
