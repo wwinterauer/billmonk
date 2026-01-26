@@ -51,6 +51,7 @@ import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
 import { useCategories } from '@/hooks/useCategories';
+import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
 import { motion } from 'framer-motion';
 
 type SortField = 'receipt_date' | 'vendor' | 'amount_gross';
@@ -98,6 +99,20 @@ const Expenses = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [receiptToDelete, setReceiptToDelete] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  // Detail panel state
+  const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
+  const [detailPanelOpen, setDetailPanelOpen] = useState(false);
+
+  const openReceiptDetail = (id: string) => {
+    setSelectedReceiptId(id);
+    setDetailPanelOpen(true);
+  };
+
+  const closeReceiptDetail = () => {
+    setDetailPanelOpen(false);
+    setSelectedReceiptId(null);
+  };
 
   // Load receipts
   const loadReceipts = async () => {
@@ -597,9 +612,7 @@ const Expenses = () => {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() => {
-                                  toast({ title: 'Detail-Ansicht', description: 'Kommt bald...' });
-                                }}
+                                onClick={() => openReceiptDetail(receipt.id)}
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
@@ -607,9 +620,7 @@ const Expenses = () => {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() => {
-                                  toast({ title: 'Bearbeiten', description: 'Kommt bald...' });
-                                }}
+                                onClick={() => openReceiptDetail(receipt.id)}
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
@@ -726,6 +737,14 @@ const Expenses = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Receipt Detail Panel */}
+      <ReceiptDetailPanel
+        receiptId={selectedReceiptId}
+        open={detailPanelOpen}
+        onClose={closeReceiptDetail}
+        onUpdate={loadReceipts}
+      />
     </DashboardLayout>
   );
 };
