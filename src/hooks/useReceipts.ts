@@ -241,8 +241,16 @@ export function useReceipts() {
   const processReceiptWithAI = async (
     file: File,
     receiptId: string,
-    onProgress?: (progress: number, statusText?: string) => void
-  ): Promise<{ receipt: Receipt; aiSuccess: boolean; aiConfidence?: number }> => {
+    onProgress?: (progress: number, statusText?: string) => void,
+    options?: {
+      skipVendorMatching?: boolean;
+    }
+  ): Promise<{ 
+    receipt: Receipt; 
+    aiSuccess: boolean; 
+    aiConfidence?: number;
+    vendorDecision?: VendorDecisionPending;
+  }> => {
     if (!user) {
       throw new Error('Nicht angemeldet');
     }
@@ -269,9 +277,8 @@ export function useReceipts() {
 
       // Match or create vendor based on detected name
       const vendorName = normalized.vendor_brand || normalized.vendor;
-      const matchedVendor = await matchOrCreateVendor(vendorName, user!.id);
-
-      // Prepare update data with vendor defaults
+      
+      // Prepare update data
       const updateData: Partial<Receipt> = {
         vendor: normalized.vendor,
         vendor_brand: normalized.vendor_brand,
@@ -290,26 +297,82 @@ export function useReceipts() {
         status: 'review',
       };
 
-      // Apply vendor matching results
-      if (matchedVendor) {
-        updateData.vendor_id = matchedVendor.id;
-        updateData.vendor = matchedVendor.display_name;
-        
-        // Vendor default category ALWAYS takes precedence when set
-        // This overrides any AI-detected category (including "Sonstiges")
-        if (matchedVendor.default_category_id) {
-          updateData.category = matchedVendor.default_category_id;
+      // Use enhanced vendor matching with similarity check
+      if (vendorName && !options?.skipVendorMatching) {
+        const vendorResult = await findOrCreateVendor(user.id, vendorName, {
+          autoCreate: false,
+          minSimilarity: 60
+        });
+
+        if (vendorResult.needsUserDecision && vendorResult.suggestions.length > 0) {
+          // User needs to decide - save receipt with extracted data but no vendor
+          onProgress?.(90, 'Warte auf Lieferanten-Auswahl...');
+          
+          const updated = await updateReceipt(receiptId, {
+            ...updateData,
+            status: 'processing', // Keep in processing until vendor is selected
+          });
+
+          return {
+            receipt: updated,
+            aiSuccess: true,
+            aiConfidence: normalized.confidence,
+            vendorDecision: {
+              receiptId,
+              extractedData: updateData,
+              detectedName: vendorName,
+              suggestions: vendorResult.suggestions
+            }
+          };
         }
-        
-        // Apply vendor default VAT rate if AI didn't detect one
-        if (matchedVendor.default_vat_rate !== null && normalized.vat_rate === null) {
-          updateData.vat_rate = matchedVendor.default_vat_rate;
-          // Recalculate VAT if we have gross amount
-          if (updateData.amount_gross && updateData.vat_rate) {
-            const grossAmount = updateData.amount_gross;
-            const vatRate = updateData.vat_rate;
-            updateData.amount_net = Number((grossAmount / (1 + vatRate / 100)).toFixed(2));
-            updateData.vat_amount = Number((grossAmount - updateData.amount_net).toFixed(2));
+
+        // Apply vendor if found (high similarity auto-match or exact match)
+        if (vendorResult.vendor) {
+          updateData.vendor_id = vendorResult.vendor.id;
+          updateData.vendor = vendorResult.vendor.display_name;
+          
+          // Vendor default category ALWAYS takes precedence when set
+          if (vendorResult.vendor.default_category_id) {
+            updateData.category = vendorResult.vendor.default_category_id;
+          }
+          
+          // Apply vendor default VAT rate if AI didn't detect one
+          if (vendorResult.vendor.default_vat_rate !== null && normalized.vat_rate === null) {
+            updateData.vat_rate = vendorResult.vendor.default_vat_rate;
+            if (updateData.amount_gross && updateData.vat_rate) {
+              const grossAmount = updateData.amount_gross;
+              const vatRate = updateData.vat_rate;
+              updateData.amount_net = Number((grossAmount / (1 + vatRate / 100)).toFixed(2));
+              updateData.vat_amount = Number((grossAmount - updateData.amount_net).toFixed(2));
+            }
+          }
+        } else if (vendorResult.isNew) {
+          // No match found and not auto-created - create new vendor
+          const newVendor = await createVendorForReceipt(vendorName);
+          if (newVendor) {
+            updateData.vendor_id = newVendor.id;
+            updateData.vendor = newVendor.display_name;
+          }
+        }
+      } else if (vendorName) {
+        // Skip vendor matching - use old behavior
+        const matchedVendor = await matchOrCreateVendor(vendorName, user.id);
+        if (matchedVendor) {
+          updateData.vendor_id = matchedVendor.id;
+          updateData.vendor = matchedVendor.display_name;
+          
+          if (matchedVendor.default_category_id) {
+            updateData.category = matchedVendor.default_category_id;
+          }
+          
+          if (matchedVendor.default_vat_rate !== null && normalized.vat_rate === null) {
+            updateData.vat_rate = matchedVendor.default_vat_rate;
+            if (updateData.amount_gross && updateData.vat_rate) {
+              const grossAmount = updateData.amount_gross;
+              const vatRate = updateData.vat_rate;
+              updateData.amount_net = Number((grossAmount / (1 + vatRate / 100)).toFixed(2));
+              updateData.vat_amount = Number((grossAmount - updateData.amount_net).toFixed(2));
+            }
           }
         }
       }
@@ -338,6 +401,85 @@ export function useReceipts() {
     }
   };
 
+  const createVendorForReceipt = async (name: string): Promise<MatchedVendor | null> => {
+    if (!user) {
+      throw new Error('Nicht angemeldet');
+    }
+    
+    const { data, error } = await supabase
+      .from('vendors')
+      .insert({
+        user_id: user.id,
+        display_name: name.trim(),
+        detected_names: [name.trim()]
+      })
+      .select(`
+        *,
+        default_category:categories(id, name, color)
+      `)
+      .single();
+
+    if (error) {
+      console.error('Error creating vendor:', error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      user_id: data.user_id,
+      display_name: data.display_name,
+      legal_name: data.legal_name,
+      detected_names: data.detected_names || [],
+      default_category_id: data.default_category_id,
+      default_vat_rate: data.default_vat_rate,
+      default_category: data.default_category
+    };
+  };
+
+  const finalizeReceiptWithVendor = async (
+    receiptId: string,
+    extractedData: Partial<Receipt>,
+    vendor: MatchedVendor | null,
+    detectedName?: string
+  ): Promise<Receipt> => {
+    if (!user) {
+      throw new Error('Nicht angemeldet');
+    }
+
+    const updateData: Partial<Receipt> = {
+      ...extractedData,
+      status: 'review',
+      duplicate_checked_at: new Date().toISOString()
+    };
+
+    if (vendor) {
+      updateData.vendor = vendor.display_name;
+      updateData.vendor_id = vendor.id;
+
+      // Apply vendor defaults
+      if (vendor.default_category_id && !extractedData.category) {
+        updateData.category = vendor.default_category_id;
+      }
+      if (vendor.default_vat_rate !== null && !extractedData.vat_rate) {
+        updateData.vat_rate = vendor.default_vat_rate;
+        // Recalculate VAT amounts
+        if (updateData.amount_gross && updateData.vat_rate) {
+          const grossAmount = updateData.amount_gross;
+          const vatRate = updateData.vat_rate;
+          updateData.amount_net = Number((grossAmount / (1 + vatRate / 100)).toFixed(2));
+          updateData.vat_amount = Number((grossAmount - updateData.amount_net).toFixed(2));
+        }
+      }
+
+      // Add detected name as variant if provided
+      if (detectedName) {
+        await addVendorVariant(vendor.id, detectedName);
+      }
+    }
+
+    return await updateReceipt(receiptId, updateData);
+  };
+
   const uploadAndProcessReceipt = async (
     file: File,
     onProgress?: (progress: number, statusText?: string) => void,
@@ -346,8 +488,15 @@ export function useReceipts() {
       skipDuplicateCheck?: boolean;
       markAsDuplicate?: boolean;
       duplicateOfId?: string;
+      skipVendorMatching?: boolean;
     }
-  ): Promise<{ receipt: Receipt; aiSuccess: boolean; aiConfidence?: number; duplicateCheck?: DuplicateCheckResult }> => {
+  ): Promise<{ 
+    receipt: Receipt; 
+    aiSuccess: boolean; 
+    aiConfidence?: number; 
+    duplicateCheck?: DuplicateCheckResult;
+    vendorDecision?: VendorDecisionPending;
+  }> => {
     if (!user) {
       throw new Error('Nicht angemeldet');
     }
@@ -367,7 +516,14 @@ export function useReceipts() {
     }
     
     // Process with AI
-    const result = await processReceiptWithAI(file, receipt.id, onProgress);
+    const result = await processReceiptWithAI(file, receipt.id, onProgress, {
+      skipVendorMatching: options?.skipVendorMatching
+    });
+
+    // If vendor decision is needed, return early
+    if (result.vendorDecision) {
+      return result;
+    }
 
     // After AI processing, check for content-based duplicates
     if (!options?.skipDuplicateCheck) {
@@ -596,6 +752,8 @@ export function useReceipts() {
     getReceiptFileUrl,
     checkExactDuplicate,
     generateFileHash,
+    finalizeReceiptWithVendor,
+    createVendorForReceipt,
     ALLOWED_TYPES,
     MAX_FILE_SIZE,
     MAX_FILES,
