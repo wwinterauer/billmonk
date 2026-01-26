@@ -401,23 +401,30 @@ export function ReceiptDetailPanel({
                             )}
                           </>
                         ) : isPdf ? (
-                          <div className="h-[500px] w-full flex flex-col">
-                            {/* PDF Preview with iframe - most reliable for blob URLs */}
-                            <iframe
-                              src={previewBlobUrl}
-                              title={receipt?.file_name || 'PDF Vorschau'}
-                              className="w-full flex-1 border-0 rounded-lg bg-white"
-                              onError={() => setFileError(true)}
-                            />
-                            {/* Action buttons below the preview */}
-                            <div className="flex gap-2 justify-center pt-3">
-                              <Button variant="outline" size="sm" onClick={handleDownload}>
-                                <Download className="h-4 w-4 mr-2" />
-                                Herunterladen
+                          <div className="h-[500px] w-full flex flex-col items-center justify-center gap-6 bg-gradient-to-b from-muted/50 to-muted rounded-lg p-8">
+                            {/* PDF Icon and Info */}
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="w-24 h-28 bg-background rounded-lg shadow-md flex flex-col items-center justify-center border">
+                                <FileText className="h-12 w-12 text-red-500" />
+                                <span className="text-xs font-semibold text-red-500 mt-1">PDF</span>
+                              </div>
+                              <p className="font-medium text-foreground text-center max-w-[250px] truncate">
+                                {receipt?.file_name}
+                              </p>
+                              <p className="text-sm text-muted-foreground text-center">
+                                PDF-Vorschau im Browser nicht möglich
+                              </p>
+                            </div>
+                            
+                            {/* Action Buttons */}
+                            <div className="flex flex-col sm:flex-row gap-3">
+                              <Button onClick={handleOpenInNewTab} className="gap-2">
+                                <ExternalLink className="h-4 w-4" />
+                                PDF in neuem Tab öffnen
                               </Button>
-                              <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
-                                <ExternalLink className="h-4 w-4 mr-2" />
-                                In neuem Tab öffnen
+                              <Button variant="outline" onClick={handleDownload} className="gap-2">
+                                <Download className="h-4 w-4" />
+                                Herunterladen
                               </Button>
                             </div>
                           </div>
