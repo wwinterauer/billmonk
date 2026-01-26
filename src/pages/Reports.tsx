@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { useQuery } from '@tanstack/react-query';
 import {
   Download,
   FileText,
@@ -8,10 +9,18 @@ import {
   File,
   Printer,
   CalendarIcon,
+  Euro,
+  Receipt,
+  Percent,
+  Calculator,
+  TrendingUp,
+  TrendingDown,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -33,10 +42,13 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 const Reports = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   
   // Period state
   const [periodType, setPeriodType] = useState<'month' | 'quarter' | 'year' | 'custom'>('month');
@@ -84,6 +96,89 @@ const Reports = () => {
     }
   }, [periodType, selectedMonth, selectedYear, selectedQuarter, dateFrom, dateTo]);
 
+  // Fetch receipts data for selected period
+  const { data: receipts, isLoading } = useQuery({
+    queryKey: ['reports', dateRange.from?.toISOString(), dateRange.to?.toISOString(), user?.id],
+    queryFn: async () => {
+      if (!user || !dateRange.from || !dateRange.to) return [];
+      
+      const { data, error } = await supabase
+        .from('receipts')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('receipt_date', format(dateRange.from, 'yyyy-MM-dd'))
+        .lte('receipt_date', format(dateRange.to, 'yyyy-MM-dd'))
+        .eq('status', 'approved');
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && !!dateRange.from && !!dateRange.to,
+  });
+
+  // Fetch previous period data for comparison
+  const previousPeriodRange = useMemo(() => {
+    if (!dateRange.from || !dateRange.to) return null;
+    
+    const periodLength = dateRange.to.getTime() - dateRange.from.getTime();
+    const previousFrom = new Date(dateRange.from.getTime() - periodLength - 86400000);
+    const previousTo = new Date(dateRange.from.getTime() - 86400000);
+    
+    return { from: previousFrom, to: previousTo };
+  }, [dateRange]);
+
+  const { data: previousReceipts } = useQuery({
+    queryKey: ['reports-previous', previousPeriodRange?.from?.toISOString(), previousPeriodRange?.to?.toISOString(), user?.id],
+    queryFn: async () => {
+      if (!user || !previousPeriodRange?.from || !previousPeriodRange?.to) return [];
+      
+      const { data, error } = await supabase
+        .from('receipts')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('receipt_date', format(previousPeriodRange.from, 'yyyy-MM-dd'))
+        .lte('receipt_date', format(previousPeriodRange.to, 'yyyy-MM-dd'))
+        .eq('status', 'approved');
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && !!previousPeriodRange?.from && !!previousPeriodRange?.to,
+  });
+
+  // Calculate KPIs
+  const stats = useMemo(() => {
+    if (!receipts) return null;
+
+    const totalGross = receipts.reduce((sum, r) => sum + (r.amount_gross || 0), 0);
+    const totalNet = receipts.reduce((sum, r) => sum + (r.amount_net || 0), 0);
+    const totalVat = receipts.reduce((sum, r) => sum + (r.vat_amount || 0), 0);
+    const count = receipts.length;
+    const avgAmount = count > 0 ? totalGross / count : 0;
+
+    // Previous period stats for comparison
+    const prevTotalGross = previousReceipts?.reduce((sum, r) => sum + (r.amount_gross || 0), 0) || 0;
+    const prevCount = previousReceipts?.length || 0;
+
+    // Calculate percentage change
+    const grossChange = prevTotalGross > 0 
+      ? ((totalGross - prevTotalGross) / prevTotalGross) * 100 
+      : null;
+    const countChange = prevCount > 0 
+      ? ((count - prevCount) / prevCount) * 100 
+      : null;
+
+    return {
+      totalGross,
+      totalNet,
+      totalVat,
+      count,
+      avgAmount,
+      grossChange,
+      countChange,
+    };
+  }, [receipts, previousReceipts]);
+
   // Quick period selection
   const setQuickPeriod = (period: 'thisMonth' | 'lastMonth' | 'thisYear') => {
     const now = new Date();
@@ -109,10 +204,10 @@ const Reports = () => {
   };
 
   // Export handlers
-  const exportReport = (format: 'pdf' | 'excel' | 'csv') => {
+  const exportReport = (formatType: 'pdf' | 'excel' | 'csv') => {
     toast({
       title: 'Export gestartet',
-      description: `Der Bericht wird als ${format.toUpperCase()} exportiert...`,
+      description: `Der Bericht wird als ${formatType.toUpperCase()} exportiert...`,
     });
     // TODO: Implement actual export logic
   };
@@ -123,6 +218,41 @@ const Reports = () => {
     if (!dateRange.to) return format(dateRange.from, 'dd.MM.yyyy', { locale: de });
     return `${format(dateRange.from, 'dd.MM.yyyy', { locale: de })} – ${format(dateRange.to, 'dd.MM.yyyy', { locale: de })}`;
   }, [dateRange]);
+
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('de-DE', {
+      style: 'currency',
+      currency: 'EUR',
+    }).format(amount);
+  };
+
+  // Render change indicator
+  const renderChange = (change: number | null, inverted = false) => {
+    if (change === null) return null;
+    
+    const isPositive = inverted ? change < 0 : change > 0;
+    const isNegative = inverted ? change > 0 : change < 0;
+    
+    return (
+      <div className="flex items-center mt-2 text-sm">
+        {isNegative ? (
+          <>
+            <TrendingDown className="w-4 h-4 text-success mr-1" />
+            <span className="text-success">{Math.abs(change).toFixed(1)}%</span>
+          </>
+        ) : isPositive ? (
+          <>
+            <TrendingUp className="w-4 h-4 text-destructive mr-1" />
+            <span className="text-destructive">+{change.toFixed(1)}%</span>
+          </>
+        ) : (
+          <span className="text-muted-foreground">±0%</span>
+        )}
+        <span className="text-muted-foreground ml-1">vs. Vorperiode</span>
+      </div>
+    );
+  };
 
   return (
     <DashboardLayout>
@@ -342,12 +472,141 @@ const Reports = () => {
           </CardContent>
         </Card>
 
-        {/* Placeholder for Reports Content */}
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+          {/* Gesamtausgaben */}
+          <Card className="border-border/50">
+            <CardContent className="pt-6">
+              {isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-8 w-32" />
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Gesamtausgaben</p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {formatCurrency(stats?.totalGross || 0)}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-primary/10 rounded-full">
+                      <Euro className="w-5 h-5 text-primary" />
+                    </div>
+                  </div>
+                  {renderChange(stats?.grossChange ?? null, true)}
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Nettobetrag */}
+          <Card className="border-border/50">
+            <CardContent className="pt-6">
+              {isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-8 w-32" />
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Nettobetrag</p>
+                    <p className="text-2xl font-bold text-foreground">
+                      {formatCurrency(stats?.totalNet || 0)}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-blue-500/10 rounded-full">
+                    <Receipt className="w-5 h-5 text-blue-500" />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Vorsteuer */}
+          <Card className="border-border/50">
+            <CardContent className="pt-6">
+              {isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-8 w-32" />
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Vorsteuer</p>
+                    <p className="text-2xl font-bold text-foreground">
+                      {formatCurrency(stats?.totalVat || 0)}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-success/10 rounded-full">
+                    <Percent className="w-5 h-5 text-success" />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Anzahl Belege */}
+          <Card className="border-border/50">
+            <CardContent className="pt-6">
+              {isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-8 w-32" />
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Belege</p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {stats?.count || 0}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-warning/10 rounded-full">
+                      <FileText className="w-5 h-5 text-warning" />
+                    </div>
+                  </div>
+                  {renderChange(stats?.countChange ?? null, false)}
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Durchschnitt */}
+          <Card className="border-border/50">
+            <CardContent className="pt-6">
+              {isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-8 w-32" />
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Ø pro Beleg</p>
+                    <p className="text-2xl font-bold text-foreground">
+                      {formatCurrency(stats?.avgAmount || 0)}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-pink-500/10 rounded-full">
+                    <Calculator className="w-5 h-5 text-pink-500" />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Placeholder for Charts */}
         <Card className="border-border/50">
           <CardContent className="py-12">
             <div className="text-center text-muted-foreground">
-              <p className="text-lg font-medium mb-2">Berichte werden hier angezeigt</p>
-              <p className="text-sm">Wähle einen Zeitraum aus, um die Auswertungen zu sehen.</p>
+              <p className="text-lg font-medium mb-2">Diagramme werden hier angezeigt</p>
+              <p className="text-sm">Weitere Auswertungen folgen in den nächsten Schritten.</p>
             </div>
           </CardContent>
         </Card>
