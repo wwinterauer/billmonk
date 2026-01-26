@@ -307,6 +307,7 @@ export type Database = {
       receipts: {
         Row: {
           ai_confidence: number | null
+          ai_processed_at: string | null
           ai_raw_response: Json | null
           amount_gross: number | null
           amount_net: number | null
@@ -332,6 +333,7 @@ export type Database = {
         }
         Insert: {
           ai_confidence?: number | null
+          ai_processed_at?: string | null
           ai_raw_response?: Json | null
           amount_gross?: number | null
           amount_net?: number | null
@@ -357,6 +359,7 @@ export type Database = {
         }
         Update: {
           ai_confidence?: number | null
+          ai_processed_at?: string | null
           ai_raw_response?: Json | null
           amount_gross?: number | null
           amount_net?: number | null
