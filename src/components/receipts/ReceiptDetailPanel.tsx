@@ -80,7 +80,7 @@ import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PdfViewer } from './PdfViewer';
-import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
+import { extractReceiptData, normalizeExtractionResult, fetchDescriptionSettings, processDescription, DEFAULT_DESCRIPTION_SETTINGS, type DescriptionSettings } from '@/services/aiService';
 import { searchVendors, matchOrCreateVendor, type MatchedVendor } from '@/services/vendorMatchingService';
 import { 
   generateFileName, 
@@ -90,6 +90,7 @@ import {
   DEFAULT_NAMING_SETTINGS,
   type NamingSettings 
 } from '@/lib/filenameUtils';
+import { AlertTriangle } from 'lucide-react';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
@@ -146,6 +147,7 @@ export function ReceiptDetailPanel({
   const [isEditingFilename, setIsEditingFilename] = useState(false);
   const [customFilename, setCustomFilename] = useState('');
   const [namingSettings, setNamingSettings] = useState<NamingSettings>(DEFAULT_NAMING_SETTINGS);
+  const [descriptionSettings, setDescriptionSettings] = useState<DescriptionSettings>(DEFAULT_DESCRIPTION_SETTINGS);
 
   // Vendor autocomplete state
   const [vendorSearch, setVendorSearch] = useState('');
@@ -322,15 +324,15 @@ export function ReceiptDetailPanel({
     loadReceipt();
   }, [receiptId, open]);
 
-  // Load user naming settings from profile
+  // Load user naming and description settings from profile
   useEffect(() => {
-    const loadNamingSettings = async () => {
+    const loadSettings = async () => {
       if (!user || !open) return;
       
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('naming_settings')
+          .select('naming_settings, description_settings')
           .eq('id', user.id)
           .single();
 
@@ -339,12 +341,17 @@ export function ReceiptDetailPanel({
         if (data?.naming_settings && typeof data.naming_settings === 'object') {
           setNamingSettings(parseNamingSettings(data.naming_settings as Record<string, unknown>));
         }
+        
+        if (data?.description_settings) {
+          const descSettings = await fetchDescriptionSettings(user.id);
+          setDescriptionSettings(descSettings);
+        }
       } catch (error) {
-        console.error('Error loading naming settings:', error);
+        console.error('Error loading settings:', error);
       }
     };
 
-    loadNamingSettings();
+    loadSettings();
   }, [user, open]);
 
   // Set customFilename when entering edit mode
@@ -620,12 +627,17 @@ export function ReceiptDetailPanel({
 
     setSaving(true);
     try {
+      // Process description according to user settings
+      const processedDescription = description 
+        ? processDescription(description, descriptionSettings)
+        : null;
+      
       // Build update data
       const updateData: Record<string, unknown> = {
         vendor: vendor || null,
         vendor_brand: vendorBrand || null,
         vendor_id: selectedVendorId || null,
-        description: description || null,
+        description: processedDescription,
         receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null,
         invoice_number: invoiceNumber || null,
         category: category || null,
@@ -1036,16 +1048,37 @@ export function ReceiptDetailPanel({
                       </div>
                     )}
 
-                    {/* Description */}
-                    <div>
-                      <Label htmlFor="description">Beschreibung</Label>
+                    {/* Description with character counter */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="description">Beschreibung</Label>
+                        <span className={cn(
+                          "text-xs",
+                          description.length > descriptionSettings.max_length 
+                            ? "text-orange-500" 
+                            : "text-muted-foreground"
+                        )}>
+                          {description.length} / {descriptionSettings.max_length} Zeichen
+                        </span>
+                      </div>
                       <Textarea
                         id="description"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Wofür war der Einkauf?"
+                        placeholder="Zusammenfassung der Rechnungspositionen..."
                         rows={2}
+                        maxLength={descriptionSettings.max_length + 50}
+                        className={cn(
+                          description.length > descriptionSettings.max_length &&
+                          "border-orange-300 focus-visible:ring-orange-500"
+                        )}
                       />
+                      {description.length > descriptionSettings.max_length && (
+                        <p className="text-xs text-orange-600 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          Wird beim Speichern auf {descriptionSettings.max_length} Zeichen gekürzt
+                        </p>
+                      )}
                     </div>
 
                     {/* Date */}
