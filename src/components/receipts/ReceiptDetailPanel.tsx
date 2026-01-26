@@ -401,12 +401,25 @@ export function ReceiptDetailPanel({
                             )}
                           </>
                         ) : isPdf ? (
-                          <div className="h-[400px] w-full">
-                            <embed
+                          <div className="h-[500px] w-full flex flex-col">
+                            {/* PDF Preview with iframe - most reliable for blob URLs */}
+                            <iframe
                               src={previewBlobUrl}
-                              type="application/pdf"
-                              className="w-full h-full"
+                              title={receipt?.file_name || 'PDF Vorschau'}
+                              className="w-full flex-1 border-0 rounded-lg bg-white"
+                              onError={() => setFileError(true)}
                             />
+                            {/* Action buttons below the preview */}
+                            <div className="flex gap-2 justify-center pt-3">
+                              <Button variant="outline" size="sm" onClick={handleDownload}>
+                                <Download className="h-4 w-4 mr-2" />
+                                Herunterladen
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                In neuem Tab öffnen
+                              </Button>
+                            </div>
                           </div>
                         ) : (
                           <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
