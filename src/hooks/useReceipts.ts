@@ -228,15 +228,13 @@ export function useReceipts() {
         updateData.vendor_id = matchedVendor.id;
         updateData.vendor = matchedVendor.display_name;
         
-        // Apply vendor defaults if not already set by AI
-        // Treat "Sonstiges" as "no category detected" so vendor default takes precedence
-        const aiCategoryIsGeneric = !normalized.category || 
-          normalized.category.toLowerCase() === 'sonstiges' ||
-          normalized.category.toLowerCase() === 'sonstige';
-          
-        if (matchedVendor.default_category_id && aiCategoryIsGeneric) {
+        // Vendor default category ALWAYS takes precedence when set
+        // This overrides any AI-detected category (including "Sonstiges")
+        if (matchedVendor.default_category_id) {
           updateData.category = matchedVendor.default_category_id;
         }
+        
+        // Apply vendor default VAT rate if AI didn't detect one
         if (matchedVendor.default_vat_rate !== null && normalized.vat_rate === null) {
           updateData.vat_rate = matchedVendor.default_vat_rate;
           // Recalculate VAT if we have gross amount
