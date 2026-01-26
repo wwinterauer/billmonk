@@ -161,8 +161,8 @@ export function ReceiptPreviewDialog({
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent 
-        className="max-w-[90vw] w-[90vw] h-[90vh] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden"
-        style={{ maxWidth: '90vw', width: '90vw', height: '90vh', maxHeight: '90vh' }}
+        className="max-w-[98vw] w-[98vw] h-[98vh] max-h-[98vh] p-0 gap-0 flex flex-col overflow-hidden"
+        style={{ maxWidth: '98vw', width: '98vw', height: '98vh', maxHeight: '98vh' }}
       >
         {/* Header */}
         <DialogHeader className="px-6 py-3 border-b flex-shrink-0">
@@ -257,7 +257,7 @@ export function ReceiptPreviewDialog({
                   </div>
                 ) : previewBlobUrl ? (
                   isPdf ? (
-                    <div className="w-full h-full" style={{ minHeight: 'calc(90vh - 100px)' }}>
+                    <div className="w-full h-full" style={{ minHeight: 'calc(98vh - 80px)' }}>
                       <PdfViewer 
                         url={previewBlobUrl} 
                         fileName={receipt?.file_name}
@@ -269,8 +269,8 @@ export function ReceiptPreviewDialog({
                     <img
                       src={previewBlobUrl}
                       alt={receipt.file_name || 'Beleg'}
-                      className={cn(
-                        "transition-transform duration-300 rounded shadow-lg cursor-zoom-in max-h-[calc(90vh-150px)]",
+                        className={cn(
+                          "transition-transform duration-300 rounded shadow-lg cursor-zoom-in max-h-[calc(98vh-120px)]",
                         isZoomed ? "scale-150 cursor-zoom-out" : "max-w-full object-contain"
                       )}
                       onClick={() => setIsZoomed(!isZoomed)}
