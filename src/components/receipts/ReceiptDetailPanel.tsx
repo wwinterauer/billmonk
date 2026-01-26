@@ -535,8 +535,13 @@ export function ReceiptDetailPanel({
           compareAndUpdate('Lieferant', vendor, matchedVendor.display_name, setVendor);
         }
         
-        // Apply vendor default category if AI didn't detect one
-        if (matchedVendor.default_category && !normalized.category) {
+        // Apply vendor default category if AI didn't detect a specific one
+        // Treat "Sonstiges" as "no category detected" so vendor default takes precedence
+        const aiCategoryIsGeneric = !normalized.category || 
+          normalized.category.toLowerCase() === 'sonstiges' ||
+          normalized.category.toLowerCase() === 'sonstige';
+          
+        if (matchedVendor.default_category && aiCategoryIsGeneric) {
           const categoryName = matchedVendor.default_category.name;
           if (category !== categoryName) {
             changes['Kategorie'] = { old: category || '-', new: `${categoryName} (Lieferanten-Standard)` };
