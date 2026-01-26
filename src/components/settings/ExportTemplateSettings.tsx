@@ -47,6 +47,7 @@ import {
   CreditCard,
   FileText,
   FileSpreadsheet,
+  Columns,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -139,6 +140,7 @@ function SortableColumn({
       className={cn(
         "flex items-center gap-3 p-3 rounded-lg border transition-all",
         column.visible ? "bg-background" : "bg-muted/50 opacity-60",
+        column.type === 'empty' && "border-dashed bg-muted/30",
         isSelected && "ring-2 ring-primary border-primary",
         isDragging && "opacity-50 shadow-lg z-50"
       )}
@@ -169,9 +171,15 @@ function SortableColumn({
         className="flex-1 cursor-pointer min-w-0"
         onClick={() => onSelect(column)}
       >
-        <div className="font-medium truncate">{column.label}</div>
+        <div className="font-medium truncate">
+          {column.type === 'empty' ? (
+            <span className="text-muted-foreground italic">{column.label || 'Leerspalte'}</span>
+          ) : (
+            column.label
+          )}
+        </div>
         <div className="text-xs text-muted-foreground">
-          {column.field} • {FIELD_TYPES[column.type]?.label || column.type}
+          {column.type === 'empty' ? 'Leere Spalte für manuelle Einträge' : `${column.field} • ${FIELD_TYPES[column.type]?.label || column.type}`}
         </div>
       </div>
 
@@ -390,6 +398,50 @@ export function ExportTemplateSettings() {
     setSelectedColumn(null);
   };
 
+  // Add empty column
+  const addEmptyColumn = () => {
+    if (!editingTemplate) return;
+    
+    const emptyCount = editingTemplate.columns.filter(c => c.type === 'empty').length;
+    const newColumn: ExportColumn = {
+      id: `empty_${Date.now()}`,
+      field: `empty_${emptyCount + 1}`,
+      label: `Leerspalte ${emptyCount + 1}`,
+      type: 'empty',
+      format: null,
+      visible: true,
+      order: editingTemplate.columns.length,
+      align: 'left',
+    };
+    
+    setEditingTemplate({
+      ...editingTemplate,
+      columns: [...editingTemplate.columns, newColumn],
+    });
+    setSelectedColumn(newColumn);
+  };
+
+  // Delete column (only for empty columns)
+  const deleteColumn = (columnId: string) => {
+    if (!editingTemplate) return;
+    
+    const column = editingTemplate.columns.find(c => c.id === columnId);
+    if (!column || column.type !== 'empty') return;
+    
+    const updatedColumns = editingTemplate.columns
+      .filter(c => c.id !== columnId)
+      .map((col, index) => ({ ...col, order: index }));
+    
+    setEditingTemplate({
+      ...editingTemplate,
+      columns: updatedColumns,
+    });
+    
+    if (selectedColumn?.id === columnId) {
+      setSelectedColumn(null);
+    }
+  };
+
   // Generate preview
   const handlePreview = async () => {
     if (!editingTemplate) return;
@@ -514,6 +566,14 @@ export function ExportTemplateSettings() {
                   </CardDescription>
                 </div>
                 <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={addEmptyColumn}
+                    title="Leerspalte hinzufügen"
+                  >
+                    <Columns className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -902,13 +962,30 @@ export function ExportTemplateSettings() {
                   />
                 </div>
 
-                {/* Preview */}
-                <div className="pt-4 border-t">
-                  <Label className="text-muted-foreground">Vorschau</Label>
-                  <div className="mt-2 p-3 bg-muted rounded-lg font-mono text-sm">
-                    {formatPreview(selectedColumn.type, selectedColumn.format)}
+                {/* Delete button for empty columns */}
+                {selectedColumn.type === 'empty' && (
+                  <div className="pt-4 border-t">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => deleteColumn(selectedColumn.id)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Leerspalte entfernen
+                    </Button>
                   </div>
-                </div>
+                )}
+
+                {/* Preview */}
+                {selectedColumn.type !== 'empty' && (
+                  <div className="pt-4 border-t">
+                    <Label className="text-muted-foreground">Vorschau</Label>
+                    <div className="mt-2 p-3 bg-muted rounded-lg font-mono text-sm">
+                      {formatPreview(selectedColumn.type, selectedColumn.format)}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ) : (

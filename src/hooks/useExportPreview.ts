@@ -74,6 +74,12 @@ export function useExportPreview() {
     const formatted: PreviewRow = {};
 
     columns.forEach(col => {
+      // Handle empty columns
+      if (col.type === 'empty') {
+        formatted[col.field] = '';
+        return;
+      }
+
       let value = receipt[col.field];
 
       // Special field handling
