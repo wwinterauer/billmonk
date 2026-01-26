@@ -509,11 +509,7 @@ export function ReceiptDetailPanel({
 
       // 3. Match or create vendor based on detected name
       const vendorName = normalized.vendor_brand || normalized.vendor;
-      console.log('[Rerun AI] Detected vendor name:', vendorName);
       const matchedVendor = await matchOrCreateVendor(vendorName, user.id);
-      console.log('[Rerun AI] Matched vendor:', matchedVendor);
-      console.log('[Rerun AI] Vendor default_category:', matchedVendor?.default_category);
-      console.log('[Rerun AI] Vendor default_category_id:', matchedVendor?.default_category_id);
 
       // 4. Track changed fields
       const changes: Record<string, { old: string; new: string }> = {};
@@ -534,24 +530,19 @@ export function ReceiptDetailPanel({
       
       // Apply vendor matching: set vendor_id and use display_name
       if (matchedVendor) {
-        console.log('[Rerun AI] Vendor matched! Setting vendor_id:', matchedVendor.id);
         setSelectedVendorId(matchedVendor.id);
         if (matchedVendor.display_name !== vendor) {
           compareAndUpdate('Lieferant', vendor, matchedVendor.display_name, setVendor);
         }
         
         // Vendor default category ALWAYS takes precedence when set
-        // This overrides any AI-detected category (including "Sonstiges")
         if (matchedVendor.default_category) {
           const categoryName = matchedVendor.default_category.name;
-          console.log('[Rerun AI] Applying vendor default category:', categoryName);
           if (category !== categoryName) {
             changes['Kategorie'] = { old: category || '-', new: `${categoryName} (Lieferanten-Standard)` };
             setCategory(categoryName);
           }
         } else {
-          console.log('[Rerun AI] No vendor default category, using AI:', normalized.category);
-          // No vendor default - use AI category (which is usually "Sonstiges")
           compareAndUpdate('Kategorie', category, normalized.category, setCategory);
         }
         
