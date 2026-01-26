@@ -402,13 +402,12 @@ export function ReceiptDetailPanel({
 
     const applied: string[] = ['Lieferant'];
 
-    // Set brand name if different from legal name
+    // Set brand name only if different from legal name
     if (vendorData.legal_name && vendorData.display_name !== vendorData.legal_name) {
       setVendorBrand(vendorData.display_name);
       applied.push('Markenname');
-    } else {
-      setVendorBrand('');
     }
+    // Don't clear vendorBrand if no brand - leave existing value
 
     // Apply default category if not already set
     if (vendorData.default_category && !category) {
