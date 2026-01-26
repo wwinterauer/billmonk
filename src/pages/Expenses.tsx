@@ -24,6 +24,7 @@ import {
   Hash,
   Loader2,
   RotateCcw,
+  Settings2,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, startOfQuarter, endOfQuarter } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -70,6 +71,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Separator } from '@/components/ui/separator';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
@@ -77,6 +79,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
 import { ReceiptPreviewDialog } from '@/components/receipts/ReceiptPreviewDialog';
 import { ExportDialog, exportAsCSV, exportAsExcel } from '@/components/exports/ExportDialog';
+import { ExportTemplateEditor } from '@/components/exports/ExportTemplateEditor';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -211,6 +214,7 @@ const Expenses = () => {
 
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportEditorOpen, setExportEditorOpen] = useState(false);
 
   // Detail panel state (edit mode)
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
@@ -695,6 +699,11 @@ const Expenses = () => {
                 }}>
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
                   Als Excel exportieren
+                </DropdownMenuItem>
+                <Separator className="my-1" />
+                <DropdownMenuItem onClick={() => setExportEditorOpen(true)}>
+                  <Settings2 className="h-4 w-4 mr-2" />
+                  Export konfigurieren...
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1361,6 +1370,12 @@ const Expenses = () => {
         open={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
         receipts={filteredReceipts}
+      />
+
+      {/* Export Template Editor */}
+      <ExportTemplateEditor
+        open={exportEditorOpen}
+        onClose={() => setExportEditorOpen(false)}
       />
     </DashboardLayout>
   );
