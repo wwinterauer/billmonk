@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw } from 'lucide-react';
+import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -39,7 +41,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useVendors, Vendor } from '@/hooks/useVendors';
-import { useCategories } from '@/hooks/useCategories';
+import { useCategories, Category } from '@/hooks/useCategories';
 import { toast } from 'sonner';
 
 const VAT_RATES = [
@@ -47,6 +49,8 @@ const VAT_RATES = [
   { value: '7', label: '7%' },
   { value: '0', label: '0%' },
 ];
+
+const ITEMS_PER_PAGE = 20;
 
 type SortOption = 'receipt_count_desc' | 'receipt_count_asc' | 'total_amount_desc' | 'total_amount_asc' | 'name_asc' | 'name_desc' | 'created_desc';
 type AdditionalFilter = 'all' | 'with_category' | 'without_category' | 'with_vat' | 'multiple_variants';
@@ -64,6 +68,17 @@ export function VendorManagement() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState<SortOption>('receipt_count_desc');
   const [additionalFilter, setAdditionalFilter] = useState<AdditionalFilter>('all');
+
+  // Selection state
+  const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Bulk action dialogs
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isBulkCategoryOpen, setIsBulkCategoryOpen] = useState(false);
+  const [bulkCategoryId, setBulkCategoryId] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -152,17 +167,11 @@ export function VendorManagement() {
     }
   };
 
-  const getCategoryName = (categoryId: string | null) => {
-    if (!categoryId) return '-';
-    const category = categories.find(c => c.id === categoryId);
-    return category?.name || '-';
+  const getCategory = (categoryId: string | null): Category | null => {
+    if (!categoryId) return null;
+    return categories.find(c => c.id === categoryId) || null;
   };
 
-  const getCategoryColor = (categoryId: string | null) => {
-    if (!categoryId) return null;
-    const category = categories.find(c => c.id === categoryId);
-    return category?.color || null;
-  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('de-DE', {
@@ -176,6 +185,56 @@ export function VendorManagement() {
     setCategoryFilter('all');
     setSortBy('receipt_count_desc');
     setAdditionalFilter('all');
+    setCurrentPage(1);
+  };
+
+  // Selection helpers
+  const toggleSelect = (vendorId: string) => {
+    setSelectedVendors(prev =>
+      prev.includes(vendorId)
+        ? prev.filter(id => id !== vendorId)
+        : [...prev, vendorId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedVendors([]);
+    } else {
+      setSelectedVendors(paginatedVendors.map(v => v.id));
+    }
+  };
+
+  // Bulk actions
+  const handleBulkDelete = async () => {
+    try {
+      for (const id of selectedVendors) {
+        await deleteVendor(id);
+      }
+      toast.success(`${selectedVendors.length} Lieferanten gelöscht`);
+      setSelectedVendors([]);
+      setIsBulkDeleteOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Fehler beim Löschen');
+    }
+  };
+
+  const handleBulkSetCategory = async () => {
+    if (!bulkCategoryId) {
+      toast.error('Bitte wähle eine Kategorie');
+      return;
+    }
+    try {
+      for (const id of selectedVendors) {
+        await updateVendor(id, { default_category_id: bulkCategoryId });
+      }
+      toast.success(`Kategorie für ${selectedVendors.length} Lieferanten gesetzt`);
+      setSelectedVendors([]);
+      setIsBulkCategoryOpen(false);
+      setBulkCategoryId('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Fehler beim Aktualisieren');
+    }
   };
 
   // Filter and sort vendors
@@ -241,6 +300,21 @@ export function VendorManagement() {
     return result;
   }, [vendors, searchQuery, categoryFilter, additionalFilter, sortBy]);
 
+  // Pagination
+  const totalPages = Math.ceil(filteredVendors.length / ITEMS_PER_PAGE);
+  const paginatedVendors = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredVendors.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredVendors, currentPage]);
+
+  // Reset page when filters change
+  useMemo(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [filteredVendors.length]);
+
+  const allSelected = paginatedVendors.length > 0 && paginatedVendors.every(v => selectedVendors.includes(v.id));
   const hasActiveFilters = searchQuery || categoryFilter !== 'all' || additionalFilter !== 'all';
 
   if (loading) {
@@ -375,6 +449,29 @@ export function VendorManagement() {
             </p>
           </div>
 
+          {/* Bulk Actions */}
+          {selectedVendors.length > 0 && (
+            <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
+              <span className="text-sm text-primary font-medium">
+                {selectedVendors.length} ausgewählt
+              </span>
+              <div className="flex-1" />
+              <Button variant="outline" size="sm" onClick={() => setIsBulkCategoryOpen(true)}>
+                <Tag className="w-4 h-4 mr-1" />
+                Kategorie setzen
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-destructive hover:text-destructive" 
+                onClick={() => setIsBulkDeleteOpen(true)}
+              >
+                <Trash2 className="w-4 h-4 mr-1" />
+                Löschen
+              </Button>
+            </div>
+          )}
+
           {/* Table */}
           {filteredVendors.length === 0 ? (
             <div className="text-center py-12 border rounded-lg bg-muted/30">
@@ -389,82 +486,212 @@ export function VendorManagement() {
               </Button>
             </div>
           ) : (
-            <div className="border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Rechtlicher Name</TableHead>
-                    <TableHead>Standardkategorie</TableHead>
-                    <TableHead>MwSt.</TableHead>
-                    <TableHead className="text-right">Belege</TableHead>
-                    <TableHead className="text-right">Gesamt</TableHead>
-                    <TableHead className="w-[100px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredVendors.map((vendor) => (
-                    <TableRow key={vendor.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          {vendor.display_name}
-                          {vendor.website && (
-                            <a
-                              href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-muted-foreground hover:text-foreground"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {vendor.legal_name || '-'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getCategoryColor(vendor.default_category_id) && (
-                            <span
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: getCategoryColor(vendor.default_category_id)! }}
-                            />
-                          )}
-                          {getCategoryName(vendor.default_category_id)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {vendor.default_vat_rate !== null ? `${vendor.default_vat_rate}%` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">{vendor.receipt_count}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(vendor.total_amount)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditDialog(vendor)}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeleteConfirmVendor(vendor)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+            <>
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[40px]">
+                        <Checkbox
+                          checked={allSelected}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </TableHead>
+                      <TableHead>Anzeigename</TableHead>
+                      <TableHead>Rechtlicher Name</TableHead>
+                      <TableHead>Erkannte Varianten</TableHead>
+                      <TableHead>Standard-Kategorie</TableHead>
+                      <TableHead className="text-right">Belege</TableHead>
+                      <TableHead className="text-right">Umsatz</TableHead>
+                      <TableHead className="w-[100px]">Aktionen</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedVendors.map((vendor) => {
+                      const category = getCategory(vendor.default_category_id);
+                      return (
+                        <TableRow key={vendor.id} className="hover:bg-muted/50">
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedVendors.includes(vendor.id)}
+                              onCheckedChange={() => toggleSelect(vendor.id)}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {vendor.display_name}
+                              {vendor.website && (
+                                <a
+                                  href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-muted-foreground hover:text-foreground"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {vendor.legal_name || '–'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                              {vendor.detected_names.slice(0, 3).map((name, i) => (
+                                <Badge key={i} variant="outline" className="text-xs">
+                                  {name}
+                                </Badge>
+                              ))}
+                              {vendor.detected_names.length > 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{vendor.detected_names.length - 3}
+                                </Badge>
+                              )}
+                              {vendor.detected_names.length === 0 && (
+                                <span className="text-muted-foreground">–</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {category ? (
+                              <Badge
+                                style={{
+                                  backgroundColor: category.color ? `${category.color}20` : undefined,
+                                  color: category.color || undefined,
+                                  borderColor: category.color || undefined,
+                                }}
+                                variant="outline"
+                              >
+                                {category.name}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">–</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">{vendor.receipt_count}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(vendor.total_amount)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditDialog(vendor)}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => setDeleteConfirmVendor(vendor)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Zeige {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredVendors.length)} von {filteredVendors.length}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(p => p - 1)}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm">Seite {currentPage} von {totalPages}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(p => p + 1)}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
+
+      {/* Bulk Delete Dialog */}
+      <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Lieferanten löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Möchtest du {selectedVendors.length} Lieferanten wirklich löschen?
+              Diese Aktion kann nicht rückgängig gemacht werden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {selectedVendors.length} Lieferanten löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Category Dialog */}
+      <Dialog open={isBulkCategoryOpen} onOpenChange={setIsBulkCategoryOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Kategorie setzen</DialogTitle>
+            <DialogDescription>
+              Wähle eine Standardkategorie für {selectedVendors.length} Lieferanten.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select value={bulkCategoryId} onValueChange={setBulkCategoryId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Kategorie auswählen..." />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    <span className="flex items-center">
+                      {cat.color && (
+                        <span
+                          className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                      )}
+                      {cat.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulkCategoryOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleBulkSetCategory} disabled={!bulkCategoryId}>
+              <Check className="h-4 w-4 mr-2" />
+              Kategorie setzen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add/Edit Dialog */}
       <Dialog open={isAddDialogOpen || !!editingVendor} onOpenChange={closeDialogs}>
