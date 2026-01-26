@@ -15,12 +15,32 @@ import {
   Calculator,
   TrendingUp,
   TrendingDown,
-  Loader2,
 } from 'lucide-react';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   Select,
   SelectContent,
@@ -116,6 +136,23 @@ const Reports = () => {
     enabled: !!user && !!dateRange.from && !!dateRange.to,
   });
 
+  // Fetch categories for color mapping
+  const { data: categories } = useQuery({
+    queryKey: ['categories', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .or(`user_id.eq.${user.id},is_system.eq.true`);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
   // Fetch previous period data for comparison
   const previousPeriodRange = useMemo(() => {
     if (!dateRange.from || !dateRange.to) return null;
@@ -178,6 +215,49 @@ const Reports = () => {
       countChange,
     };
   }, [receipts, previousReceipts]);
+
+  // Group data by category
+  const categoryData = useMemo(() => {
+    if (!receipts) return [];
+
+    // Create a map for category colors
+    const categoryColorMap = new Map<string, string>();
+    categories?.forEach((cat) => {
+      categoryColorMap.set(cat.name, cat.color || '#94A3B8');
+    });
+
+    const grouped = receipts.reduce((acc: Record<string, { name: string; color: string; amount: number; count: number; vat: number }>, receipt) => {
+      const catName = receipt.category || 'Ohne Kategorie';
+      const catColor = categoryColorMap.get(catName) || '#94A3B8';
+
+      if (!acc[catName]) {
+        acc[catName] = {
+          name: catName,
+          color: catColor,
+          amount: 0,
+          count: 0,
+          vat: 0,
+        };
+      }
+
+      acc[catName].amount += receipt.amount_gross || 0;
+      acc[catName].count += 1;
+      acc[catName].vat += receipt.vat_amount || 0;
+
+      return acc;
+    }, {});
+
+    return Object.values(grouped).sort((a, b) => b.amount - a.amount);
+  }, [receipts, categories]);
+
+  // Prepare data for Pie Chart
+  const pieChartData = useMemo(() => {
+    return categoryData.map((cat) => ({
+      name: cat.name,
+      value: cat.amount,
+      color: cat.color,
+    }));
+  }, [categoryData]);
 
   // Quick period selection
   const setQuickPeriod = (period: 'thisMonth' | 'lastMonth' | 'thisYear') => {
@@ -601,13 +681,190 @@ const Reports = () => {
           </Card>
         </div>
 
-        {/* Placeholder for Charts */}
-        <Card className="border-border/50">
-          <CardContent className="py-12">
-            <div className="text-center text-muted-foreground">
-              <p className="text-lg font-medium mb-2">Diagramme werden hier angezeigt</p>
-              <p className="text-sm">Weitere Auswertungen folgen in den nächsten Schritten.</p>
-            </div>
+        {/* Category Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Pie Chart - Expenses by Category */}
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="text-lg">Ausgaben nach Kategorie</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="h-[300px] flex items-center justify-center">
+                  <Skeleton className="h-[200px] w-[200px] rounded-full" />
+                </div>
+              ) : pieChartData.length === 0 ? (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  Keine Daten für den gewählten Zeitraum
+                </div>
+              ) : (
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieChartData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        label={({ name, percent }) =>
+                          `${name} (${(percent * 100).toFixed(0)}%)`
+                        }
+                        labelLine={{ stroke: 'hsl(var(--muted-foreground))' }}
+                      >
+                        {pieChartData.map((entry, index) => (
+                          <Cell key={index} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value: number) => formatCurrency(value)}
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Bar Chart - Top Categories */}
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="text-lg">Top Kategorien</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="h-[300px] flex flex-col justify-center gap-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} className="h-8 w-full" />
+                  ))}
+                </div>
+              ) : categoryData.length === 0 ? (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  Keine Daten für den gewählten Zeitraum
+                </div>
+              ) : (
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={categoryData.slice(0, 5)} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis
+                        type="number"
+                        tickFormatter={(v) => `€${v}`}
+                        stroke="hsl(var(--muted-foreground))"
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={120}
+                        stroke="hsl(var(--muted-foreground))"
+                        tick={{ fill: 'hsl(var(--foreground))' }}
+                      />
+                      <Tooltip
+                        formatter={(value: number) => formatCurrency(value)}
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                        }}
+                      />
+                      <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
+                        {categoryData.slice(0, 5).map((entry, index) => (
+                          <Cell key={index} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Category Detail Table */}
+        <Card className="border-border/50 mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Detailübersicht nach Kategorie</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : categoryData.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                Keine Daten für den gewählten Zeitraum
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Kategorie</TableHead>
+                    <TableHead className="text-right">Anzahl</TableHead>
+                    <TableHead className="text-right">Brutto</TableHead>
+                    <TableHead className="text-right">Netto</TableHead>
+                    <TableHead className="text-right">Vorsteuer</TableHead>
+                    <TableHead className="text-right">Anteil</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {categoryData.map((cat) => (
+                    <TableRow key={cat.name}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: cat.color }}
+                          />
+                          {cat.name}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{cat.count}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(cat.amount)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(cat.amount - cat.vat)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(cat.vat)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {stats?.totalGross
+                          ? ((cat.amount / stats.totalGross) * 100).toFixed(1)
+                          : 0}
+                        %
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell className="font-medium">Gesamt</TableCell>
+                    <TableCell className="text-right font-medium">
+                      {stats?.count || 0}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(stats?.totalGross || 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(stats?.totalNet || 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(stats?.totalVat || 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">100%</TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>
