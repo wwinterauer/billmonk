@@ -14,6 +14,11 @@ export interface Vendor {
   website: string | null;
   receipt_count: number;
   total_amount: number;
+  // Learning fields
+  learning_enabled: boolean;
+  learning_level: number;
+  correction_count: number;
+  prediction_accuracy: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -76,6 +81,10 @@ export function useVendors() {
           detected_names: v.detected_names || [],
           receipt_count: stats?.count ?? v.receipt_count ?? 0,
           total_amount: stats?.total ?? Number(v.total_amount) ?? 0,
+          learning_enabled: v.learning_enabled ?? true,
+          learning_level: v.learning_level ?? 0,
+          correction_count: v.correction_count ?? 0,
+          prediction_accuracy: v.prediction_accuracy ?? null,
         };
       }) as Vendor[];
 
@@ -139,6 +148,10 @@ export function useVendors() {
       detected_names: data.detected_names || [],
       receipt_count: data.receipt_count || 0,
       total_amount: Number(data.total_amount) || 0,
+      learning_enabled: data.learning_enabled ?? true,
+      learning_level: data.learning_level ?? 0,
+      correction_count: data.correction_count ?? 0,
+      prediction_accuracy: data.prediction_accuracy ?? null,
     } as Vendor;
 
     setVendors(prev => [...prev, newVendor].sort((a, b) => 
@@ -211,6 +224,10 @@ export function useVendors() {
       detected_names: data.detected_names || [],
       receipt_count: data.receipt_count || 0,
       total_amount: Number(data.total_amount) || 0,
+      learning_enabled: data.learning_enabled ?? true,
+      learning_level: data.learning_level ?? 0,
+      correction_count: data.correction_count ?? 0,
+      prediction_accuracy: data.prediction_accuracy ?? null,
     } as Vendor;
 
     setVendors(prev => prev.map(v => v.id === id ? updated : v).sort((a, b) => 

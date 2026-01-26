@@ -336,6 +336,67 @@ export type Database = {
           },
         ]
       }
+      field_corrections: {
+        Row: {
+          corrected_value: string
+          created_at: string | null
+          detected_value: string | null
+          field_name: string
+          id: string
+          receipt_id: string | null
+          surrounding_text: string | null
+          user_id: string
+          vendor_learning_id: string
+          was_helpful: boolean | null
+        }
+        Insert: {
+          corrected_value: string
+          created_at?: string | null
+          detected_value?: string | null
+          field_name: string
+          id?: string
+          receipt_id?: string | null
+          surrounding_text?: string | null
+          user_id: string
+          vendor_learning_id: string
+          was_helpful?: boolean | null
+        }
+        Update: {
+          corrected_value?: string
+          created_at?: string | null
+          detected_value?: string | null
+          field_name?: string
+          id?: string
+          receipt_id?: string | null
+          surrounding_text?: string | null
+          user_id?: string
+          vendor_learning_id?: string
+          was_helpful?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_corrections_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_corrections_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_corrections_vendor_learning_id_fkey"
+            columns: ["vendor_learning_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_learning"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_name: string | null
@@ -518,16 +579,86 @@ export type Database = {
           },
         ]
       }
+      vendor_learning: {
+        Row: {
+          confidence_boost: number | null
+          created_at: string | null
+          field_patterns: Json | null
+          id: string
+          is_active: boolean | null
+          last_correction_at: string | null
+          last_successful_at: string | null
+          layout_hints: Json | null
+          learning_level: number | null
+          successful_predictions: number | null
+          total_corrections: number | null
+          updated_at: string | null
+          user_id: string
+          vendor_id: string
+        }
+        Insert: {
+          confidence_boost?: number | null
+          created_at?: string | null
+          field_patterns?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_correction_at?: string | null
+          last_successful_at?: string | null
+          layout_hints?: Json | null
+          learning_level?: number | null
+          successful_predictions?: number | null
+          total_corrections?: number | null
+          updated_at?: string | null
+          user_id: string
+          vendor_id: string
+        }
+        Update: {
+          confidence_boost?: number | null
+          created_at?: string | null
+          field_patterns?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_correction_at?: string | null
+          last_successful_at?: string | null
+          layout_hints?: Json | null
+          learning_level?: number | null
+          successful_predictions?: number | null
+          total_corrections?: number | null
+          updated_at?: string | null
+          user_id?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_learning_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_learning_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendors: {
         Row: {
+          correction_count: number | null
           created_at: string | null
           default_category_id: string | null
           default_vat_rate: number | null
           detected_names: string[] | null
           display_name: string
           id: string
+          learning_enabled: boolean | null
+          learning_level: number | null
           legal_name: string | null
           notes: string | null
+          prediction_accuracy: number | null
           receipt_count: number | null
           total_amount: number | null
           updated_at: string | null
@@ -535,14 +666,18 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          correction_count?: number | null
           created_at?: string | null
           default_category_id?: string | null
           default_vat_rate?: number | null
           detected_names?: string[] | null
           display_name: string
           id?: string
+          learning_enabled?: boolean | null
+          learning_level?: number | null
           legal_name?: string | null
           notes?: string | null
+          prediction_accuracy?: number | null
           receipt_count?: number | null
           total_amount?: number | null
           updated_at?: string | null
@@ -550,14 +685,18 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          correction_count?: number | null
           created_at?: string | null
           default_category_id?: string | null
           default_vat_rate?: number | null
           detected_names?: string[] | null
           display_name?: string
           id?: string
+          learning_enabled?: boolean | null
+          learning_level?: number | null
           legal_name?: string | null
           notes?: string | null
+          prediction_accuracy?: number | null
           receipt_count?: number | null
           total_amount?: number | null
           updated_at?: string | null
