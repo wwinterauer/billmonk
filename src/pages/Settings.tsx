@@ -168,6 +168,13 @@ const Settings = () => {
   const { user } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   
+  // Handle tab from URL query parameter - must be before any early returns
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const validTabs = ['naming', 'recognition', 'categories', 'vendors', 'export'];
+  const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'naming';
+  const [activeTab, setActiveTab] = useState(initialTab);
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<NamingSettings>(DEFAULT_SETTINGS);
@@ -398,13 +405,6 @@ const Settings = () => {
       </DashboardLayout>
     );
   }
-
-  // Handle tab from URL query parameter
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['naming', 'recognition', 'categories', 'vendors', 'export'];
-  const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'naming';
-  const [activeTab, setActiveTab] = useState(initialTab);
 
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
