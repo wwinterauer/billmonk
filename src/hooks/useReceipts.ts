@@ -5,6 +5,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
 import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
 import { matchOrCreateVendor } from '@/services/vendorMatchingService';
+import { 
+  generateFileHash, 
+  checkForDuplicates, 
+  type DuplicateCheckResult 
+} from '@/services/duplicateDetectionService';
 
 export interface Receipt {
   id: string;
@@ -34,6 +39,20 @@ export interface Receipt {
   custom_filename: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DuplicateInfo {
+  type: 'exact' | 'content';
+  original: {
+    id: string;
+    file_name: string | null;
+    vendor: string | null;
+    amount_gross: number | null;
+    receipt_date: string | null;
+  };
+  file: File;
+  fileHash: string;
+  duplicateCheck?: DuplicateCheckResult;
 }
 
 export interface ReceiptFilters {
@@ -115,9 +134,31 @@ export function useReceipts() {
     return `${userId}/${year}/${month}/${uuid}_${safeFileName}`;
   };
 
+  const checkExactDuplicate = async (
+    fileHash: string
+  ): Promise<{ id: string; file_name: string | null; vendor: string | null; amount_gross: number | null; receipt_date: string | null } | null> => {
+    if (!user) return null;
+
+    const { data } = await supabase
+      .from('receipts')
+      .select('id, file_name, vendor, amount_gross, receipt_date')
+      .eq('user_id', user.id)
+      .eq('file_hash', fileHash)
+      .limit(1)
+      .maybeSingle();
+
+    return data;
+  };
+
   const uploadReceipt = async (
     file: File, 
-    onProgress?: (progress: number, statusText?: string) => void
+    onProgress?: (progress: number, statusText?: string) => void,
+    options?: {
+      fileHash?: string;
+      skipDuplicateCheck?: boolean;
+      markAsDuplicate?: boolean;
+      duplicateOfId?: string;
+    }
   ): Promise<Receipt> => {
     if (!user) {
       throw new Error('Nicht angemeldet');
@@ -127,6 +168,9 @@ export function useReceipts() {
     if (!validation.valid) {
       throw new Error(validation.error);
     }
+
+    // Generate hash if not provided
+    const fileHash = options?.fileHash || await generateFileHash(file);
 
     const storagePath = generateStoragePath(user.id, file.name);
     const fileExtension = getFileExtension(file.name);
@@ -148,15 +192,22 @@ export function useReceipts() {
     onProgress?.(40, 'Wird hochgeladen...');
 
     // Create database entry with 'processing' status
+    const insertData = {
+      user_id: user.id,
+      file_url: uploadData.path,
+      file_name: file.name,
+      file_type: fileExtension,
+      file_hash: fileHash,
+      status: options?.markAsDuplicate ? 'duplicate' : 'processing',
+      is_duplicate: options?.markAsDuplicate || false,
+      duplicate_of: options?.duplicateOfId || null,
+      duplicate_score: options?.markAsDuplicate ? 100 : null,
+      duplicate_checked_at: options?.markAsDuplicate ? new Date().toISOString() : null,
+    };
+
     const { data: receipt, error: dbError } = await supabase
       .from('receipts')
-      .insert({
-        user_id: user.id,
-        file_url: uploadData.path,
-        file_name: file.name,
-        file_type: fileExtension,
-        status: 'processing',
-      })
+      .insert(insertData)
       .select()
       .single();
 
@@ -273,13 +324,67 @@ export function useReceipts() {
 
   const uploadAndProcessReceipt = async (
     file: File,
-    onProgress?: (progress: number, statusText?: string) => void
-  ): Promise<{ receipt: Receipt; aiSuccess: boolean; aiConfidence?: number }> => {
+    onProgress?: (progress: number, statusText?: string) => void,
+    options?: {
+      fileHash?: string;
+      skipDuplicateCheck?: boolean;
+      markAsDuplicate?: boolean;
+      duplicateOfId?: string;
+    }
+  ): Promise<{ receipt: Receipt; aiSuccess: boolean; aiConfidence?: number; duplicateCheck?: DuplicateCheckResult }> => {
+    if (!user) {
+      throw new Error('Nicht angemeldet');
+    }
+
+    // Generate hash first for duplicate check
+    const fileHash = options?.fileHash || await generateFileHash(file);
+
     // First upload
-    const receipt = await uploadReceipt(file, onProgress);
+    const receipt = await uploadReceipt(file, onProgress, { 
+      ...options, 
+      fileHash 
+    });
+
+    // If marked as duplicate, skip AI processing
+    if (options?.markAsDuplicate) {
+      return { receipt, aiSuccess: false };
+    }
     
-    // Then process with AI
-    return processReceiptWithAI(file, receipt.id, onProgress);
+    // Process with AI
+    const result = await processReceiptWithAI(file, receipt.id, onProgress);
+
+    // After AI processing, check for content-based duplicates
+    if (!options?.skipDuplicateCheck) {
+      const duplicateCheck = await checkForDuplicates(
+        user.id,
+        fileHash,
+        {
+          vendor: result.receipt.vendor,
+          amount_gross: result.receipt.amount_gross,
+          receipt_date: result.receipt.receipt_date,
+          invoice_number: result.receipt.invoice_number,
+          file_name: file.name
+        },
+        receipt.id
+      );
+
+      if (duplicateCheck.isDuplicate) {
+        // Update receipt with duplicate info
+        await supabase
+          .from('receipts')
+          .update({
+            is_duplicate: true,
+            duplicate_of: duplicateCheck.duplicateOf,
+            duplicate_score: duplicateCheck.score,
+            duplicate_checked_at: new Date().toISOString(),
+          })
+          .eq('id', receipt.id);
+
+        return { ...result, duplicateCheck };
+      }
+    }
+
+    return result;
   };
 
   const uploadMultipleReceipts = async (
@@ -473,6 +578,8 @@ export function useReceipts() {
     updateReceipt,
     deleteReceipt,
     getReceiptFileUrl,
+    checkExactDuplicate,
+    generateFileHash,
     ALLOWED_TYPES,
     MAX_FILE_SIZE,
     MAX_FILES,
