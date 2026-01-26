@@ -23,6 +23,7 @@ export interface Receipt {
   category: string | null;
   payment_method: string | null;
   notes: string | null;
+  invoice_number: string | null;
   ai_confidence: number | null;
   ai_raw_response: Json | null;
   bank_transaction_id: string | null;

@@ -3,7 +3,6 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
-import { de } from 'date-fns/locale';
 import {
   Dialog,
   DialogContent,
@@ -15,7 +14,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 import {
   FileText,
   Folder,
@@ -38,6 +36,7 @@ interface NamingSettings {
   removeSpecialChars: boolean;
   lowercase: boolean;
   dateFormat: string;
+  emptyFieldHandling: 'keep' | 'replace' | 'remove';
 }
 
 const DEFAULT_SETTINGS: NamingSettings = {
@@ -46,7 +45,8 @@ const DEFAULT_SETTINGS: NamingSettings = {
   replaceSpaces: true,
   removeSpecialChars: true,
   lowercase: false,
-  dateFormat: 'YYYY-MM-DD',
+  dateFormat: 'YYYYMMDD',
+  emptyFieldHandling: 'remove',
 };
 
 interface ExportDialogProps {
@@ -92,6 +92,7 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
             removeSpecialChars: savedSettings.removeSpecialChars !== undefined ? Boolean(savedSettings.removeSpecialChars) : DEFAULT_SETTINGS.removeSpecialChars,
             lowercase: savedSettings.lowercase !== undefined ? Boolean(savedSettings.lowercase) : DEFAULT_SETTINGS.lowercase,
             dateFormat: (savedSettings.dateFormat as string) || DEFAULT_SETTINGS.dateFormat,
+            emptyFieldHandling: (savedSettings.emptyFieldHandling as NamingSettings['emptyFieldHandling']) || DEFAULT_SETTINGS.emptyFieldHandling,
           });
         }
       } catch (error) {
@@ -108,16 +109,43 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
   const formatDate = (dateStr: string | null, formatStr: string): string => {
     if (!dateStr) return 'kein-datum';
     const [year, month, day] = dateStr.split('-');
+    const year2 = year.slice(2);
     switch (formatStr) {
       case 'DD.MM.YYYY':
         return `${day}.${month}.${year}`;
       case 'DD-MM-YYYY':
         return `${day}-${month}-${year}`;
+      case 'DD.MM.YY':
+        return `${day}.${month}.${year2}`;
       case 'YYYYMMDD':
         return `${year}${month}${day}`;
+      case 'YYMMDD':
+        return `${year2}${month}${day}`;
       case 'YYYY-MM-DD':
       default:
         return dateStr;
+    }
+  };
+
+  // Get date parts
+  const getDateParts = (dateStr: string | null) => {
+    if (!dateStr) return { year: 'kein', year2: 'kein', month: 'kein', day: 'kein' };
+    const [year, month, day] = dateStr.split('-');
+    return { year, year2: year.slice(2), month, day };
+  };
+
+  // Handle empty field based on settings
+  const handleEmptyField = (value: string | null | undefined): string => {
+    if (value) return value;
+    
+    switch (settings.emptyFieldHandling) {
+      case 'replace':
+        return 'k.A.';
+      case 'remove':
+        return '';
+      case 'keep':
+      default:
+        return '';
     }
   };
 
@@ -148,6 +176,9 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
       result = result.toLowerCase();
     }
 
+    // Clean up multiple underscores
+    result = result.replace(/_+/g, '_').replace(/^_|_$/g, '');
+
     return result;
   };
 
@@ -170,13 +201,25 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
   const generateFileName = (receipt: Receipt, index: number): string => {
     let name = settings.template;
 
-    // Replace placeholders
+    // Date placeholders
     const formattedDate = formatDate(receipt.receipt_date, settings.dateFormat);
+    const dateParts = getDateParts(receipt.receipt_date);
+    
     name = name.replace(/{datum}/g, formattedDate);
-    name = name.replace(/{datum_de}/g, formatDate(receipt.receipt_date, 'DD.MM.YYYY'));
-    name = name.replace(/{lieferant}/g, receipt.vendor || 'unbekannt');
+    name = name.replace(/{jahr}/g, dateParts.year);
+    name = name.replace(/{jahr2}/g, dateParts.year2);
+    name = name.replace(/{monat}/g, dateParts.month);
+    name = name.replace(/{tag}/g, dateParts.day);
+
+    // Beleg-Info placeholders
+    name = name.replace(/{lieferant}/g, handleEmptyField(receipt.vendor));
     name = name.replace(/{betrag}/g, receipt.amount_gross?.toFixed(2) || '0');
-    name = name.replace(/{kategorie}/g, receipt.category || 'sonstiges');
+    name = name.replace(/{betrag_int}/g, receipt.amount_gross ? Math.round(receipt.amount_gross * 100).toString() : '0');
+    name = name.replace(/{kategorie}/g, handleEmptyField(receipt.category));
+    name = name.replace(/{rechnungsnummer}/g, handleEmptyField(receipt.invoice_number));
+    name = name.replace(/{zahlungsart}/g, handleEmptyField(receipt.payment_method));
+
+    // System placeholders
     name = name.replace(/{nummer}/g, String(index + 1).padStart(3, '0'));
     name = name.replace(/{original}/g, getFileNameWithoutExtension(receipt.file_name));
 
@@ -433,6 +476,7 @@ export async function exportAsCSV(receipts: Receipt[]) {
   const rows = receipts.map(r => ({
     'Datum': r.receipt_date || '',
     'Lieferant': r.vendor || '',
+    'Rechnungsnummer': r.invoice_number || '',
     'Beschreibung': r.description || '',
     'Kategorie': r.category || '',
     'Brutto (€)': r.amount_gross?.toFixed(2) || '',
@@ -460,6 +504,7 @@ export async function exportAsExcel(receipts: Receipt[]) {
   const rows = receipts.map(r => ({
     'Datum': r.receipt_date || '',
     'Lieferant': r.vendor || '',
+    'Rechnungsnummer': r.invoice_number || '',
     'Beschreibung': r.description || '',
     'Kategorie': r.category || '',
     'Brutto (€)': r.amount_gross || 0,
@@ -479,6 +524,7 @@ export async function exportAsExcel(receipts: Receipt[]) {
   const colWidths = [
     { wch: 12 }, // Datum
     { wch: 25 }, // Lieferant
+    { wch: 18 }, // Rechnungsnummer
     { wch: 35 }, // Beschreibung
     { wch: 15 }, // Kategorie
     { wch: 12 }, // Brutto
