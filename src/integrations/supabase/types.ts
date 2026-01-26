@@ -14,7 +14,383 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bank_accounts: {
+        Row: {
+          account_name: string | null
+          bank_name: string | null
+          created_at: string | null
+          iban: string | null
+          id: string
+          is_default: boolean | null
+          user_id: string
+        }
+        Insert: {
+          account_name?: string | null
+          bank_name?: string | null
+          created_at?: string | null
+          iban?: string | null
+          id?: string
+          is_default?: boolean | null
+          user_id: string
+        }
+        Update: {
+          account_name?: string | null
+          bank_name?: string | null
+          created_at?: string | null
+          iban?: string | null
+          id?: string
+          is_default?: boolean | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_imports: {
+        Row: {
+          bank_account_id: string | null
+          created_at: string | null
+          date_from: string | null
+          date_to: string | null
+          file_name: string | null
+          id: string
+          imported_rows: number | null
+          skipped_rows: number | null
+          total_rows: number | null
+          user_id: string
+        }
+        Insert: {
+          bank_account_id?: string | null
+          created_at?: string | null
+          date_from?: string | null
+          date_to?: string | null
+          file_name?: string | null
+          id?: string
+          imported_rows?: number | null
+          skipped_rows?: number | null
+          total_rows?: number | null
+          user_id: string
+        }
+        Update: {
+          bank_account_id?: string | null
+          created_at?: string | null
+          date_from?: string | null
+          date_to?: string | null
+          file_name?: string | null
+          id?: string
+          imported_rows?: number | null
+          skipped_rows?: number | null
+          total_rows?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_imports_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_imports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_transactions: {
+        Row: {
+          amount: number | null
+          bank_account_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          import_batch_id: string | null
+          is_expense: boolean | null
+          raw_data: Json | null
+          receipt_id: string | null
+          status: string | null
+          transaction_date: string | null
+          user_id: string
+          value_date: string | null
+        }
+        Insert: {
+          amount?: number | null
+          bank_account_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          import_batch_id?: string | null
+          is_expense?: boolean | null
+          raw_data?: Json | null
+          receipt_id?: string | null
+          status?: string | null
+          transaction_date?: string | null
+          user_id: string
+          value_date?: string | null
+        }
+        Update: {
+          amount?: number | null
+          bank_account_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          import_batch_id?: string | null
+          is_expense?: boolean | null
+          raw_data?: Json | null
+          receipt_id?: string | null
+          status?: string | null
+          transaction_date?: string | null
+          user_id?: string
+          value_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_transactions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "bank_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_bank_transactions_receipt"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      categories: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          icon: string | null
+          id: string
+          is_system: boolean | null
+          name: string
+          user_id: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          is_system?: boolean | null
+          name: string
+          user_id?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          is_system?: boolean | null
+          name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cloud_connections: {
+        Row: {
+          access_token: string | null
+          created_at: string | null
+          folder_path: string | null
+          id: string
+          is_active: boolean | null
+          last_sync: string | null
+          provider: string | null
+          refresh_token: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string | null
+          folder_path?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sync?: string | null
+          provider?: string | null
+          refresh_token?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string | null
+          folder_path?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sync?: string | null
+          provider?: string | null
+          refresh_token?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cloud_connections_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          company_name: string | null
+          created_at: string | null
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          monthly_receipt_count: number | null
+          plan: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string | null
+          email: string
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          monthly_receipt_count?: number | null
+          plan?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string | null
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          monthly_receipt_count?: number | null
+          plan?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      receipts: {
+        Row: {
+          ai_confidence: number | null
+          ai_raw_response: Json | null
+          amount_gross: number | null
+          amount_net: number | null
+          bank_transaction_id: string | null
+          category: string | null
+          created_at: string | null
+          currency: string | null
+          description: string | null
+          file_name: string | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          notes: string | null
+          payment_method: string | null
+          receipt_date: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+          vat_amount: number | null
+          vat_rate: number | null
+          vendor: string | null
+        }
+        Insert: {
+          ai_confidence?: number | null
+          ai_raw_response?: Json | null
+          amount_gross?: number | null
+          amount_net?: number | null
+          bank_transaction_id?: string | null
+          category?: string | null
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          notes?: string | null
+          payment_method?: string | null
+          receipt_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+          vat_amount?: number | null
+          vat_rate?: number | null
+          vendor?: string | null
+        }
+        Update: {
+          ai_confidence?: number | null
+          ai_raw_response?: Json | null
+          amount_gross?: number | null
+          amount_net?: number | null
+          bank_transaction_id?: string | null
+          category?: string | null
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          notes?: string | null
+          payment_method?: string | null
+          receipt_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+          vat_amount?: number | null
+          vat_rate?: number | null
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipts_bank_transaction_id_fkey"
+            columns: ["bank_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "bank_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
