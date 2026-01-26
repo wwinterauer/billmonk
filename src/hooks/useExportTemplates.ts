@@ -1,0 +1,281 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import type { Json } from '@/integrations/supabase/types';
+
+// Column configuration type
+export interface ExportColumn {
+  id: string;
+  field: string;
+  label: string;
+  type: 'date' | 'text' | 'currency' | 'percent' | 'number';
+  format: string | null;
+  visible: boolean;
+  order: number;
+  width?: number;
+}
+
+// Export template type
+export interface ExportTemplate {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  is_default: boolean;
+  columns: ExportColumn[];
+  sort_by: string | null;
+  sort_direction: 'asc' | 'desc';
+  group_by: string | null;
+  group_subtotals: boolean;
+  include_header: boolean;
+  include_totals: boolean;
+  date_format: string;
+  number_format: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Default columns for new templates
+export const DEFAULT_COLUMNS: ExportColumn[] = [
+  { id: '1', field: 'receipt_date', label: 'Datum', type: 'date', format: 'DD.MM.YYYY', visible: true, order: 0 },
+  { id: '2', field: 'vendor', label: 'Lieferant', type: 'text', format: null, visible: true, order: 1 },
+  { id: '3', field: 'description', label: 'Beschreibung', type: 'text', format: null, visible: true, order: 2 },
+  { id: '4', field: 'invoice_number', label: 'Rechnungsnr.', type: 'text', format: null, visible: true, order: 3 },
+  { id: '5', field: 'category', label: 'Kategorie', type: 'text', format: null, visible: true, order: 4 },
+  { id: '6', field: 'amount_gross', label: 'Brutto', type: 'currency', format: '€ #.##0,00', visible: true, order: 5 },
+  { id: '7', field: 'amount_net', label: 'Netto', type: 'currency', format: '€ #.##0,00', visible: true, order: 6 },
+  { id: '8', field: 'vat_rate', label: 'MwSt-Satz', type: 'percent', format: '#0%', visible: true, order: 7 },
+  { id: '9', field: 'vat_amount', label: 'Vorsteuer', type: 'currency', format: '€ #.##0,00', visible: true, order: 8 },
+  { id: '10', field: 'payment_method', label: 'Zahlungsart', type: 'text', format: null, visible: false, order: 9 },
+  { id: '11', field: 'status', label: 'Status', type: 'text', format: null, visible: false, order: 10 },
+  { id: '12', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 11 },
+];
+
+// Field type definitions with format options
+export const FIELD_TYPES = {
+  date: { label: 'Datum', formats: ['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'DD/MM/YYYY'] },
+  text: { label: 'Text', formats: null },
+  currency: { label: 'Währung', formats: ['€ #.##0,00', '#.##0,00 €', '#,##0.00'] },
+  percent: { label: 'Prozent', formats: ['#0%', '#0,0%', '#0.0%'] },
+  number: { label: 'Zahl', formats: ['#.##0', '#,##0', '#0'] },
+};
+
+// Available fields for grouping/sorting
+export const AVAILABLE_FIELDS = [
+  { value: 'receipt_date', label: 'Datum' },
+  { value: 'vendor', label: 'Lieferant' },
+  { value: 'category', label: 'Kategorie' },
+  { value: 'amount_gross', label: 'Brutto' },
+  { value: 'vat_rate', label: 'MwSt-Satz' },
+  { value: 'status', label: 'Status' },
+  { value: 'payment_method', label: 'Zahlungsart' },
+];
+
+export function useExportTemplates() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [templates, setTemplates] = useState<ExportTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch all templates
+  const fetchTemplates = useCallback(async () => {
+    if (!user) return;
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('export_templates')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('is_default', { ascending: false })
+        .order('name');
+
+      if (error) throw error;
+
+      // Parse columns from JSON
+      const parsed = (data || []).map(t => ({
+        ...t,
+        columns: (t.columns as unknown as ExportColumn[]) || DEFAULT_COLUMNS,
+        sort_direction: (t.sort_direction as 'asc' | 'desc') || 'asc',
+      })) as ExportTemplate[];
+
+      setTemplates(parsed);
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler beim Laden',
+        description: 'Export-Vorlagen konnten nicht geladen werden.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [user, toast]);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
+
+  // Create a new template
+  const createTemplate = async (
+    template: Omit<ExportTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+  ): Promise<ExportTemplate | null> => {
+    if (!user) return null;
+
+    try {
+      // If setting as default, unset other defaults first
+      if (template.is_default) {
+        await supabase
+          .from('export_templates')
+          .update({ is_default: false })
+          .eq('user_id', user.id);
+      }
+
+      const { data, error } = await supabase
+        .from('export_templates')
+        .insert({
+          user_id: user.id,
+          name: template.name,
+          description: template.description,
+          is_default: template.is_default,
+          columns: template.columns as unknown as Json,
+          sort_by: template.sort_by,
+          sort_direction: template.sort_direction,
+          group_by: template.group_by,
+          group_subtotals: template.group_subtotals,
+          include_header: template.include_header,
+          include_totals: template.include_totals,
+          date_format: template.date_format,
+          number_format: template.number_format,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newTemplate = {
+        ...data,
+        columns: data.columns as unknown as ExportColumn[],
+        sort_direction: data.sort_direction as 'asc' | 'desc',
+      } as ExportTemplate;
+
+      setTemplates(prev => [...prev, newTemplate]);
+      toast({ title: 'Vorlage erstellt' });
+      return newTemplate;
+    } catch (error) {
+      console.error('Error creating template:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Vorlage konnte nicht erstellt werden.',
+      });
+      return null;
+    }
+  };
+
+  // Update an existing template
+  const updateTemplate = async (
+    id: string,
+    updates: Partial<Omit<ExportTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+  ): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      // If setting as default, unset other defaults first
+      if (updates.is_default) {
+        await supabase
+          .from('export_templates')
+          .update({ is_default: false })
+          .eq('user_id', user.id)
+          .neq('id', id);
+      }
+
+      const updateData: Record<string, unknown> = { ...updates };
+      if (updates.columns) {
+        updateData.columns = updates.columns as unknown as Json;
+      }
+
+      const { error } = await supabase
+        .from('export_templates')
+        .update(updateData)
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setTemplates(prev =>
+        prev.map(t => (t.id === id ? { ...t, ...updates } : t))
+      );
+      toast({ title: 'Vorlage gespeichert' });
+      return true;
+    } catch (error) {
+      console.error('Error updating template:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Vorlage konnte nicht gespeichert werden.',
+      });
+      return false;
+    }
+  };
+
+  // Delete a template
+  const deleteTemplate = async (id: string): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      const { error } = await supabase
+        .from('export_templates')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setTemplates(prev => prev.filter(t => t.id !== id));
+      toast({ title: 'Vorlage gelöscht' });
+      return true;
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Vorlage konnte nicht gelöscht werden.',
+      });
+      return false;
+    }
+  };
+
+  // Get the default template
+  const getDefaultTemplate = (): ExportTemplate | null => {
+    return templates.find(t => t.is_default) || null;
+  };
+
+  // Create an empty template structure
+  const createEmptyTemplate = (): Omit<ExportTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'> => ({
+    name: 'Neue Vorlage',
+    description: null,
+    is_default: false,
+    columns: [...DEFAULT_COLUMNS],
+    sort_by: 'receipt_date',
+    sort_direction: 'desc',
+    group_by: null,
+    group_subtotals: true,
+    include_header: true,
+    include_totals: true,
+    date_format: 'DD.MM.YYYY',
+    number_format: 'de-AT',
+  });
+
+  return {
+    templates,
+    loading,
+    fetchTemplates,
+    createTemplate,
+    updateTemplate,
+    deleteTemplate,
+    getDefaultTemplate,
+    createEmptyTemplate,
+  };
+}

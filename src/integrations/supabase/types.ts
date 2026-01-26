@@ -271,6 +271,71 @@ export type Database = {
           },
         ]
       }
+      export_templates: {
+        Row: {
+          columns: Json
+          created_at: string | null
+          date_format: string | null
+          description: string | null
+          group_by: string | null
+          group_subtotals: boolean | null
+          id: string
+          include_header: boolean | null
+          include_totals: boolean | null
+          is_default: boolean | null
+          name: string
+          number_format: string | null
+          sort_by: string | null
+          sort_direction: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          columns?: Json
+          created_at?: string | null
+          date_format?: string | null
+          description?: string | null
+          group_by?: string | null
+          group_subtotals?: boolean | null
+          id?: string
+          include_header?: boolean | null
+          include_totals?: boolean | null
+          is_default?: boolean | null
+          name: string
+          number_format?: string | null
+          sort_by?: string | null
+          sort_direction?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          columns?: Json
+          created_at?: string | null
+          date_format?: string | null
+          description?: string | null
+          group_by?: string | null
+          group_subtotals?: boolean | null
+          id?: string
+          include_header?: boolean | null
+          include_totals?: boolean | null
+          is_default?: boolean | null
+          name?: string
+          number_format?: string | null
+          sort_by?: string | null
+          sort_direction?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "export_templates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_name: string | null
