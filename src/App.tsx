@@ -14,6 +14,7 @@ import Review from "./pages/Review";
 import Expenses from "./pages/Expenses";
 import BankImport from "./pages/BankImport";
 import Reconciliation from "./pages/Reconciliation";
+import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -82,7 +83,7 @@ const App = () => (
               path="/reports" 
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <Reports />
                 </ProtectedRoute>
               } 
             />
