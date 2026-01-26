@@ -165,12 +165,12 @@ export function ReceiptPreviewDialog({
         style={{ maxWidth: '98vw', width: '98vw', height: '98vh', maxHeight: '98vh' }}
       >
         {/* Header */}
-        <DialogHeader className="px-6 py-3 border-b flex-shrink-0">
+        <DialogHeader className="px-6 py-3 border-b flex-shrink-0 pr-14">
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-lg font-semibold">
+            <DialogTitle className="text-lg font-semibold truncate mr-4">
               {loading ? 'Lade Vorschau...' : receipt?.file_name || 'Beleg-Vorschau'}
             </DialogTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <Button variant="outline" size="sm" onClick={handleDownload} disabled={!signedUrl}>
                 <Download className="h-4 w-4 mr-2" />
                 Herunterladen
