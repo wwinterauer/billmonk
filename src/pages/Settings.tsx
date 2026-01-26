@@ -14,6 +14,7 @@ import {
   CreditCard,
   Settings2,
   Tags,
+  Building,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,6 +40,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CategoryManagement } from '@/components/settings/CategoryManagement';
+import { VendorManagement } from '@/components/settings/VendorManagement';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
@@ -403,7 +405,7 @@ const Settings = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="naming" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+          <TabsList className="grid w-full grid-cols-3 lg:w-[500px]">
             <TabsTrigger value="naming" className="gap-2">
               <FileText className="h-4 w-4" />
               Umbenennung
@@ -411,6 +413,10 @@ const Settings = () => {
             <TabsTrigger value="categories" className="gap-2">
               <Tags className="h-4 w-4" />
               Kategorien
+            </TabsTrigger>
+            <TabsTrigger value="vendors" className="gap-2">
+              <Building className="h-4 w-4" />
+              Lieferanten
             </TabsTrigger>
           </TabsList>
 
@@ -711,6 +717,33 @@ const Settings = () => {
             </CardHeader>
             <CardContent>
               <CategoryManagement />
+            </CardContent>
+          </Card>
+        </motion.div>
+      </TabsContent>
+
+      {/* Vendors Tab */}
+      <TabsContent value="vendors">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Building className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>Lieferanten-Verwaltung</CardTitle>
+                  <CardDescription>
+                    Verwalte erkannte Lieferanten und weise ihnen Standardwerte zu
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <VendorManagement />
             </CardContent>
           </Card>
         </motion.div>
