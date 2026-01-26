@@ -25,6 +25,7 @@ import {
   Euro,
   Percent,
   MousePointer,
+  Square,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,6 +66,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -606,6 +608,52 @@ export function ReceiptDetailPanel({
     }
   };
 
+  // General reanalysis modes
+  const reanalyzeGeneral = async (mode: 'smart' | 'empty' | 'full') => {
+    let fieldsToAnalyze: string[];
+    
+    switch (mode) {
+      case 'smart':
+        // Only fields the user has NOT manually modified
+        fieldsToAnalyze = REANALYZABLE_FIELDS
+          .map(f => f.id)
+          .filter(id => !receipt?.user_modified_fields?.includes(id));
+        
+        if (fieldsToAnalyze.length === 0) {
+          toast({
+            title: 'Alle Felder wurden bereits manuell bearbeitet',
+            description: 'Nutze "Komplett neu" um alle Felder zu überschreiben',
+          });
+          return;
+        }
+        break;
+      
+      case 'empty':
+        // Only empty fields
+        fieldsToAnalyze = REANALYZABLE_FIELDS
+          .map(f => f.id)
+          .filter(id => {
+            const value = receipt?.[id as keyof Receipt];
+            return !value || value === '';
+          });
+        
+        if (fieldsToAnalyze.length === 0) {
+          toast({
+            title: 'Alle Felder haben bereits Werte',
+          });
+          return;
+        }
+        break;
+      
+      case 'full':
+        // All fields
+        fieldsToAnalyze = REANALYZABLE_FIELDS.map(f => f.id);
+        break;
+    }
+    
+    await reanalyzeFields(fieldsToAnalyze);
+  };
+
   // Reanalyze only fields that haven't been manually modified
   const reanalyzeUnmodifiedFields = () => {
     const modifiedFields = receipt?.user_modified_fields || [];
@@ -613,6 +661,11 @@ export function ReceiptDetailPanel({
       .map(f => f.id)
       .filter(id => !modifiedFields.includes(id));
     reanalyzeFields(unmodifiedFields);
+  };
+
+  // Reanalyze a single field
+  const reanalyzeSingleField = (fieldId: string) => {
+    reanalyzeFields([fieldId]);
   };
 
 
@@ -879,7 +932,16 @@ export function ReceiptDetailPanel({
               </div>
 
               {/* RIGHT COLUMN - Form Only */}
-              <div className="w-1/2 flex flex-col bg-background">
+              <div className="w-1/2 flex flex-col bg-background relative">
+                {/* Loading Overlay during reanalysis */}
+                {isRerunning && (
+                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-lg backdrop-blur-sm">
+                    <div className="text-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+                      <p className="text-sm text-muted-foreground mt-2">Analysiere...</p>
+                    </div>
+                  </div>
+                )}
                 {/* AI Badge Header */}
                 <div className="flex items-center justify-between p-4 border-b">
                   <div className="flex items-center gap-2">
@@ -921,52 +983,117 @@ export function ReceiptDetailPanel({
                           <ChevronDown className="h-3 w-3 ml-1" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem onClick={() => setShowFieldSelectDialog(true)}>
-                          <MousePointer className="h-4 w-4 mr-2" />
-                          Felder auswählen...
-                        </DropdownMenuItem>
+                      <DropdownMenuContent align="end" className="w-64">
+                        {/* OPTION 1: General Re-Analysis */}
+                        <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                          Generelle Analyse
+                        </DropdownMenuLabel>
                         
-                        <DropdownMenuSeparator />
-                        
-                        <DropdownMenuItem onClick={() => reanalyzeFields(['invoice_number'])}>
-                          <Hash className="h-4 w-4 mr-2" />
-                          Nur Rechnungsnummer
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => reanalyzeFields(['amount_gross', 'amount_net', 'vat_amount', 'vat_rate'])}>
-                          <Euro className="h-4 w-4 mr-2" />
-                          Nur Beträge
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => reanalyzeFields(['receipt_date'])}>
-                          <CalendarIconLucide className="h-4 w-4 mr-2" />
-                          Nur Datum
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => reanalyzeFields(['description'])}>
-                          <FileText className="h-4 w-4 mr-2" />
-                          Nur Beschreibung
-                        </DropdownMenuItem>
-                        
-                        <DropdownMenuSeparator />
-                        
-                        <DropdownMenuItem onClick={reanalyzeUnmodifiedFields}>
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          Nur unveränderte Felder
+                        <DropdownMenuItem onClick={() => reanalyzeGeneral('smart')}>
+                          <Sparkles className="w-4 h-4 mr-2 text-primary" />
+                          <div className="flex-1">
+                            <p>Intelligent</p>
+                            <p className="text-xs text-muted-foreground">Schützt manuell bearbeitete Felder</p>
+                          </div>
                           {(receipt.user_modified_fields?.length || 0) > 0 && (
-                            <Badge variant="outline" className="ml-auto text-xs">
-                              {REANALYZABLE_FIELDS.length - (receipt.user_modified_fields?.length || 0)}
+                            <Badge variant="outline" className="text-xs ml-2">
+                              {REANALYZABLE_FIELDS.length - (receipt.user_modified_fields?.length || 0)} Felder
                             </Badge>
                           )}
                         </DropdownMenuItem>
                         
-                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => reanalyzeGeneral('empty')}>
+                          <Square className="w-4 h-4 mr-2 text-blue-500" />
+                          <div className="flex-1">
+                            <p>Nur leere Felder</p>
+                            <p className="text-xs text-muted-foreground">Füllt nur fehlende Werte</p>
+                          </div>
+                        </DropdownMenuItem>
                         
                         <DropdownMenuItem 
-                          onClick={() => setShowFullReanalyzeConfirm(true)} 
+                          onClick={() => setShowFullReanalyzeConfirm(true)}
                           className="text-orange-600 focus:text-orange-600"
                         >
-                          <AlertTriangle className="h-4 w-4 mr-2" />
-                          Alles neu (überschreibt Korrekturen)
+                          <AlertTriangle className="w-4 h-4 mr-2" />
+                          <div className="flex-1">
+                            <p>Komplett neu</p>
+                            <p className="text-xs text-orange-400">Überschreibt alle Felder</p>
+                          </div>
                         </DropdownMenuItem>
+                        
+                        <DropdownMenuSeparator />
+                        
+                        {/* OPTION 2: Field-wise Analysis */}
+                        <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                          Einzelne Felder analysieren
+                        </DropdownMenuLabel>
+                        
+                        <DropdownMenuItem onClick={() => setShowFieldSelectDialog(true)}>
+                          <MousePointer className="w-4 h-4 mr-2 text-muted-foreground" />
+                          <div className="flex-1">
+                            <p>Felder auswählen...</p>
+                            <p className="text-xs text-muted-foreground">Wähle gezielt welche Felder</p>
+                          </div>
+                        </DropdownMenuItem>
+                        
+                        <DropdownMenuSeparator />
+                        
+                        {/* Quick Access for individual fields */}
+                        <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                          Schnellzugriff
+                        </DropdownMenuLabel>
+                        
+                        <div className="grid grid-cols-2 gap-1 p-1">
+                          <DropdownMenuItem 
+                            onClick={() => reanalyzeSingleField('vendor')}
+                            className="flex-col items-start py-1.5"
+                          >
+                            <div className="flex items-center gap-1">
+                              <Building className="w-3 h-3" />
+                              <span className="text-xs">Lieferant</span>
+                            </div>
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuItem 
+                            onClick={() => reanalyzeSingleField('invoice_number')}
+                            className="flex-col items-start py-1.5"
+                          >
+                            <div className="flex items-center gap-1">
+                              <Hash className="w-3 h-3" />
+                              <span className="text-xs">Rechnungsnr.</span>
+                            </div>
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuItem 
+                            onClick={() => reanalyzeSingleField('receipt_date')}
+                            className="flex-col items-start py-1.5"
+                          >
+                            <div className="flex items-center gap-1">
+                              <CalendarIconLucide className="w-3 h-3" />
+                              <span className="text-xs">Datum</span>
+                            </div>
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuItem 
+                            onClick={() => reanalyzeFields(['amount_gross', 'amount_net', 'vat_amount', 'vat_rate'])}
+                            className="flex-col items-start py-1.5"
+                          >
+                            <div className="flex items-center gap-1">
+                              <Euro className="w-3 h-3" />
+                              <span className="text-xs">Beträge</span>
+                            </div>
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuItem 
+                            onClick={() => reanalyzeSingleField('description')}
+                            className="flex-col items-start py-1.5 col-span-2"
+                          >
+                            <div className="flex items-center gap-1">
+                              <FileText className="w-3 h-3" />
+                              <span className="text-xs">Beschreibung</span>
+                            </div>
+                          </DropdownMenuItem>
+                        </div>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
@@ -1517,17 +1644,34 @@ export function ReceiptDetailPanel({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
               <AlertTriangle className="w-5 h-5" />
-              Alles neu analysieren?
+              Komplett neu analysieren?
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              ALLE Felder werden überschrieben, auch deine manuellen Korrekturen.
+            <AlertDialogDescription asChild>
+              <div>
+                <p>ALLE Felder werden überschrieben, auch deine manuellen Korrekturen.</p>
+                
+                {(receipt?.user_modified_fields?.length || 0) > 0 && (
+                  <div className="mt-3 p-2 bg-orange-50 rounded border border-orange-200">
+                    <p className="text-sm text-orange-800 font-medium mb-1">
+                      Folgende Felder wurden manuell bearbeitet:
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {receipt?.user_modified_fields?.map(fieldId => (
+                        <Badge key={fieldId} variant="outline" className="text-xs">
+                          {REANALYZABLE_FIELDS.find(f => f.id === fieldId)?.label || fieldId}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Abbrechen</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                reanalyzeFields(REANALYZABLE_FIELDS.map(f => f.id));
+                reanalyzeGeneral('full');
                 setShowFullReanalyzeConfirm(false);
               }}
               className="bg-orange-600 hover:bg-orange-700"
