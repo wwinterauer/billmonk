@@ -14,6 +14,7 @@ export interface Receipt {
   status: 'pending' | 'processing' | 'review' | 'approved' | 'rejected';
   vendor: string | null;
   vendor_brand: string | null;
+  vendor_id: string | null;
   description: string | null;
   amount_gross: number | null;
   amount_net: number | null;
