@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Save, 
   FileText, 
@@ -398,6 +399,19 @@ const Settings = () => {
     );
   }
 
+  // Handle tab from URL query parameter
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const validTabs = ['naming', 'recognition', 'categories', 'vendors', 'export'];
+  const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'naming';
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Update URL when tab changes
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    setSearchParams({ tab: value });
+  };
+
   return (
     <DashboardLayout>
       <div className="p-6 lg:p-8">
@@ -408,7 +422,7 @@ const Settings = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="naming" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5 lg:w-[800px]">
             <TabsTrigger value="naming" className="gap-2">
               <FileText className="h-4 w-4" />
