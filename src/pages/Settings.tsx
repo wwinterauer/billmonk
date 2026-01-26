@@ -18,6 +18,7 @@ import {
   Building,
   Table2,
   Sparkles,
+  Brain,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,6 +47,7 @@ import { CategoryManagement } from '@/components/settings/CategoryManagement';
 import { VendorManagement } from '@/components/settings/VendorManagement';
 import { ExportTemplateSettings } from '@/components/settings/ExportTemplateSettings';
 import { DescriptionSettings } from '@/components/settings/DescriptionSettings';
+import { AILearningSettings } from '@/components/settings/AILearningSettings';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
@@ -171,7 +173,7 @@ const Settings = () => {
   // Handle tab from URL query parameter - must be before any early returns
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['naming', 'recognition', 'categories', 'vendors', 'export'];
+  const validTabs = ['naming', 'recognition', 'categories', 'vendors', 'export', 'ai-learning'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'naming';
   const [activeTab, setActiveTab] = useState(initialTab);
   
@@ -423,7 +425,7 @@ const Settings = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-[800px]">
+          <TabsList className="grid w-full grid-cols-6 lg:w-[950px]">
             <TabsTrigger value="naming" className="gap-2">
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Umbenennung</span>
@@ -442,7 +444,11 @@ const Settings = () => {
             </TabsTrigger>
             <TabsTrigger value="export" className="gap-2">
               <Table2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Export-Vorlagen</span>
+              <span className="hidden sm:inline">Export</span>
+            </TabsTrigger>
+            <TabsTrigger value="ai-learning" className="gap-2">
+              <Brain className="h-4 w-4" />
+              <span className="hidden sm:inline">KI-Training</span>
             </TabsTrigger>
           </TabsList>
 
@@ -824,6 +830,33 @@ const Settings = () => {
             </CardHeader>
             <CardContent>
               <ExportTemplateSettings />
+            </CardContent>
+          </Card>
+        </motion.div>
+      </TabsContent>
+
+      {/* AI Learning Tab */}
+      <TabsContent value="ai-learning">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                  <Brain className="h-5 w-5 text-violet-600" />
+                </div>
+                <div>
+                  <CardTitle>KI-Training</CardTitle>
+                  <CardDescription>
+                    Übersicht und Verwaltung der automatischen Lernfunktion
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <AILearningSettings />
             </CardContent>
           </Card>
         </motion.div>
