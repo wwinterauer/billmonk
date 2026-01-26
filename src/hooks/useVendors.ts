@@ -35,7 +35,8 @@ export function useVendors() {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await supabase
+      // Fetch vendors
+      const { data: vendorsData, error: fetchError } = await supabase
         .from('vendors')
         .select('*')
         .order('display_name');
@@ -44,12 +45,39 @@ export function useVendors() {
         throw new Error(fetchError.message);
       }
 
-      const mappedData = (data || []).map(v => ({
-        ...v,
-        detected_names: v.detected_names || [],
-        receipt_count: v.receipt_count || 0,
-        total_amount: Number(v.total_amount) || 0,
-      })) as Vendor[];
+      // Fetch receipt statistics per vendor
+      const { data: statsData, error: statsError } = await supabase
+        .from('receipts')
+        .select('vendor_id, amount_gross')
+        .not('vendor_id', 'is', null);
+
+      if (statsError) {
+        console.error('Error fetching receipt stats:', statsError);
+      }
+
+      // Calculate stats per vendor
+      const statsMap = new Map<string, { count: number; total: number }>();
+      if (statsData) {
+        for (const receipt of statsData) {
+          if (receipt.vendor_id) {
+            const existing = statsMap.get(receipt.vendor_id) || { count: 0, total: 0 };
+            statsMap.set(receipt.vendor_id, {
+              count: existing.count + 1,
+              total: existing.total + (Number(receipt.amount_gross) || 0),
+            });
+          }
+        }
+      }
+
+      const mappedData = (vendorsData || []).map(v => {
+        const stats = statsMap.get(v.id);
+        return {
+          ...v,
+          detected_names: v.detected_names || [],
+          receipt_count: stats?.count ?? v.receipt_count ?? 0,
+          total_amount: stats?.total ?? Number(v.total_amount) ?? 0,
+        };
+      }) as Vendor[];
 
       setVendors(mappedData);
     } catch (err) {
