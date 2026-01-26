@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
 import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
-import { matchOrCreateVendor } from '@/services/vendorMatchingService';
+import { matchOrCreateVendor, findOrCreateVendor, addVendorVariant, type MatchedVendor, type VendorSuggestion, type FindOrCreateVendorResult } from '@/services/vendorMatchingService';
 import { 
   generateFileHash, 
   checkForDuplicates, 
@@ -83,9 +83,19 @@ export interface UploadProgress {
   aiConfidence?: number;
 }
 
+export interface VendorDecisionPending {
+  receiptId: string;
+  extractedData: Partial<Receipt>;
+  detectedName: string;
+  suggestions: VendorSuggestion[];
+}
+
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES = 10;
+
+// Export types for external use
+export type { MatchedVendor, VendorSuggestion, FindOrCreateVendorResult };
 
 export function useReceipts() {
   const { user } = useAuth();
