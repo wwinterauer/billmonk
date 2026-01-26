@@ -45,6 +45,9 @@ import {
   CalendarRange,
   Percent,
   CreditCard,
+  FileText,
+  FileSpreadsheet,
+  Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,9 +67,19 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -89,6 +102,7 @@ import {
   type ExportTemplate,
   type ExportColumn,
 } from '@/hooks/useExportTemplates';
+import { useExportPreview, type PreviewRow } from '@/hooks/useExportPreview';
 import { cn } from '@/lib/utils';
 
 interface ExportTemplateEditorProps {
@@ -200,6 +214,13 @@ export function ExportTemplateEditor({
     createEmptyTemplate,
   } = useExportTemplates();
 
+  const {
+    previewData,
+    loading: previewLoading,
+    generatePreview,
+    getTotal,
+  } = useExportPreview();
+
   // Current editing state
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<Omit<ExportTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'> | null>(null);
@@ -207,6 +228,7 @@ export function ExportTemplateEditor({
   const [saving, setSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   // DnD sensors
   const sensors = useSensors(
@@ -423,6 +445,24 @@ export function ExportTemplateEditor({
     onClose();
   };
 
+  // Generate preview
+  const handlePreview = async () => {
+    if (!editingTemplate) return;
+
+    await generatePreview({
+      columns: editingTemplate.columns,
+      sortBy: editingTemplate.sort_by,
+      sortDirection: editingTemplate.sort_direction,
+      groupBy: editingTemplate.group_by,
+      groupSubtotals: editingTemplate.group_subtotals,
+      includeHeader: editingTemplate.include_header,
+      includeTotals: editingTemplate.include_totals,
+      dateFormat: editingTemplate.date_format,
+      numberFormat: editingTemplate.number_format,
+    });
+    setShowPreview(true);
+  };
+
   if (!editingTemplate) {
     return null;
   }
@@ -493,8 +533,17 @@ export function ExportTemplateEditor({
               Speichern
             </Button>
 
+            <Button variant="outline" size="sm" onClick={handlePreview} disabled={previewLoading}>
+              {previewLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Eye className="h-4 w-4 mr-2" />
+              )}
+              Vorschau
+            </Button>
+
             <Button size="sm" onClick={handleApply}>
-              <Eye className="h-4 w-4 mr-2" />
+              <Download className="h-4 w-4 mr-2" />
               Anwenden
             </Button>
           </div>
@@ -1004,6 +1053,155 @@ export function ExportTemplateEditor({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Preview Modal */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Export-Vorschau</DialogTitle>
+            <DialogDescription>
+              Zeigt die ersten 50 Einträge mit aktueller Konfiguration
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto border rounded-lg">
+            <Table>
+              {editingTemplate?.include_header && (
+                <TableHeader>
+                  <TableRow>
+                    {editingTemplate?.columns
+                      .filter(c => c.visible)
+                      .sort((a, b) => a.order - b.order)
+                      .map(col => (
+                        <TableHead
+                          key={col.id}
+                          style={{
+                            width: col.width || 'auto',
+                            textAlign: col.align || 'left',
+                          }}
+                          className="whitespace-nowrap"
+                        >
+                          {col.label}
+                        </TableHead>
+                      ))
+                    }
+                  </TableRow>
+                </TableHeader>
+              )}
+              <TableBody>
+                {previewData.map((row, i) => (
+                  <>
+                    {/* Group Header */}
+                    {row.isGroupHeader && (
+                      <TableRow key={`group-${i}`} className="bg-muted/70">
+                        <TableCell
+                          colSpan={editingTemplate?.columns.filter(c => c.visible).length || 1}
+                          className="font-semibold"
+                        >
+                          <span className="flex items-center gap-2">
+                            <ChevronRight className="h-4 w-4" />
+                            {row.groupName}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    )}
+
+                    {/* Normal Row */}
+                    {!row.isGroupHeader && !row.isSubtotal && (
+                      <TableRow key={`row-${i}`}>
+                        {editingTemplate?.columns
+                          .filter(c => c.visible)
+                          .sort((a, b) => a.order - b.order)
+                          .map(col => (
+                            <TableCell
+                              key={col.id}
+                              style={{ textAlign: col.align || 'left' }}
+                            >
+                              {String(row[col.field] ?? '')}
+                            </TableCell>
+                          ))
+                        }
+                      </TableRow>
+                    )}
+
+                    {/* Subtotal Row */}
+                    {row.isSubtotal && editingTemplate?.group_subtotals && (
+                      <TableRow key={`subtotal-${i}`} className="bg-muted/40 font-medium">
+                        {(() => {
+                          const visibleCols = editingTemplate?.columns.filter(c => c.visible).sort((a, b) => a.order - b.order) || [];
+                          const nonCurrencyCols = visibleCols.filter(c => c.type !== 'currency');
+                          const currencyCols = visibleCols.filter(c => c.type === 'currency');
+                          
+                          return (
+                            <>
+                              {nonCurrencyCols.length > 0 && (
+                                <TableCell colSpan={nonCurrencyCols.length}>
+                                  Zwischensumme {row.groupName}
+                                </TableCell>
+                              )}
+                              {currencyCols.map(col => (
+                                <TableCell key={col.id} style={{ textAlign: 'right' }}>
+                                  {String(row[col.field] ?? '')}
+                                </TableCell>
+                              ))}
+                            </>
+                          );
+                        })()}
+                      </TableRow>
+                    )}
+                  </>
+                ))}
+              </TableBody>
+
+              {/* Totals */}
+              {editingTemplate?.include_totals && previewData.length > 0 && (
+                <TableFooter>
+                  <TableRow className="font-bold">
+                    {(() => {
+                      const visibleCols = editingTemplate?.columns.filter(c => c.visible).sort((a, b) => a.order - b.order) || [];
+                      const nonCurrencyCols = visibleCols.filter(c => c.type !== 'currency');
+                      const currencyCols = visibleCols.filter(c => c.type === 'currency');
+                      
+                      return (
+                        <>
+                          {nonCurrencyCols.length > 0 && (
+                            <TableCell colSpan={nonCurrencyCols.length}>
+                              Gesamt
+                            </TableCell>
+                          )}
+                          {currencyCols.map(col => (
+                            <TableCell key={col.id} style={{ textAlign: 'right' }}>
+                              {getTotal(col.field, editingTemplate?.number_format || 'de-AT')}
+                            </TableCell>
+                          ))}
+                        </>
+                      );
+                    })()}
+                  </TableRow>
+                </TableFooter>
+              )}
+            </Table>
+          </div>
+
+          <DialogFooter className="mt-4 gap-2">
+            <Button variant="outline" onClick={() => setShowPreview(false)}>
+              Schließen
+            </Button>
+            <Button variant="outline" disabled>
+              <FileText className="h-4 w-4 mr-2" />
+              Als CSV
+            </Button>
+            <Button variant="outline" disabled>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Als Excel
+            </Button>
+            <Button disabled>
+              <FileText className="h-4 w-4 mr-2" />
+              Als PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
