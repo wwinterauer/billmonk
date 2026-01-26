@@ -388,11 +388,16 @@ export type Database = {
           currency: string | null
           custom_filename: string | null
           description: string | null
+          duplicate_checked_at: string | null
+          duplicate_of: string | null
+          duplicate_score: number | null
+          file_hash: string | null
           file_name: string | null
           file_type: string | null
           file_url: string | null
           id: string
           invoice_number: string | null
+          is_duplicate: boolean | null
           notes: string | null
           payment_method: string | null
           receipt_date: string | null
@@ -417,11 +422,16 @@ export type Database = {
           currency?: string | null
           custom_filename?: string | null
           description?: string | null
+          duplicate_checked_at?: string | null
+          duplicate_of?: string | null
+          duplicate_score?: number | null
+          file_hash?: string | null
           file_name?: string | null
           file_type?: string | null
           file_url?: string | null
           id?: string
           invoice_number?: string | null
+          is_duplicate?: boolean | null
           notes?: string | null
           payment_method?: string | null
           receipt_date?: string | null
@@ -446,11 +456,16 @@ export type Database = {
           currency?: string | null
           custom_filename?: string | null
           description?: string | null
+          duplicate_checked_at?: string | null
+          duplicate_of?: string | null
+          duplicate_score?: number | null
+          file_hash?: string | null
           file_name?: string | null
           file_type?: string | null
           file_url?: string | null
           id?: string
           invoice_number?: string | null
+          is_duplicate?: boolean | null
           notes?: string | null
           payment_method?: string | null
           receipt_date?: string | null
@@ -469,6 +484,13 @@ export type Database = {
             columns: ["bank_transaction_id"]
             isOneToOne: false
             referencedRelation: "bank_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_duplicate_of_fkey"
+            columns: ["duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "receipts"
             referencedColumns: ["id"]
           },
           {
