@@ -490,8 +490,21 @@ const Review = () => {
                   <div className="lg:col-span-2">
                     <div className="sticky top-6">
                       <div 
-                        className="relative aspect-[3/4] bg-muted rounded-lg overflow-hidden cursor-pointer group"
-                        onClick={() => imageUrl && setLightboxOpen(true)}
+                        className={cn(
+                          "relative bg-muted rounded-lg overflow-hidden",
+                          currentReceipt?.file_type?.toLowerCase() === 'pdf' || 
+                          currentReceipt?.file_name?.toLowerCase().endsWith('.pdf')
+                            ? "min-h-[500px] h-[60vh]" // Taller for PDFs
+                            : "aspect-[3/4] cursor-pointer group"
+                        )}
+                        onClick={() => {
+                          // Only open lightbox for images, not PDFs (they have their own controls)
+                          if (imageUrl && 
+                              !(currentReceipt?.file_type?.toLowerCase() === 'pdf' || 
+                                currentReceipt?.file_name?.toLowerCase().endsWith('.pdf'))) {
+                            setLightboxOpen(true);
+                          }
+                        }}
                       >
                         {imageLoading ? (
                           <div className="flex flex-col items-center justify-center h-full">
@@ -522,11 +535,12 @@ const Review = () => {
                           <>
                             {currentReceipt?.file_type?.toLowerCase() === 'pdf' || 
                              currentReceipt?.file_name?.toLowerCase().endsWith('.pdf') ? (
-                              <div className="h-full w-full">
+                              <div className="h-full w-full p-2">
                                 <PdfViewer 
                                   url={imageUrl} 
                                   fileName={currentReceipt?.file_name || 'document.pdf'}
                                   className="h-full"
+                                  compact={true}
                                   onError={() => setImageError('PDF konnte nicht geladen werden')}
                                 />
                               </div>
