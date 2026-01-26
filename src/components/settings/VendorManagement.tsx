@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge, Download, Loader2, ArrowLeftRight, Users, ScanSearch, CheckCircle } from 'lucide-react';
+import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge, Download, Loader2, ArrowLeftRight, Users, ScanSearch, CheckCircle, Sparkles, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +12,7 @@ import { importVendorsFromReceipts } from '@/services/vendorMatchingService';
 import { findVendorDuplicates, type VendorDuplicateCandidate } from '@/services/vendorDuplicateService';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -99,6 +99,22 @@ export function VendorManagement() {
   const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [mergeTargetId, setMergeTargetId] = useState('');
   const [isMerging, setIsMerging] = useState(false);
+
+  // Detailed merge dialog state
+  const [showMergeDialog, setShowMergeDialog] = useState(false);
+  const [mergeSource, setMergeSource] = useState<Vendor | null>(null);
+  const [mergeTarget, setMergeTarget] = useState<Vendor | null>(null);
+
+  interface MergePreview {
+    display_name: string;
+    legal_name: string;
+    detected_names: string[];
+    default_category_id: string | null;
+    default_vat_rate: number | null;
+    total_receipts: number;
+    total_amount: number;
+  }
+  const [mergePreview, setMergePreview] = useState<MergePreview | null>(null);
 
   // Import state
   const [isImporting, setIsImporting] = useState(false);
@@ -347,12 +363,85 @@ export function VendorManagement() {
     setVendorDuplicates(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Open merge dialog for a specific duplicate pair
+  // Open detailed merge dialog for a specific duplicate pair
   const openMergePairDialog = (duplicate: Vendor, original: Vendor) => {
-    setSelectedVendors([duplicate.id, original.id]);
-    setMergeTargetId(original.id);
-    setIsMergeOpen(true);
-    setShowDuplicateResults(false);
+    setMergeSource(duplicate);
+    setMergeTarget(original);
+
+    // Calculate merge preview
+    const allDetectedNames = [
+      ...new Set([
+        ...(original.detected_names || []),
+        ...(duplicate.detected_names || []),
+        duplicate.display_name // Add source name as variant
+      ])
+    ];
+
+    setMergePreview({
+      display_name: original.display_name,
+      legal_name: original.legal_name || duplicate.legal_name || '',
+      detected_names: allDetectedNames,
+      default_category_id: original.default_category_id || duplicate.default_category_id,
+      default_vat_rate: original.default_vat_rate || duplicate.default_vat_rate,
+      total_receipts: (original.receipt_count || 0) + (duplicate.receipt_count || 0),
+      total_amount: (original.total_amount || 0) + (duplicate.total_amount || 0)
+    });
+
+    setShowMergeDialog(true);
+  };
+
+  // Execute detailed merge
+  const executeMerge = async () => {
+    if (!mergeSource || !mergeTarget || !mergePreview) return;
+
+    setIsMerging(true);
+    try {
+      // 1. Update target vendor
+      await supabase
+        .from('vendors')
+        .update({
+          display_name: mergePreview.display_name,
+          legal_name: mergePreview.legal_name || null,
+          detected_names: mergePreview.detected_names,
+          default_category_id: mergePreview.default_category_id,
+          default_vat_rate: mergePreview.default_vat_rate,
+          receipt_count: mergePreview.total_receipts,
+          total_amount: mergePreview.total_amount
+        })
+        .eq('id', mergeTarget.id);
+
+      // 2. Move receipts
+      await supabase
+        .from('receipts')
+        .update({
+          vendor_id: mergeTarget.id,
+          vendor: mergePreview.display_name
+        })
+        .eq('vendor_id', mergeSource.id);
+
+      // 3. Delete source vendor
+      await supabase
+        .from('vendors')
+        .delete()
+        .eq('id', mergeSource.id);
+
+      toast.success('Lieferanten zusammengeführt');
+      setShowMergeDialog(false);
+
+      // Remove from duplicate list
+      setVendorDuplicates(prev => prev.filter(d =>
+        d.vendor.id !== mergeSource.id && d.matchingVendor.id !== mergeSource.id
+      ));
+
+      // Refresh vendor list
+      fetchVendors();
+
+    } catch (error) {
+      toast.error('Fehler beim Zusammenführen');
+      console.error(error);
+    } finally {
+      setIsMerging(false);
+    }
   };
 
   // Merge all suggested duplicates
@@ -360,6 +449,8 @@ export function VendorManagement() {
     if (vendorDuplicates.length === 0) return;
 
     setIsMerging(true);
+    let merged = 0;
+
     try {
       for (const item of vendorDuplicates) {
         const targetVendor = item.matchingVendor;
@@ -367,22 +458,30 @@ export function VendorManagement() {
 
         // Collect all detected_names
         const allDetectedNames = [
-          ...targetVendor.detected_names,
-          ...sourceVendor.detected_names,
-          sourceVendor.display_name
+          ...new Set([
+            ...(targetVendor.detected_names || []),
+            ...(sourceVendor.detected_names || []),
+            sourceVendor.display_name
+          ])
         ];
-        const uniqueNames = [...new Set(allDetectedNames)];
 
-        // Update target vendor with combined detected_names
+        // Update target vendor
         await supabase
           .from('vendors')
-          .update({ detected_names: uniqueNames })
+          .update({
+            detected_names: allDetectedNames,
+            receipt_count: (targetVendor.receipt_count || 0) + (sourceVendor.receipt_count || 0),
+            total_amount: (targetVendor.total_amount || 0) + (sourceVendor.total_amount || 0)
+          })
           .eq('id', targetVendor.id);
 
         // Move all receipts from source vendor to target
         await supabase
           .from('receipts')
-          .update({ vendor_id: targetVendor.id })
+          .update({
+            vendor_id: targetVendor.id,
+            vendor: targetVendor.display_name
+          })
           .eq('vendor_id', sourceVendor.id);
 
         // Delete source vendor
@@ -390,9 +489,11 @@ export function VendorManagement() {
           .from('vendors')
           .delete()
           .eq('id', sourceVendor.id);
+
+        merged++;
       }
 
-      toast.success(`${vendorDuplicates.length} Duplikate zusammengeführt`);
+      toast.success(`${merged} Duplikate zusammengeführt`);
       setShowDuplicateResults(false);
       setVendorDuplicates([]);
       fetchVendors();
@@ -1447,6 +1548,152 @@ export function VendorManagement() {
                 Alle zusammenführen
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Detailed Merge Dialog */}
+      <Dialog open={showMergeDialog} onOpenChange={setShowMergeDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Merge className="w-5 h-5 text-primary" />
+              Lieferanten zusammenführen
+            </DialogTitle>
+            <DialogDescription>
+              Die Belege von "{mergeSource?.display_name}" werden zu "{mergeTarget?.display_name}" verschoben
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            {/* Before/After Comparison */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Left: Will be deleted */}
+              <Card className="border-destructive/30 bg-destructive/5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2 text-destructive">
+                    <Trash2 className="w-4 h-4" />
+                    Wird gelöscht
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm space-y-1">
+                  <p className="font-medium">{mergeSource?.display_name}</p>
+                  {mergeSource?.legal_name && (
+                    <p className="text-muted-foreground">{mergeSource.legal_name}</p>
+                  )}
+                  <p className="text-muted-foreground">
+                    {mergeSource?.receipt_count} Belege
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Right: Will be kept */}
+              <Card className="border-success/30 bg-success/5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2 text-success">
+                    <Check className="w-4 h-4" />
+                    Wird beibehalten
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm space-y-1">
+                  <p className="font-medium">{mergeTarget?.display_name}</p>
+                  {mergeTarget?.legal_name && (
+                    <p className="text-muted-foreground">{mergeTarget.legal_name}</p>
+                  )}
+                  <p className="text-muted-foreground">
+                    {mergeTarget?.receipt_count} Belege
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Result Preview */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  Ergebnis nach Zusammenführung
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Display Name */}
+                <div>
+                  <Label className="text-xs text-muted-foreground">Anzeigename</Label>
+                  <Input
+                    value={mergePreview?.display_name || ''}
+                    onChange={(e) => setMergePreview(prev => prev ? { ...prev, display_name: e.target.value } : null)}
+                  />
+                </div>
+
+                {/* Legal Name */}
+                <div>
+                  <Label className="text-xs text-muted-foreground">Rechtlicher Firmenname</Label>
+                  <Input
+                    value={mergePreview?.legal_name || ''}
+                    onChange={(e) => setMergePreview(prev => prev ? { ...prev, legal_name: e.target.value } : null)}
+                    placeholder="Optional"
+                  />
+                </div>
+
+                {/* Detected Variants */}
+                <div>
+                  <Label className="text-xs text-muted-foreground">Erkannte Varianten</Label>
+                  <div className="flex flex-wrap gap-1 p-2 bg-muted/30 rounded-lg min-h-[40px]">
+                    {mergePreview?.detected_names.map((name, i) => (
+                      <Badge key={i} variant="secondary" className="text-xs">
+                        {name}
+                        <button
+                          className="ml-1 hover:text-destructive"
+                          onClick={() => {
+                            setMergePreview(prev => prev ? {
+                              ...prev,
+                              detected_names: prev.detected_names.filter((_, j) => j !== i)
+                            } : null);
+                          }}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Statistics */}
+                <div className="flex gap-4 pt-2 border-t">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Gesamt Belege</p>
+                    <p className="font-semibold">{mergePreview?.total_receipts}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Gesamt Umsatz</p>
+                    <p className="font-semibold">{formatCurrency(mergePreview?.total_amount || 0)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Warning */}
+            <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-warning">Achtung</p>
+                <p className="text-muted-foreground">Diese Aktion kann nicht rückgängig gemacht werden. Alle Belege von "{mergeSource?.display_name}" werden "{mergeTarget?.display_name}" zugeordnet.</p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMergeDialog(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={executeMerge} disabled={isMerging}>
+              {isMerging ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Merge className="w-4 h-4 mr-2" />
+              )}
+              Zusammenführen
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
