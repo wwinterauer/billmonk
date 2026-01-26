@@ -457,8 +457,16 @@ const Upload = () => {
     setIsProcessingVendor(true);
     
     try {
-      // Create new vendor
-      const newVendor = await createVendorForReceipt(currentVendorDecision.detectedName);
+      // Get legal name from extractedData if different from detected name
+      const legalName = currentVendorDecision.extractedData.vendor !== currentVendorDecision.detectedName
+        ? currentVendorDecision.extractedData.vendor || undefined
+        : undefined;
+      
+      // Create new vendor with legal name
+      const newVendor = await createVendorForReceipt(
+        currentVendorDecision.detectedName,
+        { legalName }
+      );
       
       if (!newVendor) {
         throw new Error('Vendor creation failed');
