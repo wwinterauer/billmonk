@@ -72,6 +72,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
 import { useCategories } from '@/hooks/useCategories';
 import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
+import { ReceiptPreviewDialog } from '@/components/receipts/ReceiptPreviewDialog';
 import { ExportDialog, exportAsCSV, exportAsExcel } from '@/components/exports/ExportDialog';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -207,9 +208,13 @@ const Expenses = () => {
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
-  // Detail panel state
+  // Detail panel state (edit mode)
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
+
+  // Preview dialog state (view only)
+  const [previewReceiptId, setPreviewReceiptId] = useState<string | null>(null);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
 
   const openReceiptDetail = (id: string) => {
     setSelectedReceiptId(id);
@@ -219,6 +224,16 @@ const Expenses = () => {
   const closeReceiptDetail = () => {
     setDetailPanelOpen(false);
     setSelectedReceiptId(null);
+  };
+
+  const openReceiptPreview = (id: string) => {
+    setPreviewReceiptId(id);
+    setPreviewDialogOpen(true);
+  };
+
+  const closeReceiptPreview = () => {
+    setPreviewDialogOpen(false);
+    setPreviewReceiptId(null);
   };
 
   // Load receipts
@@ -989,7 +1004,8 @@ const Expenses = () => {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() => openReceiptDetail(receipt.id)}
+                                onClick={() => openReceiptPreview(receipt.id)}
+                                title="Vorschau anzeigen"
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
@@ -998,6 +1014,7 @@ const Expenses = () => {
                                 size="icon"
                                 className="h-8 w-8"
                                 onClick={() => openReceiptDetail(receipt.id)}
+                                title="Bearbeiten"
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
@@ -1121,6 +1138,13 @@ const Expenses = () => {
         open={detailPanelOpen}
         onClose={closeReceiptDetail}
         onUpdate={loadReceipts}
+      />
+
+      {/* Receipt Preview Dialog (View Only) */}
+      <ReceiptPreviewDialog
+        receiptId={previewReceiptId}
+        open={previewDialogOpen}
+        onClose={closeReceiptPreview}
       />
 
       {/* Export Dialog */}
