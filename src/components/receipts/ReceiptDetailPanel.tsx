@@ -601,9 +601,12 @@ export function ReceiptDetailPanel({
   return (
     <>
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <DialogContent className="max-w-6xl w-[95vw] h-[90vh] p-0 flex flex-col overflow-hidden">
+        <DialogContent 
+          className="max-w-[95vw] w-[95vw] h-[95vh] max-h-[95vh] p-0 gap-0 flex flex-col overflow-hidden"
+          style={{ maxWidth: '95vw', width: '95vw', height: '95vh', maxHeight: '95vh' }}
+        >
           {/* Header */}
-          <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
+          <DialogHeader className="px-6 py-3 border-b flex-shrink-0">
             <DialogTitle className="text-lg font-semibold">
               {loading ? 'Beleg laden...' : 'Beleg-Details'}
             </DialogTitle>
@@ -623,38 +626,40 @@ export function ReceiptDetailPanel({
           ) : receipt ? (
             <div className="flex-1 flex overflow-hidden">
               {/* LEFT COLUMN - Document Preview */}
-              <div className="w-1/2 bg-muted/30 flex flex-col border-r">
-                {/* Preview Header with Controls */}
-                <div className="flex items-center justify-between p-3 border-b bg-background">
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm text-muted-foreground">1 / 1</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+              <div className="w-1/2 bg-muted/50 flex flex-col border-r">
+                {/* Preview Header with Controls - Only for images (PDFs have their own controls) */}
+                {!isPdf && (
+                  <div className="flex items-center justify-between px-4 py-2 border-b bg-background flex-shrink-0">
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm text-muted-foreground min-w-[60px] text-center">1 / 1</span>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!isImage} onClick={() => isZoomed && setIsZoomed(false)}>
+                        <ZoomOut className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm text-muted-foreground min-w-[50px] text-center">{isZoomed ? '150%' : '100%'}</span>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!isImage} onClick={() => !isZoomed && setIsZoomed(true)}>
+                        <ZoomIn className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!isImage} onClick={() => isZoomed && setIsZoomed(false)}>
-                      <ZoomOut className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm text-muted-foreground">{isZoomed ? '150%' : '100%'}</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!isImage} onClick={() => !isZoomed && setIsZoomed(true)}>
-                      <ZoomIn className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                )}
 
-                {/* Main Preview Area */}
-                <div className="flex-1 p-4 flex items-center justify-center overflow-auto">
+                {/* Main Preview Area - Maximum Size */}
+                <div className="flex-1 p-4 overflow-auto flex items-start justify-center">
                   {fileLoading ? (
-                    <div className="flex flex-col items-center">
+                    <div className="flex flex-col items-center justify-center h-full">
                       <Loader2 className="h-10 w-10 animate-spin text-primary" />
                       <p className="mt-2 text-sm text-muted-foreground">Lade Vorschau...</p>
                     </div>
                   ) : fileError ? (
-                    <div className="flex flex-col items-center gap-4 text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
                       <AlertCircle className="h-12 w-12" />
                       <p className="text-center text-foreground">Vorschau konnte nicht geladen werden</p>
                       <div className="flex gap-2">
@@ -669,19 +674,8 @@ export function ReceiptDetailPanel({
                       </div>
                     </div>
                   ) : previewBlobUrl ? (
-                    isImage ? (
-                      <img
-                        src={previewBlobUrl}
-                        alt={receipt.file_name || 'Beleg'}
-                        className={cn(
-                          "transition-transform duration-300 rounded shadow-sm cursor-zoom-in",
-                          isZoomed ? "scale-150 cursor-zoom-out" : "max-w-full max-h-full object-contain"
-                        )}
-                        onClick={() => setIsZoomed(!isZoomed)}
-                        onError={() => setFileError(true)}
-                      />
-                    ) : isPdf ? (
-                      <div className="h-full w-full">
+                    isPdf ? (
+                      <div className="w-full h-full" style={{ minHeight: 'calc(95vh - 140px)' }}>
                         <PdfViewer 
                           url={previewBlobUrl} 
                           fileName={receipt?.file_name}
@@ -689,17 +683,28 @@ export function ReceiptDetailPanel({
                           className="h-full"
                         />
                       </div>
+                    ) : isImage ? (
+                      <img
+                        src={previewBlobUrl}
+                        alt={receipt.file_name || 'Beleg'}
+                        className={cn(
+                          "transition-transform duration-300 rounded shadow-lg cursor-zoom-in",
+                          isZoomed ? "scale-150 cursor-zoom-out" : "max-w-full max-h-full object-contain"
+                        )}
+                        onClick={() => setIsZoomed(!isZoomed)}
+                        onError={() => setFileError(true)}
+                      />
                     ) : (
-                      <div className="flex flex-col items-center gap-4 text-muted-foreground">
-                        <FileText className="h-20 w-20" />
+                      <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
+                        <FileText className="h-24 w-24" />
                         <p className="font-medium text-foreground">{receipt?.file_name}</p>
                         <p className="text-sm">Vorschau nicht verfügbar</p>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={handleDownload}>
+                          <Button variant="outline" onClick={handleDownload}>
                             <Download className="h-4 w-4 mr-2" />
                             Herunterladen
                           </Button>
-                          <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
+                          <Button variant="outline" onClick={handleOpenInNewTab}>
                             <ExternalLink className="h-4 w-4 mr-2" />
                             In neuem Tab
                           </Button>
@@ -707,28 +712,16 @@ export function ReceiptDetailPanel({
                       </div>
                     )
                   ) : (
-                    <div className="flex flex-col items-center gap-4 text-muted-foreground">
-                      <FileText className="h-20 w-20" />
+                    <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
+                      <FileText className="h-24 w-24" />
                       <p>Keine Datei vorhanden</p>
                     </div>
                   )}
                 </div>
 
                 {/* Preview Footer with Filename */}
-                <div className="p-3 border-t bg-background text-center">
-                  <p className="text-xs text-muted-foreground truncate">
-                    Datei: {receipt?.file_name}
-                  </p>
-                  <div className="flex gap-2 justify-center mt-2">
-                    <Button variant="outline" size="sm" onClick={handleDownload}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Herunterladen
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      In neuem Tab
-                    </Button>
-                  </div>
+                <div className="px-4 py-2 border-t bg-background text-center flex-shrink-0">
+                  <p className="text-xs text-muted-foreground truncate">Datei: {receipt?.file_name}</p>
                 </div>
               </div>
 
