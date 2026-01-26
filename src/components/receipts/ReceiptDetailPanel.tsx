@@ -615,7 +615,7 @@ export function ReceiptDetailPanel({
     }
   };
 
-  const handleSave = async (newStatus?: 'approved' | 'rejected') => {
+  const handleSave = async (newStatus?: 'approved' | 'rejected' | 'review') => {
     if (!receipt) return;
 
     setSaving(true);
@@ -657,6 +657,7 @@ export function ReceiptDetailPanel({
       const statusMessages = {
         approved: 'Beleg freigegeben',
         rejected: 'Beleg abgelehnt',
+        review: 'Beleg zur Überprüfung',
       };
 
       toast({
@@ -1265,6 +1266,15 @@ export function ReceiptDetailPanel({
                     >
                       {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                       Ablehnen
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="border-blue-500 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                      onClick={() => handleSave('review')}
+                      disabled={saving}
+                    >
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Überprüfen
                     </Button>
                     <Button
                       variant="outline"
