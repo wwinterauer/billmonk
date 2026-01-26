@@ -22,6 +22,7 @@ import {
   AlertCircle,
   Loader2,
   X,
+  CheckCircle2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -62,11 +63,15 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
   
   const [settings, setSettings] = useState<NamingSettings>(DEFAULT_SETTINGS);
   const [loadingSettings, setLoadingSettings] = useState(true);
+  const [groupByYear, setGroupByYear] = useState(false);
   const [groupByMonth, setGroupByMonth] = useState(true);
   const [groupByCategory, setGroupByCategory] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportComplete, setExportComplete] = useState(false);
+  const [exportedCount, setExportedCount] = useState(0);
   const [progress, setProgress] = useState(0);
   const [currentItem, setCurrentItem] = useState(0);
+  const [currentFileName, setCurrentFileName] = useState('');
 
   // Load naming settings from database
   useEffect(() => {
@@ -249,12 +254,15 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
     if (receipts.length === 0) return;
 
     setIsExporting(true);
+    setExportComplete(false);
     setProgress(0);
     setCurrentItem(0);
+    setCurrentFileName('');
     abortRef.current = false;
 
     const zip = new JSZip();
     const usedNames = new Map<string, number>();
+    let successCount = 0;
 
     try {
       for (let i = 0; i < receipts.length; i++) {
@@ -287,6 +295,7 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
 
           // Generate unique filename
           let newName = generateFileName(receipt, i);
+          setCurrentFileName(newName);
           
           // Handle duplicate names
           const baseName = newName.replace(/\.[^/.]+$/, '');
@@ -302,14 +311,18 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
 
           // Determine folder path
           let folderPath = '';
+          if (groupByYear && receipt.receipt_date) {
+            folderPath = receipt.receipt_date.substring(0, 4) + '/';
+          }
           if (groupByMonth && receipt.receipt_date) {
-            folderPath = receipt.receipt_date.substring(0, 7) + '/';
+            folderPath += receipt.receipt_date.substring(0, 7) + '/';
           }
           if (groupByCategory && receipt.category) {
             folderPath += applyTransformations(receipt.category) + '/';
           }
 
           zip.file(folderPath + newName, blob);
+          successCount++;
         } catch (fetchError) {
           console.error('Error fetching file:', fetchError);
         }
@@ -317,14 +330,16 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
 
       if (!abortRef.current) {
         // Generate ZIP
-        const content = await zip.generateAsync({ type: 'blob' });
+        const content = await zip.generateAsync({ 
+          type: 'blob',
+          compression: 'DEFLATE',
+          compressionOptions: { level: 6 }
+        });
         const exportDate = format(new Date(), 'yyyy-MM-dd');
         saveAs(content, `belege_export_${exportDate}.zip`);
 
-        toast({
-          title: 'Export abgeschlossen',
-          description: `${receipts.length} Belege wurden exportiert.`,
-        });
+        setExportedCount(successCount);
+        setExportComplete(true);
       }
     } catch (error) {
       console.error('Export error:', error);
@@ -333,42 +348,70 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
         title: 'Fehler beim Export',
         description: error instanceof Error ? error.message : 'Unbekannter Fehler',
       });
-    } finally {
       setIsExporting(false);
-      setProgress(0);
-      setCurrentItem(0);
-      if (!abortRef.current) {
-        onOpenChange(false);
-      }
     }
   };
 
+  const handleClose = () => {
+    setIsExporting(false);
+    setExportComplete(false);
+    setProgress(0);
+    setCurrentItem(0);
+    setCurrentFileName('');
+    onOpenChange(false);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(v) => !isExporting && onOpenChange(v)}>
+    <Dialog open={open} onOpenChange={(v) => !isExporting && !exportComplete && onOpenChange(v)}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            {receipts.length} Belege exportieren
+            {exportComplete ? 'Export abgeschlossen' : `${receipts.length} Belege exportieren`}
           </DialogTitle>
-          <DialogDescription>
-            Die Dateien werden nach deinen Umbenennungsregeln exportiert.
-          </DialogDescription>
+          {!exportComplete && (
+            <DialogDescription>
+              Die Dateien werden nach deinen Umbenennungsregeln exportiert.
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         {loadingSettings ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
+        ) : exportComplete ? (
+          // Success View
+          <div className="py-8 space-y-4 text-center">
+            <div className="flex justify-center">
+              <div className="h-16 w-16 rounded-full bg-green-500/10 flex items-center justify-center">
+                <CheckCircle2 className="h-10 w-10 text-green-600" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-lg font-semibold text-foreground">Export erfolgreich!</p>
+              <p className="text-muted-foreground">
+                {exportedCount} Belege als ZIP heruntergeladen
+              </p>
+            </div>
+            <Button onClick={handleClose} className="w-full">
+              Schließen
+            </Button>
+          </div>
         ) : isExporting ? (
           // Progress View
           <div className="py-6 space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span>Verarbeite Beleg {currentItem} von {receipts.length}...</span>
                 <span className="font-medium">{progress}%</span>
               </div>
               <Progress value={progress} className="h-2" />
+              {currentFileName && (
+                <p className="text-xs text-muted-foreground font-mono truncate">
+                  {currentFileName}
+                </p>
+              )}
             </div>
             <Button 
               variant="outline" 
@@ -421,6 +464,17 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
               <div className="space-y-3">
                 <p className="text-sm font-medium">Optionen:</p>
                 <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <Checkbox
+                      id="groupByYear"
+                      checked={groupByYear}
+                      onCheckedChange={(v) => setGroupByYear(v as boolean)}
+                    />
+                    <label htmlFor="groupByYear" className="text-sm cursor-pointer flex items-center gap-2">
+                      <Folder className="h-4 w-4 text-muted-foreground" />
+                      Ordner nach Jahr erstellen (z.B. 2024/)
+                    </label>
+                  </div>
                   <div className="flex items-center space-x-3">
                     <Checkbox
                       id="groupByMonth"
