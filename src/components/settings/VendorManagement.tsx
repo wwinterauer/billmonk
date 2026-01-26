@@ -45,9 +45,12 @@ import { useCategories, Category } from '@/hooks/useCategories';
 import { toast } from 'sonner';
 
 const VAT_RATES = [
+  { value: '20', label: '20%' },
   { value: '19', label: '19%' },
+  { value: '13', label: '13%' },
+  { value: '10', label: '10%' },
   { value: '7', label: '7%' },
-  { value: '0', label: '0%' },
+  { value: '0', label: '0% (steuerfrei)' },
 ];
 
 const ITEMS_PER_PAGE = 20;
@@ -84,21 +87,25 @@ export function VendorManagement() {
   const [formData, setFormData] = useState({
     display_name: '',
     legal_name: '',
+    detected_names: [] as string[],
     default_category_id: '',
     default_vat_rate: '',
     website: '',
     notes: '',
   });
+  const [newVariant, setNewVariant] = useState('');
 
   const resetForm = () => {
     setFormData({
       display_name: '',
       legal_name: '',
+      detected_names: [],
       default_category_id: '',
       default_vat_rate: '',
       website: '',
       notes: '',
     });
+    setNewVariant('');
   };
 
   const openEditDialog = (vendor: Vendor) => {
@@ -106,17 +113,36 @@ export function VendorManagement() {
     setFormData({
       display_name: vendor.display_name,
       legal_name: vendor.legal_name || '',
+      detected_names: vendor.detected_names || [],
       default_category_id: vendor.default_category_id || '',
       default_vat_rate: vendor.default_vat_rate?.toString() || '',
       website: vendor.website || '',
       notes: vendor.notes || '',
     });
+    setNewVariant('');
   };
 
   const closeDialogs = () => {
     setIsAddDialogOpen(false);
     setEditingVendor(null);
     resetForm();
+  };
+
+  const addVariant = () => {
+    if (newVariant.trim() && !formData.detected_names.includes(newVariant.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        detected_names: [...prev.detected_names, newVariant.trim()]
+      }));
+      setNewVariant('');
+    }
+  };
+
+  const removeVariant = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      detected_names: prev.detected_names.filter((_, i) => i !== index)
+    }));
   };
 
   const handleSave = async () => {
@@ -131,6 +157,7 @@ export function VendorManagement() {
         await updateVendor(editingVendor.id, {
           display_name: formData.display_name.trim(),
           legal_name: formData.legal_name.trim() || null,
+          detected_names: formData.detected_names,
           default_category_id: formData.default_category_id || null,
           default_vat_rate: formData.default_vat_rate ? parseFloat(formData.default_vat_rate) : null,
           website: formData.website.trim() || null,
@@ -140,6 +167,7 @@ export function VendorManagement() {
       } else {
         await addVendor(formData.display_name.trim(), {
           legalName: formData.legal_name.trim() || undefined,
+          detectedNames: formData.detected_names,
           defaultCategoryId: formData.default_category_id || undefined,
           defaultVatRate: formData.default_vat_rate ? parseFloat(formData.default_vat_rate) : undefined,
           website: formData.website.trim() || undefined,
@@ -695,7 +723,7 @@ export function VendorManagement() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isAddDialogOpen || !!editingVendor} onOpenChange={closeDialogs}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingVendor ? 'Lieferant bearbeiten' : 'Neuer Lieferant'}
@@ -707,8 +735,9 @@ export function VendorManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
+          <div className="space-y-4 py-4">
+            {/* Anzeigename */}
+            <div className="space-y-2">
               <Label htmlFor="display_name">Anzeigename *</Label>
               <Input
                 id="display_name"
@@ -716,59 +745,122 @@ export function VendorManagement() {
                 onChange={(e) => setFormData(prev => ({ ...prev, display_name: e.target.value }))}
                 placeholder="z.B. Amazon"
               />
+              <p className="text-xs text-muted-foreground">
+                Dieser Name wird in Listen und Exporten verwendet
+              </p>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="legal_name">Rechtlicher Name</Label>
+            {/* Rechtlicher Name */}
+            <div className="space-y-2">
+              <Label htmlFor="legal_name">Rechtlicher Firmenname</Label>
               <Input
                 id="legal_name"
                 value={formData.legal_name}
                 onChange={(e) => setFormData(prev => ({ ...prev, legal_name: e.target.value }))}
                 placeholder="z.B. Amazon EU S.à r.l."
               />
+              <p className="text-xs text-muted-foreground">
+                Optional: Vollständiger Name für Buchhaltung
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="default_category">Standardkategorie</Label>
-                <Select
-                  value={formData.default_category_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, default_category_id: value }))}
+            {/* Erkannte Varianten */}
+            <div className="space-y-2">
+              <Label>Erkannte Namen (KI)</Label>
+              <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg min-h-[60px]">
+                {formData.detected_names.map((name, i) => (
+                  <Badge key={i} variant="secondary" className="flex items-center gap-1 pr-1">
+                    {name}
+                    <button
+                      type="button"
+                      onClick={() => removeVariant(i)}
+                      className="ml-1 rounded-full hover:bg-muted p-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+                {formData.detected_names.length === 0 && (
+                  <span className="text-muted-foreground text-sm">Keine Varianten erkannt</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={newVariant}
+                  onChange={(e) => setNewVariant(e.target.value)}
+                  placeholder="Neue Variante hinzufügen..."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addVariant();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={addVariant}
+                  disabled={!newVariant.trim()}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Auswählen..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Standard-Kategorie */}
+            <div className="space-y-2">
+              <Label htmlFor="default_category">Standard-Kategorie</Label>
+              <Select
+                value={formData.default_category_id}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, default_category_id: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Keine (manuell wählen)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      <span className="flex items-center">
+                        {category.color && (
+                          <span
+                            className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
+                            style={{ backgroundColor: category.color }}
+                          />
+                        )}
                         {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="default_vat_rate">Standard-MwSt.</Label>
-                <Select
-                  value={formData.default_vat_rate}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, default_vat_rate: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Auswählen..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {VAT_RATES.map((rate) => (
-                      <SelectItem key={rate.value} value={rate.value}>
-                        {rate.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Wird automatisch bei neuen Belegen gesetzt
+              </p>
             </div>
 
-            <div className="grid gap-2">
+            {/* Standard MwSt-Satz */}
+            <div className="space-y-2">
+              <Label htmlFor="default_vat_rate">Standard MwSt-Satz</Label>
+              <Select
+                value={formData.default_vat_rate}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, default_vat_rate: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Keine Vorgabe" />
+                </SelectTrigger>
+                <SelectContent>
+                  {VAT_RATES.map((rate) => (
+                    <SelectItem key={rate.value} value={rate.value}>
+                      {rate.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Website */}
+            <div className="space-y-2">
               <Label htmlFor="website">Website</Label>
               <Input
                 id="website"
@@ -778,23 +870,41 @@ export function VendorManagement() {
               />
             </div>
 
-            <div className="grid gap-2">
+            {/* Notizen */}
+            <div className="space-y-2">
               <Label htmlFor="notes">Notizen</Label>
               <Textarea
                 id="notes"
                 value={formData.notes}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Zusätzliche Informationen..."
-                rows={3}
+                placeholder="Optionale Anmerkungen..."
+                rows={2}
               />
             </div>
+
+            {/* Statistik (nur bei Bearbeitung) */}
+            {editingVendor && (
+              <div className="bg-muted/50 rounded-lg p-4">
+                <Label className="text-sm text-muted-foreground">Statistik</Label>
+                <div className="flex gap-6 mt-2">
+                  <div>
+                    <span className="text-2xl font-semibold">{editingVendor.receipt_count}</span>
+                    <span className="text-sm text-muted-foreground ml-1">Belege</span>
+                  </div>
+                  <div>
+                    <span className="text-2xl font-semibold">{formatCurrency(editingVendor.total_amount)}</span>
+                    <span className="text-sm text-muted-foreground ml-1">Gesamt</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={closeDialogs}>
+            <Button variant="ghost" onClick={closeDialogs}>
               Abbrechen
             </Button>
-            <Button onClick={handleSave} disabled={isSaving}>
+            <Button onClick={handleSave} disabled={isSaving || !formData.display_name.trim()}>
               {isSaving ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
               ) : editingVendor ? (
@@ -802,7 +912,7 @@ export function VendorManagement() {
               ) : (
                 <Plus className="h-4 w-4 mr-2" />
               )}
-              {editingVendor ? 'Speichern' : 'Hinzufügen'}
+              {editingVendor ? 'Speichern' : 'Erstellen'}
             </Button>
           </DialogFooter>
         </DialogContent>
