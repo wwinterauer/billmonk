@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
 import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
+import { matchOrCreateVendor } from '@/services/vendorMatchingService';
 
 export interface Receipt {
   id: string;
@@ -197,10 +198,14 @@ export function useReceipts() {
       const extracted = await extractReceiptData(file);
       const normalized = normalizeExtractionResult(extracted);
 
-      onProgress?.(90, 'Speichern...');
+      onProgress?.(80, 'Lieferant zuordnen...');
 
-      // Update receipt with extracted data
-      const updated = await updateReceipt(receiptId, {
+      // Match or create vendor based on detected name
+      const vendorName = normalized.vendor_brand || normalized.vendor;
+      const matchedVendor = await matchOrCreateVendor(vendorName, user!.id);
+
+      // Prepare update data with vendor defaults
+      const updateData: Partial<Receipt> = {
         vendor: normalized.vendor,
         vendor_brand: normalized.vendor_brand,
         description: normalized.description,
@@ -216,7 +221,33 @@ export function useReceipts() {
         ai_raw_response: normalized as unknown as Json,
         ai_processed_at: new Date().toISOString(),
         status: 'review',
-      });
+      };
+
+      // Apply vendor matching results
+      if (matchedVendor) {
+        updateData.vendor_id = matchedVendor.id;
+        updateData.vendor = matchedVendor.display_name;
+        
+        // Apply vendor defaults if not already set by AI
+        if (matchedVendor.default_category_id && !normalized.category) {
+          updateData.category = matchedVendor.default_category_id;
+        }
+        if (matchedVendor.default_vat_rate !== null && normalized.vat_rate === null) {
+          updateData.vat_rate = matchedVendor.default_vat_rate;
+          // Recalculate VAT if we have gross amount
+          if (updateData.amount_gross && updateData.vat_rate) {
+            const grossAmount = updateData.amount_gross;
+            const vatRate = updateData.vat_rate;
+            updateData.amount_net = Number((grossAmount / (1 + vatRate / 100)).toFixed(2));
+            updateData.vat_amount = Number((grossAmount - updateData.amount_net).toFixed(2));
+          }
+        }
+      }
+
+      onProgress?.(90, 'Speichern...');
+
+      // Update receipt with extracted data
+      const updated = await updateReceipt(receiptId, updateData);
 
       onProgress?.(100, 'Zur Überprüfung');
 
