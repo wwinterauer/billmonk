@@ -149,6 +149,9 @@ export function ReceiptDetailPanel({
   // Vendor state
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
 
+  // Original receipt data for tracking changes
+  const [originalReceipt, setOriginalReceipt] = useState<Receipt | null>(null);
+
   // Form state
   const [vendor, setVendor] = useState('');
   const [vendorBrand, setVendorBrand] = useState('');
@@ -288,6 +291,7 @@ export function ReceiptDetailPanel({
         const data = await getReceipt(receiptId);
         if (data) {
           setReceipt(data);
+          setOriginalReceipt(data); // Store original for change tracking
           // Populate form
           setVendor(data.vendor || '');
           setVendorBrand(data.vendor_brand || '');
@@ -299,6 +303,7 @@ export function ReceiptDetailPanel({
           setVatRate(data.vat_rate?.toString() || '20');
           setPaymentMethod(data.payment_method || '');
           setNotes(data.notes || '');
+          setSelectedVendorId(data.vendor_id || null);
         }
       } catch (error) {
         toast({
@@ -593,8 +598,15 @@ export function ReceiptDetailPanel({
     }
   };
 
+  // Fields that are tracked for manual modifications
+  const TRACKABLE_FIELDS = [
+    'vendor', 'invoice_number', 'receipt_date', 
+    'amount_gross', 'amount_net', 'vat_rate', 'vat_amount', 
+    'description', 'category'
+  ] as const;
+
   const handleSave = async (newStatus?: 'approved' | 'rejected' | 'review') => {
-    if (!receipt) return;
+    if (!receipt || !originalReceipt) return;
 
     setSaving(true);
     try {
@@ -603,6 +615,38 @@ export function ReceiptDetailPanel({
         ? processDescription(description, descriptionSettings)
         : null;
       
+      // Track which fields were manually modified
+      const existingModifiedFields = (receipt.user_modified_fields as string[]) || [];
+      const modifiedFields = new Set(existingModifiedFields);
+
+      // Current form values mapped to field names
+      const currentValues: Record<string, unknown> = {
+        vendor: vendor || null,
+        invoice_number: invoiceNumber || null,
+        receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null,
+        amount_gross: parseFloat(amountGross) || null,
+        amount_net: calculatedValues.net || null,
+        vat_rate: parseFloat(vatRate) || null,
+        vat_amount: calculatedValues.vat || null,
+        description: processedDescription,
+        category: category || null,
+      };
+
+      // Check each trackable field for changes
+      for (const fieldId of TRACKABLE_FIELDS) {
+        const originalValue = originalReceipt[fieldId as keyof Receipt];
+        const newValue = currentValues[fieldId];
+        
+        // Normalize values for comparison
+        const normalizedOriginal = originalValue === undefined ? null : originalValue;
+        const normalizedNew = newValue === undefined ? null : newValue;
+        
+        // If value changed and not already tracked, add to modified fields
+        if (String(normalizedOriginal) !== String(normalizedNew)) {
+          modifiedFields.add(fieldId);
+        }
+      }
+
       // Build update data
       const updateData: Record<string, unknown> = {
         vendor: vendor || null,
@@ -618,6 +662,7 @@ export function ReceiptDetailPanel({
         vat_rate: parseFloat(vatRate) || null,
         payment_method: paymentMethod || null,
         notes: notes || null,
+        user_modified_fields: Array.from(modifiedFields),
       };
 
       // Add status if provided
