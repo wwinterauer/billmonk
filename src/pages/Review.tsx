@@ -18,6 +18,7 @@ import {
   Download,
   ExternalLink
 } from 'lucide-react';
+import { PdfViewer } from '@/components/receipts/PdfViewer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -519,27 +520,15 @@ const Review = () => {
                           </div>
                         ) : imageUrl ? (
                           <>
-                            {currentReceipt?.file_type?.toLowerCase() === 'pdf' ? (
-                              <div className="flex flex-col items-center justify-center h-full p-6">
-                                <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-                                <p className="text-foreground font-medium mb-2 text-center truncate max-w-full">
-                                  {currentReceipt?.file_name}
-                                </p>
-                                <p className="text-muted-foreground text-sm mb-4">PDF-Vorschau nicht verfügbar</p>
-                                <div className="flex gap-2">
-                                  <Button variant="outline" size="sm" asChild>
-                                    <a href={imageUrl} download={currentReceipt?.file_name} target="_blank" rel="noopener noreferrer">
-                                      <Download className="h-4 w-4 mr-2" />
-                                      Herunterladen
-                                    </a>
-                                  </Button>
-                                  <Button variant="outline" size="sm" asChild>
-                                    <a href={imageUrl} target="_blank" rel="noopener noreferrer">
-                                      <ExternalLink className="h-4 w-4 mr-2" />
-                                      Öffnen
-                                    </a>
-                                  </Button>
-                                </div>
+                            {currentReceipt?.file_type?.toLowerCase() === 'pdf' || 
+                             currentReceipt?.file_name?.toLowerCase().endsWith('.pdf') ? (
+                              <div className="h-full w-full">
+                                <PdfViewer 
+                                  url={imageUrl} 
+                                  fileName={currentReceipt?.file_name || 'document.pdf'}
+                                  className="h-full"
+                                  onError={() => setImageError('PDF konnte nicht geladen werden')}
+                                />
                               </div>
                             ) : (
                               <>
@@ -925,27 +914,21 @@ const Review = () => {
             </DialogHeader>
             <div className="flex-1 overflow-auto flex items-center justify-center">
               {imageUrl ? (
-                currentReceipt?.file_type?.toLowerCase() === 'pdf' ? (
-                  <div className="flex flex-col items-center justify-center h-full p-8">
-                    <FileText className="h-24 w-24 text-muted-foreground mb-6" />
-                    <p className="text-foreground font-medium mb-2 text-lg">
-                      {currentReceipt?.file_name}
-                    </p>
-                    <p className="text-muted-foreground mb-6">PDF-Vorschau nicht verfügbar</p>
-                    <div className="flex gap-3">
-                      <Button variant="outline" asChild>
-                        <a href={imageUrl} download={currentReceipt?.file_name} target="_blank" rel="noopener noreferrer">
-                          <Download className="h-4 w-4 mr-2" />
-                          Herunterladen
-                        </a>
-                      </Button>
-                      <Button variant="outline" asChild>
-                        <a href={imageUrl} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          In neuem Tab öffnen
-                        </a>
-                      </Button>
-                    </div>
+                currentReceipt?.file_type?.toLowerCase() === 'pdf' ||
+                currentReceipt?.file_name?.toLowerCase().endsWith('.pdf') ? (
+                  <div className="w-full h-full max-w-4xl mx-auto">
+                    <PdfViewer 
+                      url={imageUrl} 
+                      fileName={currentReceipt?.file_name || 'document.pdf'}
+                      className="h-full"
+                      onError={() => {
+                        toast({
+                          variant: 'destructive',
+                          title: 'PDF konnte nicht geladen werden',
+                          description: 'Bitte versuchen Sie es erneut oder laden Sie die Datei herunter.',
+                        });
+                      }}
+                    />
                   </div>
                 ) : (
                   <img 
