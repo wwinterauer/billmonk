@@ -60,7 +60,8 @@ export function VendorAutocomplete({
     
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      // Load vendors
+      const { data: vendorsData, error: vendorsError } = await supabase
         .from('vendors')
         .select(`
           id,
@@ -69,20 +70,40 @@ export function VendorAutocomplete({
           detected_names,
           default_category_id,
           default_vat_rate,
-          receipt_count,
           default_category:categories(id, name, color)
         `)
-        .order('receipt_count', { ascending: false, nullsFirst: false });
+        .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (vendorsError) throw vendorsError;
 
-      // Transform the data to match our interface
-      const transformedData = (data || []).map(v => ({
+      // Load receipt counts per vendor (real-time aggregation)
+      const { data: receiptsData, error: receiptsError } = await supabase
+        .from('receipts')
+        .select('vendor_id')
+        .eq('user_id', user.id)
+        .not('vendor_id', 'is', null);
+
+      if (receiptsError) throw receiptsError;
+
+      // Count receipts per vendor
+      const receiptCounts: Record<string, number> = {};
+      (receiptsData || []).forEach(r => {
+        if (r.vendor_id) {
+          receiptCounts[r.vendor_id] = (receiptCounts[r.vendor_id] || 0) + 1;
+        }
+      });
+
+      // Transform and combine the data
+      const transformedData = (vendorsData || []).map(v => ({
         ...v,
+        receipt_count: receiptCounts[v.id] || 0,
         default_category: Array.isArray(v.default_category) 
           ? v.default_category[0] || null 
           : v.default_category
       })) as VendorWithCategory[];
+
+      // Sort by receipt count descending
+      transformedData.sort((a, b) => (b.receipt_count || 0) - (a.receipt_count || 0));
 
       setAllVendors(transformedData);
     } catch (error) {
