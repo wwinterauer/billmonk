@@ -620,10 +620,10 @@ export function ReceiptDetailPanel({
               <div className="flex-1 overflow-y-auto">
                 <div className="grid md:grid-cols-[55%_45%] gap-6 p-6">
                   {/* Left Column - File Preview */}
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div 
                       className={cn(
-                        "relative bg-muted rounded-lg overflow-hidden min-h-[400px] flex items-center justify-center",
+                        "relative bg-background rounded-lg overflow-hidden min-h-[500px] flex items-center justify-center border",
                         isZoomed && "cursor-zoom-out",
                         !isZoomed && isImage && "cursor-zoom-in"
                       )}
@@ -657,7 +657,7 @@ export function ReceiptDetailPanel({
                               alt={receipt.file_name || 'Beleg'}
                               className={cn(
                                 "transition-transform duration-300",
-                                isZoomed ? "scale-150" : "max-w-full max-h-[500px] object-contain"
+                                isZoomed ? "scale-150" : "max-w-full max-h-[600px] object-contain"
                               )}
                               onError={() => setFileError(true)}
                             />
@@ -668,7 +668,7 @@ export function ReceiptDetailPanel({
                             )}
                           </>
                         ) : isPdf ? (
-                          <div className="h-[500px] w-full flex flex-col">
+                          <div className="h-[600px] w-full flex flex-col">
                             <PdfViewer 
                               url={previewBlobUrl} 
                               fileName={receipt?.file_name}
@@ -717,93 +717,6 @@ export function ReceiptDetailPanel({
                         Datei: {receipt.file_name}
                       </p>
                     )}
-
-                    {/* Export Filename Preview Section */}
-                    <div className="border rounded-lg p-4 bg-muted/50">
-                      <div className="flex items-center justify-between mb-2">
-                        <Label className="text-sm font-medium">
-                          Export-Dateiname
-                        </Label>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setIsEditingFilename(!isEditingFilename)}
-                        >
-                          {isEditingFilename ? (
-                            <>
-                              <X className="w-4 h-4 mr-1" />
-                              Abbrechen
-                            </>
-                          ) : (
-                            <>
-                              <Pencil className="w-4 h-4 mr-1" />
-                              Anpassen
-                            </>
-                          )}
-                        </Button>
-                      </div>
-
-                      {isEditingFilename ? (
-                        <div className="space-y-2">
-                          <Input 
-                            value={customFilename}
-                            onChange={(e) => setCustomFilename(e.target.value)}
-                            placeholder="Benutzerdefinierter Dateiname"
-                            className="font-mono text-sm"
-                          />
-                          <div className="flex items-center gap-2">
-                            <Button size="sm" onClick={handleSaveCustomFilename}>
-                              <Check className="w-4 h-4 mr-1" />
-                              Übernehmen
-                            </Button>
-                            {receipt.custom_filename && (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={handleResetFilename}
-                              >
-                                <RotateCcw className="w-4 h-4 mr-1" />
-                                Zurücksetzen
-                              </Button>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Dateiendung (.{getFileExtension(receipt.file_name)}) wird automatisch ergänzt
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                            <code className="text-sm bg-background px-2 py-1 rounded border flex-1 truncate">
-                              {displayFilename}
-                            </code>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={handleCopyFilename}
-                              title="Kopieren"
-                            >
-                              <Copy className="w-4 h-4" />
-                            </Button>
-                          </div>
-                          
-                          {receipt.custom_filename && (
-                            <p className="text-xs text-amber-600 flex items-center">
-                              <AlertCircle className="w-3 h-3 mr-1" />
-                              Benutzerdefinierter Name (weicht von Vorlage ab)
-                            </p>
-                          )}
-
-                          {/* Show generated name if custom is set and different */}
-                          {receipt.custom_filename && generatedFilename !== displayFilename && (
-                            <p className="text-xs text-muted-foreground">
-                              Nach Vorlage wäre: {generatedFilename}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
                   </div>
 
                   {/* Right Column - Form */}
@@ -1066,6 +979,93 @@ export function ReceiptDetailPanel({
                           placeholder="Optionale Anmerkungen..."
                           rows={2}
                         />
+                      </div>
+
+                      {/* Export Filename Preview Section */}
+                      <div className="border rounded-lg p-4 bg-muted/30 mt-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="text-sm font-medium">
+                            Export-Dateiname
+                          </Label>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setIsEditingFilename(!isEditingFilename)}
+                          >
+                            {isEditingFilename ? (
+                              <>
+                                <X className="w-4 h-4 mr-1" />
+                                Abbrechen
+                              </>
+                            ) : (
+                              <>
+                                <Pencil className="w-4 h-4 mr-1" />
+                                Anpassen
+                              </>
+                            )}
+                          </Button>
+                        </div>
+
+                        {isEditingFilename ? (
+                          <div className="space-y-2">
+                            <Input 
+                              value={customFilename}
+                              onChange={(e) => setCustomFilename(e.target.value)}
+                              placeholder="Benutzerdefinierter Dateiname"
+                              className="font-mono text-sm"
+                            />
+                            <div className="flex items-center gap-2">
+                              <Button size="sm" onClick={handleSaveCustomFilename}>
+                                <Check className="w-4 h-4 mr-1" />
+                                Übernehmen
+                              </Button>
+                              {receipt.custom_filename && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={handleResetFilename}
+                                >
+                                  <RotateCcw className="w-4 h-4 mr-1" />
+                                  Zurücksetzen
+                                </Button>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Dateiendung (.{getFileExtension(receipt.file_name)}) wird automatisch ergänzt
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                              <code className="text-sm bg-background px-2 py-1 rounded border flex-1 truncate">
+                                {displayFilename}
+                              </code>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={handleCopyFilename}
+                                title="Kopieren"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            
+                            {receipt.custom_filename && (
+                              <p className="text-xs text-amber-600 flex items-center">
+                                <AlertCircle className="w-3 h-3 mr-1" />
+                                Benutzerdefinierter Name (weicht von Vorlage ab)
+                              </p>
+                            )}
+
+                            {/* Show generated name if custom is set and different */}
+                            {receipt.custom_filename && generatedFilename !== displayFilename && (
+                              <p className="text-xs text-muted-foreground">
+                                Nach Vorlage wäre: {generatedFilename}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
