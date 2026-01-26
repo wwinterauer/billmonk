@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
@@ -12,6 +12,11 @@ import {
   AlertCircle,
   RefreshCw,
   ChevronDown,
+  Pencil,
+  X,
+  Check,
+  RotateCcw,
+  Copy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,11 +64,20 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
 import { useCategories } from '@/hooks/useCategories';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PdfViewer } from './PdfViewer';
 import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
+import { 
+  generateFileName, 
+  getExportFilename, 
+  getFileExtension,
+  parseNamingSettings, 
+  DEFAULT_NAMING_SETTINGS,
+  type NamingSettings 
+} from '@/lib/filenameUtils';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
@@ -94,6 +108,7 @@ export function ReceiptDetailPanel({
   onUpdate 
 }: ReceiptDetailPanelProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { getReceipt, updateReceipt, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
 
@@ -113,6 +128,11 @@ export function ReceiptDetailPanel({
   const [hasUnsavedAiChanges, setHasUnsavedAiChanges] = useState(false);
   const [changedFields, setChangedFields] = useState<Record<string, { old: string; new: string }>>({});
   const [currentAiConfidence, setCurrentAiConfidence] = useState<number | null>(null);
+
+  // Filename editing state
+  const [isEditingFilename, setIsEditingFilename] = useState(false);
+  const [customFilename, setCustomFilename] = useState('');
+  const [namingSettings, setNamingSettings] = useState<NamingSettings>(DEFAULT_NAMING_SETTINGS);
 
   // Form state
   const [vendor, setVendor] = useState('');
@@ -137,6 +157,30 @@ export function ReceiptDetailPanel({
       vat: isNaN(vat) ? 0 : vat,
     };
   }, [amountGross, vatRate]);
+
+  // Generated filename based on current form values
+  const generatedFilename = useMemo(() => {
+    const previewReceipt = {
+      vendor,
+      vendor_brand: vendorBrand,
+      receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null,
+      amount_gross: parseFloat(amountGross) || null,
+      category,
+      invoice_number: invoiceNumber,
+      payment_method: paymentMethod,
+      file_name: receipt?.file_name,
+    };
+    return generateFileName(previewReceipt, namingSettings);
+  }, [vendor, vendorBrand, receiptDate, amountGross, category, invoiceNumber, paymentMethod, receipt?.file_name, namingSettings]);
+
+  // Display filename (custom or generated)
+  const displayFilename = useMemo(() => {
+    if (receipt?.custom_filename) {
+      const extension = getFileExtension(receipt.file_name);
+      return receipt.custom_filename + '.' + extension;
+    }
+    return generatedFilename;
+  }, [receipt?.custom_filename, receipt?.file_name, generatedFilename]);
 
   // File type detection
   const isImage = useMemo(() => {
@@ -212,13 +256,14 @@ export function ReceiptDetailPanel({
     };
   }, [receipt?.file_url]);
 
-  // Load receipt data
+  // Load receipt data and user naming settings
   useEffect(() => {
     if (!receiptId || !open) {
       setReceipt(null);
       setPreviewBlobUrl(null);
       setSignedUrl(null);
       setFileError(false);
+      setIsEditingFilename(false);
       return;
     }
 
@@ -254,12 +299,46 @@ export function ReceiptDetailPanel({
     loadReceipt();
   }, [receiptId, open]);
 
+  // Load user naming settings from profile
+  useEffect(() => {
+    const loadNamingSettings = async () => {
+      if (!user || !open) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('naming_settings')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+
+        if (data?.naming_settings && typeof data.naming_settings === 'object') {
+          setNamingSettings(parseNamingSettings(data.naming_settings as Record<string, unknown>));
+        }
+      } catch (error) {
+        console.error('Error loading naming settings:', error);
+      }
+    };
+
+    loadNamingSettings();
+  }, [user, open]);
+
+  // Set customFilename when entering edit mode
+  useEffect(() => {
+    if (isEditingFilename) {
+      // Remove extension for editing
+      const filenameWithoutExt = displayFilename.replace(/\.[^/.]+$/, '');
+      setCustomFilename(filenameWithoutExt);
+    }
+  }, [isEditingFilename, displayFilename]);
+
   // Download/Open handlers using signedUrl
   const handleDownload = () => {
-    if (signedUrl && receipt?.file_name) {
+    if (signedUrl) {
       const link = document.createElement('a');
       link.href = signedUrl;
-      link.download = receipt.file_name;
+      link.download = displayFilename; // Use custom or generated filename
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -271,6 +350,61 @@ export function ReceiptDetailPanel({
       window.open(signedUrl, '_blank');
     }
   };
+
+  // Filename handlers
+  const handleSaveCustomFilename = useCallback(async () => {
+    if (!receipt) return;
+
+    // Sanitize filename
+    const sanitized = customFilename
+      .trim()
+      .replace(/[<>:"/\\|?*]/g, '')
+      .substring(0, 200);
+
+    if (!sanitized) {
+      toast({
+        variant: 'destructive',
+        title: 'Dateiname darf nicht leer sein',
+      });
+      return;
+    }
+
+    try {
+      await updateReceipt(receipt.id, { custom_filename: sanitized } as Partial<Receipt>);
+      setReceipt(prev => prev ? { ...prev, custom_filename: sanitized } : prev);
+      setIsEditingFilename(false);
+      toast({ title: 'Dateiname gespeichert' });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler beim Speichern',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    }
+  }, [receipt, customFilename, updateReceipt, toast]);
+
+  const handleResetFilename = useCallback(async () => {
+    if (!receipt) return;
+
+    try {
+      await updateReceipt(receipt.id, { custom_filename: null } as Partial<Receipt>);
+      setReceipt(prev => prev ? { ...prev, custom_filename: null } : prev);
+      setCustomFilename('');
+      setIsEditingFilename(false);
+      toast({ title: 'Dateiname auf Vorlage zurückgesetzt' });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler beim Zurücksetzen',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    }
+  }, [receipt, updateReceipt, toast]);
+
+  const handleCopyFilename = useCallback(() => {
+    navigator.clipboard.writeText(displayFilename);
+    toast({ title: 'Dateiname kopiert' });
+  }, [displayFilename, toast]);
 
   // AI Re-run handler
   const handleRerunAI = async () => {
@@ -583,6 +717,93 @@ export function ReceiptDetailPanel({
                         Datei: {receipt.file_name}
                       </p>
                     )}
+
+                    {/* Export Filename Preview Section */}
+                    <div className="border rounded-lg p-4 bg-muted/50">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="text-sm font-medium">
+                          Export-Dateiname
+                        </Label>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setIsEditingFilename(!isEditingFilename)}
+                        >
+                          {isEditingFilename ? (
+                            <>
+                              <X className="w-4 h-4 mr-1" />
+                              Abbrechen
+                            </>
+                          ) : (
+                            <>
+                              <Pencil className="w-4 h-4 mr-1" />
+                              Anpassen
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {isEditingFilename ? (
+                        <div className="space-y-2">
+                          <Input 
+                            value={customFilename}
+                            onChange={(e) => setCustomFilename(e.target.value)}
+                            placeholder="Benutzerdefinierter Dateiname"
+                            className="font-mono text-sm"
+                          />
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" onClick={handleSaveCustomFilename}>
+                              <Check className="w-4 h-4 mr-1" />
+                              Übernehmen
+                            </Button>
+                            {receipt.custom_filename && (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={handleResetFilename}
+                              >
+                                <RotateCcw className="w-4 h-4 mr-1" />
+                                Zurücksetzen
+                              </Button>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Dateiendung (.{getFileExtension(receipt.file_name)}) wird automatisch ergänzt
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            <code className="text-sm bg-background px-2 py-1 rounded border flex-1 truncate">
+                              {displayFilename}
+                            </code>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={handleCopyFilename}
+                              title="Kopieren"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          
+                          {receipt.custom_filename && (
+                            <p className="text-xs text-amber-600 flex items-center">
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                              Benutzerdefinierter Name (weicht von Vorlage ab)
+                            </p>
+                          )}
+
+                          {/* Show generated name if custom is set and different */}
+                          {receipt.custom_filename && generatedFilename !== displayFilename && (
+                            <p className="text-xs text-muted-foreground">
+                              Nach Vorlage wäre: {generatedFilename}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Right Column - Form */}
