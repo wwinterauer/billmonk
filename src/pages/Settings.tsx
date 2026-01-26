@@ -16,6 +16,7 @@ import {
   Tags,
   Building,
   Table2,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +44,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CategoryManagement } from '@/components/settings/CategoryManagement';
 import { VendorManagement } from '@/components/settings/VendorManagement';
 import { ExportTemplateSettings } from '@/components/settings/ExportTemplateSettings';
+import { DescriptionSettings } from '@/components/settings/DescriptionSettings';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
@@ -407,10 +409,14 @@ const Settings = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="naming" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-[650px]">
+          <TabsList className="grid w-full grid-cols-5 lg:w-[800px]">
             <TabsTrigger value="naming" className="gap-2">
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Umbenennung</span>
+            </TabsTrigger>
+            <TabsTrigger value="recognition" className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Erkennung</span>
             </TabsTrigger>
             <TabsTrigger value="categories" className="gap-2">
               <Tags className="h-4 w-4" />
@@ -696,6 +702,33 @@ const Settings = () => {
                   )}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </TabsContent>
+
+      {/* Recognition Settings Tab */}
+      <TabsContent value="recognition">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>Beschreibung / Rechnungspositionen</CardTitle>
+                  <CardDescription>
+                    Einstellungen für die Zusammenfassung der Rechnungspositionen
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <DescriptionSettings />
             </CardContent>
           </Card>
         </motion.div>
