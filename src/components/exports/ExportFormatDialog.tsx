@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -38,6 +39,9 @@ import {
   Settings,
   CheckCircle2,
   X,
+  Folder,
+  FolderOpen,
+  AlertTriangle,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -105,6 +109,13 @@ export function ExportFormatDialog({
   const [renameFiles, setRenameFiles] = useState(true);
   const [namingSettings, setNamingSettings] = useState<NamingSettings>(DEFAULT_NAMING_SETTINGS);
 
+  // Folder selection
+  const [exportFolder, setExportFolder] = useState<'downloads' | 'custom'>('downloads');
+  const [customFolderName, setCustomFolderName] = useState<string>('');
+  const [includeSubfolder, setIncludeSubfolder] = useState<boolean>(true);
+  const [selectedFolderHandle, setSelectedFolderHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [selectedFolderName, setSelectedFolderName] = useState<string>('');
+
   // Export state
   const [isExporting, setIsExporting] = useState(false);
   const [exportComplete, setExportComplete] = useState(false);
@@ -112,6 +123,37 @@ export function ExportFormatDialog({
   const [currentItem, setCurrentItem] = useState(0);
   const [currentFileName, setCurrentFileName] = useState('');
   const [exportedCount, setExportedCount] = useState(0);
+
+  // Check for File System Access API support
+  const supportsDirectoryPicker = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+
+  // Load export preferences from localStorage
+  useEffect(() => {
+    const savedPrefs = localStorage.getItem('exportPreferences');
+    if (savedPrefs) {
+      try {
+        const prefs = JSON.parse(savedPrefs);
+        setExportFolder(prefs.exportFolder || 'downloads');
+        setCustomFolderName(prefs.customFolderName || '');
+        setIncludeSubfolder(prefs.includeSubfolder ?? true);
+        setIncludeHeader(prefs.includeHeader ?? true);
+        setIncludeTotals(prefs.includeTotals ?? true);
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  }, []);
+
+  // Save export preferences to localStorage
+  useEffect(() => {
+    localStorage.setItem('exportPreferences', JSON.stringify({
+      exportFolder,
+      customFolderName,
+      includeSubfolder,
+      includeHeader,
+      includeTotals
+    }));
+  }, [exportFolder, customFolderName, includeSubfolder, includeHeader, includeTotals]);
 
   // Load naming settings
   useEffect(() => {
@@ -182,6 +224,91 @@ export function ExportFormatDialog({
       .filter(c => c.visible)
       .sort((a, b) => a.order - b.order);
   }, [selectedTemplate]);
+
+  // Folder selection handler
+  const selectFolder = async () => {
+    try {
+      const handle = await (window as unknown as { showDirectoryPicker: (options?: { mode?: string; startIn?: string }) => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker({
+        mode: 'readwrite',
+        startIn: 'downloads'
+      });
+      
+      setSelectedFolderHandle(handle);
+      setSelectedFolderName(handle.name);
+      toast({ title: `Ordner "${handle.name}" ausgewählt` });
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') {
+        console.error('Fehler bei Ordner-Auswahl:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Ordner konnte nicht ausgewählt werden',
+        });
+      }
+    }
+  };
+
+  // Get or create subfolder
+  const getOrCreateSubfolder = async (
+    parentHandle: FileSystemDirectoryHandle,
+    folderPath: string
+  ): Promise<FileSystemDirectoryHandle> => {
+    const parts = folderPath.split('/').filter(p => p);
+    let currentHandle = parentHandle;
+    
+    for (const part of parts) {
+      currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
+    }
+    
+    return currentHandle;
+  };
+
+  // Save export file (with folder selection support)
+  const saveExportFile = async (content: Blob, filename: string, subfolder: string) => {
+    // Option 1: File System Access API (modern browser + folder selected)
+    if (exportFolder === 'custom' && selectedFolderHandle) {
+      try {
+        let targetFolder = selectedFolderHandle;
+        
+        // Create subfolder if desired
+        if (includeSubfolder && subfolder) {
+          targetFolder = await getOrCreateSubfolder(selectedFolderHandle, subfolder);
+        }
+        
+        // Create file
+        const fileHandle = await targetFolder.getFileHandle(filename, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(content);
+        await writable.close();
+        
+        toast({ 
+          title: 'Gespeichert',
+          description: `${selectedFolderName}/${subfolder ? subfolder + '/' : ''}${filename}`
+        });
+        return;
+      } catch (error) {
+        console.error('Fehler beim Speichern:', error);
+        // Fallback to normal download
+      }
+    }
+    
+    // Option 2: Normal browser download
+    let downloadFilename = filename;
+    
+    // With custom folder name: Include in filename (fallback)
+    if (exportFolder === 'custom' && customFolderName) {
+      const folderPrefix = customFolderName.replace(/[/\\]/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
+      downloadFilename = `${folderPrefix}_${filename}`;
+    }
+    
+    // With subfolder: Append period to filename
+    if (includeSubfolder && subfolder) {
+      const ext = filename.split('.').pop();
+      const name = filename.replace(`.${ext}`, '');
+      downloadFilename = `${name}_${subfolder}.${ext}`;
+    }
+    
+    saveAs(content, downloadFilename);
+  };
 
   const getGroupLabel = (groupBy: string | null): string => {
     switch (groupBy) {
@@ -437,8 +564,8 @@ export function ExportFormatDialog({
     abortRef.current = true;
   };
 
-  // CSV Export
-  const exportToCSV = () => {
+  // CSV Export - returns Blob
+  const generateCSV = (): Blob => {
     const { columns, receipts: data, groupedData } = prepareExportData();
     const lines: string[] = [];
     const template = selectedTemplate;
@@ -449,7 +576,7 @@ export function ExportFormatDialog({
 
     const formatRow = (receipt: Receipt) => {
       return columns.map(col => {
-        let value = getReceiptValue(receipt, col.field);
+        const value = getReceiptValue(receipt, col.field);
         const formatted = formatValue(value, col.type, col.format, template?.number_format || 'de-AT');
         return `"${formatted}"`;
       }).join(';');
@@ -488,13 +615,11 @@ export function ExportFormatDialog({
     }
 
     const csv = lines.join('\n');
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
-    const exportDate = format(new Date(), 'yyyy-MM-dd');
-    saveAs(blob, `ausgaben_${exportDate}.csv`);
+    return new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
   };
 
-  // Excel Export
-  const exportToExcel = () => {
+  // Excel Export - returns Blob
+  const generateExcel = (): Blob => {
     const { columns, receipts: data, groupedData } = prepareExportData();
     const template = selectedTemplate;
     const rows: unknown[][] = [];
@@ -556,12 +681,14 @@ export function ExportFormatDialog({
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Ausgaben');
 
-    const exportDate = format(new Date(), 'yyyy-MM-dd');
-    XLSX.writeFile(workbook, `ausgaben_${exportDate}.xlsx`);
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    return new Blob([excelBuffer], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    });
   };
 
-  // PDF Export
-  const exportToPDF = () => {
+  // PDF Export - returns Blob
+  const generatePDF = (): Blob => {
     const { columns, receipts: data, groupedData } = prepareExportData();
     const template = selectedTemplate;
 
@@ -647,11 +774,81 @@ export function ExportFormatDialog({
       doc.text(`Gesamt MwSt: ${formatValue(totalVat, 'currency', null)}`, 146, startY + 5);
     }
 
-    const exportDate = format(new Date(), 'yyyy-MM-dd');
-    doc.save(`ausgaben_${exportDate}.pdf`);
+    return doc.output('blob');
   };
 
-  // ZIP Export
+  // Generate ZIP Blob
+  const generateZIPBlob = async (): Promise<Blob> => {
+    const zip = new JSZip();
+    const usedNames = new Map<string, number>();
+
+    for (let i = 0; i < receipts.length; i++) {
+      if (abortRef.current) break;
+
+      const receipt = receipts[i];
+      setCurrentItem(i + 1);
+      setProgress(Math.round(((i + 1) / receipts.length) * 100));
+
+      if (!receipt.file_url) continue;
+
+      const { data: urlData, error: urlError } = await supabase.storage
+        .from('receipts')
+        .createSignedUrl(receipt.file_url, 60);
+
+      if (urlError || !urlData?.signedUrl) continue;
+
+      try {
+        const response = await fetch(urlData.signedUrl);
+        if (!response.ok) continue;
+        const blob = await response.blob();
+
+        let newName = renameFiles ? generateFileName(receipt, i) : receipt.file_name || `beleg_${i + 1}.pdf`;
+        setCurrentFileName(newName);
+
+        const baseName = newName.replace(/\.[^/.]+$/, '');
+        const ext = getFileExtension(receipt.file_name);
+        
+        if (usedNames.has(newName)) {
+          const count = usedNames.get(newName)! + 1;
+          usedNames.set(newName, count);
+          newName = `${baseName}_${count}.${ext}`;
+        } else {
+          usedNames.set(newName, 1);
+        }
+
+        let folderPath = '';
+        switch (zipStructure) {
+          case 'month':
+            if (receipt.receipt_date) {
+              folderPath = receipt.receipt_date.substring(0, 7) + '/';
+            }
+            break;
+          case 'category':
+            if (receipt.category) {
+              folderPath = applyTransformations(receipt.category) + '/';
+            }
+            break;
+          case 'vendor':
+            if (receipt.vendor) {
+              folderPath = applyTransformations(receipt.vendor) + '/';
+            }
+            break;
+        }
+
+        zip.file(folderPath + newName, blob);
+      } catch (fetchError) {
+        console.error('Error fetching file:', fetchError);
+      }
+    }
+
+    return await zip.generateAsync({ 
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    });
+  };
+
+  // ZIP Export with folder support
   const exportToZIP = async () => {
     if (receipts.length === 0) return;
 
@@ -693,7 +890,6 @@ export function ExportFormatDialog({
           let newName = renameFiles ? generateFileName(receipt, i) : receipt.file_name || `beleg_${i + 1}.pdf`;
           setCurrentFileName(newName);
 
-          // Handle duplicate names
           const baseName = newName.replace(/\.[^/.]+$/, '');
           const ext = getFileExtension(receipt.file_name);
           
@@ -705,7 +901,6 @@ export function ExportFormatDialog({
             usedNames.set(newName, 1);
           }
 
-          // Determine folder path
           let folderPath = '';
           switch (zipStructure) {
             case 'month':
@@ -738,9 +933,13 @@ export function ExportFormatDialog({
           compression: 'DEFLATE',
           compressionOptions: { level: 6 }
         });
+        
         const exportDate = format(new Date(), 'yyyy-MM-dd');
-        saveAs(content, `belege_export_${exportDate}.zip`);
-
+        const subfolder = includeSubfolder && dateRange?.from 
+          ? format(dateRange.from, 'yyyy-MM')
+          : '';
+        
+        await saveExportFile(content, `belege_export_${exportDate}.zip`, subfolder);
         setExportedCount(successCount);
         setExportComplete(true);
       }
@@ -759,16 +958,27 @@ export function ExportFormatDialog({
     setIsExporting(true);
 
     try {
+      const exportDate = format(new Date(), 'yyyy-MM-dd');
+      const subfolder = includeSubfolder && dateRange?.from 
+        ? format(dateRange.from, 'yyyy-MM')
+        : '';
+
       switch (exportFormat) {
-        case 'csv':
-          exportToCSV();
+        case 'csv': {
+          const blob = generateCSV();
+          await saveExportFile(blob, `ausgaben_${exportDate}.csv`, subfolder);
           break;
-        case 'excel':
-          exportToExcel();
+        }
+        case 'excel': {
+          const blob = generateExcel();
+          await saveExportFile(blob, `ausgaben_${exportDate}.xlsx`, subfolder);
           break;
-        case 'pdf':
-          exportToPDF();
+        }
+        case 'pdf': {
+          const blob = generatePDF();
+          await saveExportFile(blob, `ausgaben_${exportDate}.pdf`, subfolder);
           break;
+        }
         case 'zip':
           await exportToZIP();
           return; // ZIP handles its own completion state
