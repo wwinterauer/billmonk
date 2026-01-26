@@ -33,7 +33,7 @@ import { Link } from 'react-router-dom';
 interface NamingSettings {
   template: string;
   replaceUmlauts: boolean;
-  replaceSpaces: boolean;
+  replaceSpaces: 'none' | 'underscore' | 'hyphen';
   removeSpecialChars: boolean;
   lowercase: boolean;
   dateFormat: string;
@@ -43,11 +43,22 @@ interface NamingSettings {
 const DEFAULT_SETTINGS: NamingSettings = {
   template: '{datum}_{lieferant}_{betrag}',
   replaceUmlauts: true,
-  replaceSpaces: true,
+  replaceSpaces: 'underscore',
   removeSpecialChars: true,
   lowercase: false,
   dateFormat: 'YYYYMMDD',
   emptyFieldHandling: 'remove',
+};
+
+// Helper to parse replaceSpaces from saved settings (handles backwards compatibility with boolean)
+const parseReplaceSpaces = (value: unknown): NamingSettings['replaceSpaces'] => {
+  if (value === 'underscore' || value === 'hyphen' || value === 'none') {
+    return value;
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'underscore' : 'none';
+  }
+  return DEFAULT_SETTINGS.replaceSpaces;
 };
 
 interface ExportDialogProps {
@@ -93,7 +104,7 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
           setSettings({
             template: (savedSettings.template as string) || DEFAULT_SETTINGS.template,
             replaceUmlauts: savedSettings.replaceUmlauts !== undefined ? Boolean(savedSettings.replaceUmlauts) : DEFAULT_SETTINGS.replaceUmlauts,
-            replaceSpaces: savedSettings.replaceSpaces !== undefined ? Boolean(savedSettings.replaceSpaces) : DEFAULT_SETTINGS.replaceSpaces,
+            replaceSpaces: parseReplaceSpaces(savedSettings.replaceSpaces),
             removeSpecialChars: savedSettings.removeSpecialChars !== undefined ? Boolean(savedSettings.removeSpecialChars) : DEFAULT_SETTINGS.removeSpecialChars,
             lowercase: savedSettings.lowercase !== undefined ? Boolean(savedSettings.lowercase) : DEFAULT_SETTINGS.lowercase,
             dateFormat: (savedSettings.dateFormat as string) || DEFAULT_SETTINGS.dateFormat,
@@ -169,8 +180,10 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
         .replace(/ß/g, 'ss');
     }
 
-    if (settings.replaceSpaces) {
+    if (settings.replaceSpaces === 'underscore') {
       result = result.replace(/\s+/g, '_');
+    } else if (settings.replaceSpaces === 'hyphen') {
+      result = result.replace(/\s+/g, '-');
     }
 
     if (settings.removeSpecialChars) {
@@ -181,8 +194,8 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
       result = result.toLowerCase();
     }
 
-    // Clean up multiple underscores
-    result = result.replace(/_+/g, '_').replace(/^_|_$/g, '');
+    // Clean up multiple underscores/hyphens
+    result = result.replace(/[-_]+/g, (match) => match[0]).replace(/^[-_]|[-_]$/g, '');
 
     return result;
   };
