@@ -681,8 +681,113 @@ const Expenses = () => {
   };
 
   // Bulk action states
-  const [bulkActionLoading, setBulkActionLoading] = useState<'approve' | 'reject' | 'review' | 'ai' | null>(null);
+  const [bulkActionLoading, setBulkActionLoading] = useState<'approve' | 'reject' | 'review' | 'ai' | 'duplicateCheck' | null>(null);
   const [aiProgress, setAiProgress] = useState<{ current: number; total: number } | null>(null);
+
+  // Check selected receipts for duplicates
+  const startSelectedDuplicateCheck = async () => {
+    if (!user?.id || selectedIds.size === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: selectedIds.size === 0 ? 'Keine Belege ausgewählt' : 'Benutzer nicht angemeldet',
+      });
+      return;
+    }
+
+    setBulkActionLoading('duplicateCheck');
+    setFoundDuplicates([]);
+
+    try {
+      // Get selected receipts that are not already marked as duplicates
+      const selectedReceipts = receipts.filter(r => 
+        selectedIds.has(r.id) && r.is_duplicate !== true
+      );
+
+      if (selectedReceipts.length === 0) {
+        toast({
+          title: 'Keine prüfbaren Belege',
+          description: 'Alle ausgewählten Belege sind bereits als Duplikate markiert',
+        });
+        setBulkActionLoading(null);
+        return;
+      }
+
+      setCheckProgress({ current: 0, total: selectedReceipts.length });
+
+      const duplicatesFound: FoundDuplicate[] = [];
+
+      // Check each selected receipt
+      for (let i = 0; i < selectedReceipts.length; i++) {
+        const receipt = selectedReceipts[i];
+        setCheckProgress({ current: i + 1, total: selectedReceipts.length });
+
+        // Check for duplicates
+        const result = await checkForDuplicates(
+          user.id,
+          receipt.file_hash,
+          {
+            vendor: receipt.vendor,
+            amount_gross: receipt.amount_gross,
+            receipt_date: receipt.receipt_date,
+            invoice_number: receipt.invoice_number
+          },
+          receipt.id
+        );
+
+        if (result.isDuplicate && result.score >= 70 && result.duplicateOf) {
+          duplicatesFound.push({
+            duplicate: receipt,
+            originalId: result.duplicateOf,
+            score: result.score,
+            matchType: result.matchType,
+            matchReasons: result.matchReasons
+          });
+
+          // Mark as duplicate in DB
+          await supabase
+            .from('receipts')
+            .update({
+              is_duplicate: true,
+              duplicate_of: result.duplicateOf,
+              duplicate_score: result.score,
+              duplicate_checked_at: new Date().toISOString()
+            })
+            .eq('id', receipt.id);
+        } else {
+          // Mark as checked
+          await supabase
+            .from('receipts')
+            .update({
+              duplicate_checked_at: new Date().toISOString()
+            })
+            .eq('id', receipt.id);
+        }
+      }
+
+      setFoundDuplicates(duplicatesFound);
+      setSelectedIds(new Set());
+
+      if (duplicatesFound.length > 0) {
+        setShowDuplicateResults(true);
+      } else {
+        toast({
+          title: 'Keine Duplikate gefunden',
+          description: `${selectedReceipts.length} ausgewählte Belege sind einzigartig`,
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler bei der Duplikat-Prüfung',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+      console.error(error);
+    } finally {
+      setBulkActionLoading(null);
+      loadReceipts();
+    }
+  };
 
   const handleBulkApprove = async () => {
     setBulkActionLoading('approve');
@@ -1272,6 +1377,27 @@ const Expenses = () => {
                 <>
                   <RotateCcw className="h-4 w-4 mr-1" />
                   KI neu starten
+                </>
+              )}
+            </Button>
+            
+            {/* Duplicate Check for selected */}
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={startSelectedDuplicateCheck}
+              disabled={bulkActionLoading !== null}
+              className="border-amber-500/50 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+            >
+              {bulkActionLoading === 'duplicateCheck' ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  {checkProgress.current}/{checkProgress.total}
+                </>
+              ) : (
+                <>
+                  <ScanSearch className="h-4 w-4 mr-1" />
+                  Duplikate prüfen
                 </>
               )}
             </Button>
