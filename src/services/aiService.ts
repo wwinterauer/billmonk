@@ -1,4 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
+import { 
+  processDescription, 
+  validateDescriptionSettings, 
+  DEFAULT_DESCRIPTION_SETTINGS,
+  type DescriptionSettings 
+} from "@/lib/descriptionUtils";
 
 export interface ExtractionResult {
   vendor: string | null;
@@ -22,6 +28,10 @@ export interface ExtractionResponse {
   error?: string;
   raw?: string;
 }
+
+// Re-export for convenience
+export type { DescriptionSettings };
+export { processDescription, validateDescriptionSettings, DEFAULT_DESCRIPTION_SETTINGS };
 
 /**
  * Converts a File to a base64 string (without the data URL prefix)
@@ -119,8 +129,13 @@ export function createEmptyExtractionResult(): ExtractionResult {
 
 /**
  * Validates and normalizes extracted data
+ * @param result - The extraction result from AI
+ * @param descriptionSettings - Optional user settings for description processing
  */
-export function normalizeExtractionResult(result: ExtractionResult): ExtractionResult {
+export function normalizeExtractionResult(
+  result: ExtractionResult, 
+  descriptionSettings?: DescriptionSettings
+): ExtractionResult {
   const normalized = { ...result };
 
   // Ensure amounts are numbers or null
@@ -156,7 +171,32 @@ export function normalizeExtractionResult(result: ExtractionResult): ExtractionR
     }
   }
 
+  // Process description with user settings or defaults
+  const settings = descriptionSettings || DEFAULT_DESCRIPTION_SETTINGS;
+  normalized.description = processDescription(normalized.description, settings);
+
   return normalized;
+}
+
+/**
+ * Fetches description settings for a user
+ */
+export async function fetchDescriptionSettings(userId: string): Promise<DescriptionSettings> {
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('description_settings')
+      .eq('id', userId)
+      .single();
+    
+    if (profile?.description_settings) {
+      return validateDescriptionSettings(profile.description_settings);
+    }
+  } catch (error) {
+    console.warn('Could not fetch description settings, using defaults:', error);
+  }
+  
+  return DEFAULT_DESCRIPTION_SETTINGS;
 }
 
 /**
