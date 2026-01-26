@@ -102,6 +102,9 @@ import {
 import { AlertTriangle } from 'lucide-react';
 import { useCorrectionTracking, type CorrectionData } from '@/hooks/useCorrectionTracking';
 import { LEARNABLE_FIELDS } from '@/types/learning';
+import { useVendorLearning } from '@/hooks/useVendorLearning';
+import { LearnableField } from './LearnableField';
+import { SaveWithLearningDialog, type FieldChange } from './SaveWithLearningDialog';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
@@ -194,6 +197,14 @@ export function ReceiptDetailPanel({
   const [vatRate, setVatRate] = useState('20');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Field changes tracking for learning dialog
+  const [fieldChanges, setFieldChanges] = useState<Record<string, FieldChange>>({});
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [rememberCorrections, setRememberCorrections] = useState(true);
+
+  // Vendor learning data
+  const { vendorLearning } = useVendorLearning(selectedVendorId);
 
   // Calculated values
   const calculatedValues = useMemo(() => {
@@ -687,6 +698,71 @@ export function ReceiptDetailPanel({
     'amount_gross', 'amount_net', 'vat_rate', 'vat_amount', 
     'description', 'category'
   ] as const;
+
+  // Calculate current field changes for learning dialog
+  const calculateFieldChanges = useCallback((): Record<string, FieldChange> => {
+    if (!originalReceipt) return {};
+    
+    const changes: Record<string, FieldChange> = {};
+    const currentValues: Record<string, unknown> = {
+      vendor: vendor || null,
+      invoice_number: invoiceNumber || null,
+      receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null,
+      amount_gross: parseFloat(amountGross) || null,
+      vat_rate: parseFloat(vatRate) || null,
+      description: description || null,
+      category: category || null,
+    };
+    
+    for (const field of LEARNABLE_FIELDS) {
+      const fieldId = field.id;
+      if (fieldId === 'amount_net' || fieldId === 'vat_amount') continue; // Skip calculated fields
+      
+      const originalValue = originalReceipt[fieldId as keyof Receipt];
+      const newValue = currentValues[fieldId];
+      
+      const normalizedOriginal = originalValue === undefined ? null : originalValue;
+      const normalizedNew = newValue === undefined ? null : newValue;
+      
+      if (String(normalizedOriginal || '') !== String(normalizedNew || '')) {
+        changes[fieldId] = {
+          original: normalizedOriginal,
+          current: normalizedNew
+        };
+      }
+    }
+    
+    return changes;
+  }, [originalReceipt, vendor, invoiceNumber, receiptDate, amountGross, vatRate, description, category]);
+
+  // Handle save click - show dialog if there are changes and vendor assigned
+  const handleSaveClick = (newStatus?: 'approved' | 'rejected' | 'review') => {
+    const changes = calculateFieldChanges();
+    const hasChanges = Object.keys(changes).length > 0;
+    
+    if (hasChanges && selectedVendorId) {
+      setFieldChanges(changes);
+      setShowSaveDialog(true);
+      // Store status for later execution
+      (window as unknown as { pendingSaveStatus?: typeof newStatus }).pendingSaveStatus = newStatus;
+    } else {
+      handleSave(newStatus);
+    }
+  };
+
+  // Execute save after dialog confirmation
+  const executeSaveWithLearning = () => {
+    const pendingStatus = (window as unknown as { pendingSaveStatus?: 'approved' | 'rejected' | 'review' }).pendingSaveStatus;
+    setShowSaveDialog(false);
+    
+    // If user chose not to remember, we still save but skip the learning
+    if (!rememberCorrections) {
+      // Save without learning - we'll handle this in handleSave
+      setFieldChanges({}); // Clear changes so tracking doesn't happen
+    }
+    
+    handleSave(pendingStatus);
+  };
 
   const handleSave = async (newStatus?: 'approved' | 'rejected' | 'review') => {
     if (!receipt || !originalReceipt) return;
@@ -1326,15 +1402,21 @@ export function ReceiptDetailPanel({
                     </div>
 
                     {/* Invoice Number */}
-                    <div>
-                      <Label htmlFor="invoiceNumber">Rechnungsnummer</Label>
+                    <LearnableField
+                      fieldName="invoice_number"
+                      label="Rechnungsnummer"
+                      value={invoiceNumber}
+                      originalValue={originalReceipt?.invoice_number}
+                      vendorLearning={vendorLearning}
+                      onReset={() => setInvoiceNumber(originalReceipt?.invoice_number || '')}
+                    >
                       <Input
                         id="invoiceNumber"
                         value={invoiceNumber}
                         onChange={(e) => setInvoiceNumber(e.target.value)}
                         placeholder="z.B. RE-2024-001"
                       />
-                    </div>
+                    </LearnableField>
 
                     {/* Category */}
                     <div>
@@ -1355,8 +1437,14 @@ export function ReceiptDetailPanel({
 
                     {/* Amount & VAT */}
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="amountGross">Bruttobetrag</Label>
+                      <LearnableField
+                        fieldName="amount_gross"
+                        label="Bruttobetrag"
+                        value={parseFloat(amountGross) || null}
+                        originalValue={originalReceipt?.amount_gross}
+                        vendorLearning={vendorLearning}
+                        onReset={() => setAmountGross(originalReceipt?.amount_gross?.toString() || '')}
+                      >
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
                           <Input
@@ -1369,9 +1457,15 @@ export function ReceiptDetailPanel({
                             placeholder="0.00"
                           />
                         </div>
-                      </div>
-                      <div>
-                        <Label>MwSt-Satz</Label>
+                      </LearnableField>
+                      <LearnableField
+                        fieldName="vat_rate"
+                        label="MwSt-Satz"
+                        value={parseFloat(vatRate) || null}
+                        originalValue={originalReceipt?.vat_rate}
+                        vendorLearning={vendorLearning}
+                        onReset={() => setVatRate(originalReceipt?.vat_rate?.toString() || '20')}
+                      >
                         <Select value={vatRate} onValueChange={setVatRate}>
                           <SelectTrigger>
                             <SelectValue />
@@ -1384,7 +1478,7 @@ export function ReceiptDetailPanel({
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
+                      </LearnableField>
                     </div>
 
                     {/* Net & VAT Amount (calculated) */}
@@ -1536,7 +1630,7 @@ export function ReceiptDetailPanel({
                   <div className="flex gap-2">
                     <Button
                       variant="destructive"
-                      onClick={() => handleSave('rejected')}
+                      onClick={() => handleSaveClick('rejected')}
                       disabled={saving}
                     >
                       {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -1545,7 +1639,7 @@ export function ReceiptDetailPanel({
                     <Button
                       variant="outline"
                       className="border-blue-500 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                      onClick={() => handleSave('review')}
+                      onClick={() => handleSaveClick('review')}
                       disabled={saving}
                     >
                       {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -1554,7 +1648,7 @@ export function ReceiptDetailPanel({
                     <Button
                       variant="outline"
                       className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700"
-                      onClick={() => handleSave('approved')}
+                      onClick={() => handleSaveClick('approved')}
                       disabled={saving}
                     >
                       {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -1562,7 +1656,7 @@ export function ReceiptDetailPanel({
                     </Button>
                     <Button
                       className="gradient-primary hover:opacity-90"
-                      onClick={() => handleSave()}
+                      onClick={() => handleSaveClick()}
                       disabled={saving}
                     >
                       {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -1761,6 +1855,17 @@ export function ReceiptDetailPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Save with Learning Dialog */}
+      <SaveWithLearningDialog
+        open={showSaveDialog}
+        onOpenChange={setShowSaveDialog}
+        fieldChanges={fieldChanges}
+        vendorName={vendor || 'Unbekannt'}
+        rememberCorrections={rememberCorrections}
+        onRememberChange={setRememberCorrections}
+        onConfirm={executeSaveWithLearning}
+      />
     </>
   );
 }
