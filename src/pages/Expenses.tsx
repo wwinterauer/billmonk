@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Search, 
   Upload, 
@@ -13,9 +13,10 @@ import {
   FileText,
   Check,
   Filter,
-  Sparkles
+  Sparkles,
+  CalendarIcon
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, startOfQuarter, endOfQuarter } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +24,12 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -54,6 +61,7 @@ import { useReceipts, type Receipt } from '@/hooks/useReceipts';
 import { useCategories } from '@/hooks/useCategories';
 import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 type SortField = 'receipt_date' | 'vendor' | 'amount_gross';
 type SortDirection = 'asc' | 'desc';
@@ -68,8 +76,43 @@ const STATUS_CONFIG = {
   rejected: { label: 'Abgelehnt', color: 'bg-red-500/10 text-red-600 border-red-500/20' },
 };
 
+type DateRangePreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'thisYear' | 'lastYear' | 'all' | 'custom';
+
+const DATE_PRESETS: { value: DateRangePreset; label: string }[] = [
+  { value: 'thisMonth', label: 'Dieser Monat' },
+  { value: 'lastMonth', label: 'Letzter Monat' },
+  { value: 'thisQuarter', label: 'Dieses Quartal' },
+  { value: 'thisYear', label: 'Dieses Jahr' },
+  { value: 'lastYear', label: 'Letztes Jahr' },
+  { value: 'all', label: 'Alle' },
+];
+
+const getPresetDates = (preset: DateRangePreset): { from: Date | undefined; to: Date | undefined } => {
+  const now = new Date();
+  switch (preset) {
+    case 'thisMonth':
+      return { from: startOfMonth(now), to: endOfMonth(now) };
+    case 'lastMonth':
+      const lastMonth = subMonths(now, 1);
+      return { from: startOfMonth(lastMonth), to: endOfMonth(lastMonth) };
+    case 'thisQuarter':
+      return { from: startOfQuarter(now), to: endOfQuarter(now) };
+    case 'thisYear':
+      return { from: startOfYear(now), to: endOfYear(now) };
+    case 'lastYear':
+      const lastYear = new Date(now.getFullYear() - 1, 0, 1);
+      return { from: startOfYear(lastYear), to: endOfYear(lastYear) };
+    case 'all':
+      return { from: undefined, to: undefined };
+    case 'custom':
+    default:
+      return { from: undefined, to: undefined };
+  }
+};
+
 const Expenses = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { getReceipts, updateReceipt, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
@@ -78,11 +121,25 @@ const Expenses = () => {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filter state
+  // Date range filter state
   const currentDate = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => {
+    const fromParam = searchParams.get('from');
+    return fromParam ? new Date(fromParam) : startOfMonth(currentDate);
+  });
+  const [dateTo, setDateTo] = useState<Date | undefined>(() => {
+    const toParam = searchParams.get('to');
+    return toParam ? new Date(toParam) : endOfMonth(currentDate);
+  });
+  const [datePreset, setDatePreset] = useState<DateRangePreset>(() => {
+    if (searchParams.get('from') || searchParams.get('to')) return 'custom';
+    return 'thisMonth';
+  });
+
+  // Other filter state
+  const [statusFilter, setStatusFilter] = useState<string>(() => 
+    searchParams.get('status') || 'all'
+  );
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -120,8 +177,8 @@ const Expenses = () => {
     setLoading(true);
     try {
       const data = await getReceipts({ 
-        year: selectedYear, 
-        month: selectedMonth 
+        dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
+        dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
       });
       setReceipts(data);
     } catch (error) {
@@ -135,9 +192,40 @@ const Expenses = () => {
     }
   };
 
+  // Update URL params when filters change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (dateFrom) params.set('from', format(dateFrom, 'yyyy-MM-dd'));
+    if (dateTo) params.set('to', format(dateTo, 'yyyy-MM-dd'));
+    if (statusFilter !== 'all') params.set('status', statusFilter);
+    setSearchParams(params, { replace: true });
+  }, [dateFrom, dateTo, statusFilter, setSearchParams]);
+
   useEffect(() => {
     loadReceipts();
-  }, [selectedMonth, selectedYear]);
+  }, [dateFrom, dateTo]);
+
+  // Handle preset selection
+  const handlePresetChange = (preset: DateRangePreset) => {
+    setDatePreset(preset);
+    const { from, to } = getPresetDates(preset);
+    setDateFrom(from);
+    setDateTo(to);
+  };
+
+  // Handle manual date changes
+  const handleDateFromChange = (date: Date | undefined) => {
+    setDateFrom(date);
+    setDatePreset('custom');
+  };
+
+  const handleDateToChange = (date: Date | undefined) => {
+    setDateTo(date);
+    setDatePreset('custom');
+  };
+
+  // Validate date range
+  const isValidDateRange = !dateFrom || !dateTo || dateFrom <= dateTo;
 
   // Filter and sort receipts
   const filteredReceipts = useMemo(() => {
@@ -328,17 +416,19 @@ const Expenses = () => {
     return category?.color || null;
   };
 
-  // Generate month options
-  const monthOptions = Array.from({ length: 12 }, (_, i) => ({
-    value: i + 1,
-    label: format(new Date(2024, i, 1), 'MMMM', { locale: de }),
-  }));
-
-  // Generate year options (last 5 years)
-  const yearOptions = Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - i);
-
   const isAllSelected = paginatedReceipts.length > 0 && 
     paginatedReceipts.every(r => selectedIds.has(r.id));
+
+  // Format date range for display
+  const dateRangeLabel = useMemo(() => {
+    if (!dateFrom && !dateTo) return 'Alle Zeiträume';
+    if (dateFrom && dateTo) {
+      return `${format(dateFrom, 'dd.MM.yyyy', { locale: de })} - ${format(dateTo, 'dd.MM.yyyy', { locale: de })}`;
+    }
+    if (dateFrom) return `Ab ${format(dateFrom, 'dd.MM.yyyy', { locale: de })}`;
+    if (dateTo) return `Bis ${format(dateTo, 'dd.MM.yyyy', { locale: de })}`;
+    return '';
+  }, [dateFrom, dateTo]);
 
   return (
     <DashboardLayout>
@@ -359,35 +449,82 @@ const Expenses = () => {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-wrap gap-3 mb-6"
+          className="flex flex-wrap items-end gap-3 mb-6"
         >
-          <div className="flex gap-2">
-            <Select 
-              value={selectedMonth.toString()} 
-              onValueChange={(v) => setSelectedMonth(parseInt(v))}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
+          {/* Date Range Filters */}
+          <div className="flex flex-wrap gap-2 items-end">
+            {/* Von Datepicker */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Von</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-[130px] justify-start text-left font-normal",
+                      !dateFrom && "text-muted-foreground",
+                      !isValidDateRange && "border-destructive"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateFrom ? format(dateFrom, 'dd.MM.yyyy') : 'Anfang'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateFrom}
+                    onSelect={handleDateFromChange}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Bis Datepicker */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Bis</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-[130px] justify-start text-left font-normal",
+                      !dateTo && "text-muted-foreground",
+                      !isValidDateRange && "border-destructive"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateTo ? format(dateTo, 'dd.MM.yyyy') : 'Heute'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateTo}
+                    onSelect={handleDateToChange}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Quick Select */}
+            <Select value={datePreset} onValueChange={(v) => handlePresetChange(v as DateRangePreset)}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Zeitraum" />
               </SelectTrigger>
               <SelectContent>
-                {monthOptions.map(m => (
-                  <SelectItem key={m.value} value={m.value.toString()}>
-                    {m.label}
+                {DATE_PRESETS.map(preset => (
+                  <SelectItem key={preset.value} value={preset.value}>
+                    {preset.label}
                   </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-            <Select 
-              value={selectedYear.toString()} 
-              onValueChange={(v) => setSelectedYear(parseInt(v))}
-            >
-              <SelectTrigger className="w-[100px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {yearOptions.map(y => (
-                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-                ))}
+                {datePreset === 'custom' && (
+                  <SelectItem value="custom">Benutzerdefiniert</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -437,10 +574,13 @@ const Expenses = () => {
         >
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Gesamt</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Gesamt im Zeitraum
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{formatCurrency(stats.total)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{dateRangeLabel}</p>
             </CardContent>
           </Card>
           <Card>
@@ -449,6 +589,7 @@ const Expenses = () => {
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{stats.count} Belege</p>
+              <p className="text-xs text-muted-foreground mt-1">{dateRangeLabel}</p>
             </CardContent>
           </Card>
           <Card>
@@ -457,6 +598,7 @@ const Expenses = () => {
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{formatCurrency(stats.vatSum)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{dateRangeLabel}</p>
             </CardContent>
           </Card>
           <Card>
@@ -465,6 +607,7 @@ const Expenses = () => {
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{formatCurrency(stats.average)}</p>
+              <p className="text-xs text-muted-foreground mt-1">pro Beleg</p>
             </CardContent>
           </Card>
         </motion.div>
