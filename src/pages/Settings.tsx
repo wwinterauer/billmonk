@@ -15,6 +15,7 @@ import {
   Settings2,
   Tags,
   Building,
+  Table2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,6 +42,7 @@ import { motion } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CategoryManagement } from '@/components/settings/CategoryManagement';
 import { VendorManagement } from '@/components/settings/VendorManagement';
+import { ExportTemplateSettings } from '@/components/settings/ExportTemplateSettings';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
@@ -405,18 +407,22 @@ const Settings = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="naming" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-[500px]">
+          <TabsList className="grid w-full grid-cols-4 lg:w-[650px]">
             <TabsTrigger value="naming" className="gap-2">
               <FileText className="h-4 w-4" />
-              Umbenennung
+              <span className="hidden sm:inline">Umbenennung</span>
             </TabsTrigger>
             <TabsTrigger value="categories" className="gap-2">
               <Tags className="h-4 w-4" />
-              Kategorien
+              <span className="hidden sm:inline">Kategorien</span>
             </TabsTrigger>
             <TabsTrigger value="vendors" className="gap-2">
               <Building className="h-4 w-4" />
-              Lieferanten
+              <span className="hidden sm:inline">Lieferanten</span>
+            </TabsTrigger>
+            <TabsTrigger value="export" className="gap-2">
+              <Table2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Export-Vorlagen</span>
             </TabsTrigger>
           </TabsList>
 
@@ -744,6 +750,33 @@ const Settings = () => {
             </CardHeader>
             <CardContent>
               <VendorManagement />
+            </CardContent>
+          </Card>
+        </motion.div>
+      </TabsContent>
+
+      {/* Export Templates Tab */}
+      <TabsContent value="export">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Table2 className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>Export-Vorlagen</CardTitle>
+                  <CardDescription>
+                    Konfiguriere das Layout für deine Ausgaben-Exporte
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ExportTemplateSettings />
             </CardContent>
           </Card>
         </motion.div>
