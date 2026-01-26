@@ -15,6 +15,7 @@ import {
   Calculator,
   TrendingUp,
   TrendingDown,
+  Activity,
 } from 'lucide-react';
 import {
   PieChart,
@@ -22,14 +23,17 @@ import {
   Cell,
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from 'recharts';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -258,6 +262,93 @@ const Reports = () => {
       color: cat.color,
     }));
   }, [categoryData]);
+
+  // Time series data - grouped by month
+  const timeSeriesData = useMemo(() => {
+    if (!receipts) return [];
+
+    const grouped = receipts.reduce((acc: Record<string, { key: string; label: string; date: Date; amount: number; count: number; vat: number }>, receipt) => {
+      if (!receipt.receipt_date) return acc;
+      
+      const date = new Date(receipt.receipt_date);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${months[date.getMonth()].substring(0, 3)} ${date.getFullYear()}`;
+
+      if (!acc[key]) {
+        acc[key] = {
+          key,
+          label,
+          date,
+          amount: 0,
+          count: 0,
+          vat: 0,
+        };
+      }
+
+      acc[key].amount += receipt.amount_gross || 0;
+      acc[key].count += 1;
+      acc[key].vat += receipt.vat_amount || 0;
+
+      return acc;
+    }, {});
+
+    return Object.values(grouped).sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [receipts, months]);
+
+  // Monthly comparison data (current year vs previous year)
+  const monthlyComparisonData = useMemo(() => {
+    if (!receipts) return [];
+
+    const currentYear = parseInt(selectedYear);
+    const previousYear = currentYear - 1;
+
+    // Initialize all months
+    const monthData: Record<string, { month: string; currentYear: number; previousYear: number }> = {};
+    months.forEach((month, index) => {
+      monthData[index.toString()] = {
+        month: month.substring(0, 3),
+        currentYear: 0,
+        previousYear: 0,
+      };
+    });
+
+    // Group current period receipts
+    receipts.forEach((receipt) => {
+      if (!receipt.receipt_date) return;
+      const date = new Date(receipt.receipt_date);
+      const year = date.getFullYear();
+      const monthIndex = date.getMonth();
+
+      if (year === currentYear) {
+        monthData[monthIndex.toString()].currentYear += receipt.amount_gross || 0;
+      }
+    });
+
+    // We need previous year data - this is already in the current query if year view
+    // For simplicity, we'll show available data
+    previousReceipts?.forEach((receipt) => {
+      if (!receipt.receipt_date) return;
+      const date = new Date(receipt.receipt_date);
+      const monthIndex = date.getMonth();
+      monthData[monthIndex.toString()].previousYear += receipt.amount_gross || 0;
+    });
+
+    return Object.values(monthData);
+  }, [receipts, previousReceipts, selectedYear, months]);
+
+  // Trend indicators
+  const trendIndicators = useMemo(() => {
+    if (!timeSeriesData || timeSeriesData.length === 0) {
+      return { highest: null, lowest: null, average: 0 };
+    }
+
+    const sorted = [...timeSeriesData].sort((a, b) => b.amount - a.amount);
+    const highest = sorted[0];
+    const lowest = sorted[sorted.length - 1];
+    const average = timeSeriesData.reduce((sum, m) => sum + m.amount, 0) / timeSeriesData.length;
+
+    return { highest, lowest, average };
+  }, [timeSeriesData]);
 
   // Quick period selection
   const setQuickPeriod = (period: 'thisMonth' | 'lastMonth' | 'thisYear') => {
@@ -867,6 +958,188 @@ const Reports = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Time Series Section */}
+        <Card className="border-border/50 mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Ausgaben im Zeitverlauf</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="h-[350px] flex items-center justify-center">
+                <Skeleton className="h-full w-full" />
+              </div>
+            ) : timeSeriesData.length === 0 ? (
+              <div className="h-[350px] flex items-center justify-center text-muted-foreground">
+                Keine Daten für den gewählten Zeitraum
+              </div>
+            ) : (
+              <div className="h-[350px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={timeSeriesData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      stroke="hsl(var(--muted-foreground))"
+                    />
+                    <YAxis
+                      tickFormatter={(v) => `€${v}`}
+                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      stroke="hsl(var(--muted-foreground))"
+                    />
+                    <Tooltip
+                      formatter={(value: number, name: string) => {
+                        if (name === 'amount') return [formatCurrency(value), 'Brutto'];
+                        if (name === 'vat') return [formatCurrency(value), 'Vorsteuer'];
+                        return [value, name];
+                      }}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="amount"
+                      name="Brutto"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--primary))' }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="vat"
+                      name="Vorsteuer"
+                      stroke="hsl(var(--success))"
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--success))' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Monthly Comparison Chart */}
+        {periodType === 'year' && (
+          <Card className="border-border/50 mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Monatsvergleich</CardTitle>
+              <CardDescription>Aktuelles Jahr vs. Vorjahr</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="h-[300px] flex items-center justify-center">
+                  <Skeleton className="h-full w-full" />
+                </div>
+              ) : (
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyComparisonData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis
+                        dataKey="month"
+                        stroke="hsl(var(--muted-foreground))"
+                        tick={{ fill: 'hsl(var(--foreground))' }}
+                      />
+                      <YAxis
+                        tickFormatter={(v) => `€${v}`}
+                        stroke="hsl(var(--muted-foreground))"
+                      />
+                      <Tooltip
+                        formatter={(value: number) => formatCurrency(value)}
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                        }}
+                      />
+                      <Legend />
+                      <Bar
+                        dataKey="currentYear"
+                        name={selectedYear}
+                        fill="hsl(var(--primary))"
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="previousYear"
+                        name={String(parseInt(selectedYear) - 1)}
+                        fill="hsl(var(--muted))"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Trend Indicators */}
+        {timeSeriesData.length > 1 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {/* Highest Month */}
+            <Card className="border-border/50">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-destructive/10 rounded-lg">
+                    <TrendingUp className="w-5 h-5 text-destructive" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Höchste Ausgaben</p>
+                    <p className="font-semibold text-foreground">
+                      {trendIndicators.highest?.label}
+                    </p>
+                    <p className="text-lg font-bold text-destructive">
+                      {formatCurrency(trendIndicators.highest?.amount || 0)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Lowest Month */}
+            <Card className="border-border/50">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-success/10 rounded-lg">
+                    <TrendingDown className="w-5 h-5 text-success" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Niedrigste Ausgaben</p>
+                    <p className="font-semibold text-foreground">
+                      {trendIndicators.lowest?.label}
+                    </p>
+                    <p className="text-lg font-bold text-success">
+                      {formatCurrency(trendIndicators.lowest?.amount || 0)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Average */}
+            <Card className="border-border/50">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    <Activity className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Monatsdurchschnitt</p>
+                    <p className="text-lg font-bold text-foreground">
+                      {formatCurrency(trendIndicators.average)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
