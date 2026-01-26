@@ -461,7 +461,7 @@ const Expenses = () => {
   };
 
   // Bulk action states
-  const [bulkActionLoading, setBulkActionLoading] = useState<'approve' | 'reject' | 'ai' | null>(null);
+  const [bulkActionLoading, setBulkActionLoading] = useState<'approve' | 'reject' | 'review' | 'ai' | null>(null);
   const [aiProgress, setAiProgress] = useState<{ current: number; total: number } | null>(null);
 
   const handleBulkApprove = async () => {
@@ -476,6 +476,29 @@ const Expenses = () => {
       const count = selectedIds.size;
       setSelectedIds(new Set());
       toast({ title: `${count} Belege freigegeben` });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setBulkActionLoading(null);
+    }
+  };
+
+  const handleBulkReview = async () => {
+    setBulkActionLoading('review');
+    try {
+      for (const id of selectedIds) {
+        await updateReceipt(id, { status: 'review' });
+      }
+      setReceipts(prev => prev.map(r => 
+        selectedIds.has(r.id) ? { ...r, status: 'review' as const } : r
+      ));
+      const count = selectedIds.size;
+      setSelectedIds(new Set());
+      toast({ title: `${count} Belege zur Überprüfung` });
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -914,6 +937,22 @@ const Expenses = () => {
                 <Check className="h-4 w-4 mr-1" />
               )}
               Freigeben
+            </Button>
+            
+            {/* Review */}
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={handleBulkReview}
+              disabled={bulkActionLoading !== null}
+              className="border-blue-500/50 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+            >
+              {bulkActionLoading === 'review' ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Eye className="h-4 w-4 mr-1" />
+              )}
+              Überprüfen
             </Button>
             
             {/* Reject */}
