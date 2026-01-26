@@ -338,6 +338,7 @@ export type Database = {
           vat_rate: number | null
           vendor: string | null
           vendor_brand: string | null
+          vendor_id: string | null
         }
         Insert: {
           ai_confidence?: number | null
@@ -366,6 +367,7 @@ export type Database = {
           vat_rate?: number | null
           vendor?: string | null
           vendor_brand?: string | null
+          vendor_id?: string | null
         }
         Update: {
           ai_confidence?: number | null
@@ -394,6 +396,7 @@ export type Database = {
           vat_rate?: number | null
           vendor?: string | null
           vendor_brand?: string | null
+          vendor_id?: string | null
         }
         Relationships: [
           {
@@ -405,6 +408,76 @@ export type Database = {
           },
           {
             foreignKeyName: "receipts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendors: {
+        Row: {
+          created_at: string | null
+          default_category_id: string | null
+          default_vat_rate: number | null
+          detected_names: string[] | null
+          display_name: string
+          id: string
+          legal_name: string | null
+          notes: string | null
+          receipt_count: number | null
+          total_amount: number | null
+          updated_at: string | null
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          default_category_id?: string | null
+          default_vat_rate?: number | null
+          detected_names?: string[] | null
+          display_name: string
+          id?: string
+          legal_name?: string | null
+          notes?: string | null
+          receipt_count?: number | null
+          total_amount?: number | null
+          updated_at?: string | null
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          default_category_id?: string | null
+          default_vat_rate?: number | null
+          detected_names?: string[] | null
+          display_name?: string
+          id?: string
+          legal_name?: string | null
+          notes?: string | null
+          receipt_count?: number | null
+          total_amount?: number | null
+          updated_at?: string | null
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendors_default_category_id_fkey"
+            columns: ["default_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendors_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
