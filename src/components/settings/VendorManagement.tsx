@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
-import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge } from 'lucide-react';
+import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { importVendorsFromReceipts } from '@/services/vendorMatchingService';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -61,6 +63,7 @@ type SortOption = 'receipt_count_desc' | 'receipt_count_asc' | 'total_amount_des
 type AdditionalFilter = 'all' | 'with_category' | 'without_category' | 'with_vat' | 'multiple_variants';
 
 export function VendorManagement() {
+  const { user } = useAuth();
   const { vendors, loading, addVendor, updateVendor, deleteVendor, fetchVendors } = useVendors();
   const { categories } = useCategories();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -93,6 +96,9 @@ export function VendorManagement() {
   const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [mergeTargetId, setMergeTargetId] = useState('');
   const [isMerging, setIsMerging] = useState(false);
+
+  // Import state
+  const [isImporting, setIsImporting] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -286,6 +292,27 @@ export function VendorManagement() {
     setIsMergeOpen(true);
   };
 
+  // Import vendors from receipts
+  const handleImportFromReceipts = async () => {
+    if (!user) return;
+    
+    setIsImporting(true);
+    try {
+      const result = await importVendorsFromReceipts(user.id);
+      
+      if (result.imported > 0) {
+        toast.success(`${result.imported} Lieferanten importiert`);
+        fetchVendors();
+      } else {
+        toast.info('Keine neuen Lieferanten in Belegen gefunden');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Fehler beim Import');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const getCategory = (categoryId: string | null): Category | null => {
     if (!categoryId) return null;
     return categories.find(c => c.id === categoryId) || null;
@@ -453,10 +480,20 @@ export function VendorManagement() {
             Verwalte erkannte Lieferanten und weise ihnen Standardwerte zu
           </p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Neuer Lieferant
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleImportFromReceipts} disabled={isImporting}>
+            {isImporting ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            Aus Belegen importieren
+          </Button>
+          <Button onClick={() => setIsAddDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Neuer Lieferant
+          </Button>
+        </div>
       </div>
 
       {vendors.length === 0 ? (
@@ -466,10 +503,20 @@ export function VendorManagement() {
           <p className="text-sm text-muted-foreground mb-4">
             Lieferanten werden automatisch beim Hochladen von Belegen erkannt oder können manuell hinzugefügt werden.
           </p>
-          <Button onClick={() => setIsAddDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Ersten Lieferanten hinzufügen
-          </Button>
+          <div className="flex gap-2 justify-center">
+            <Button variant="outline" onClick={handleImportFromReceipts} disabled={isImporting}>
+              {isImporting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Aus Belegen importieren
+            </Button>
+            <Button onClick={() => setIsAddDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Manuell erstellen
+            </Button>
+          </div>
         </div>
       ) : (
         <>
