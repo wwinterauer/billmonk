@@ -1604,7 +1604,12 @@ const Expenses = () => {
                           )}
                           {visibleColumns.has('description') && (
                             <TableCell className="max-w-[200px]">
-                              {truncateText(receipt.description)}
+                              <span 
+                                className="truncate block" 
+                                title={receipt.description || undefined}
+                              >
+                                {truncateText(receipt.description)}
+                              </span>
                             </TableCell>
                           )}
                           {visibleColumns.has('category') && (
