@@ -18,7 +18,9 @@ import {
   Download,
   FileSpreadsheet,
   FileDown,
-  Archive
+  Archive,
+  Columns3,
+  Hash,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, startOfQuarter, endOfQuarter } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -74,8 +76,27 @@ import { ExportDialog, exportAsCSV, exportAsExcel } from '@/components/exports/E
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
-type SortField = 'receipt_date' | 'vendor' | 'amount_gross';
+type SortField = 'receipt_date' | 'vendor' | 'invoice_number' | 'amount_gross';
 type SortDirection = 'asc' | 'desc';
+
+type ColumnKey = 'date' | 'vendor' | 'invoice_number' | 'description' | 'category' | 'amount' | 'ai' | 'status';
+
+const COLUMN_CONFIG: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
+  { key: 'date', label: 'Datum', defaultVisible: true },
+  { key: 'vendor', label: 'Lieferant', defaultVisible: true },
+  { key: 'invoice_number', label: 'Rechnungsnr.', defaultVisible: true },
+  { key: 'description', label: 'Beschreibung', defaultVisible: true },
+  { key: 'category', label: 'Kategorie', defaultVisible: true },
+  { key: 'amount', label: 'Betrag', defaultVisible: true },
+  { key: 'ai', label: 'KI', defaultVisible: true },
+  { key: 'status', label: 'Status', defaultVisible: true },
+];
+
+const INVOICE_FILTER_OPTIONS = [
+  { value: 'all', label: 'Alle' },
+  { value: 'with', label: 'Mit Rechnungsnr.' },
+  { value: 'without', label: 'Ohne Rechnungsnr.' },
+];
 
 const ITEMS_PER_PAGE = 20;
 
@@ -152,7 +173,21 @@ const Expenses = () => {
     searchParams.get('status') || 'all'
   );
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [invoiceFilter, setInvoiceFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Column visibility state
+  const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(() => {
+    const saved = localStorage.getItem('expenses-visible-columns');
+    if (saved) {
+      try {
+        return new Set(JSON.parse(saved) as ColumnKey[]);
+      } catch {
+        return new Set(COLUMN_CONFIG.filter(c => c.defaultVisible).map(c => c.key));
+      }
+    }
+    return new Set(COLUMN_CONFIG.filter(c => c.defaultVisible).map(c => c.key));
+  });
 
   // Sort state
   const [sortField, setSortField] = useState<SortField>('receipt_date');
@@ -255,12 +290,20 @@ const Expenses = () => {
       result = result.filter(r => r.category === categoryFilter);
     }
 
-    // Search filter
+    // Invoice number filter
+    if (invoiceFilter === 'with') {
+      result = result.filter(r => r.invoice_number && r.invoice_number.trim() !== '');
+    } else if (invoiceFilter === 'without') {
+      result = result.filter(r => !r.invoice_number || r.invoice_number.trim() === '');
+    }
+
+    // Search filter (extended to include invoice_number)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(r => 
         r.vendor?.toLowerCase().includes(query) ||
         r.description?.toLowerCase().includes(query) ||
+        r.invoice_number?.toLowerCase().includes(query) ||
         r.file_name?.toLowerCase().includes(query)
       );
     }
@@ -278,6 +321,10 @@ const Expenses = () => {
         case 'vendor':
           aVal = a.vendor?.toLowerCase() || '';
           bVal = b.vendor?.toLowerCase() || '';
+          break;
+        case 'invoice_number':
+          aVal = a.invoice_number?.toLowerCase() || '';
+          bVal = b.invoice_number?.toLowerCase() || '';
           break;
         case 'amount_gross':
           aVal = a.amount_gross || 0;
@@ -305,7 +352,24 @@ const Expenses = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, categoryFilter, searchQuery]);
+  }, [statusFilter, categoryFilter, invoiceFilter, searchQuery]);
+
+  // Save column visibility to localStorage
+  useEffect(() => {
+    localStorage.setItem('expenses-visible-columns', JSON.stringify(Array.from(visibleColumns)));
+  }, [visibleColumns]);
+
+  const toggleColumn = (key: ColumnKey) => {
+    setVisibleColumns(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  };
 
   // Statistics
   const stats = useMemo(() => {
@@ -598,15 +662,54 @@ const Expenses = () => {
             </SelectContent>
           </Select>
 
+          <Select value={invoiceFilter} onValueChange={setInvoiceFilter}>
+            <SelectTrigger className="w-[160px]">
+              <Hash className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Rechnungsnr." />
+            </SelectTrigger>
+            <SelectContent>
+              {INVOICE_FILTER_OPTIONS.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Suche nach Lieferant, Beschreibung..."
+              placeholder="Suche nach Lieferant, Beschreibung, Rechnungsnr..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
+
+          {/* Column Visibility Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" title="Spalten ein-/ausblenden">
+                <Columns3 className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {COLUMN_CONFIG.map(col => (
+                <DropdownMenuItem
+                  key={col.key}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    toggleColumn(col.key);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Checkbox 
+                    checked={visibleColumns.has(col.key)} 
+                    className="pointer-events-none"
+                  />
+                  <span>{col.label}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </motion.div>
 
         {/* Stats Cards */}
@@ -725,28 +828,50 @@ const Expenses = () => {
                             onCheckedChange={handleSelectAll}
                           />
                         </TableHead>
-                        <TableHead 
-                          className="cursor-pointer hover:text-foreground"
-                          onClick={() => handleSort('receipt_date')}
-                        >
-                          Datum {getSortIcon('receipt_date')}
-                        </TableHead>
-                        <TableHead 
-                          className="cursor-pointer hover:text-foreground"
-                          onClick={() => handleSort('vendor')}
-                        >
-                          Lieferant {getSortIcon('vendor')}
-                        </TableHead>
-                        <TableHead>Beschreibung</TableHead>
-                        <TableHead>Kategorie</TableHead>
-                        <TableHead 
-                          className="text-right cursor-pointer hover:text-foreground"
-                          onClick={() => handleSort('amount_gross')}
-                        >
-                          Betrag {getSortIcon('amount_gross')}
-                        </TableHead>
-                        <TableHead>KI</TableHead>
-                        <TableHead>Status</TableHead>
+                        {visibleColumns.has('date') && (
+                          <TableHead 
+                            className="cursor-pointer hover:text-foreground"
+                            onClick={() => handleSort('receipt_date')}
+                          >
+                            Datum {getSortIcon('receipt_date')}
+                          </TableHead>
+                        )}
+                        {visibleColumns.has('vendor') && (
+                          <TableHead 
+                            className="cursor-pointer hover:text-foreground"
+                            onClick={() => handleSort('vendor')}
+                          >
+                            Lieferant {getSortIcon('vendor')}
+                          </TableHead>
+                        )}
+                        {visibleColumns.has('invoice_number') && (
+                          <TableHead 
+                            className="cursor-pointer hover:text-foreground w-[120px]"
+                            onClick={() => handleSort('invoice_number')}
+                          >
+                            Rechnungsnr. {getSortIcon('invoice_number')}
+                          </TableHead>
+                        )}
+                        {visibleColumns.has('description') && (
+                          <TableHead>Beschreibung</TableHead>
+                        )}
+                        {visibleColumns.has('category') && (
+                          <TableHead>Kategorie</TableHead>
+                        )}
+                        {visibleColumns.has('amount') && (
+                          <TableHead 
+                            className="text-right cursor-pointer hover:text-foreground"
+                            onClick={() => handleSort('amount_gross')}
+                          >
+                            Betrag {getSortIcon('amount_gross')}
+                          </TableHead>
+                        )}
+                        {visibleColumns.has('ai') && (
+                          <TableHead>KI</TableHead>
+                        )}
+                        {visibleColumns.has('status') && (
+                          <TableHead>Status</TableHead>
+                        )}
                         <TableHead className="text-right">Aktionen</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -761,56 +886,88 @@ const Expenses = () => {
                               }
                             />
                           </TableCell>
-                          <TableCell className="font-medium">
-                            {receipt.receipt_date 
-                              ? format(new Date(receipt.receipt_date), 'dd.MM.yyyy')
-                              : format(new Date(receipt.created_at), 'dd.MM.yyyy')
-                            }
-                          </TableCell>
-                          <TableCell>{receipt.vendor || '—'}</TableCell>
-                          <TableCell className="max-w-[200px]">
-                            {truncateText(receipt.description)}
-                          </TableCell>
-                          <TableCell>
-                            {receipt.category ? (
+                          {visibleColumns.has('date') && (
+                            <TableCell className="font-medium">
+                              {receipt.receipt_date 
+                                ? format(new Date(receipt.receipt_date), 'dd.MM.yyyy')
+                                : format(new Date(receipt.created_at), 'dd.MM.yyyy')
+                              }
+                            </TableCell>
+                          )}
+                          {visibleColumns.has('vendor') && (
+                            <TableCell>{receipt.vendor || '—'}</TableCell>
+                          )}
+                          {visibleColumns.has('invoice_number') && (
+                            <TableCell className="w-[120px]">
+                              {receipt.invoice_number ? (
+                                receipt.invoice_number.length > 15 ? (
+                                  <span 
+                                    className="font-mono text-sm truncate block max-w-[100px]" 
+                                    title={receipt.invoice_number}
+                                  >
+                                    {receipt.invoice_number.slice(0, 12)}...
+                                  </span>
+                                ) : (
+                                  <span className="font-mono text-sm">{receipt.invoice_number}</span>
+                                )
+                              ) : (
+                                <span className="text-muted-foreground">–</span>
+                              )}
+                            </TableCell>
+                          )}
+                          {visibleColumns.has('description') && (
+                            <TableCell className="max-w-[200px]">
+                              {truncateText(receipt.description)}
+                            </TableCell>
+                          )}
+                          {visibleColumns.has('category') && (
+                            <TableCell>
+                              {receipt.category ? (
+                                <Badge 
+                                  variant="outline"
+                                  style={{ 
+                                    borderColor: getCategoryColor(receipt.category) || undefined,
+                                    color: getCategoryColor(receipt.category) || undefined,
+                                  }}
+                                >
+                                  {receipt.category}
+                                </Badge>
+                              ) : '—'}
+                            </TableCell>
+                          )}
+                          {visibleColumns.has('amount') && (
+                            <TableCell className="text-right font-medium">
+                              {formatCurrency(receipt.amount_gross)}
+                            </TableCell>
+                          )}
+                          {visibleColumns.has('ai') && (
+                            <TableCell>
+                              {receipt.ai_confidence !== null && receipt.ai_confidence !== undefined ? (
+                                <Badge 
+                                  variant={
+                                    receipt.ai_confidence >= 0.8 ? 'default' :
+                                    receipt.ai_confidence >= 0.5 ? 'secondary' : 'destructive'
+                                  }
+                                  className="text-xs"
+                                >
+                                  <Sparkles className="h-3 w-3 mr-1" />
+                                  {Math.round(receipt.ai_confidence * 100)}%
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                          )}
+                          {visibleColumns.has('status') && (
+                            <TableCell>
                               <Badge 
-                                variant="outline"
-                                style={{ 
-                                  borderColor: getCategoryColor(receipt.category) || undefined,
-                                  color: getCategoryColor(receipt.category) || undefined,
-                                }}
+                                variant="outline" 
+                                className={STATUS_CONFIG[receipt.status]?.color || ''}
                               >
-                                {receipt.category}
+                                {STATUS_CONFIG[receipt.status]?.label || receipt.status}
                               </Badge>
-                            ) : '—'}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatCurrency(receipt.amount_gross)}
-                          </TableCell>
-                          <TableCell>
-                            {receipt.ai_confidence !== null && receipt.ai_confidence !== undefined ? (
-                              <Badge 
-                                variant={
-                                  receipt.ai_confidence >= 0.8 ? 'default' :
-                                  receipt.ai_confidence >= 0.5 ? 'secondary' : 'destructive'
-                                }
-                                className="text-xs"
-                              >
-                                <Sparkles className="h-3 w-3 mr-1" />
-                                {Math.round(receipt.ai_confidence * 100)}%
-                              </Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant="outline" 
-                              className={STATUS_CONFIG[receipt.status]?.color || ''}
-                            >
-                              {STATUS_CONFIG[receipt.status]?.label || receipt.status}
-                            </Badge>
-                          </TableCell>
+                            </TableCell>
+                          )}
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button
