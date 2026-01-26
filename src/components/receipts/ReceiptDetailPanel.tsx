@@ -9,9 +9,12 @@ import {
   Info,
   FileText,
   ZoomIn,
+  ZoomOut,
   AlertCircle,
   RefreshCw,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Pencil,
   X,
   Check,
@@ -60,7 +63,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
 import { useCategories } from '@/hooks/useCategories';
@@ -591,193 +600,198 @@ export function ReceiptDetailPanel({
 
   return (
     <>
-      <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <SheetContent 
-          side="right" 
-          className="w-full sm:max-w-[800px] p-0 flex flex-col"
-        >
-          <SheetHeader className="px-6 py-4 border-b">
-            <SheetTitle className="text-lg font-semibold">
+      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+        <DialogContent className="max-w-6xl w-[95vw] h-[90vh] p-0 flex flex-col overflow-hidden">
+          {/* Header */}
+          <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
+            <DialogTitle className="text-lg font-semibold">
               {loading ? 'Beleg laden...' : 'Beleg-Details'}
-            </SheetTitle>
-          </SheetHeader>
+            </DialogTitle>
+          </DialogHeader>
 
           {loading ? (
-            <div className="flex-1 p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <Skeleton className="h-[400px] w-full" />
-                <div className="space-y-4">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-20 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
+            <div className="flex-1 p-6 flex gap-6">
+              <Skeleton className="w-1/2 h-full" />
+              <div className="w-1/2 space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
               </div>
             </div>
           ) : receipt ? (
-            <>
-              <div className="flex-1 overflow-y-auto">
-                <div className="grid md:grid-cols-[55%_45%] gap-6 p-6">
-                  {/* Left Column - File Preview */}
-                  <div className="space-y-3">
-                    <div 
-                      className={cn(
-                        "relative bg-background rounded-lg overflow-hidden min-h-[500px] flex items-center justify-center border",
-                        isZoomed && "cursor-zoom-out",
-                        !isZoomed && isImage && "cursor-zoom-in"
-                      )}
-                      onClick={() => isImage && !fileLoading && !fileError && setIsZoomed(!isZoomed)}
-                    >
-                      {fileLoading ? (
-                        <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
-                          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                          <p>Lade Vorschau...</p>
-                        </div>
-                      ) : fileError ? (
-                        <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
-                          <AlertCircle className="h-12 w-12 text-muted-foreground" />
-                          <p className="text-center text-foreground mb-2">Vorschau konnte nicht geladen werden</p>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={handleDownload}>
-                              <Download className="h-4 w-4 mr-2" />
-                              Herunterladen
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
-                              <ExternalLink className="h-4 w-4 mr-2" />
-                              In neuem Tab
-                            </Button>
-                          </div>
-                        </div>
-                      ) : previewBlobUrl ? (
-                        isImage ? (
-                          <>
-                            <img
-                              src={previewBlobUrl}
-                              alt={receipt.file_name || 'Beleg'}
-                              className={cn(
-                                "transition-transform duration-300",
-                                isZoomed ? "scale-150" : "max-w-full max-h-[600px] object-contain"
-                              )}
-                              onError={() => setFileError(true)}
-                            />
-                            {!isZoomed && (
-                              <div className="absolute bottom-2 right-2 bg-background/80 rounded p-1">
-                                <ZoomIn className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                            )}
-                          </>
-                        ) : isPdf ? (
-                          <div className="h-[600px] w-full flex flex-col">
-                            <PdfViewer 
-                              url={previewBlobUrl} 
-                              fileName={receipt?.file_name}
-                              onError={() => setFileError(true)}
-                              className="flex-1"
-                            />
-                            {/* Action buttons below the PDF viewer */}
-                            <div className="flex gap-2 justify-center pt-3 border-t mt-3">
-                              <Button variant="outline" size="sm" onClick={handleDownload}>
-                                <Download className="h-4 w-4 mr-2" />
-                                Herunterladen
-                              </Button>
-                              <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
-                                <ExternalLink className="h-4 w-4 mr-2" />
-                                In neuem Tab
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
-                            <FileText className="h-16 w-16" />
-                            <p className="font-medium text-foreground">{receipt?.file_name}</p>
-                            <p className="text-sm">Vorschau nicht verfügbar</p>
-                            <div className="flex gap-2">
-                              <Button variant="outline" size="sm" onClick={handleDownload}>
-                                <Download className="h-4 w-4 mr-2" />
-                                Herunterladen
-                              </Button>
-                              <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
-                                <ExternalLink className="h-4 w-4 mr-2" />
-                                In neuem Tab
-                              </Button>
-                            </div>
-                          </div>
-                        )
-                      ) : (
-                        <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
-                          <FileText className="h-16 w-16" />
-                          <p>Keine Datei vorhanden</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {receipt.file_name && (
-                      <p className="text-sm text-muted-foreground">
-                        Datei: {receipt.file_name}
-                      </p>
-                    )}
+            <div className="flex-1 flex overflow-hidden">
+              {/* LEFT COLUMN - Document Preview */}
+              <div className="w-1/2 bg-muted/30 flex flex-col border-r">
+                {/* Preview Header with Controls */}
+                <div className="flex items-center justify-between p-3 border-b bg-background">
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm text-muted-foreground">1 / 1</span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!isImage} onClick={() => isZoomed && setIsZoomed(false)}>
+                      <ZoomOut className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm text-muted-foreground">{isZoomed ? '150%' : '100%'}</span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!isImage} onClick={() => !isZoomed && setIsZoomed(true)}>
+                      <ZoomIn className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
 
-                  {/* Right Column - Form */}
-                  <div className="space-y-4">
-                    {/* AI Confidence Box with Re-run Button */}
-                    <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge variant="secondary" className="bg-primary/10 text-primary cursor-help">
-                                KI-Erkennung: {Math.round((currentAiConfidence ?? receipt?.ai_confidence ?? 0) * 100)}%
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-[250px]">
-                              <div className="space-y-1 text-sm">
-                                <p><strong>Erkannt mit:</strong> Lovable AI (Gemini)</p>
-                                {receipt?.created_at && (
-                                  <p><strong>Zeitpunkt:</strong> {format(new Date(receipt.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}</p>
-                                )}
-                                <p><strong>Konfidenz:</strong> {Math.round((currentAiConfidence ?? receipt?.ai_confidence ?? 0) * 100)}%</p>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        
-                        {/* Re-run AI Button */}
-                        {receipt?.file_url && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                disabled={isRerunning || fileLoading}
-                                className="gap-1"
-                              >
-                                {isRerunning ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <RefreshCw className="h-4 w-4" />
-                                )}
-                                <ChevronDown className="h-3 w-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={handleRerunAI} disabled={isRerunning}>
-                                <Sparkles className="h-4 w-4 mr-2" />
-                                Erneut analysieren
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                                <Info className="h-4 w-4 mr-2" />
-                                Verwendet Lovable AI
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
+                {/* Main Preview Area */}
+                <div className="flex-1 p-4 flex items-center justify-center overflow-auto">
+                  {fileLoading ? (
+                    <div className="flex flex-col items-center">
+                      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                      <p className="mt-2 text-sm text-muted-foreground">Lade Vorschau...</p>
+                    </div>
+                  ) : fileError ? (
+                    <div className="flex flex-col items-center gap-4 text-muted-foreground">
+                      <AlertCircle className="h-12 w-12" />
+                      <p className="text-center text-foreground">Vorschau konnte nicht geladen werden</p>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={handleDownload}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Herunterladen
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          In neuem Tab
+                        </Button>
                       </div>
                     </div>
+                  ) : previewBlobUrl ? (
+                    isImage ? (
+                      <img
+                        src={previewBlobUrl}
+                        alt={receipt.file_name || 'Beleg'}
+                        className={cn(
+                          "transition-transform duration-300 rounded shadow-sm cursor-zoom-in",
+                          isZoomed ? "scale-150 cursor-zoom-out" : "max-w-full max-h-full object-contain"
+                        )}
+                        onClick={() => setIsZoomed(!isZoomed)}
+                        onError={() => setFileError(true)}
+                      />
+                    ) : isPdf ? (
+                      <div className="h-full w-full">
+                        <PdfViewer 
+                          url={previewBlobUrl} 
+                          fileName={receipt?.file_name}
+                          onError={() => setFileError(true)}
+                          className="h-full"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-4 text-muted-foreground">
+                        <FileText className="h-20 w-20" />
+                        <p className="font-medium text-foreground">{receipt?.file_name}</p>
+                        <p className="text-sm">Vorschau nicht verfügbar</p>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={handleDownload}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Herunterladen
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            In neuem Tab
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  ) : (
+                    <div className="flex flex-col items-center gap-4 text-muted-foreground">
+                      <FileText className="h-20 w-20" />
+                      <p>Keine Datei vorhanden</p>
+                    </div>
+                  )}
+                </div>
 
+                {/* Preview Footer with Filename */}
+                <div className="p-3 border-t bg-background text-center">
+                  <p className="text-xs text-muted-foreground truncate">
+                    Datei: {receipt?.file_name}
+                  </p>
+                  <div className="flex gap-2 justify-center mt-2">
+                    <Button variant="outline" size="sm" onClick={handleDownload}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Herunterladen
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      In neuem Tab
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN - Form Only */}
+              <div className="w-1/2 flex flex-col bg-background">
+                {/* AI Badge Header */}
+                <div className="flex items-center justify-between p-4 border-b">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="secondary" className="bg-primary/10 text-primary cursor-help">
+                          KI-Erkennung: {Math.round((currentAiConfidence ?? receipt?.ai_confidence ?? 0) * 100)}%
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[250px]">
+                        <div className="space-y-1 text-sm">
+                          <p><strong>Erkannt mit:</strong> Lovable AI (Gemini)</p>
+                          {receipt?.created_at && (
+                            <p><strong>Zeitpunkt:</strong> {format(new Date(receipt.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}</p>
+                          )}
+                          <p><strong>Konfidenz:</strong> {Math.round((currentAiConfidence ?? receipt?.ai_confidence ?? 0) * 100)}%</p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  
+                  {/* Re-run AI Button */}
+                  {receipt?.file_url && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          disabled={isRerunning || fileLoading}
+                          className="gap-1"
+                        >
+                          {isRerunning ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                          <ChevronDown className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={handleRerunAI} disabled={isRerunning}>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Erneut analysieren
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                          <Info className="h-4 w-4 mr-2" />
+                          Verwendet Lovable AI
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+
+                {/* Scrollable Form Area */}
+                <ScrollArea className="flex-1">
+                  <div className="p-4 space-y-4">
                     {/* Unsaved AI Changes Alert */}
                     {hasUnsavedAiChanges && Object.keys(changedFields).length > 0 && (
                       <Alert className="bg-amber-50 border-amber-200">
@@ -800,323 +814,323 @@ export function ReceiptDetailPanel({
                       </Alert>
                     )}
 
-                    {/* Form Fields */}
-                    <div className="space-y-4">
-                      {/* Vendor fields - show brand if different from legal name */}
-                      <div className="space-y-3">
-                        <div>
-                          <Label htmlFor="vendor">
-                            {vendorBrand && vendorBrand !== vendor ? 'Firmenname (rechtlich)' : 'Lieferant'}
-                          </Label>
-                          <Input
-                            id="vendor"
-                            value={vendor}
-                            onChange={(e) => setVendor(e.target.value)}
-                            placeholder="z.B. Media Markt E-Business GmbH"
-                          />
-                        </div>
-                        
-                        {/* Show brand name field if exists or vendor has legal suffix */}
-                        {(vendorBrand || vendor.match(/(GmbH|AG|e\.U\.|OG|KG|Ltd\.|S\.à r\.l\.)/i)) && (
-                          <div>
-                            <Label htmlFor="vendorBrand" className="text-muted-foreground">
-                              Markenname (falls abweichend)
-                            </Label>
-                            <Input
-                              id="vendorBrand"
-                              value={vendorBrand}
-                              onChange={(e) => setVendorBrand(e.target.value)}
-                              placeholder="z.B. MediaMarkt"
-                              className="text-muted-foreground"
-                            />
-                          </div>
-                        )}
-                      </div>
-
+                    {/* Vendor */}
+                    <div>
+                      <Label htmlFor="vendor">
+                        {vendorBrand && vendorBrand !== vendor ? 'Firmenname (rechtlich)' : 'Lieferant'}
+                      </Label>
+                      <Input
+                        id="vendor"
+                        value={vendor}
+                        onChange={(e) => setVendor(e.target.value)}
+                        placeholder="z.B. Media Markt E-Business GmbH"
+                      />
+                    </div>
+                    
+                    {/* Brand name field if exists or vendor has legal suffix */}
+                    {(vendorBrand || vendor.match(/(GmbH|AG|e\.U\.|OG|KG|Ltd\.|S\.à r\.l\.)/i)) && (
                       <div>
-                        <Label htmlFor="description">Beschreibung</Label>
-                        <Textarea
-                          id="description"
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          placeholder="Wofür war der Einkauf?"
-                          rows={3}
-                        />
-                      </div>
-
-                      <div>
-                        <Label>Belegdatum</Label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                "w-full justify-start text-left font-normal",
-                                !receiptDate && "text-muted-foreground"
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {receiptDate 
-                                ? format(receiptDate, 'dd.MM.yyyy', { locale: de }) 
-                                : 'Datum auswählen'
-                              }
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={receiptDate}
-                              onSelect={setReceiptDate}
-                              initialFocus
-                              className="p-3 pointer-events-auto"
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="invoiceNumber">Rechnungsnummer</Label>
+                        <Label htmlFor="vendorBrand" className="text-muted-foreground">
+                          Markenname (falls abweichend)
+                        </Label>
                         <Input
-                          id="invoiceNumber"
-                          value={invoiceNumber}
-                          onChange={(e) => setInvoiceNumber(e.target.value)}
-                          placeholder="z.B. RE-2024-001"
+                          id="vendorBrand"
+                          value={vendorBrand}
+                          onChange={(e) => setVendorBrand(e.target.value)}
+                          placeholder="z.B. MediaMarkt"
+                          className="text-muted-foreground"
                         />
                       </div>
+                    )}
 
-                      <div>
-                        <Label>Kategorie</Label>
-                        <Select value={category} onValueChange={setCategory}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Kategorie wählen" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.name}>
-                                {cat.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    {/* Description */}
+                    <div>
+                      <Label htmlFor="description">Beschreibung</Label>
+                      <Textarea
+                        id="description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Wofür war der Einkauf?"
+                        rows={2}
+                      />
+                    </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="amountGross">Bruttobetrag</Label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
-                            <Input
-                              id="amountGross"
-                              type="number"
-                              step="0.01"
-                              value={amountGross}
-                              onChange={(e) => setAmountGross(e.target.value)}
-                              className="pl-8"
-                              placeholder="0.00"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label>MwSt-Satz</Label>
-                          <Select value={vatRate} onValueChange={setVatRate}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {VAT_RATES.map((rate) => (
-                                <SelectItem key={rate.value} value={rate.value}>
-                                  {rate.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Nettobetrag</Label>
-                          <Input
-                            value={formatCurrency(calculatedValues.net)}
-                            readOnly
-                            className="bg-muted text-muted-foreground"
-                          />
-                        </div>
-
-                        <div>
-                          <Label>MwSt-Betrag</Label>
-                          <Input
-                            value={formatCurrency(calculatedValues.vat)}
-                            readOnly
-                            className="bg-muted text-muted-foreground"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label>Zahlungsart</Label>
-                        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Zahlungsart wählen" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PAYMENT_METHODS.map((method) => (
-                              <SelectItem key={method.value} value={method.value}>
-                                {method.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="notes">Notizen</Label>
-                        <Textarea
-                          id="notes"
-                          value={notes}
-                          onChange={(e) => setNotes(e.target.value)}
-                          placeholder="Optionale Anmerkungen..."
-                          rows={2}
-                        />
-                      </div>
-
-                      {/* Export Filename Preview Section */}
-                      <div className="border rounded-lg p-4 bg-muted/30 mt-2">
-                        <div className="flex items-center justify-between mb-2">
-                          <Label className="text-sm font-medium">
-                            Export-Dateiname
-                          </Label>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => setIsEditingFilename(!isEditingFilename)}
+                    {/* Date */}
+                    <div>
+                      <Label>Belegdatum</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !receiptDate && "text-muted-foreground"
+                            )}
                           >
-                            {isEditingFilename ? (
-                              <>
-                                <X className="w-4 h-4 mr-1" />
-                                Abbrechen
-                              </>
-                            ) : (
-                              <>
-                                <Pencil className="w-4 h-4 mr-1" />
-                                Anpassen
-                              </>
-                            )}
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {receiptDate 
+                              ? format(receiptDate, 'dd.MM.yyyy', { locale: de }) 
+                              : 'Datum auswählen'
+                            }
                           </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={receiptDate}
+                            onSelect={setReceiptDate}
+                            initialFocus
+                            className="p-3 pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    {/* Invoice Number */}
+                    <div>
+                      <Label htmlFor="invoiceNumber">Rechnungsnummer</Label>
+                      <Input
+                        id="invoiceNumber"
+                        value={invoiceNumber}
+                        onChange={(e) => setInvoiceNumber(e.target.value)}
+                        placeholder="z.B. RE-2024-001"
+                      />
+                    </div>
+
+                    {/* Category */}
+                    <div>
+                      <Label>Kategorie</Label>
+                      <Select value={category} onValueChange={setCategory}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Kategorie wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.name}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Amount & VAT */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="amountGross">Bruttobetrag</Label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
+                          <Input
+                            id="amountGross"
+                            type="number"
+                            step="0.01"
+                            value={amountGross}
+                            onChange={(e) => setAmountGross(e.target.value)}
+                            className="pl-8"
+                            placeholder="0.00"
+                          />
                         </div>
-
-                        {isEditingFilename ? (
-                          <div className="space-y-2">
-                            <Input 
-                              value={customFilename}
-                              onChange={(e) => setCustomFilename(e.target.value)}
-                              placeholder="Benutzerdefinierter Dateiname"
-                              className="font-mono text-sm"
-                            />
-                            <div className="flex items-center gap-2">
-                              <Button size="sm" onClick={handleSaveCustomFilename}>
-                                <Check className="w-4 h-4 mr-1" />
-                                Übernehmen
-                              </Button>
-                              {receipt.custom_filename && (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  onClick={handleResetFilename}
-                                >
-                                  <RotateCcw className="w-4 h-4 mr-1" />
-                                  Zurücksetzen
-                                </Button>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              Dateiendung (.{getFileExtension(receipt.file_name)}) wird automatisch ergänzt
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                              <code className="text-sm bg-background px-2 py-1 rounded border flex-1 truncate">
-                                {displayFilename}
-                              </code>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={handleCopyFilename}
-                                title="Kopieren"
-                              >
-                                <Copy className="w-4 h-4" />
-                              </Button>
-                            </div>
-                            
-                            {receipt.custom_filename && (
-                              <p className="text-xs text-amber-600 flex items-center">
-                                <AlertCircle className="w-3 h-3 mr-1" />
-                                Benutzerdefinierter Name (weicht von Vorlage ab)
-                              </p>
-                            )}
-
-                            {/* Show generated name if custom is set and different */}
-                            {receipt.custom_filename && generatedFilename !== displayFilename && (
-                              <p className="text-xs text-muted-foreground">
-                                Nach Vorlage wäre: {generatedFilename}
-                              </p>
-                            )}
-                          </div>
-                        )}
+                      </div>
+                      <div>
+                        <Label>MwSt-Satz</Label>
+                        <Select value={vatRate} onValueChange={setVatRate}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {VAT_RATES.map((rate) => (
+                              <SelectItem key={rate.value} value={rate.value}>
+                                {rate.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* Action Buttons - Fixed at bottom */}
-              <div className="border-t p-4 bg-background">
-                <div className="flex flex-wrap gap-2 justify-end">
+                    {/* Net & VAT Amount (calculated) */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Nettobetrag</Label>
+                        <Input
+                          value={formatCurrency(calculatedValues.net)}
+                          readOnly
+                          className="bg-muted text-muted-foreground"
+                        />
+                      </div>
+                      <div>
+                        <Label>MwSt-Betrag</Label>
+                        <Input
+                          value={formatCurrency(calculatedValues.vat)}
+                          readOnly
+                          className="bg-muted text-muted-foreground"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Payment Method */}
+                    <div>
+                      <Label>Zahlungsart</Label>
+                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Zahlungsart wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAYMENT_METHODS.map((method) => (
+                            <SelectItem key={method.value} value={method.value}>
+                              {method.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                      <Label htmlFor="notes">Notizen</Label>
+                      <Textarea
+                        id="notes"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Optionale Anmerkungen..."
+                        rows={2}
+                      />
+                    </div>
+
+                    {/* Export Filename - at the bottom of the form */}
+                    <div className="border rounded-lg p-3 bg-muted/30">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="text-sm font-medium">Export-Dateiname</Label>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setIsEditingFilename(!isEditingFilename)}
+                        >
+                          {isEditingFilename ? (
+                            <>
+                              <X className="w-3 h-3 mr-1" />
+                              Abbrechen
+                            </>
+                          ) : (
+                            <>
+                              <Pencil className="w-3 h-3 mr-1" />
+                              Anpassen
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {isEditingFilename ? (
+                        <div className="space-y-2">
+                          <Input 
+                            value={customFilename}
+                            onChange={(e) => setCustomFilename(e.target.value)}
+                            placeholder="Benutzerdefinierter Dateiname"
+                            className="font-mono text-sm"
+                          />
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" onClick={handleSaveCustomFilename}>
+                              <Check className="w-4 h-4 mr-1" />
+                              Übernehmen
+                            </Button>
+                            {receipt.custom_filename && (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={handleResetFilename}
+                              >
+                                <RotateCcw className="w-4 h-4 mr-1" />
+                                Zurücksetzen
+                              </Button>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Dateiendung (.{getFileExtension(receipt.file_name)}) wird automatisch ergänzt
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            <code className="text-xs bg-background px-2 py-1 rounded border flex-1 truncate">
+                              {displayFilename}
+                            </code>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={handleCopyFilename}
+                              title="Kopieren"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
+                          
+                          {receipt.custom_filename && (
+                            <p className="text-xs text-amber-600 flex items-center">
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                              Benutzerdefinierter Name (weicht von Vorlage ab)
+                            </p>
+                          )}
+
+                          {receipt.custom_filename && generatedFilename !== displayFilename && (
+                            <p className="text-xs text-muted-foreground">
+                              Nach Vorlage wäre: {generatedFilename}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </ScrollArea>
+
+                {/* Action Buttons Footer */}
+                <div className="flex items-center justify-between p-4 border-t">
                   <Button
                     variant="ghost"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
                     onClick={() => setDeleteDialogOpen(true)}
                     disabled={saving}
                   >
                     Löschen
                   </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => handleSave('rejected')}
-                    disabled={saving}
-                  >
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Ablehnen
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700"
-                    onClick={() => handleSave('approved')}
-                    disabled={saving}
-                  >
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Freigeben
-                  </Button>
-                  <Button
-                    className="gradient-primary hover:opacity-90"
-                    onClick={() => handleSave()}
-                    disabled={saving}
-                  >
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Speichern
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleSave('rejected')}
+                      disabled={saving}
+                    >
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Ablehnen
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700"
+                      onClick={() => handleSave('approved')}
+                      disabled={saving}
+                    >
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Freigeben
+                    </Button>
+                    <Button
+                      className="gradient-primary hover:opacity-90"
+                      onClick={() => handleSave()}
+                      disabled={saving}
+                    >
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Speichern
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </>
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <p className="text-muted-foreground">Beleg nicht gefunden</p>
             </div>
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
