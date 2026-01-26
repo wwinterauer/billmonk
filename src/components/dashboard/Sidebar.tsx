@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -25,12 +25,20 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
-const navigation = [
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badgeKey?: 'review';
+}
+
+const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Belege hochladen', href: '/upload', icon: Upload },
-  { name: 'Review', href: '/review', icon: CheckCircle, badge: 5 },
+  { name: 'Review', href: '/review', icon: CheckCircle, badgeKey: 'review' },
   { name: 'Alle Ausgaben', href: '/expenses', icon: Receipt },
   { name: 'Kontoabgleich', href: '/reconciliation', icon: Building2 },
   { name: 'Konto-Import', href: '/bank-import', icon: FileUp },
@@ -46,6 +54,56 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const [reviewCount, setReviewCount] = useState<number>(0);
+
+  // Fetch review count
+  useEffect(() => {
+    const fetchReviewCount = async () => {
+      if (!user) {
+        setReviewCount(0);
+        return;
+      }
+
+      const { count, error } = await supabase
+        .from('receipts')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'review');
+
+      if (!error && count !== null) {
+        setReviewCount(count);
+      }
+    };
+
+    fetchReviewCount();
+
+    // Subscribe to changes in receipts table
+    const channel = supabase
+      .channel('receipts-review-count')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'receipts',
+        },
+        () => {
+          fetchReviewCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  const getBadgeCount = (badgeKey?: string): number | null => {
+    if (badgeKey === 'review') {
+      return reviewCount > 0 ? reviewCount : null;
+    }
+    return null;
+  };
 
   const userEmail = user?.email || 'user@example.com';
   const userName = user?.user_metadata?.first_name 
@@ -84,6 +142,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
         {navigation.map((item) => {
           const isActive = location.pathname === item.href;
+          const badgeCount = getBadgeCount(item.badgeKey);
+          
           return (
             <Link
               key={item.name}
@@ -99,22 +159,22 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               {!collapsed && (
                 <>
                   <span className="truncate">{item.name}</span>
-                  {item.badge && (
+                  {badgeCount !== null && (
                     <Badge 
                       variant="destructive" 
                       className="ml-auto h-5 w-5 p-0 flex items-center justify-center text-xs"
                     >
-                      {item.badge}
+                      {badgeCount > 99 ? '99+' : badgeCount}
                     </Badge>
                   )}
                 </>
               )}
-              {collapsed && item.badge && (
+              {collapsed && badgeCount !== null && (
                 <Badge 
                   variant="destructive" 
                   className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-xs"
                 >
-                  {item.badge}
+                  {badgeCount > 9 ? '9+' : badgeCount}
                 </Badge>
               )}
             </Link>
