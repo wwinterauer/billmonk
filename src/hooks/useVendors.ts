@@ -67,6 +67,7 @@ export function useVendors() {
     displayName: string,
     options?: {
       legalName?: string;
+      detectedNames?: string[];
       defaultCategoryId?: string;
       defaultVatRate?: number;
       notes?: string;
@@ -89,6 +90,7 @@ export function useVendors() {
         user_id: user.id,
         display_name: displayName,
         legal_name: options?.legalName || null,
+        detected_names: options?.detectedNames || [],
         default_category_id: options?.defaultCategoryId || null,
         default_vat_rate: options?.defaultVatRate || null,
         notes: options?.notes || null,
