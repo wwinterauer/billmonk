@@ -150,7 +150,7 @@ export function useVendors() {
   const updateVendor = async (
     id: string,
     updates: Partial<Pick<Vendor, 'display_name' | 'legal_name' | 'detected_names' | 'default_category_id' | 'default_vat_rate' | 'notes' | 'website'>>
-  ): Promise<Vendor> => {
+  ): Promise<{ vendor: Vendor; syncedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
 
     // Check for duplicate if display_name is being updated
@@ -177,6 +177,35 @@ export function useVendors() {
       throw new Error(error.message);
     }
 
+    // Sync linked receipts with new vendor names
+    let syncedReceipts = 0;
+    if (updates.display_name !== undefined || updates.legal_name !== undefined) {
+      const newLegalName = updates.legal_name !== undefined ? updates.legal_name : data.legal_name;
+      const newBrandName = updates.display_name !== undefined ? updates.display_name : data.display_name;
+      
+      // Determine what to set on receipts:
+      // - vendor = legal_name (or display_name as fallback)
+      // - vendor_brand = display_name (only if different from legal_name)
+      const receiptVendor = newLegalName || newBrandName;
+      const receiptBrand = (newLegalName && newBrandName !== newLegalName) ? newBrandName : null;
+
+      const { data: updateResult, error: syncError } = await supabase
+        .from('receipts')
+        .update({
+          vendor: receiptVendor,
+          vendor_brand: receiptBrand,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('vendor_id', id)
+        .select('id');
+
+      if (syncError) {
+        console.error('Error syncing receipts:', syncError);
+      } else {
+        syncedReceipts = updateResult?.length || 0;
+      }
+    }
+
     const updated = {
       ...data,
       detected_names: data.detected_names || [],
@@ -187,7 +216,7 @@ export function useVendors() {
     setVendors(prev => prev.map(v => v.id === id ? updated : v).sort((a, b) => 
       a.display_name.localeCompare(b.display_name)
     ));
-    return updated;
+    return { vendor: updated, syncedReceipts };
   };
 
   const deleteVendor = async (id: string): Promise<void> => {
