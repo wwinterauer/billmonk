@@ -9,7 +9,8 @@ import {
   Link, 
   Info,
   Building2,
-  Calendar
+  Calendar,
+  Check
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -46,10 +47,11 @@ const banks = [
 ];
 
 const steps = [
-  { icon: Download, text: 'Lade den Kontoauszug als CSV von deinem Online-Banking herunter' },
-  { icon: Upload, text: 'Lade die CSV-Datei hier hoch' },
+  { icon: Download, text: 'Lade den Kontoauszug als CSV aus deinem Online-Banking' },
+  { icon: Upload, text: 'Wähle die CSV-Datei hier aus' },
+  { icon: Building2, text: 'Wähle deine Bank für korrektes Format' },
   { icon: Sparkles, text: 'XpenzAi analysiert die Buchungen' },
-  { icon: Link, text: 'Gleiche Buchungen mit deinen Belegen ab' },
+  { icon: Link, text: 'Gleiche Buchungen mit Belegen ab' },
 ];
 
 export default function BankImport() {
@@ -273,10 +275,12 @@ export default function BankImport() {
                 <CardContent className="space-y-6">
                   {/* Bank Selection */}
                   <div className="space-y-2">
-                    <Label>Bank auswählen</Label>
+                    <Label>
+                      Bank auswählen <span className="text-destructive">*</span>
+                    </Label>
                     <Select value={selectedBank} onValueChange={setSelectedBank}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Bank auswählen..." />
+                        <SelectValue placeholder="Bitte wählen..." />
                       </SelectTrigger>
                       <SelectContent>
                         {banks.map((bank) => (
@@ -288,7 +292,7 @@ export default function BankImport() {
                     </Select>
                     <p className="text-sm text-muted-foreground flex items-center gap-1">
                       <Info className="h-3 w-3" />
-                      Wir erkennen automatisch das Format deiner Bank
+                      Für automatische Formaterkennung
                     </p>
                   </div>
 
@@ -318,7 +322,7 @@ export default function BankImport() {
 
                   {/* Date Range */}
                   <div className="space-y-2">
-                    <Label>Datumsbereich (optional)</Label>
+                    <Label>Zeitraum einschränken (optional)</Label>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Von</Label>
@@ -380,7 +384,7 @@ export default function BankImport() {
                     className="w-full" 
                     size="lg"
                     onClick={handleImport}
-                    disabled={isImporting || !file}
+                    disabled={isImporting || !file || !selectedBank}
                   >
                     {isImporting ? (
                       <>
@@ -436,20 +440,20 @@ export default function BankImport() {
                   <CardTitle className="text-lg">Unterstützte Banken</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-3">
+                  <ul className="space-y-2">
                     {banks.slice(0, -1).map((bank) => (
-                      <div
+                      <li
                         key={bank.value}
-                        className="flex items-center gap-2 p-2 rounded-lg bg-muted/50"
+                        className="flex items-center gap-2"
                       >
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <Check className="h-4 w-4 text-green-500" />
                         <span className="text-sm">{bank.label}</span>
-                      </div>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                   <p className="text-sm text-muted-foreground mt-4">
                     Deine Bank fehlt?{' '}
-                    <a href="/contact" className="text-primary hover:underline">
+                    <a href="mailto:support@xpenzai.com" className="text-primary hover:underline">
                       Kontaktiere uns
                     </a>
                   </p>
