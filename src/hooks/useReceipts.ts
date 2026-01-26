@@ -29,6 +29,7 @@ export interface Receipt {
   ai_raw_response: Json | null;
   ai_processed_at: string | null;
   bank_transaction_id: string | null;
+  custom_filename: string | null;
   created_at: string;
   updated_at: string;
 }

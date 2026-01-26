@@ -315,6 +315,7 @@ export type Database = {
           category: string | null
           created_at: string | null
           currency: string | null
+          custom_filename: string | null
           description: string | null
           file_name: string | null
           file_type: string | null
@@ -342,6 +343,7 @@ export type Database = {
           category?: string | null
           created_at?: string | null
           currency?: string | null
+          custom_filename?: string | null
           description?: string | null
           file_name?: string | null
           file_type?: string | null
@@ -369,6 +371,7 @@ export type Database = {
           category?: string | null
           created_at?: string | null
           currency?: string | null
+          custom_filename?: string | null
           description?: string | null
           file_name?: string | null
           file_type?: string | null
