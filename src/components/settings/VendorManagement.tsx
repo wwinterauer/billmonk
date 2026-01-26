@@ -196,7 +196,7 @@ export function VendorManagement() {
     setIsSaving(true);
     try {
       if (editingVendor) {
-        await updateVendor(editingVendor.id, {
+        const result = await updateVendor(editingVendor.id, {
           display_name: formData.display_name.trim(),
           legal_name: formData.legal_name.trim() || null,
           detected_names: formData.detected_names,
@@ -205,7 +205,13 @@ export function VendorManagement() {
           website: formData.website.trim() || null,
           notes: formData.notes.trim() || null,
         });
-        toast.success('Lieferant aktualisiert');
+        if (result.syncedReceipts > 0) {
+          toast.success(`Lieferant aktualisiert`, {
+            description: `${result.syncedReceipts} verknüpfte Beleg(e) wurden synchronisiert`
+          });
+        } else {
+          toast.success('Lieferant aktualisiert');
+        }
       } else {
         await addVendor(formData.display_name.trim(), {
           legalName: formData.legal_name.trim() || undefined,
