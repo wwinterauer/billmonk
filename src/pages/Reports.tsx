@@ -35,6 +35,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -83,6 +84,7 @@ const Reports = () => {
   );
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [vendorSearch, setVendorSearch] = useState('');
 
   const months = [
     'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
@@ -349,6 +351,41 @@ const Reports = () => {
 
     return { highest, lowest, average };
   }, [timeSeriesData]);
+
+  // Group data by vendor
+  const vendorData = useMemo(() => {
+    if (!receipts) return [];
+
+    const grouped = receipts.reduce((acc: Record<string, { name: string; brand: string | null; amount: number; count: number; vat: number }>, receipt) => {
+      const vendorName = receipt.vendor_brand || receipt.vendor || 'Unbekannt';
+
+      if (!acc[vendorName]) {
+        acc[vendorName] = {
+          name: vendorName,
+          brand: receipt.vendor_brand,
+          amount: 0,
+          count: 0,
+          vat: 0,
+        };
+      }
+
+      acc[vendorName].amount += receipt.amount_gross || 0;
+      acc[vendorName].count += 1;
+      acc[vendorName].vat += receipt.vat_amount || 0;
+
+      return acc;
+    }, {});
+
+    return Object.values(grouped).sort((a, b) => b.amount - a.amount);
+  }, [receipts]);
+
+  // Filtered vendor data for table
+  const filteredVendorData = useMemo(() => {
+    if (!vendorSearch) return vendorData;
+    return vendorData.filter((v) =>
+      v.name.toLowerCase().includes(vendorSearch.toLowerCase())
+    );
+  }, [vendorData, vendorSearch]);
 
   // Quick period selection
   const setQuickPeriod = (period: 'thisMonth' | 'lastMonth' | 'thisYear') => {
@@ -1140,6 +1177,138 @@ const Reports = () => {
             </Card>
           </div>
         )}
+
+        {/* Vendor Analysis Section */}
+        <Card className="border-border/50 mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Top 10 Lieferanten</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="h-[400px] flex items-center justify-center">
+                <Skeleton className="h-full w-full" />
+              </div>
+            ) : vendorData.length === 0 ? (
+              <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+                Keine Daten für den gewählten Zeitraum
+              </div>
+            ) : (
+              <div className="h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={vendorData.slice(0, 10)} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis
+                      type="number"
+                      tickFormatter={(v) => `€${v}`}
+                      stroke="hsl(var(--muted-foreground))"
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      width={150}
+                      tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
+                      stroke="hsl(var(--muted-foreground))"
+                    />
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      labelFormatter={(name) => `Lieferant: ${name}`}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                    />
+                    <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Vendor Table */}
+        <Card className="border-border/50 mb-6">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <CardTitle className="text-lg">Alle Lieferanten</CardTitle>
+              <Input
+                placeholder="Lieferant suchen..."
+                value={vendorSearch}
+                onChange={(e) => setVendorSearch(e.target.value)}
+                className="w-full sm:w-[250px]"
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : filteredVendorData.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                {vendorSearch ? 'Keine Lieferanten gefunden' : 'Keine Daten für den gewählten Zeitraum'}
+              </div>
+            ) : (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Lieferant</TableHead>
+                      <TableHead className="text-right">Belege</TableHead>
+                      <TableHead className="text-right">Brutto</TableHead>
+                      <TableHead className="text-right">Vorsteuer</TableHead>
+                      <TableHead className="text-right">Ø pro Beleg</TableHead>
+                      <TableHead className="text-right">Anteil</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredVendorData.slice(0, 20).map((vendor) => (
+                      <TableRow key={vendor.name}>
+                        <TableCell className="font-medium">{vendor.name}</TableCell>
+                        <TableCell className="text-right">{vendor.count}</TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(vendor.amount)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(vendor.vat)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(vendor.amount / vendor.count)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="w-16 bg-muted rounded-full h-2">
+                              <div
+                                className="bg-primary h-2 rounded-full"
+                                style={{
+                                  width: `${stats?.totalGross ? (vendor.amount / stats.totalGross) * 100 : 0}%`,
+                                }}
+                              />
+                            </div>
+                            <span className="text-sm w-12 text-right">
+                              {stats?.totalGross
+                                ? ((vendor.amount / stats.totalGross) * 100).toFixed(1)
+                                : 0}
+                              %
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                {filteredVendorData.length > 20 && (
+                  <p className="text-sm text-muted-foreground mt-4 text-center">
+                    Zeige 20 von {filteredVendorData.length} Lieferanten
+                  </p>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );
