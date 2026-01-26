@@ -1,7 +1,25 @@
 import { useState, useEffect } from 'react';
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
   Save,
   Eye,
+  EyeOff,
   Trash2,
   Plus,
   GripVertical,
@@ -9,6 +27,10 @@ import {
   ChevronUp,
   Settings2,
   Loader2,
+  RotateCcw,
+  CheckSquare,
+  Square,
+  Pencil,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,8 +63,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
 import {
   useExportTemplates,
   DEFAULT_COLUMNS,
@@ -51,11 +71,105 @@ import {
   type ExportTemplate,
   type ExportColumn,
 } from '@/hooks/useExportTemplates';
+import { cn } from '@/lib/utils';
 
 interface ExportTemplateEditorProps {
   open: boolean;
   onClose: () => void;
   onApplyTemplate?: (template: ExportTemplate) => void;
+}
+
+// Sortable Column Component
+interface SortableColumnProps {
+  column: ExportColumn;
+  isSelected: boolean;
+  onSelect: (column: ExportColumn) => void;
+  onToggleVisible: (columnId: string) => void;
+  onUpdateLabel: (columnId: string, label: string) => void;
+  onUpdateFormat: (columnId: string, format: string) => void;
+}
+
+function SortableColumn({
+  column,
+  isSelected,
+  onSelect,
+  onToggleVisible,
+  onUpdateLabel,
+  onUpdateFormat,
+}: SortableColumnProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: column.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center gap-3 p-3 rounded-lg border transition-all",
+        column.visible ? "bg-background" : "bg-muted/50 opacity-60",
+        isSelected && "ring-2 ring-primary border-primary",
+        isDragging && "opacity-50 shadow-lg z-50"
+      )}
+    >
+      {/* Drag Handle */}
+      <button
+        className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded touch-none"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </button>
+
+      {/* Visibility Toggle */}
+      <button
+        onClick={() => onToggleVisible(column.id)}
+        className="p-1 hover:bg-muted rounded transition-colors"
+      >
+        {column.visible ? (
+          <Eye className="h-4 w-4 text-green-600" />
+        ) : (
+          <EyeOff className="h-4 w-4 text-muted-foreground" />
+        )}
+      </button>
+
+      {/* Column Info */}
+      <div
+        className="flex-1 cursor-pointer min-w-0"
+        onClick={() => onSelect(column)}
+      >
+        <div className="font-medium truncate">{column.label}</div>
+        <div className="text-xs text-muted-foreground">
+          {column.field} • {FIELD_TYPES[column.type]?.label || column.type}
+        </div>
+      </div>
+
+      {/* Format Badge */}
+      {column.format && (
+        <Badge variant="outline" className="text-xs shrink-0">
+          {column.format}
+        </Badge>
+      )}
+
+      {/* Edit Button */}
+      <button
+        className="p-1 hover:bg-muted rounded transition-colors"
+        onClick={() => onSelect(column)}
+      >
+        <Pencil className="h-4 w-4 text-muted-foreground" />
+      </button>
+    </div>
+  );
 }
 
 export function ExportTemplateEditor({
@@ -75,9 +189,22 @@ export function ExportTemplateEditor({
   // Current editing state
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<Omit<ExportTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'> | null>(null);
+  const [selectedColumn, setSelectedColumn] = useState<ExportColumn | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Initialize with first template or empty
   useEffect(() => {
@@ -99,7 +226,6 @@ export function ExportTemplateEditor({
         number_format: defaultTemplate.number_format,
       });
     } else if (!loading && templates.length === 0 && !editingTemplate) {
-      // No templates, create empty one
       setEditingTemplate(createEmptyTemplate());
     }
   }, [loading, templates, selectedTemplateId, editingTemplate, createEmptyTemplate]);
@@ -109,6 +235,7 @@ export function ExportTemplateEditor({
     if (templateId === 'new') {
       setSelectedTemplateId(null);
       setEditingTemplate(createEmptyTemplate());
+      setSelectedColumn(null);
       return;
     }
 
@@ -129,7 +256,27 @@ export function ExportTemplateEditor({
         date_format: template.date_format,
         number_format: template.number_format,
       });
+      setSelectedColumn(null);
     }
+  };
+
+  // Handle drag end
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id || !editingTemplate) return;
+
+    const oldIndex = editingTemplate.columns.findIndex(c => c.id === active.id);
+    const newIndex = editingTemplate.columns.findIndex(c => c.id === over.id);
+
+    const newColumns = arrayMove(editingTemplate.columns, oldIndex, newIndex).map(
+      (col, index) => ({ ...col, order: index })
+    );
+
+    setEditingTemplate({
+      ...editingTemplate,
+      columns: newColumns,
+    });
   };
 
   // Save template
@@ -159,6 +306,7 @@ export function ExportTemplateEditor({
     setDeleteDialogOpen(false);
     setSelectedTemplateId(null);
     setEditingTemplate(createEmptyTemplate());
+    setSelectedColumn(null);
   };
 
   // Toggle column visibility
@@ -183,6 +331,10 @@ export function ExportTemplateEditor({
         col.id === columnId ? { ...col, label } : col
       ),
     });
+
+    if (selectedColumn?.id === columnId) {
+      setSelectedColumn({ ...selectedColumn, label });
+    }
   };
 
   // Update column format
@@ -195,34 +347,42 @@ export function ExportTemplateEditor({
         col.id === columnId ? { ...col, format } : col
       ),
     });
+
+    if (selectedColumn?.id === columnId) {
+      setSelectedColumn({ ...selectedColumn, format });
+    }
   };
 
-  // Move column up/down
-  const moveColumn = (columnId: string, direction: 'up' | 'down') => {
+  // Show/hide all columns
+  const showAllColumns = () => {
     if (!editingTemplate) return;
-
-    const columns = [...editingTemplate.columns].sort((a, b) => a.order - b.order);
-    const currentIndex = columns.findIndex(c => c.id === columnId);
-    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-
-    if (newIndex < 0 || newIndex >= columns.length) return;
-
-    // Swap orders
-    const temp = columns[currentIndex].order;
-    columns[currentIndex].order = columns[newIndex].order;
-    columns[newIndex].order = temp;
-
     setEditingTemplate({
       ...editingTemplate,
-      columns,
+      columns: editingTemplate.columns.map(c => ({ ...c, visible: true })),
     });
+  };
+
+  const hideAllColumns = () => {
+    if (!editingTemplate) return;
+    setEditingTemplate({
+      ...editingTemplate,
+      columns: editingTemplate.columns.map(c => ({ ...c, visible: false })),
+    });
+  };
+
+  const resetColumns = () => {
+    if (!editingTemplate) return;
+    setEditingTemplate({
+      ...editingTemplate,
+      columns: [...DEFAULT_COLUMNS],
+    });
+    setSelectedColumn(null);
   };
 
   // Apply template to export
   const handleApply = () => {
     if (!editingTemplate) return;
 
-    // Find the full template or create a temporary one
     const fullTemplate = selectedTemplateId
       ? templates.find(t => t.id === selectedTemplateId)
       : null;
@@ -238,11 +398,12 @@ export function ExportTemplateEditor({
   }
 
   const sortedColumns = [...editingTemplate.columns].sort((a, b) => a.order - b.order);
+  const visibleCount = editingTemplate.columns.filter(c => c.visible).length;
 
   return (
     <>
       <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Export-Editor</DialogTitle>
             <DialogDescription>
@@ -308,270 +469,210 @@ export function ExportTemplateEditor({
             </Button>
           </div>
 
-          {/* Main content */}
-          <div className="flex-1 overflow-y-auto space-y-6 py-4">
-            {/* Template name and settings */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Vorlagenname</Label>
-                <Input
-                  value={editingTemplate.name}
-                  onChange={(e) =>
-                    setEditingTemplate({ ...editingTemplate, name: e.target.value })
-                  }
-                  placeholder="z.B. Monatsbericht"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Beschreibung (optional)</Label>
-                <Input
-                  value={editingTemplate.description || ''}
-                  onChange={(e) =>
-                    setEditingTemplate({ ...editingTemplate, description: e.target.value })
-                  }
-                  placeholder="Kurze Beschreibung..."
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="is-default"
-                  checked={editingTemplate.is_default}
-                  onCheckedChange={(checked) =>
-                    setEditingTemplate({ ...editingTemplate, is_default: checked })
-                  }
-                />
-                <Label htmlFor="is-default">Als Standard-Vorlage verwenden</Label>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Column configuration */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Spalten</CardTitle>
-                <CardDescription>
-                  Wähle die Spalten aus, die exportiert werden sollen
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {sortedColumns.map((column, index) => (
-                  <div
-                    key={column.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border ${
-                      column.visible ? 'bg-background' : 'bg-muted/50 opacity-60'
-                    }`}
-                  >
-                    <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-
-                    <Checkbox
-                      checked={column.visible}
-                      onCheckedChange={() => toggleColumnVisibility(column.id)}
-                    />
-
-                    <Input
-                      value={column.label}
-                      onChange={(e) => updateColumnLabel(column.id, e.target.value)}
-                      className="w-[150px]"
-                    />
-
-                    <Badge variant="outline" className="text-xs">
-                      {FIELD_TYPES[column.type]?.label || column.type}
-                    </Badge>
-
-                    {FIELD_TYPES[column.type]?.formats && (
-                      <Select
-                        value={column.format || ''}
-                        onValueChange={(val) => updateColumnFormat(column.id, val)}
-                      >
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue placeholder="Format" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {FIELD_TYPES[column.type].formats?.map((format) => (
-                            <SelectItem key={format} value={format}>
-                              {format}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-
-                    <div className="flex-1" />
-
+          {/* Main content - Two column layout */}
+          <div className="flex-1 overflow-hidden flex gap-6 py-4">
+            {/* Left: Column list */}
+            <div className="w-1/2 flex flex-col overflow-hidden">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="pb-3 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base">Spalten</CardTitle>
+                      <CardDescription>
+                        {visibleCount} von {editingTemplate.columns.length} sichtbar
+                      </CardDescription>
+                    </div>
                     <div className="flex gap-1">
                       <Button
                         variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => moveColumn(column.id, 'up')}
-                        disabled={index === 0}
+                        size="sm"
+                        onClick={showAllColumns}
+                        title="Alle einblenden"
                       >
-                        <ChevronUp className="h-4 w-4" />
+                        <CheckSquare className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => moveColumn(column.id, 'down')}
-                        disabled={index === sortedColumns.length - 1}
+                        size="sm"
+                        onClick={hideAllColumns}
+                        title="Alle ausblenden"
                       >
-                        <ChevronDown className="h-4 w-4" />
+                        <Square className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={resetColumns}
+                        title="Zurücksetzen"
+                      >
+                        <RotateCcw className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Sorting & Grouping */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Sortierung & Gruppierung</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Sortieren nach</Label>
-                    <Select
-                      value={editingTemplate.sort_by || 'receipt_date'}
-                      onValueChange={(val) =>
-                        setEditingTemplate({ ...editingTemplate, sort_by: val })
-                      }
+                </CardHeader>
+                <CardContent className="flex-1 overflow-y-auto space-y-2 pb-4">
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={sortedColumns.map(c => c.id)}
+                      strategy={verticalListSortingStrategy}
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {AVAILABLE_FIELDS.map((field) => (
-                          <SelectItem key={field.value} value={field.value}>
-                            {field.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      {sortedColumns.map(column => (
+                        <SortableColumn
+                          key={column.id}
+                          column={column}
+                          isSelected={selectedColumn?.id === column.id}
+                          onSelect={setSelectedColumn}
+                          onToggleVisible={toggleColumnVisibility}
+                          onUpdateLabel={updateColumnLabel}
+                          onUpdateFormat={updateColumnFormat}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                </CardContent>
+              </Card>
+            </div>
 
-                  <div className="space-y-2">
-                    <Label>Richtung</Label>
-                    <Select
-                      value={editingTemplate.sort_direction}
-                      onValueChange={(val: 'asc' | 'desc') =>
-                        setEditingTemplate({ ...editingTemplate, sort_direction: val })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="asc">Aufsteigend (A-Z, 1-9)</SelectItem>
-                        <SelectItem value="desc">Absteigend (Z-A, 9-1)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Gruppieren nach (optional)</Label>
-                    <Select
-                      value={editingTemplate.group_by || 'none'}
-                      onValueChange={(val) =>
-                        setEditingTemplate({
-                          ...editingTemplate,
-                          group_by: val === 'none' ? null : val,
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Keine Gruppierung</SelectItem>
-                        {AVAILABLE_FIELDS.map((field) => (
-                          <SelectItem key={field.value} value={field.value}>
-                            {field.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {editingTemplate.group_by && (
-                    <div className="flex items-center gap-2 pt-6">
-                      <Switch
-                        id="group-subtotals"
-                        checked={editingTemplate.group_subtotals}
-                        onCheckedChange={(checked) =>
-                          setEditingTemplate({ ...editingTemplate, group_subtotals: checked })
-                        }
-                      />
-                      <Label htmlFor="group-subtotals">Zwischensummen anzeigen</Label>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Advanced options */}
-            <Card>
-              <CardHeader
-                className="pb-3 cursor-pointer"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-              >
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Settings2 className="h-4 w-4" />
-                    Erweiterte Optionen
-                  </CardTitle>
-                  {showAdvanced ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </div>
-              </CardHeader>
-              {showAdvanced && (
-                <CardContent>
+            {/* Right: Settings */}
+            <div className="w-1/2 overflow-y-auto space-y-4">
+              {/* Template name */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Vorlage</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        id="include-header"
-                        checked={editingTemplate.include_header}
-                        onCheckedChange={(checked) =>
-                          setEditingTemplate({ ...editingTemplate, include_header: checked })
-                        }
-                      />
-                      <Label htmlFor="include-header">Kopfzeile einschließen</Label>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        id="include-totals"
-                        checked={editingTemplate.include_totals}
-                        onCheckedChange={(checked) =>
-                          setEditingTemplate({ ...editingTemplate, include_totals: checked })
-                        }
-                      />
-                      <Label htmlFor="include-totals">Summenzeile einschließen</Label>
-                    </div>
-
                     <div className="space-y-2">
-                      <Label>Datumsformat</Label>
+                      <Label>Name</Label>
+                      <Input
+                        value={editingTemplate.name}
+                        onChange={(e) =>
+                          setEditingTemplate({ ...editingTemplate, name: e.target.value })
+                        }
+                        placeholder="z.B. Monatsbericht"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Beschreibung</Label>
+                      <Input
+                        value={editingTemplate.description || ''}
+                        onChange={(e) =>
+                          setEditingTemplate({ ...editingTemplate, description: e.target.value })
+                        }
+                        placeholder="Optional..."
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="is-default"
+                      checked={editingTemplate.is_default}
+                      onCheckedChange={(checked) =>
+                        setEditingTemplate({ ...editingTemplate, is_default: checked })
+                      }
+                    />
+                    <Label htmlFor="is-default">Als Standard verwenden</Label>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Selected column editor */}
+              {selectedColumn && (
+                <Card className="border-primary">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">Spalte bearbeiten</CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedColumn(null)}
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Bezeichnung</Label>
+                      <Input
+                        value={selectedColumn.label}
+                        onChange={(e) => updateColumnLabel(selectedColumn.id, e.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Feld</Label>
+                        <Input value={selectedColumn.field} disabled className="bg-muted" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Typ</Label>
+                        <Input
+                          value={FIELD_TYPES[selectedColumn.type]?.label || selectedColumn.type}
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
+                    </div>
+
+                    {FIELD_TYPES[selectedColumn.type]?.formats && (
+                      <div className="space-y-2">
+                        <Label>Format</Label>
+                        <Select
+                          value={selectedColumn.format || ''}
+                          onValueChange={(val) => updateColumnFormat(selectedColumn.id, val)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Format wählen..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {FIELD_TYPES[selectedColumn.type].formats?.map((format) => (
+                              <SelectItem key={format} value={format}>
+                                {format}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={selectedColumn.visible}
+                        onCheckedChange={() => toggleColumnVisibility(selectedColumn.id)}
+                      />
+                      <Label>Sichtbar im Export</Label>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Sorting & Grouping */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Sortierung & Gruppierung</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Sortieren nach</Label>
                       <Select
-                        value={editingTemplate.date_format}
+                        value={editingTemplate.sort_by || 'receipt_date'}
                         onValueChange={(val) =>
-                          setEditingTemplate({ ...editingTemplate, date_format: val })
+                          setEditingTemplate({ ...editingTemplate, sort_by: val })
                         }
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {FIELD_TYPES.date.formats?.map((format) => (
-                            <SelectItem key={format} value={format}>
-                              {format}
+                          {AVAILABLE_FIELDS.map((field) => (
+                            <SelectItem key={field.value} value={field.value}>
+                              {field.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -579,27 +680,155 @@ export function ExportTemplateEditor({
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Zahlenformat</Label>
+                      <Label>Richtung</Label>
                       <Select
-                        value={editingTemplate.number_format}
-                        onValueChange={(val) =>
-                          setEditingTemplate({ ...editingTemplate, number_format: val })
+                        value={editingTemplate.sort_direction}
+                        onValueChange={(val: 'asc' | 'desc') =>
+                          setEditingTemplate({ ...editingTemplate, sort_direction: val })
                         }
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="de-AT">Deutsch (Österreich)</SelectItem>
-                          <SelectItem value="de-DE">Deutsch (Deutschland)</SelectItem>
-                          <SelectItem value="en-US">Englisch (US)</SelectItem>
+                          <SelectItem value="asc">Aufsteigend</SelectItem>
+                          <SelectItem value="desc">Absteigend</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Gruppieren nach</Label>
+                      <Select
+                        value={editingTemplate.group_by || 'none'}
+                        onValueChange={(val) =>
+                          setEditingTemplate({
+                            ...editingTemplate,
+                            group_by: val === 'none' ? null : val,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Keine</SelectItem>
+                          {AVAILABLE_FIELDS.map((field) => (
+                            <SelectItem key={field.value} value={field.value}>
+                              {field.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {editingTemplate.group_by && (
+                      <div className="flex items-center gap-2 pt-6">
+                        <Switch
+                          id="group-subtotals"
+                          checked={editingTemplate.group_subtotals}
+                          onCheckedChange={(checked) =>
+                            setEditingTemplate({ ...editingTemplate, group_subtotals: checked })
+                          }
+                        />
+                        <Label htmlFor="group-subtotals">Zwischensummen</Label>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
-              )}
-            </Card>
+              </Card>
+
+              {/* Advanced options */}
+              <Card>
+                <CardHeader
+                  className="pb-3 cursor-pointer"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                >
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Settings2 className="h-4 w-4" />
+                      Erweitert
+                    </CardTitle>
+                    {showAdvanced ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </div>
+                </CardHeader>
+                {showAdvanced && (
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="include-header"
+                          checked={editingTemplate.include_header}
+                          onCheckedChange={(checked) =>
+                            setEditingTemplate({ ...editingTemplate, include_header: checked })
+                          }
+                        />
+                        <Label htmlFor="include-header">Kopfzeile</Label>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="include-totals"
+                          checked={editingTemplate.include_totals}
+                          onCheckedChange={(checked) =>
+                            setEditingTemplate({ ...editingTemplate, include_totals: checked })
+                          }
+                        />
+                        <Label htmlFor="include-totals">Summenzeile</Label>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Datumsformat</Label>
+                        <Select
+                          value={editingTemplate.date_format}
+                          onValueChange={(val) =>
+                            setEditingTemplate({ ...editingTemplate, date_format: val })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {FIELD_TYPES.date.formats?.map((format) => (
+                              <SelectItem key={format} value={format}>
+                                {format}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Zahlenformat</Label>
+                        <Select
+                          value={editingTemplate.number_format}
+                          onValueChange={(val) =>
+                            setEditingTemplate({ ...editingTemplate, number_format: val })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="de-AT">Österreich</SelectItem>
+                            <SelectItem value="de-DE">Deutschland</SelectItem>
+                            <SelectItem value="en-US">US</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
