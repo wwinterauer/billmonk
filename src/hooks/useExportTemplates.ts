@@ -9,7 +9,7 @@ export interface ExportColumn {
   id: string;
   field: string;
   label: string;
-  type: 'date' | 'text' | 'currency' | 'percent' | 'number';
+  type: 'date' | 'text' | 'currency' | 'percent' | 'number' | 'empty';
   format: string | null;
   visible: boolean;
   order: number;
@@ -94,12 +94,13 @@ export const formatPreview = (type: ExportColumn['type'], format: string | null)
 };
 
 // Field type definitions with format options
-export const FIELD_TYPES = {
+export const FIELD_TYPES: Record<string, { label: string; formats: string[] | null }> = {
   date: { label: 'Datum', formats: ['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'DD/MM/YYYY'] },
   text: { label: 'Text', formats: null },
   currency: { label: 'Währung', formats: ['€ #.##0,00', '#.##0,00 €', '#,##0.00'] },
   percent: { label: 'Prozent', formats: ['#0%', '#0,0%', '#0.0%'] },
   number: { label: 'Zahl', formats: ['#.##0', '#,##0', '#0'] },
+  empty: { label: 'Leerspalte', formats: null },
 };
 
 // Available fields for sorting
