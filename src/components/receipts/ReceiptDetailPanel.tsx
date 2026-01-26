@@ -81,7 +81,7 @@ import { CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PdfViewer } from './PdfViewer';
 import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
-import { searchVendors, type MatchedVendor } from '@/services/vendorMatchingService';
+import { searchVendors, matchOrCreateVendor, type MatchedVendor } from '@/services/vendorMatchingService';
 import { 
   generateFileName, 
   getExportFilename, 
@@ -483,7 +483,7 @@ export function ReceiptDetailPanel({
 
   // AI Re-run handler
   const handleRerunAI = async () => {
-    if (!receipt?.file_url || isRerunning || !signedUrl) return;
+    if (!receipt?.file_url || isRerunning || !signedUrl || !user) return;
 
     setIsRerunning(true);
     setHasUnsavedAiChanges(false);
@@ -507,7 +507,11 @@ export function ReceiptDetailPanel({
         throw new Error('KI-Erkennung hat keine Daten zurückgegeben');
       }
 
-      // 3. Track changed fields
+      // 3. Match or create vendor based on detected name
+      const vendorName = normalized.vendor_brand || normalized.vendor;
+      const matchedVendor = await matchOrCreateVendor(vendorName, user.id);
+
+      // 4. Track changed fields
       const changes: Record<string, { old: string; new: string }> = {};
       
       const compareAndUpdate = (field: string, oldVal: string, newVal: string | null, setter: (val: string) => void) => {
@@ -522,22 +526,57 @@ export function ReceiptDetailPanel({
       compareAndUpdate('Markenname', vendorBrand, normalized.vendor_brand, setVendorBrand);
       compareAndUpdate('Beschreibung', description, normalized.description, setDescription);
       compareAndUpdate('Rechnungsnummer', invoiceNumber, normalized.invoice_number, setInvoiceNumber);
-      compareAndUpdate('Kategorie', category, normalized.category, setCategory);
       compareAndUpdate('Zahlungsart', paymentMethod, normalized.payment_method, setPaymentMethod);
+      
+      // Apply vendor matching: set vendor_id and use display_name
+      if (matchedVendor) {
+        setSelectedVendorId(matchedVendor.id);
+        if (matchedVendor.display_name !== vendor) {
+          compareAndUpdate('Lieferant', vendor, matchedVendor.display_name, setVendor);
+        }
+        
+        // Apply vendor default category if AI didn't detect one
+        if (matchedVendor.default_category && !normalized.category) {
+          const categoryName = matchedVendor.default_category.name;
+          if (category !== categoryName) {
+            changes['Kategorie'] = { old: category || '-', new: `${categoryName} (Lieferanten-Standard)` };
+            setCategory(categoryName);
+          }
+        } else {
+          compareAndUpdate('Kategorie', category, normalized.category, setCategory);
+        }
+        
+        // Apply vendor default VAT rate if AI didn't detect one
+        if (matchedVendor.default_vat_rate !== null && normalized.vat_rate === null) {
+          const newRate = matchedVendor.default_vat_rate.toString();
+          if (vatRate !== newRate) {
+            changes['MwSt-Satz'] = { old: vatRate || '-', new: `${newRate}% (Lieferanten-Standard)` };
+            setVatRate(newRate);
+          }
+        } else if (normalized.vat_rate !== null) {
+          const newRate = normalized.vat_rate.toString();
+          if (vatRate !== newRate) {
+            changes['MwSt-Satz'] = { old: vatRate || '-', new: newRate + '%' };
+            setVatRate(newRate);
+          }
+        }
+      } else {
+        // No vendor matched - use AI values directly
+        compareAndUpdate('Kategorie', category, normalized.category, setCategory);
+        if (normalized.vat_rate !== null) {
+          const newRate = normalized.vat_rate.toString();
+          if (vatRate !== newRate) {
+            changes['MwSt-Satz'] = { old: vatRate || '-', new: newRate + '%' };
+            setVatRate(newRate);
+          }
+        }
+      }
       
       if (normalized.amount_gross !== null) {
         const newAmount = normalized.amount_gross.toString();
         if (amountGross !== newAmount) {
           changes['Bruttobetrag'] = { old: amountGross || '-', new: newAmount };
           setAmountGross(newAmount);
-        }
-      }
-      
-      if (normalized.vat_rate !== null) {
-        const newRate = normalized.vat_rate.toString();
-        if (vatRate !== newRate) {
-          changes['MwSt-Satz'] = { old: vatRate || '-', new: newRate + '%' };
-          setVatRate(newRate);
         }
       }
       
@@ -551,7 +590,7 @@ export function ReceiptDetailPanel({
         }
       }
 
-      // 4. Update confidence
+      // 5. Update confidence
       setCurrentAiConfidence(normalized.confidence);
       
       if (Object.keys(changes).length > 0) {
