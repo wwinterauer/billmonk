@@ -7,6 +7,7 @@ const corsHeaders = {
 
 interface ExtractionResult {
   vendor: string | null;
+  vendor_brand: string | null;
   description: string | null;
   amount_gross: number | null;
   amount_net: number | null;
@@ -53,7 +54,8 @@ Antworte IMMER und AUSSCHLIESSLICH mit validem JSON ohne zusätzliche Erklärung
     const userPrompt = `Analysiere diesen Beleg/diese Rechnung und extrahiere folgende Informationen im JSON-Format:
 
 {
-  "vendor": "Name des Händlers/Lieferanten",
+  "vendor": "Offizieller/rechtlicher Firmenname des Lieferanten",
+  "vendor_brand": "Markenname/Handelsname falls abweichend vom rechtlichen Namen (sonst null)",
   "description": "Kurze Beschreibung was gekauft wurde (max 100 Zeichen)",
   "amount_gross": Bruttobetrag als Zahl,
   "amount_net": Nettobetrag als Zahl (falls erkennbar, sonst null),
@@ -66,7 +68,23 @@ Antworte IMMER und AUSSCHLIESSLICH mit validem JSON ohne zusätzliche Erklärung
   "confidence": Konfidenz deiner Erkennung von 0.0 bis 1.0
 }
 
-WICHTIGE REGELN:
+WICHTIGE REGELN FÜR LIEFERANT/VENDOR:
+- "vendor" = Offizieller/rechtlicher Firmenname. Priorisiere diese Quellen:
+  1. HÖCHSTE PRIORITÄT: Impressum/Fußbereich der Rechnung:
+     - Firmenname bei 'Firmenbuchnummer', 'FN', 'FB-Nr.', 'HRB', 'Handelsregister'
+     - Firmenname bei 'UID', 'ATU', 'USt-IdNr.', 'Umsatzsteuer-ID'
+     - Firmenname bei 'Firmensitz', 'Sitz der Gesellschaft'
+     - Gesellschaftsform: 'GmbH', 'AG', 'e.U.', 'OG', 'KG', 'S.à r.l.', 'Ltd.'
+  2. MITTLERE PRIORITÄT: Rechnungskopf mit vollständigem Firmennamen, Adressblock des Absenders
+  3. NIEDRIGE PRIORITÄT: Logo-Text (Logos zeigen oft nur Markennamen)
+- "vendor_brand" = Markenname wenn abweichend (z.B. Logo zeigt "MediaMarkt" aber rechtlich "Media Markt E-Business GmbH")
+  
+BEISPIELE:
+- Logo: 'Amazon' → Fuß: 'Amazon EU S.à r.l.' → vendor: "Amazon EU S.à r.l.", vendor_brand: "Amazon"
+- Logo: 'IKEA' → Fuß: 'IKEA Austria GmbH' → vendor: "IKEA Austria GmbH", vendor_brand: null (gleich)
+- Logo: 'BILLA' → Fuß: 'REWE International AG' → vendor: "REWE International AG", vendor_brand: "BILLA"
+
+WEITERE REGELN:
 - Antworte NUR mit dem JSON, keine zusätzlichen Erklärungen oder Markdown-Codeblöcke
 - Falls ein Feld nicht erkennbar ist, setze es auf null
 - Beträge immer als Dezimalzahlen ohne Währungssymbol (z.B. 125.50 statt "€ 125,50")
@@ -159,6 +177,7 @@ WICHTIGE REGELN:
       
       console.log("Successfully extracted receipt data:", {
         vendor: extractedData.vendor,
+        vendor_brand: extractedData.vendor_brand,
         amount_gross: extractedData.amount_gross,
         invoice_number: extractedData.invoice_number,
         confidence: extractedData.confidence,

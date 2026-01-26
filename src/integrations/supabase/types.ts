@@ -330,6 +330,7 @@ export type Database = {
           vat_amount: number | null
           vat_rate: number | null
           vendor: string | null
+          vendor_brand: string | null
         }
         Insert: {
           ai_confidence?: number | null
@@ -356,6 +357,7 @@ export type Database = {
           vat_amount?: number | null
           vat_rate?: number | null
           vendor?: string | null
+          vendor_brand?: string | null
         }
         Update: {
           ai_confidence?: number | null
@@ -382,6 +384,7 @@ export type Database = {
           vat_amount?: number | null
           vat_rate?: number | null
           vendor?: string | null
+          vendor_brand?: string | null
         }
         Relationships: [
           {

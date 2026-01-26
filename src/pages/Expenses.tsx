@@ -297,11 +297,12 @@ const Expenses = () => {
       result = result.filter(r => !r.invoice_number || r.invoice_number.trim() === '');
     }
 
-    // Search filter (extended to include invoice_number)
+    // Search filter (extended to include invoice_number and vendor_brand)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(r => 
         r.vendor?.toLowerCase().includes(query) ||
+        r.vendor_brand?.toLowerCase().includes(query) ||
         r.description?.toLowerCase().includes(query) ||
         r.invoice_number?.toLowerCase().includes(query) ||
         r.file_name?.toLowerCase().includes(query)
@@ -895,7 +896,21 @@ const Expenses = () => {
                             </TableCell>
                           )}
                           {visibleColumns.has('vendor') && (
-                            <TableCell>{receipt.vendor || '—'}</TableCell>
+                            <TableCell>
+                              {receipt.vendor_brand && receipt.vendor_brand !== receipt.vendor ? (
+                                <div>
+                                  <span className="font-medium">{receipt.vendor_brand}</span>
+                                  <span 
+                                    className="block text-xs text-muted-foreground truncate max-w-[180px]"
+                                    title={receipt.vendor || ''}
+                                  >
+                                    {receipt.vendor}
+                                  </span>
+                                </div>
+                              ) : (
+                                receipt.vendor || '—'
+                              )}
+                            </TableCell>
                           )}
                           {visibleColumns.has('invoice_number') && (
                             <TableCell className="w-[120px]">

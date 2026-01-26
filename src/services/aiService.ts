@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface ExtractionResult {
   vendor: string | null;
+  vendor_brand: string | null;
   description: string | null;
   amount_gross: number | null;
   amount_net: number | null;
@@ -102,6 +103,7 @@ export async function extractReceiptData(file: File): Promise<ExtractionResult> 
 export function createEmptyExtractionResult(): ExtractionResult {
   return {
     vendor: null,
+    vendor_brand: null,
     description: null,
     amount_gross: null,
     amount_net: null,
