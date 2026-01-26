@@ -20,7 +20,6 @@ import {
   Check,
   RotateCcw,
   Copy,
-  Building,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,17 +73,16 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
 import { useCategories } from '@/hooks/useCategories';
-import { useVendors, Vendor } from '@/hooks/useVendors';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PdfViewer } from './PdfViewer';
 import { extractReceiptData, normalizeExtractionResult, fetchDescriptionSettings, processDescription, DEFAULT_DESCRIPTION_SETTINGS, type DescriptionSettings } from '@/services/aiService';
-import { searchVendors, matchOrCreateVendor, type MatchedVendor } from '@/services/vendorMatchingService';
+import { matchOrCreateVendor } from '@/services/vendorMatchingService';
+import { VendorAutocomplete } from './VendorAutocomplete';
 import { 
   generateFileName, 
-  getExportFilename, 
   getFileExtension,
   parseNamingSettings, 
   DEFAULT_NAMING_SETTINGS,
@@ -124,7 +122,6 @@ export function ReceiptDetailPanel({
   const { user } = useAuth();
   const { getReceipt, updateReceipt, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
-  const { vendors } = useVendors();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -149,15 +146,8 @@ export function ReceiptDetailPanel({
   const [namingSettings, setNamingSettings] = useState<NamingSettings>(DEFAULT_NAMING_SETTINGS);
   const [descriptionSettings, setDescriptionSettings] = useState<DescriptionSettings>(DEFAULT_DESCRIPTION_SETTINGS);
 
-  // Vendor autocomplete state
-  const [vendorSearch, setVendorSearch] = useState('');
-  const [showVendorSuggestions, setShowVendorSuggestions] = useState(false);
-  const [vendorSuggestions, setVendorSuggestions] = useState<MatchedVendor[]>([]);
+  // Vendor state
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
-  const [vendorDefaultsApplied, setVendorDefaultsApplied] = useState<{
-    category?: string;
-    vatRate?: string;
-  } | null>(null);
 
   // Form state
   const [vendor, setVendor] = useState('');
@@ -363,54 +353,35 @@ export function ReceiptDetailPanel({
     }
   }, [isEditingFilename, displayFilename]);
 
-  // Vendor autocomplete search
-  useEffect(() => {
-    if (!user || !vendorSearch || vendorSearch.length < 2) {
-      setVendorSuggestions([]);
-      return;
-    }
-
-    const searchTimeout = setTimeout(async () => {
-      try {
-        const results = await searchVendors(vendorSearch, user.id, 5);
-        setVendorSuggestions(results);
-      } catch (error) {
-        console.error('Vendor search error:', error);
-        setVendorSuggestions([]);
-      }
-    }, 150);
-
-    return () => clearTimeout(searchTimeout);
-  }, [vendorSearch, user]);
 
   // Handle vendor selection from autocomplete
-  const handleSelectVendor = useCallback((matchedVendor: MatchedVendor) => {
-    setVendor(matchedVendor.display_name);
-    setSelectedVendorId(matchedVendor.id);
-    setShowVendorSuggestions(false);
-    setVendorSearch('');
+  const handleVendorSelect = useCallback((vendorData: {
+    id: string;
+    display_name: string;
+    default_category_id: string | null;
+    default_vat_rate: number | null;
+    default_category: { id: string; name: string; color: string | null } | null;
+  }) => {
+    setVendor(vendorData.display_name);
+    setSelectedVendorId(vendorData.id);
 
-    const appliedDefaults: { category?: string; vatRate?: string } = {};
+    const applied: string[] = [];
 
     // Apply default category if not already set
-    if (matchedVendor.default_category && !category) {
-      setCategory(matchedVendor.default_category.name);
-      appliedDefaults.category = matchedVendor.default_category.name;
+    if (vendorData.default_category && !category) {
+      setCategory(vendorData.default_category.name);
+      applied.push('Kategorie');
     }
 
     // Apply default VAT rate if not already set
-    if (matchedVendor.default_vat_rate !== null && vatRate === '20') {
-      setVatRate(matchedVendor.default_vat_rate.toString());
-      appliedDefaults.vatRate = matchedVendor.default_vat_rate.toString() + '%';
+    if (vendorData.default_vat_rate !== null && vatRate === '20') {
+      setVatRate(vendorData.default_vat_rate.toString());
+      applied.push('MwSt-Satz');
     }
 
-    if (Object.keys(appliedDefaults).length > 0) {
-      setVendorDefaultsApplied(appliedDefaults);
+    if (applied.length > 0) {
       toast({
-        title: 'Lieferant-Standardwerte angewendet',
-        description: Object.entries(appliedDefaults)
-          .map(([key, val]) => `${key === 'category' ? 'Kategorie' : 'MwSt'}: ${val}`)
-          .join(', '),
+        title: `${applied.join(' und ')} vom Lieferanten übernommen`,
       });
     }
   }, [category, vatRate, toast]);
@@ -956,81 +927,16 @@ export function ReceiptDetailPanel({
                     )}
 
                     {/* Vendor with Autocomplete */}
-                    <div className="relative">
-                      <Label htmlFor="vendor">
-                        {vendorBrand && vendorBrand !== vendor ? 'Firmenname (rechtlich)' : 'Lieferant'}
-                      </Label>
-                      <div className="relative">
-                        <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="vendor"
-                          value={vendor}
-                          onChange={(e) => {
-                            setVendor(e.target.value);
-                            setVendorSearch(e.target.value);
-                            setShowVendorSuggestions(true);
-                            setSelectedVendorId(null);
-                            setVendorDefaultsApplied(null);
-                          }}
-                          onFocus={() => {
-                            if (vendor.length >= 2) {
-                              setVendorSearch(vendor);
-                              setShowVendorSuggestions(true);
-                            }
-                          }}
-                          onBlur={() => {
-                            // Delay to allow click on suggestion
-                            setTimeout(() => setShowVendorSuggestions(false), 200);
-                          }}
-                          placeholder="Lieferant suchen oder eingeben..."
-                          className="pl-10"
-                        />
-                      </div>
-
-                      {/* Suggestions Dropdown */}
-                      {showVendorSuggestions && vendorSuggestions.length > 0 && (
-                        <div className="absolute z-50 w-full mt-1 bg-background border rounded-lg shadow-lg overflow-hidden">
-                          {vendorSuggestions.map((v) => (
-                            <button
-                              key={v.id}
-                              type="button"
-                              className="w-full px-3 py-2 text-left hover:bg-muted flex items-center justify-between transition-colors"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                handleSelectVendor(v);
-                              }}
-                            >
-                              <div className="min-w-0 flex-1">
-                                <p className="font-medium truncate">{v.display_name}</p>
-                                {v.legal_name && v.legal_name !== v.display_name && (
-                                  <p className="text-xs text-muted-foreground truncate">{v.legal_name}</p>
-                                )}
-                              </div>
-                              {v.default_category && (
-                                <Badge 
-                                  variant="outline" 
-                                  className="text-xs ml-2 flex-shrink-0"
-                                  style={{ 
-                                    color: v.default_category.color || undefined,
-                                    borderColor: v.default_category.color || undefined,
-                                  }}
-                                >
-                                  {v.default_category.name}
-                                </Badge>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Vendor defaults applied indicator */}
-                      {vendorDefaultsApplied && (
-                        <p className="text-xs text-green-600 mt-1 flex items-center">
-                          <Check className="w-3 h-3 mr-1" />
-                          Standardwerte angewendet
-                        </p>
-                      )}
-                    </div>
+                    <VendorAutocomplete
+                      value={vendor}
+                      vendorId={selectedVendorId}
+                      onChange={(value, id) => {
+                        setVendor(value);
+                        setSelectedVendorId(id || null);
+                      }}
+                      onVendorSelect={handleVendorSelect}
+                      disabled={saving}
+                    />
                     
                     {/* Brand name field if exists or vendor has legal suffix */}
                     {(vendorBrand || vendor.match(/(GmbH|AG|e\.U\.|OG|KG|Ltd\.|S\.à r\.l\.)/i)) && (
