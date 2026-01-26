@@ -12,6 +12,7 @@ import {
   ChevronRight,
   FileText,
   Check,
+  X,
   Filter,
   Sparkles,
   CalendarIcon,
@@ -21,6 +22,8 @@ import {
   Archive,
   Columns3,
   Hash,
+  Loader2,
+  RotateCcw,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, startOfQuarter, endOfQuarter } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -75,6 +78,7 @@ import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
 import { ReceiptPreviewDialog } from '@/components/receipts/ReceiptPreviewDialog';
 import { ExportDialog, exportAsCSV, exportAsExcel } from '@/components/exports/ExportDialog';
 import { motion } from 'framer-motion';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 type SortField = 'receipt_date' | 'vendor' | 'invoice_number' | 'amount_gross';
@@ -147,7 +151,7 @@ const Expenses = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
-  const { getReceipts, updateReceipt, deleteReceipt } = useReceipts();
+  const { getReceipts, updateReceipt, deleteReceipt, processReceiptWithAI } = useReceipts();
   const { categories } = useCategories();
 
   // Data state
@@ -456,7 +460,12 @@ const Expenses = () => {
     }
   };
 
+  // Bulk action states
+  const [bulkActionLoading, setBulkActionLoading] = useState<'approve' | 'reject' | 'ai' | null>(null);
+  const [aiProgress, setAiProgress] = useState<{ current: number; total: number } | null>(null);
+
   const handleBulkApprove = async () => {
+    setBulkActionLoading('approve');
     try {
       for (const id of selectedIds) {
         await updateReceipt(id, { status: 'approved' });
@@ -464,14 +473,121 @@ const Expenses = () => {
       setReceipts(prev => prev.map(r => 
         selectedIds.has(r.id) ? { ...r, status: 'approved' as const } : r
       ));
+      const count = selectedIds.size;
       setSelectedIds(new Set());
-      toast({ title: `${selectedIds.size} Belege freigegeben` });
+      toast({ title: `${count} Belege freigegeben` });
     } catch (error) {
       toast({
         variant: 'destructive',
         title: 'Fehler',
         description: error instanceof Error ? error.message : 'Unbekannter Fehler',
       });
+    } finally {
+      setBulkActionLoading(null);
+    }
+  };
+
+  const handleBulkReject = async () => {
+    setBulkActionLoading('reject');
+    try {
+      for (const id of selectedIds) {
+        await updateReceipt(id, { status: 'rejected' });
+      }
+      setReceipts(prev => prev.map(r => 
+        selectedIds.has(r.id) ? { ...r, status: 'rejected' as const } : r
+      ));
+      const count = selectedIds.size;
+      setSelectedIds(new Set());
+      toast({ title: `${count} Belege abgelehnt` });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setBulkActionLoading(null);
+    }
+  };
+
+  const handleBulkRerunAI = async () => {
+    setBulkActionLoading('ai');
+    const selectedReceipts = receipts.filter(r => selectedIds.has(r.id));
+    const total = selectedReceipts.length;
+    let current = 0;
+    let successCount = 0;
+    let failCount = 0;
+
+    setAiProgress({ current: 0, total });
+
+    try {
+      for (const receipt of selectedReceipts) {
+        current++;
+        setAiProgress({ current, total });
+
+        if (!receipt.file_url) {
+          failCount++;
+          continue;
+        }
+
+        try {
+          // Fetch the file from storage
+          const { data: fileData, error: downloadError } = await supabase.storage
+            .from('receipts')
+            .download(receipt.file_url.replace(/^.*\/receipts\//, ''));
+
+          if (downloadError || !fileData) {
+            failCount++;
+            continue;
+          }
+
+          // Create a File object from the blob
+          const file = new File([fileData], receipt.file_name || 'receipt', {
+            type: receipt.file_type || 'application/pdf',
+          });
+
+          // Process with AI (file first, then receiptId)
+          const result = await processReceiptWithAI(file, receipt.id);
+          
+          if (result.aiSuccess) {
+            // Update local state with new data
+            setReceipts(prev => prev.map(r => 
+              r.id === receipt.id ? result.receipt : r
+            ));
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (err) {
+          console.error('AI re-run failed for receipt:', receipt.id, err);
+          failCount++;
+        }
+      }
+
+      setSelectedIds(new Set());
+      
+      if (successCount > 0 && failCount === 0) {
+        toast({ title: `${successCount} Belege neu analysiert` });
+      } else if (successCount > 0 && failCount > 0) {
+        toast({ 
+          title: `${successCount} erfolgreich, ${failCount} fehlgeschlagen`,
+          variant: 'default'
+        });
+      } else {
+        toast({ 
+          title: 'KI-Analyse fehlgeschlagen',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler bei KI-Analyse',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setBulkActionLoading(null);
+      setAiProgress(null);
     }
   };
 
@@ -780,18 +896,72 @@ const Expenses = () => {
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            className="flex items-center gap-3 mb-4 p-3 bg-muted/50 rounded-lg"
+            className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-muted/50 rounded-lg"
           >
             <Badge variant="secondary">{selectedIds.size} ausgewählt</Badge>
-            <Button size="sm" variant="outline" onClick={handleBulkApprove}>
-              <Check className="h-4 w-4 mr-1" />
-              Alle freigeben
-            </Button>
+            
+            {/* Approve */}
             <Button 
               size="sm" 
               variant="outline" 
-              className="text-destructive hover:text-destructive"
+              onClick={handleBulkApprove}
+              disabled={bulkActionLoading !== null}
+              className="border-green-500/50 text-green-600 hover:bg-green-50 hover:text-green-700"
+            >
+              {bulkActionLoading === 'approve' ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4 mr-1" />
+              )}
+              Freigeben
+            </Button>
+            
+            {/* Reject */}
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={handleBulkReject}
+              disabled={bulkActionLoading !== null}
+              className="border-orange-500/50 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+            >
+              {bulkActionLoading === 'reject' ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <X className="h-4 w-4 mr-1" />
+              )}
+              Ablehnen
+            </Button>
+            
+            {/* Re-run AI */}
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={handleBulkRerunAI}
+              disabled={bulkActionLoading !== null}
+              className="border-violet-500/50 text-violet-600 hover:bg-violet-50 hover:text-violet-700"
+            >
+              {bulkActionLoading === 'ai' ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  {aiProgress && `${aiProgress.current}/${aiProgress.total}`}
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  KI neu starten
+                </>
+              )}
+            </Button>
+            
+            <div className="h-4 w-px bg-border" />
+            
+            {/* Delete */}
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={() => setBulkDeleteOpen(true)}
+              disabled={bulkActionLoading !== null}
             >
               <Trash2 className="h-4 w-4 mr-1" />
               Löschen
