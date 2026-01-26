@@ -401,7 +401,10 @@ export function useReceipts() {
     }
   };
 
-  const createVendorForReceipt = async (name: string): Promise<MatchedVendor | null> => {
+  const createVendorForReceipt = async (
+    name: string,
+    options?: { legalName?: string }
+  ): Promise<MatchedVendor | null> => {
     if (!user) {
       throw new Error('Nicht angemeldet');
     }
@@ -411,7 +414,8 @@ export function useReceipts() {
       .insert({
         user_id: user.id,
         display_name: name.trim(),
-        detected_names: [name.trim()]
+        detected_names: [name.trim()],
+        legal_name: options?.legalName?.trim() || null
       })
       .select(`
         *,
@@ -474,6 +478,15 @@ export function useReceipts() {
       // Add detected name as variant if provided
       if (detectedName) {
         await addVendorVariant(vendor.id, detectedName);
+      }
+
+      // Update vendor's legal_name if not set and we have legal name from receipt
+      if (!vendor.legal_name && extractedData.vendor && extractedData.vendor !== vendor.display_name) {
+        await supabase
+          .from('vendors')
+          .update({ legal_name: extractedData.vendor })
+          .eq('id', vendor.id)
+          .is('legal_name', null);
       }
     }
 

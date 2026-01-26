@@ -142,9 +142,10 @@ export async function findOrCreateVendor(
   options?: {
     autoCreate?: boolean;
     minSimilarity?: number;
+    legalName?: string;
   }
 ): Promise<FindOrCreateVendorResult> {
-  const { autoCreate = false, minSimilarity = 60 } = options || {};
+  const { autoCreate = false, minSimilarity = 60, legalName } = options || {};
 
   if (!detectedName || !userId) {
     return {
@@ -170,7 +171,7 @@ export async function findOrCreateVendor(
     if (!allVendors || allVendors.length === 0) {
       // No vendors exist - create new if autoCreate
       if (autoCreate) {
-        const newVendor = await createVendorInternal(userId, detectedName);
+        const newVendor = await createVendorInternal(userId, detectedName, legalName);
         return {
           vendor: newVendor,
           isNew: true,
@@ -273,7 +274,7 @@ export async function findOrCreateVendor(
 
     // No good matches - create new vendor
     if (autoCreate) {
-      const newVendor = await createVendorInternal(userId, detectedName);
+      const newVendor = await createVendorInternal(userId, detectedName, legalName);
       return {
         vendor: newVendor,
         isNew: true,
@@ -303,13 +304,18 @@ export async function findOrCreateVendor(
 /**
  * Create a new vendor internally
  */
-async function createVendorInternal(userId: string, name: string): Promise<MatchedVendor | null> {
+async function createVendorInternal(
+  userId: string,
+  name: string,
+  legalName?: string
+): Promise<MatchedVendor | null> {
   const { data, error } = await supabase
     .from('vendors')
     .insert({
       user_id: userId,
       display_name: name.trim(),
-      detected_names: [name.trim()]
+      detected_names: [name.trim()],
+      legal_name: legalName?.trim() || null
     })
     .select(`
       *,
