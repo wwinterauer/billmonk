@@ -1173,19 +1173,22 @@ export function ReceiptDetailPanel({
                       disabled={saving}
                     />
                     
-                    {/* Brand name field if exists or vendor has legal suffix */}
-                    {(vendorBrand || vendor.match(/(GmbH|AG|e\.U\.|OG|KG|Ltd\.|S\.à r\.l\.)/i)) && (
+                    {/* Brand name field - shown if exists or if vendor looks like a legal name */}
+                    {(vendorBrand || vendor.match(/(GmbH|AG|e\.U\.|OG|KG|Ltd\.|S\.à r\.l\.|ApS|Inc\.|Corp\.)/i)) && (
                       <div>
                         <Label htmlFor="vendorBrand" className="text-muted-foreground">
-                          Markenname (falls abweichend)
+                          Markenname
                         </Label>
                         <Input
                           id="vendorBrand"
                           value={vendorBrand}
                           onChange={(e) => setVendorBrand(e.target.value)}
-                          placeholder="z.B. MediaMarkt"
+                          placeholder="z.B. Amazon, spusu, MediaMarkt"
                           className="text-muted-foreground"
                         />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Bekannter Name/Marke falls abweichend vom rechtlichen Namen
+                        </p>
                       </div>
                     )}
 

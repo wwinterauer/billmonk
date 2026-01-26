@@ -872,7 +872,7 @@ export function VendorManagement() {
                           onCheckedChange={toggleSelectAll}
                         />
                       </TableHead>
-                      <TableHead>Anzeigename</TableHead>
+                      <TableHead>Markenname</TableHead>
                       <TableHead>Rechtlicher Name</TableHead>
                       <TableHead>Erkannte Varianten</TableHead>
                       <TableHead>Standard-Kategorie</TableHead>
@@ -1083,17 +1083,17 @@ export function VendorManagement() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Anzeigename */}
+            {/* Markenname (display_name) */}
             <div className="space-y-2">
-              <Label htmlFor="display_name">Anzeigename *</Label>
+              <Label htmlFor="display_name">Markenname *</Label>
               <Input
                 id="display_name"
                 value={formData.display_name}
                 onChange={(e) => setFormData(prev => ({ ...prev, display_name: e.target.value }))}
-                placeholder="z.B. Amazon"
+                placeholder="z.B. Amazon, spusu, MediaMarkt"
               />
               <p className="text-xs text-muted-foreground">
-                Dieser Name wird in Listen und Exporten verwendet
+                Bekannter Name/Marke – wird in Listen und zur Identifikation verwendet
               </p>
             </div>
 
@@ -1104,10 +1104,10 @@ export function VendorManagement() {
                 id="legal_name"
                 value={formData.legal_name}
                 onChange={(e) => setFormData(prev => ({ ...prev, legal_name: e.target.value }))}
-                placeholder="z.B. Amazon EU S.à r.l."
+                placeholder="z.B. Amazon EU S.à r.l., Mass Response Service GmbH"
               />
               <p className="text-xs text-muted-foreground">
-                Optional: Vollständiger Name für Buchhaltung
+                Offizieller Firmenname für Buchhaltung und Belege (falls abweichend)
               </p>
             </div>
 
@@ -1618,7 +1618,7 @@ export function VendorManagement() {
               <CardContent className="space-y-3">
                 {/* Display Name */}
                 <div>
-                  <Label className="text-xs text-muted-foreground">Anzeigename</Label>
+                  <Label className="text-xs text-muted-foreground">Markenname</Label>
                   <Input
                     value={mergePreview?.display_name || ''}
                     onChange={(e) => setMergePreview(prev => prev ? { ...prev, display_name: e.target.value } : null)}

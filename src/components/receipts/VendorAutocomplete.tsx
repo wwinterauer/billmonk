@@ -177,7 +177,7 @@ export function VendorAutocomplete({
 
   return (
     <div className="relative" ref={containerRef}>
-      <Label className="mb-1.5 block">Lieferant</Label>
+      <Label className="mb-1.5 block">Lieferant (rechtlicher Name)</Label>
 
       <div className="relative">
         <Input
