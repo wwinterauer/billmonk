@@ -274,6 +274,7 @@ export type Database = {
           id: string
           last_name: string | null
           monthly_receipt_count: number | null
+          naming_settings: Json | null
           plan: string | null
           updated_at: string | null
         }
@@ -285,6 +286,7 @@ export type Database = {
           id: string
           last_name?: string | null
           monthly_receipt_count?: number | null
+          naming_settings?: Json | null
           plan?: string | null
           updated_at?: string | null
         }
@@ -296,6 +298,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           monthly_receipt_count?: number | null
+          naming_settings?: Json | null
           plan?: string | null
           updated_at?: string | null
         }
