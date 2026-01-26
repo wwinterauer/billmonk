@@ -229,6 +229,7 @@ export function ExportTemplateEditor({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
 
   // DnD sensors
   const sensors = useSensors(
@@ -329,9 +330,27 @@ export function ExportTemplateEditor({
           setSelectedTemplateId(newTemplate.id);
         }
       }
+      setShowSaveDialog(false);
     } finally {
       setSaving(false);
     }
+  };
+
+  // Open save dialog
+  const openSaveDialog = () => {
+    setShowSaveDialog(true);
+  };
+
+  // Get group label for display
+  const getGroupLabel = (groupField: string | null): string => {
+    if (!groupField) return 'Keine';
+    return GROUPING_OPTIONS.find(g => g.value === groupField)?.label || groupField;
+  };
+
+  // Get sort label for display
+  const getSortLabel = (sortField: string | null): string => {
+    if (!sortField) return 'Datum';
+    return SORTABLE_FIELDS.find(f => f.value === sortField)?.label || sortField;
   };
 
   // Delete template
@@ -524,7 +543,7 @@ export function ExportTemplateEditor({
               </Button>
             )}
 
-            <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
+            <Button variant="outline" size="sm" onClick={openSaveDialog} disabled={saving}>
               {saving ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
@@ -1198,6 +1217,111 @@ export function ExportTemplateEditor({
             <Button disabled>
               <FileText className="h-4 w-4 mr-2" />
               Als PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Save Template Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedTemplateId ? 'Vorlage aktualisieren' : 'Neue Vorlage speichern'}
+            </DialogTitle>
+            <DialogDescription>
+              Speichere deine Export-Konfiguration als Vorlage
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Name */}
+            <div className="space-y-2">
+              <Label>Name der Vorlage *</Label>
+              <Input
+                value={editingTemplate?.name || ''}
+                onChange={(e) =>
+                  setEditingTemplate(prev => prev ? { ...prev, name: e.target.value } : null)
+                }
+                placeholder="z.B. Standard-Export, Buchhaltung, etc."
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label>Beschreibung (optional)</Label>
+              <Input
+                value={editingTemplate?.description || ''}
+                onChange={(e) =>
+                  setEditingTemplate(prev => prev ? { ...prev, description: e.target.value } : null)
+                }
+                placeholder="Kurze Beschreibung der Vorlage..."
+              />
+            </div>
+
+            {/* Default toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Als Standard verwenden</Label>
+                <p className="text-xs text-muted-foreground">
+                  Wird automatisch beim Export verwendet
+                </p>
+              </div>
+              <Switch
+                checked={editingTemplate?.is_default || false}
+                onCheckedChange={(checked) =>
+                  setEditingTemplate(prev => prev ? { ...prev, is_default: checked } : null)
+                }
+              />
+            </div>
+
+            {/* Configuration Summary */}
+            <div className="p-3 bg-muted rounded-lg text-sm">
+              <p className="font-medium mb-2">Konfiguration:</p>
+              <ul className="space-y-1 text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <CheckSquare className="h-3 w-3" />
+                  {editingTemplate?.columns.filter(c => c.visible).length || 0} sichtbare Spalten
+                </li>
+                <li className="flex items-center gap-2">
+                  {editingTemplate?.sort_direction === 'asc' ? (
+                    <ArrowUp className="h-3 w-3" />
+                  ) : (
+                    <ArrowDown className="h-3 w-3" />
+                  )}
+                  Sortierung: {getSortLabel(editingTemplate?.sort_by || null)} (
+                  {editingTemplate?.sort_direction === 'asc' ? 'aufsteigend' : 'absteigend'})
+                </li>
+                <li className="flex items-center gap-2">
+                  <Tag className="h-3 w-3" />
+                  Gruppierung: {getGroupLabel(editingTemplate?.group_by || null)}
+                </li>
+                <li className="flex items-center gap-2">
+                  {editingTemplate?.include_totals ? (
+                    <CheckSquare className="h-3 w-3" />
+                  ) : (
+                    <Square className="h-3 w-3" />
+                  )}
+                  {editingTemplate?.include_totals ? 'Mit' : 'Ohne'} Summenzeile
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={!editingTemplate?.name?.trim() || saving}
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              {selectedTemplateId ? 'Aktualisieren' : 'Speichern'}
             </Button>
           </DialogFooter>
         </DialogContent>
