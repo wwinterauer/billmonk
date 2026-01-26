@@ -25,6 +25,7 @@ import {
   GripVertical,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Settings2,
   Loader2,
   RotateCcw,
@@ -35,6 +36,15 @@ import {
   AlignCenter,
   AlignRight,
   MousePointerClick,
+  ArrowUp,
+  ArrowDown,
+  Tag,
+  Building,
+  Calendar,
+  CalendarDays,
+  CalendarRange,
+  Percent,
+  CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,8 +81,11 @@ import {
   useExportTemplates,
   DEFAULT_COLUMNS,
   FIELD_TYPES,
-  AVAILABLE_FIELDS,
+  SORTABLE_FIELDS,
+  GROUPING_OPTIONS,
   formatPreview,
+  getGroupPreview,
+  getSortInfo,
   type ExportTemplate,
   type ExportColumn,
 } from '@/hooks/useExportTemplates';
@@ -90,8 +103,6 @@ interface SortableColumnProps {
   isSelected: boolean;
   onSelect: (column: ExportColumn) => void;
   onToggleVisible: (columnId: string) => void;
-  onUpdateLabel: (columnId: string, label: string) => void;
-  onUpdateFormat: (columnId: string, format: string) => void;
 }
 
 function SortableColumn({
@@ -99,8 +110,6 @@ function SortableColumn({
   isSelected,
   onSelect,
   onToggleVisible,
-  onUpdateLabel,
-  onUpdateFormat,
 }: SortableColumnProps) {
   const {
     attributes,
@@ -548,8 +557,6 @@ export function ExportTemplateEditor({
                           isSelected={selectedColumn?.id === column.id}
                           onSelect={setSelectedColumn}
                           onToggleVisible={toggleColumnVisibility}
-                          onUpdateLabel={updateColumnLabel}
-                          onUpdateFormat={updateColumnFormat}
                         />
                       ))}
                     </SortableContext>
@@ -739,14 +746,14 @@ export function ExportTemplateEditor({
                 </Card>
               )}
 
-              {/* Sorting & Grouping */}
+              {/* Sortierung */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Sortierung & Gruppierung</CardTitle>
+                  <CardTitle className="text-base">Sortierung</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 space-y-2">
                       <Label>Sortieren nach</Label>
                       <Select
                         value={editingTemplate.sort_by || 'receipt_date'}
@@ -758,7 +765,7 @@ export function ExportTemplateEditor({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {AVAILABLE_FIELDS.map((field) => (
+                          {SORTABLE_FIELDS.map((field) => (
                             <SelectItem key={field.value} value={field.value}>
                               {field.label}
                             </SelectItem>
@@ -767,7 +774,7 @@ export function ExportTemplateEditor({
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="w-[150px] space-y-2">
                       <Label>Richtung</Label>
                       <Select
                         value={editingTemplate.sort_direction}
@@ -779,41 +786,85 @@ export function ExportTemplateEditor({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="asc">Aufsteigend</SelectItem>
-                          <SelectItem value="desc">Absteigend</SelectItem>
+                          <SelectItem value="asc">
+                            <span className="flex items-center gap-2">
+                              <ArrowUp className="h-4 w-4" />
+                              Aufsteigend
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="desc">
+                            <span className="flex items-center gap-2">
+                              <ArrowDown className="h-4 w-4" />
+                              Absteigend
+                            </span>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Gruppieren nach</Label>
-                      <Select
-                        value={editingTemplate.group_by || 'none'}
-                        onValueChange={(val) =>
-                          setEditingTemplate({
-                            ...editingTemplate,
-                            group_by: val === 'none' ? null : val,
-                          })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Keine</SelectItem>
-                          {AVAILABLE_FIELDS.map((field) => (
-                            <SelectItem key={field.value} value={field.value}>
-                              {field.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  {/* Sort Info */}
+                  <p className="text-sm text-muted-foreground">
+                    {getSortInfo(editingTemplate.sort_by, editingTemplate.sort_direction)}
+                  </p>
+                </CardContent>
+              </Card>
 
-                    {editingTemplate.group_by && (
-                      <div className="flex items-center gap-2 pt-6">
+              {/* Gruppierung */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Gruppierung</CardTitle>
+                  <CardDescription>Fasse Belege nach Kriterien zusammen</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Gruppieren nach</Label>
+                    <Select
+                      value={editingTemplate.group_by || 'none'}
+                      onValueChange={(val) =>
+                        setEditingTemplate({
+                          ...editingTemplate,
+                          group_by: val === 'none' ? null : val,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Keine Gruppierung" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Keine Gruppierung</SelectItem>
+                        <Separator className="my-1" />
+                        {GROUPING_OPTIONS.map((option) => {
+                          const IconComponent = {
+                            Tag,
+                            Building,
+                            Calendar,
+                            CalendarDays,
+                            CalendarRange,
+                            Percent,
+                            CreditCard,
+                          }[option.icon];
+                          
+                          return (
+                            <SelectItem key={option.value} value={option.value}>
+                              <span className="flex items-center gap-2">
+                                {IconComponent && <IconComponent className="h-4 w-4" />}
+                                {option.label}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {editingTemplate.group_by && (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label>Zwischensummen anzeigen</Label>
+                          <p className="text-xs text-muted-foreground">Summen pro Gruppe berechnen</p>
+                        </div>
                         <Switch
                           id="group-subtotals"
                           checked={editingTemplate.group_subtotals}
@@ -821,10 +872,22 @@ export function ExportTemplateEditor({
                             setEditingTemplate({ ...editingTemplate, group_subtotals: checked })
                           }
                         />
-                        <Label htmlFor="group-subtotals">Zwischensummen</Label>
                       </div>
-                    )}
-                  </div>
+
+                      {/* Group Preview */}
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-sm font-medium mb-2">Vorschau der Gruppen:</p>
+                        <div className="space-y-1 text-sm text-muted-foreground">
+                          {getGroupPreview(editingTemplate.group_by).map((group, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <ChevronRight className="h-3 w-3" />
+                              {group}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 

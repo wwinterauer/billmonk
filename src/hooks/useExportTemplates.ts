@@ -102,16 +102,69 @@ export const FIELD_TYPES = {
   number: { label: 'Zahl', formats: ['#.##0', '#,##0', '#0'] },
 };
 
-// Available fields for grouping/sorting
-export const AVAILABLE_FIELDS = [
+// Available fields for sorting
+export const SORTABLE_FIELDS = [
   { value: 'receipt_date', label: 'Datum' },
   { value: 'vendor', label: 'Lieferant' },
   { value: 'category', label: 'Kategorie' },
   { value: 'amount_gross', label: 'Brutto' },
+  { value: 'amount_net', label: 'Netto' },
   { value: 'vat_rate', label: 'MwSt-Satz' },
   { value: 'status', label: 'Status' },
   { value: 'payment_method', label: 'Zahlungsart' },
+  { value: 'invoice_number', label: 'Rechnungsnr.' },
 ];
+
+// Available fields for grouping with icons
+export const GROUPING_OPTIONS = [
+  { value: 'category', label: 'Kategorie', icon: 'Tag' },
+  { value: 'vendor', label: 'Lieferant', icon: 'Building' },
+  { value: 'month', label: 'Monat', icon: 'Calendar' },
+  { value: 'quarter', label: 'Quartal', icon: 'CalendarDays' },
+  { value: 'year', label: 'Jahr', icon: 'CalendarRange' },
+  { value: 'vat_rate', label: 'MwSt-Satz', icon: 'Percent' },
+  { value: 'payment_method', label: 'Zahlungsart', icon: 'CreditCard' },
+];
+
+// Group preview helper
+export const getGroupPreview = (groupBy: string | null): string[] => {
+  switch (groupBy) {
+    case 'category':
+      return ['Büromaterial', 'Software & Lizenzen', 'Reisekosten', '...'];
+    case 'vendor':
+      return ['Amazon', 'MediaMarkt', 'IKEA', '...'];
+    case 'month':
+      return ['Januar 2024', 'Februar 2024', 'März 2024', '...'];
+    case 'quarter':
+      return ['Q1 2024', 'Q2 2024', 'Q3 2024', '...'];
+    case 'year':
+      return ['2023', '2024', '2025'];
+    case 'vat_rate':
+      return ['20%', '13%', '10%', '0%'];
+    case 'payment_method':
+      return ['Überweisung', 'Kreditkarte', 'Bar', '...'];
+    default:
+      return [];
+  }
+};
+
+// Sort info helper
+export const getSortInfo = (sortBy: string | null, sortDirection: 'asc' | 'desc'): string => {
+  const fieldLabel = SORTABLE_FIELDS.find(f => f.value === sortBy)?.label || sortBy;
+  const arrow = sortDirection === 'asc' ? '↑' : '↓';
+  
+  let detail = '';
+  if (sortBy === 'receipt_date') {
+    detail = sortDirection === 'desc' ? ' (neueste zuerst)' : ' (älteste zuerst)';
+  } else if (sortBy === 'amount_gross' || sortBy === 'amount_net') {
+    detail = sortDirection === 'desc' ? ' (höchste zuerst)' : ' (niedrigste zuerst)';
+  }
+  
+  return `${arrow} Sortiert nach ${fieldLabel}${detail}`;
+};
+
+// Keep AVAILABLE_FIELDS for backwards compatibility
+export const AVAILABLE_FIELDS = SORTABLE_FIELDS;
 
 export function useExportTemplates() {
   const { user } = useAuth();
