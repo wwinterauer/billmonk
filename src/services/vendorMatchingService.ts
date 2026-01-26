@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { calculateSimilarity } from './vendorDuplicateService';
 
 export interface MatchedVendor {
   id: string;
@@ -13,6 +14,19 @@ export interface MatchedVendor {
     name: string;
     color: string | null;
   } | null;
+}
+
+export interface VendorSuggestion {
+  vendor: MatchedVendor;
+  score: number;
+  reasons: string[];
+}
+
+export interface FindOrCreateVendorResult {
+  vendor: MatchedVendor | null;
+  isNew: boolean;
+  suggestions: VendorSuggestion[];
+  needsUserDecision: boolean;
 }
 
 /**
@@ -112,6 +126,228 @@ export async function matchOrCreateVendor(
   } catch (error) {
     console.error('Error in matchOrCreateVendor:', error);
     return null;
+  }
+}
+
+/**
+ * Enhanced vendor matching with similarity scoring and user decision support
+ * @param userId - The user's ID
+ * @param detectedName - The vendor name detected from receipt
+ * @param options - Configuration options
+ * @returns Vendor match result with suggestions if needed
+ */
+export async function findOrCreateVendor(
+  userId: string,
+  detectedName: string,
+  options?: {
+    autoCreate?: boolean;
+    minSimilarity?: number;
+  }
+): Promise<FindOrCreateVendorResult> {
+  const { autoCreate = false, minSimilarity = 60 } = options || {};
+
+  if (!detectedName || !userId) {
+    return {
+      vendor: null,
+      isNew: false,
+      suggestions: [],
+      needsUserDecision: false
+    };
+  }
+
+  const normalizedName = detectedName.trim().toLowerCase();
+
+  try {
+    // 1. Load all vendors for the user
+    const { data: allVendors } = await supabase
+      .from('vendors')
+      .select(`
+        *,
+        default_category:categories(id, name, color)
+      `)
+      .eq('user_id', userId);
+
+    if (!allVendors || allVendors.length === 0) {
+      // No vendors exist - create new if autoCreate
+      if (autoCreate) {
+        const newVendor = await createVendorInternal(userId, detectedName);
+        return {
+          vendor: newVendor,
+          isNew: true,
+          suggestions: [],
+          needsUserDecision: false
+        };
+      }
+      return {
+        vendor: null,
+        isNew: true,
+        suggestions: [],
+        needsUserDecision: false
+      };
+    }
+
+    // 2. Check for exact match in detected_names
+    const exactMatch = allVendors.find(v =>
+      v.detected_names?.some((dn: string) =>
+        dn.toLowerCase() === normalizedName
+      )
+    );
+
+    if (exactMatch) {
+      return {
+        vendor: mapVendor(exactMatch),
+        isNew: false,
+        suggestions: [],
+        needsUserDecision: false
+      };
+    }
+
+    // 3. Calculate similarity scores for all vendors
+    const suggestions: VendorSuggestion[] = [];
+
+    for (const vendor of allVendors) {
+      // Display Name similarity
+      const displaySim = calculateSimilarity(detectedName, vendor.display_name);
+
+      // Detected Names similarity (find best match)
+      let detectedSim = 0;
+      for (const name of vendor.detected_names || []) {
+        const sim = calculateSimilarity(detectedName, name);
+        if (sim > detectedSim) detectedSim = sim;
+      }
+
+      // Legal Name similarity
+      const legalSim = vendor.legal_name
+        ? calculateSimilarity(detectedName, vendor.legal_name)
+        : 0;
+
+      // Take the highest similarity
+      const bestScore = Math.max(displaySim, detectedSim, legalSim);
+
+      if (bestScore >= minSimilarity) {
+        const reasons: string[] = [];
+        if (displaySim >= minSimilarity) reasons.push(`Ähnlicher Name (${displaySim}%)`);
+        if (detectedSim >= minSimilarity) reasons.push('Bekannte Variante');
+        if (legalSim >= minSimilarity) reasons.push('Ähnlicher Firmenname');
+
+        suggestions.push({
+          vendor: mapVendor(vendor),
+          score: bestScore,
+          reasons
+        });
+      }
+    }
+
+    // Sort by score descending
+    suggestions.sort((a, b) => b.score - a.score);
+
+    // 4. Decision logic
+    if (suggestions.length > 0 && suggestions[0].score >= 90) {
+      // Very high match - auto-assign and add variant
+      const bestMatch = suggestions[0].vendor;
+
+      await supabase
+        .from('vendors')
+        .update({
+          detected_names: [...(bestMatch.detected_names || []), detectedName.trim()]
+        })
+        .eq('id', bestMatch.id);
+
+      return {
+        vendor: bestMatch,
+        isNew: false,
+        suggestions: [],
+        needsUserDecision: false
+      };
+    }
+
+    if (suggestions.length > 0 && suggestions[0].score >= minSimilarity) {
+      // Medium match - ask user
+      return {
+        vendor: null,
+        isNew: false,
+        suggestions: suggestions.slice(0, 5), // Top 5
+        needsUserDecision: true
+      };
+    }
+
+    // No good matches - create new vendor
+    if (autoCreate) {
+      const newVendor = await createVendorInternal(userId, detectedName);
+      return {
+        vendor: newVendor,
+        isNew: true,
+        suggestions: [],
+        needsUserDecision: false
+      };
+    }
+
+    return {
+      vendor: null,
+      isNew: true,
+      suggestions: [],
+      needsUserDecision: false
+    };
+
+  } catch (error) {
+    console.error('Error in findOrCreateVendor:', error);
+    return {
+      vendor: null,
+      isNew: false,
+      suggestions: [],
+      needsUserDecision: false
+    };
+  }
+}
+
+/**
+ * Create a new vendor internally
+ */
+async function createVendorInternal(userId: string, name: string): Promise<MatchedVendor | null> {
+  const { data, error } = await supabase
+    .from('vendors')
+    .insert({
+      user_id: userId,
+      display_name: name.trim(),
+      detected_names: [name.trim()]
+    })
+    .select(`
+      *,
+      default_category:categories(id, name, color)
+    `)
+    .single();
+
+  if (error) {
+    console.error('Error creating vendor:', error);
+    return null;
+  }
+
+  return mapVendor(data);
+}
+
+/**
+ * Add a detected name variant to an existing vendor
+ */
+export async function addVendorVariant(vendorId: string, newName: string): Promise<void> {
+  const { data: vendor } = await supabase
+    .from('vendors')
+    .select('detected_names')
+    .eq('id', vendorId)
+    .single();
+
+  if (vendor) {
+    const existingNames = vendor.detected_names || [];
+    const normalizedNew = newName.trim().toLowerCase();
+    
+    // Only add if not already present
+    if (!existingNames.some((n: string) => n.toLowerCase() === normalizedNew)) {
+      await supabase
+        .from('vendors')
+        .update({
+          detected_names: [...existingNames, newName.trim()]
+        })
+        .eq('id', vendorId);
+    }
   }
 }
 
