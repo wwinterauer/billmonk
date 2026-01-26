@@ -85,7 +85,8 @@ import { useCategories } from '@/hooks/useCategories';
 import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
 import { ReceiptPreviewDialog } from '@/components/receipts/ReceiptPreviewDialog';
 import { DuplicateComparisonModal } from '@/components/receipts/DuplicateComparisonModal';
-import { ExportDialog, exportAsCSV, exportAsExcel } from '@/components/exports/ExportDialog';
+import { ExportDialog } from '@/components/exports/ExportDialog';
+import { ExportFormatDialog, type ExportFormat } from '@/components/exports/ExportFormatDialog';
 import { ExportTemplateEditor } from '@/components/exports/ExportTemplateEditor';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
@@ -229,6 +230,8 @@ const Expenses = () => {
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportEditorOpen, setExportEditorOpen] = useState(false);
+  const [exportFormatDialogOpen, setExportFormatDialogOpen] = useState(false);
+  const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>('csv');
 
   // Detail panel state (edit mode)
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
@@ -1000,31 +1003,40 @@ const Expenses = () => {
                 <Button variant="outline">
                   <Download className="h-4 w-4 mr-2" />
                   Exportieren
+                  <ChevronDown className="h-4 w-4 ml-2" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setExportDialogOpen(true)}>
-                  <Archive className="h-4 w-4 mr-2" />
-                  Als ZIP herunterladen (umbenannt)
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem onClick={() => {
-                  exportAsCSV(filteredReceipts);
-                  toast({ title: 'CSV exportiert', description: `${filteredReceipts.length} Belege exportiert.` });
+                  setSelectedExportFormat('csv');
+                  setExportFormatDialogOpen(true);
                 }}>
-                  <FileDown className="h-4 w-4 mr-2" />
+                  <FileText className="h-4 w-4 mr-2" />
                   Als CSV exportieren
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
-                  exportAsExcel(filteredReceipts);
-                  toast({ title: 'Excel exportiert', description: `${filteredReceipts.length} Belege exportiert.` });
+                  setSelectedExportFormat('excel');
+                  setExportFormatDialogOpen(true);
                 }}>
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
                   Als Excel exportieren
                 </DropdownMenuItem>
-                <Separator className="my-1" />
-                <DropdownMenuItem onClick={() => setExportEditorOpen(true)}>
+                <DropdownMenuItem onClick={() => {
+                  setSelectedExportFormat('pdf');
+                  setExportFormatDialogOpen(true);
+                }}>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Als PDF exportieren
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setExportDialogOpen(true)}>
+                  <Archive className="h-4 w-4 mr-2" />
+                  Belege als ZIP
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/settings?tab=export')}>
                   <Settings2 className="h-4 w-4 mr-2" />
-                  Export konfigurieren...
+                  Vorlagen verwalten
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1980,6 +1992,15 @@ const Expenses = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Export Format Dialog */}
+      <ExportFormatDialog
+        open={exportFormatDialogOpen}
+        onOpenChange={setExportFormatDialogOpen}
+        receipts={filteredReceipts}
+        format={selectedExportFormat}
+        dateRange={{ from: dateFrom, to: dateTo }}
+      />
     </DashboardLayout>
   );
 };
