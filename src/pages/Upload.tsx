@@ -1,33 +1,37 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Upload as UploadIcon, 
   Cloud, 
   FileText, 
+  FileImage,
   X, 
   Check,
-  Loader2
+  Loader2,
+  XCircle,
+  AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useToast } from '@/hooks/use-toast';
+import { useReceipts, type UploadProgress, type Receipt } from '@/hooks/useReceipts';
 import { motion, AnimatePresence } from 'framer-motion';
 
-interface UploadedFile {
-  id: string;
-  name: string;
-  size: number;
-  progress: number;
-  status: 'uploading' | 'complete' | 'error';
+interface FileUpload extends UploadProgress {
+  file: File;
+  previewUrl?: string;
 }
 
 const Upload = () => {
   const [isDragOver, setIsDragOver] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [uploads, setUploads] = useState<Map<string, FileUpload>>(new Map());
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { validateFiles, uploadReceipt, ALLOWED_TYPES, MAX_FILE_SIZE, MAX_FILES } = useReceipts();
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -37,73 +41,186 @@ const Upload = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const simulateUpload = (file: File) => {
-    const id = Math.random().toString(36).substring(7);
-    const newFile: UploadedFile = {
-      id,
-      name: file.name,
-      size: file.size,
-      progress: 0,
-      status: 'uploading',
-    };
+  const truncateFileName = (name: string, maxLength = 30) => {
+    if (name.length <= maxLength) return name;
+    const ext = name.split('.').pop() || '';
+    const nameWithoutExt = name.slice(0, name.length - ext.length - 1);
+    const truncated = nameWithoutExt.slice(0, maxLength - ext.length - 4) + '...';
+    return `${truncated}.${ext}`;
+  };
 
-    setUploadedFiles(prev => [...prev, newFile]);
+  const isImageFile = (file: File) => {
+    return file.type.startsWith('image/');
+  };
 
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setUploadedFiles(prev => prev.map(f => {
-        if (f.id === id && f.progress < 100) {
-          const newProgress = Math.min(f.progress + Math.random() * 30, 100);
-          return {
-            ...f,
-            progress: newProgress,
-            status: newProgress === 100 ? 'complete' : 'uploading',
-          };
+  const createPreviewUrl = (file: File): string | undefined => {
+    if (isImageFile(file)) {
+      return URL.createObjectURL(file);
+    }
+    return undefined;
+  };
+
+  const processFiles = async (files: File[]) => {
+    const { validFiles, errors } = validateFiles(files);
+
+    if (errors.length > 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Einige Dateien wurden abgelehnt',
+        description: errors.slice(0, 3).join('\n') + (errors.length > 3 ? `\n...und ${errors.length - 3} weitere` : ''),
+      });
+    }
+
+    if (validFiles.length === 0) return;
+
+    // Check total count including existing pending/uploading files
+    const pendingCount = Array.from(uploads.values()).filter(
+      u => u.status === 'pending' || u.status === 'uploading'
+    ).length;
+
+    if (pendingCount + validFiles.length > MAX_FILES) {
+      toast({
+        variant: 'destructive',
+        title: 'Zu viele Dateien',
+        description: `Maximal ${MAX_FILES} Dateien gleichzeitig erlaubt.`,
+      });
+      return;
+    }
+
+    // Add files to upload queue
+    const newUploads = new Map(uploads);
+    const filesToUpload: FileUpload[] = [];
+
+    for (const file of validFiles) {
+      const id = crypto.randomUUID();
+      const upload: FileUpload = {
+        id,
+        fileName: file.name,
+        fileSize: file.size,
+        progress: 0,
+        status: 'pending',
+        file,
+        previewUrl: createPreviewUrl(file),
+      };
+      newUploads.set(id, upload);
+      filesToUpload.push(upload);
+    }
+
+    setUploads(newUploads);
+
+    // Start uploading files sequentially
+    for (const upload of filesToUpload) {
+      await uploadFile(upload);
+    }
+  };
+
+  const uploadFile = async (upload: FileUpload) => {
+    // Update status to uploading
+    setUploads(prev => {
+      const updated = new Map(prev);
+      const current = updated.get(upload.id);
+      if (current) {
+        updated.set(upload.id, { ...current, status: 'uploading', progress: 5 });
+      }
+      return updated;
+    });
+
+    try {
+      const receipt = await uploadReceipt(upload.file, (progress) => {
+        setUploads(prev => {
+          const updated = new Map(prev);
+          const current = updated.get(upload.id);
+          if (current) {
+            updated.set(upload.id, { ...current, progress });
+          }
+          return updated;
+        });
+      });
+
+      setUploads(prev => {
+        const updated = new Map(prev);
+        const current = updated.get(upload.id);
+        if (current) {
+          updated.set(upload.id, { 
+            ...current, 
+            status: 'complete', 
+            progress: 100,
+            receipt 
+          });
         }
-        return f;
-      }));
-    }, 200);
+        return updated;
+      });
 
-    setTimeout(() => {
-      clearInterval(interval);
-      setUploadedFiles(prev => prev.map(f => 
-        f.id === id ? { ...f, progress: 100, status: 'complete' } : f
-      ));
-    }, 2000);
+      toast({
+        title: 'Beleg hochgeladen',
+        description: `${truncateFileName(upload.fileName, 25)} wurde erfolgreich gespeichert.`,
+      });
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
+      
+      setUploads(prev => {
+        const updated = new Map(prev);
+        const current = updated.get(upload.id);
+        if (current) {
+          updated.set(upload.id, { 
+            ...current, 
+            status: 'error', 
+            progress: 0,
+            error: errorMessage 
+          });
+        }
+        return updated;
+      });
+
+      toast({
+        variant: 'destructive',
+        title: 'Upload fehlgeschlagen',
+        description: `${truncateFileName(upload.fileName, 25)}: ${errorMessage}`,
+      });
+    }
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-
     const files = Array.from(e.dataTransfer.files);
-    const validFiles = files.filter(file => {
-      const isValid = ['application/pdf', 'image/jpeg', 'image/png'].includes(file.type);
-      const isSmallEnough = file.size <= 10 * 1024 * 1024; // 10MB
-      return isValid && isSmallEnough;
-    });
-
-    if (validFiles.length !== files.length) {
-      toast({
-        variant: 'destructive',
-        title: 'Einige Dateien wurden abgelehnt',
-        description: 'Nur PDF, JPG und PNG bis 10MB sind erlaubt.',
-      });
-    }
-
-    validFiles.forEach(simulateUpload);
-  }, [toast]);
+    processFiles(files);
+  }, [validateFiles, toast, uploads]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    files.forEach(simulateUpload);
+    processFiles(files);
+    // Reset input to allow selecting same file again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
-  const removeFile = (id: string) => {
-    setUploadedFiles(prev => prev.filter(f => f.id !== id));
+  const removeUpload = (id: string) => {
+    setUploads(prev => {
+      const updated = new Map(prev);
+      const upload = updated.get(id);
+      // Revoke preview URL if exists
+      if (upload?.previewUrl) {
+        URL.revokeObjectURL(upload.previewUrl);
+      }
+      updated.delete(id);
+      return updated;
+    });
   };
 
-  const completedCount = uploadedFiles.filter(f => f.status === 'complete').length;
+  const handleCloudImport = (provider: string) => {
+    toast({
+      title: 'Cloud-Import kommt bald!',
+      description: `${provider} Integration wird in Kürze verfügbar sein.`,
+    });
+  };
+
+  const uploadsArray = Array.from(uploads.values());
+  const completedCount = uploadsArray.filter(u => u.status === 'complete').length;
+  const isAnyUploading = uploadsArray.some(u => u.status === 'uploading');
+  const canRemove = (status: UploadProgress['status']) => status !== 'uploading';
 
   const handleContinue = () => {
     toast({
@@ -111,6 +228,50 @@ const Upload = () => {
       description: `${completedCount} Beleg(e) werden von der KI analysiert...`,
     });
     navigate('/review');
+  };
+
+  const getStatusIcon = (upload: FileUpload) => {
+    switch (upload.status) {
+      case 'uploading':
+        return <Loader2 className="h-5 w-5 text-primary animate-spin" />;
+      case 'complete':
+        return (
+          <div className="h-8 w-8 rounded-full bg-success flex items-center justify-center">
+            <Check className="h-4 w-4 text-success-foreground" />
+          </div>
+        );
+      case 'error':
+        return (
+          <div className="h-8 w-8 rounded-full bg-destructive flex items-center justify-center">
+            <XCircle className="h-4 w-4 text-destructive-foreground" />
+          </div>
+        );
+      default:
+        return <Loader2 className="h-5 w-5 text-muted-foreground" />;
+    }
+  };
+
+  const getThumbnail = (upload: FileUpload) => {
+    if (upload.previewUrl) {
+      return (
+        <img 
+          src={upload.previewUrl} 
+          alt={upload.fileName}
+          className="h-10 w-10 rounded-lg object-cover"
+        />
+      );
+    }
+    
+    const isPdf = upload.file.type === 'application/pdf';
+    return (
+      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+        {isPdf ? (
+          <FileText className="h-5 w-5 text-primary" />
+        ) : (
+          <FileImage className="h-5 w-5 text-primary" />
+        )}
+      </div>
+    );
   };
 
   return (
@@ -135,9 +296,9 @@ const Upload = () => {
                 onDragLeave={() => setIsDragOver(false)}
                 onDrop={handleDrop}
                 className={`
-                  border-2 border-dashed rounded-xl p-12 text-center transition-colors
+                  border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200
                   ${isDragOver 
-                    ? 'border-primary bg-primary/5' 
+                    ? 'border-primary bg-primary/10 scale-[1.02]' 
                     : 'border-border hover:border-primary/50 hover:bg-muted/30'
                   }
                 `}
@@ -151,10 +312,11 @@ const Upload = () => {
                 <p className="text-muted-foreground mb-6">oder</p>
                 <div>
                   <input
+                    ref={fileInputRef}
                     type="file"
                     id="file-upload"
                     multiple
-                    accept=".pdf,.jpg,.jpeg,.png"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp"
                     onChange={handleFileSelect}
                     className="hidden"
                   />
@@ -165,7 +327,7 @@ const Upload = () => {
                   </label>
                 </div>
                 <p className="text-sm text-muted-foreground mt-4">
-                  PDF, JPG, PNG bis 10MB
+                  PDF, JPG, PNG, WebP bis {MAX_FILE_SIZE / 1024 / 1024}MB • Max. {MAX_FILES} Dateien
                 </p>
               </div>
             </CardContent>
@@ -187,23 +349,44 @@ const Upload = () => {
             </CardHeader>
             <CardContent>
               <div className="grid sm:grid-cols-3 gap-4">
-                <Button variant="outline" className="h-auto py-4 flex-col gap-2">
+                <Button 
+                  variant="outline" 
+                  className="h-auto py-4 flex-col gap-2 relative overflow-hidden"
+                  onClick={() => handleCloudImport('OneDrive')}
+                >
+                  <Badge className="absolute top-2 right-2 text-xs bg-muted text-muted-foreground">
+                    Coming Soon
+                  </Badge>
                   <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
                     <Cloud className="h-5 w-5 text-blue-500" />
                   </div>
-                  <span>OneDrive verbinden</span>
+                  <span className="text-muted-foreground">OneDrive</span>
                 </Button>
-                <Button variant="outline" className="h-auto py-4 flex-col gap-2">
+                <Button 
+                  variant="outline" 
+                  className="h-auto py-4 flex-col gap-2 relative overflow-hidden"
+                  onClick={() => handleCloudImport('Google Drive')}
+                >
+                  <Badge className="absolute top-2 right-2 text-xs bg-muted text-muted-foreground">
+                    Coming Soon
+                  </Badge>
                   <div className="h-10 w-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
                     <Cloud className="h-5 w-5 text-yellow-500" />
                   </div>
-                  <span>Google Drive verbinden</span>
+                  <span className="text-muted-foreground">Google Drive</span>
                 </Button>
-                <Button variant="outline" className="h-auto py-4 flex-col gap-2">
+                <Button 
+                  variant="outline" 
+                  className="h-auto py-4 flex-col gap-2 relative overflow-hidden"
+                  onClick={() => handleCloudImport('Dropbox')}
+                >
+                  <Badge className="absolute top-2 right-2 text-xs bg-muted text-muted-foreground">
+                    Coming Soon
+                  </Badge>
                   <div className="h-10 w-10 rounded-lg bg-blue-600/10 flex items-center justify-center">
                     <Cloud className="h-5 w-5 text-blue-600" />
                   </div>
-                  <span>Dropbox verbinden</span>
+                  <span className="text-muted-foreground">Dropbox</span>
                 </Button>
               </div>
             </CardContent>
@@ -212,7 +395,7 @@ const Upload = () => {
 
         {/* Upload Progress */}
         <AnimatePresence>
-          {uploadedFiles.length > 0 && (
+          {uploadsArray.length > 0 && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
@@ -220,52 +403,71 @@ const Upload = () => {
             >
               <Card className="border-border/50">
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg">Hochgeladene Dateien</CardTitle>
-                  {completedCount > 0 && (
+                  <div>
+                    <CardTitle className="text-lg">Hochgeladene Dateien</CardTitle>
+                    {completedCount > 0 && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {completedCount} Beleg{completedCount !== 1 ? 'e' : ''} hochgeladen
+                      </p>
+                    )}
+                  </div>
+                  {completedCount > 0 && !isAnyUploading && (
                     <Button 
                       className="gradient-primary hover:opacity-90"
                       onClick={handleContinue}
                     >
-                      Weiter zur Prüfung
+                      Zur Überprüfung
                     </Button>
                   )}
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {uploadedFiles.map((file) => (
+                    {uploadsArray.map((upload) => (
                       <motion.div
-                        key={file.id}
+                        key={upload.id}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg"
+                        exit={{ opacity: 0, x: 20 }}
+                        className={`
+                          flex items-center gap-4 p-4 rounded-lg transition-colors
+                          ${upload.status === 'error' 
+                            ? 'bg-destructive/10 border border-destructive/20' 
+                            : 'bg-muted/30'
+                          }
+                        `}
                       >
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <FileText className="h-5 w-5 text-primary" />
-                        </div>
+                        {getThumbnail(upload)}
+                        
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-foreground truncate">{file.name}</p>
-                          <p className="text-sm text-muted-foreground">{formatFileSize(file.size)}</p>
-                          {file.status === 'uploading' && (
-                            <Progress value={file.progress} className="h-1.5 mt-2" />
+                          <p className="font-medium text-foreground truncate">
+                            {truncateFileName(upload.fileName)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatFileSize(upload.fileSize)}
+                          </p>
+                          {upload.status === 'uploading' && (
+                            <Progress value={upload.progress} className="h-1.5 mt-2" />
+                          )}
+                          {upload.status === 'error' && upload.error && (
+                            <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              {upload.error}
+                            </p>
                           )}
                         </div>
+                        
                         <div className="flex items-center gap-2">
-                          {file.status === 'uploading' && (
-                            <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                          {getStatusIcon(upload)}
+                          {canRemove(upload.status) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeUpload(upload.id)}
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
                           )}
-                          {file.status === 'complete' && (
-                            <div className="h-8 w-8 rounded-full bg-success flex items-center justify-center">
-                              <Check className="h-4 w-4 text-success-foreground" />
-                            </div>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeFile(file.id)}
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
                         </div>
                       </motion.div>
                     ))}
