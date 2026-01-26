@@ -269,10 +269,12 @@ export function VendorAutocomplete({
                   />
 
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{vendor.display_name}</p>
+                    <p className="font-medium truncate">
+                      {vendor.legal_name || vendor.display_name}
+                    </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {vendor.legal_name && (
-                        <span className="truncate max-w-[120px]">{vendor.legal_name}</span>
+                      {vendor.legal_name && vendor.legal_name !== vendor.display_name && (
+                        <span className="truncate max-w-[120px]">{vendor.display_name}</span>
                       )}
                       {vendor.default_category && (
                         <Badge variant="outline" className="text-xs py-0">
