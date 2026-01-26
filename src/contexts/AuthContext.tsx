@@ -14,6 +14,25 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper function to ensure profile exists
+const ensureProfileExists = async (user: User) => {
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (!existingProfile) {
+    await supabase.from('profiles').insert({
+      id: user.id,
+      email: user.email || '',
+      first_name: user.user_metadata?.first_name || '',
+      last_name: user.user_metadata?.last_name || '',
+      plan: 'free'
+    });
+  }
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -26,6 +45,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Ensure profile exists when user signs in (deferred to avoid deadlock)
+        if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+          setTimeout(() => {
+            ensureProfileExists(session.user);
+          }, 0);
+        }
       }
     );
 
@@ -34,6 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Ensure profile exists for existing session
+      if (session?.user) {
+        setTimeout(() => {
+          ensureProfileExists(session.user);
+        }, 0);
+      }
     });
 
     return () => subscription.unsubscribe();
