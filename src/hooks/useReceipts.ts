@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
+import { extractReceiptData, normalizeExtractionResult, type ExtractionResult } from '@/services/aiService';
 
 export interface Receipt {
   id: string;
@@ -34,14 +35,18 @@ export interface ReceiptFilters {
   year?: number;
 }
 
+export type UploadStatus = 'pending' | 'uploading' | 'processing' | 'complete' | 'complete-manual' | 'error';
+
 export interface UploadProgress {
   id: string;
   fileName: string;
   fileSize: number;
   progress: number;
-  status: 'pending' | 'uploading' | 'complete' | 'error';
+  status: UploadStatus;
+  statusText?: string;
   error?: string;
   receipt?: Receipt;
+  aiConfidence?: number;
 }
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
@@ -103,7 +108,7 @@ export function useReceipts() {
 
   const uploadReceipt = async (
     file: File, 
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number, statusText?: string) => void
   ): Promise<Receipt> => {
     if (!user) {
       throw new Error('Nicht angemeldet');
@@ -117,9 +122,8 @@ export function useReceipts() {
     const storagePath = generateStoragePath(user.id, file.name);
     const fileExtension = getFileExtension(file.name);
 
-    // Upload to Supabase Storage
-    // Note: Supabase doesn't provide upload progress natively, so we simulate it
-    onProgress?.(10);
+    // Phase 1: Upload to Storage (0-50%)
+    onProgress?.(5, 'Wird hochgeladen...');
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('receipts')
@@ -132,9 +136,9 @@ export function useReceipts() {
       throw new Error(`Upload fehlgeschlagen: ${uploadError.message}`);
     }
 
-    onProgress?.(70);
+    onProgress?.(40, 'Wird hochgeladen...');
 
-    // Create database entry
+    // Create database entry with 'processing' status
     const { data: receipt, error: dbError } = await supabase
       .from('receipts')
       .insert({
@@ -142,7 +146,7 @@ export function useReceipts() {
         file_url: uploadData.path,
         file_name: file.name,
         file_type: fileExtension,
-        status: 'pending',
+        status: 'processing',
       })
       .select()
       .single();
@@ -153,14 +157,89 @@ export function useReceipts() {
       throw new Error(`Datenbank-Fehler: ${dbError.message}`);
     }
 
-    onProgress?.(100);
+    onProgress?.(50, 'KI analysiert...');
 
     return receipt as Receipt;
   };
 
+  const processReceiptWithAI = async (
+    file: File,
+    receiptId: string,
+    onProgress?: (progress: number, statusText?: string) => void
+  ): Promise<{ receipt: Receipt; aiSuccess: boolean; aiConfidence?: number }> => {
+    if (!user) {
+      throw new Error('Nicht angemeldet');
+    }
+
+    // Check if file is supported for AI extraction
+    const supportedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+    const isSupported = supportedTypes.includes(file.type);
+
+    if (!isSupported) {
+      // Not a supported type, set to pending for manual entry
+      onProgress?.(100, 'Manuelle Eingabe');
+      const updated = await updateReceipt(receiptId, { status: 'pending' });
+      return { receipt: updated, aiSuccess: false };
+    }
+
+    try {
+      onProgress?.(60, 'KI analysiert...');
+      
+      // Call AI extraction
+      const extracted = await extractReceiptData(file);
+      const normalized = normalizeExtractionResult(extracted);
+
+      onProgress?.(90, 'Speichern...');
+
+      // Update receipt with extracted data
+      const updated = await updateReceipt(receiptId, {
+        vendor: normalized.vendor,
+        description: normalized.description,
+        amount_gross: normalized.amount_gross,
+        amount_net: normalized.amount_net,
+        vat_amount: normalized.vat_amount,
+        vat_rate: normalized.vat_rate,
+        receipt_date: normalized.receipt_date,
+        category: normalized.category,
+        payment_method: normalized.payment_method,
+        ai_confidence: normalized.confidence,
+        ai_raw_response: normalized as unknown as Json,
+        status: 'review',
+      });
+
+      onProgress?.(100, 'Zur Überprüfung');
+
+      return { 
+        receipt: updated, 
+        aiSuccess: true, 
+        aiConfidence: normalized.confidence 
+      };
+
+    } catch (error) {
+      console.error('AI extraction failed:', error);
+      
+      // AI failed, set to pending for manual entry
+      onProgress?.(100, 'Manuelle Eingabe');
+      const updated = await updateReceipt(receiptId, { status: 'pending' });
+      
+      return { receipt: updated, aiSuccess: false };
+    }
+  };
+
+  const uploadAndProcessReceipt = async (
+    file: File,
+    onProgress?: (progress: number, statusText?: string) => void
+  ): Promise<{ receipt: Receipt; aiSuccess: boolean; aiConfidence?: number }> => {
+    // First upload
+    const receipt = await uploadReceipt(file, onProgress);
+    
+    // Then process with AI
+    return processReceiptWithAI(file, receipt.id, onProgress);
+  };
+
   const uploadMultipleReceipts = async (
     files: File[],
-    onFileProgress?: (fileId: string, progress: number, status: UploadProgress['status'], error?: string, receipt?: Receipt) => void
+    onFileProgress?: (fileId: string, progress: number, status: UploadProgress['status'], statusText?: string, error?: string, receipt?: Receipt, aiConfidence?: number) => void
   ): Promise<{ successful: Receipt[]; failed: { fileName: string; error: string }[] }> => {
     if (!user) {
       throw new Error('Nicht angemeldet');
@@ -174,18 +253,23 @@ export function useReceipts() {
       const fileId = crypto.randomUUID();
       
       try {
-        onFileProgress?.(fileId, 0, 'uploading');
+        onFileProgress?.(fileId, 0, 'uploading', 'Wird hochgeladen...');
         
-        const receipt = await uploadReceipt(file, (progress) => {
-          onFileProgress?.(fileId, progress, 'uploading');
+        const result = await uploadAndProcessReceipt(file, (progress, statusText) => {
+          const status: UploadProgress['status'] = progress < 50 ? 'uploading' : 'processing';
+          onFileProgress?.(fileId, progress, status, statusText);
         });
         
-        successful.push(receipt);
-        onFileProgress?.(fileId, 100, 'complete', undefined, receipt);
+        successful.push(result.receipt);
+        
+        const finalStatus: UploadProgress['status'] = result.aiSuccess ? 'complete' : 'complete-manual';
+        const finalText = result.aiSuccess ? 'Zur Überprüfung' : 'Manuelle Eingabe';
+        onFileProgress?.(fileId, 100, finalStatus, finalText, undefined, result.receipt, result.aiConfidence);
+
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
         failed.push({ fileName: file.name, error: errorMessage });
-        onFileProgress?.(fileId, 0, 'error', errorMessage);
+        onFileProgress?.(fileId, 0, 'error', undefined, errorMessage);
       }
     }
 
@@ -327,6 +411,8 @@ export function useReceipts() {
     validateFile,
     validateFiles,
     uploadReceipt,
+    uploadAndProcessReceipt,
+    processReceiptWithAI,
     uploadMultipleReceipts,
     getReceipts,
     getReceipt,

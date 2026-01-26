@@ -12,7 +12,8 @@ import {
   ChevronRight,
   FileText,
   Check,
-  Filter
+  Filter,
+  Sparkles
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -557,6 +558,7 @@ const Expenses = () => {
                         >
                           Betrag {getSortIcon('amount_gross')}
                         </TableHead>
+                        <TableHead>KI</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Aktionen</TableHead>
                       </TableRow>
@@ -597,6 +599,22 @@ const Expenses = () => {
                           </TableCell>
                           <TableCell className="text-right font-medium">
                             {formatCurrency(receipt.amount_gross)}
+                          </TableCell>
+                          <TableCell>
+                            {receipt.ai_confidence !== null && receipt.ai_confidence !== undefined ? (
+                              <Badge 
+                                variant={
+                                  receipt.ai_confidence >= 0.8 ? 'default' :
+                                  receipt.ai_confidence >= 0.5 ? 'secondary' : 'destructive'
+                                }
+                                className="text-xs"
+                              >
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                {Math.round(receipt.ai_confidence * 100)}%
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Badge 
