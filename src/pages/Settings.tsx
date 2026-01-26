@@ -41,7 +41,7 @@ import type { Json } from '@/integrations/supabase/types';
 interface NamingSettings {
   template: string;
   replaceUmlauts: boolean;
-  replaceSpaces: boolean;
+  replaceSpaces: 'none' | 'underscore' | 'hyphen';
   removeSpecialChars: boolean;
   lowercase: boolean;
   dateFormat: string;
@@ -51,7 +51,7 @@ interface NamingSettings {
 const DEFAULT_SETTINGS: NamingSettings = {
   template: '{datum}_{lieferant}_{betrag}',
   replaceUmlauts: true,
-  replaceSpaces: true,
+  replaceSpaces: 'underscore',
   removeSpecialChars: true,
   lowercase: false,
   dateFormat: 'YYYYMMDD',
@@ -135,6 +135,24 @@ const EXAMPLE_DATA_PARTIAL = {
   original: 'scan_001',
 };
 
+// Helper to parse replaceSpaces from saved settings (handles backwards compatibility with boolean)
+const parseReplaceSpaces = (value: unknown): NamingSettings['replaceSpaces'] => {
+  if (value === 'underscore' || value === 'hyphen' || value === 'none') {
+    return value;
+  }
+  // Backwards compatibility: true -> 'underscore', false -> 'none'
+  if (typeof value === 'boolean') {
+    return value ? 'underscore' : 'none';
+  }
+  return DEFAULT_SETTINGS.replaceSpaces;
+};
+
+const SPACE_REPLACEMENT_OPTIONS = [
+  { value: 'none', label: 'Nicht ersetzen', description: 'Leerzeichen beibehalten' },
+  { value: 'underscore', label: 'Unterstrich', description: 'Leerzeichen durch _ ersetzen' },
+  { value: 'hyphen', label: 'Bindestrich', description: 'Leerzeichen durch - ersetzen' },
+];
+
 const Settings = () => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -164,7 +182,7 @@ const Settings = () => {
           setSettings({
             template: (savedSettings.template as string) || DEFAULT_SETTINGS.template,
             replaceUmlauts: savedSettings.replaceUmlauts !== undefined ? Boolean(savedSettings.replaceUmlauts) : DEFAULT_SETTINGS.replaceUmlauts,
-            replaceSpaces: savedSettings.replaceSpaces !== undefined ? Boolean(savedSettings.replaceSpaces) : DEFAULT_SETTINGS.replaceSpaces,
+            replaceSpaces: parseReplaceSpaces(savedSettings.replaceSpaces),
             removeSpecialChars: savedSettings.removeSpecialChars !== undefined ? Boolean(savedSettings.removeSpecialChars) : DEFAULT_SETTINGS.removeSpecialChars,
             lowercase: savedSettings.lowercase !== undefined ? Boolean(savedSettings.lowercase) : DEFAULT_SETTINGS.lowercase,
             dateFormat: (savedSettings.dateFormat as string) || DEFAULT_SETTINGS.dateFormat,
@@ -258,8 +276,10 @@ const Settings = () => {
         .replace(/ß/g, 'ss');
     }
 
-    if (settings.replaceSpaces) {
+    if (settings.replaceSpaces === 'underscore') {
       result = result.replace(/\s+/g, '_');
+    } else if (settings.replaceSpaces === 'hyphen') {
+      result = result.replace(/\s+/g, '-');
     }
 
     if (settings.removeSpecialChars) {
@@ -271,8 +291,8 @@ const Settings = () => {
       result = result.toLowerCase();
     }
 
-    // Clean up multiple underscores that may result from empty placeholders
-    result = result.replace(/_+/g, '_').replace(/^_|_$/g, '');
+    // Clean up multiple underscores/hyphens that may result from empty placeholders
+    result = result.replace(/[-_]+/g, (match) => match[0]).replace(/^[-_]|[-_]$/g, '');
 
     return result;
   };
@@ -488,24 +508,27 @@ const Settings = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id="replaceSpaces"
-                      checked={settings.replaceSpaces}
-                      onCheckedChange={(checked) => 
-                        setSettings(prev => ({ ...prev, replaceSpaces: checked as boolean }))
-                      }
-                    />
-                    <div className="space-y-0.5">
-                      <label
-                        htmlFor="replaceSpaces"
-                        className="text-sm font-medium cursor-pointer"
+                  <div className="flex items-start space-x-3 col-span-2">
+                    <div className="space-y-2 flex-1">
+                      <Label>Leerzeichen ersetzen</Label>
+                      <Select
+                        value={settings.replaceSpaces}
+                        onValueChange={(value) => 
+                          setSettings(prev => ({ ...prev, replaceSpaces: value as NamingSettings['replaceSpaces'] }))
+                        }
                       >
-                        Leerzeichen ersetzen
-                      </label>
-                      <p className="text-xs text-muted-foreground">
-                        Leerzeichen durch Unterstrich ersetzen
-                      </p>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SPACE_REPLACEMENT_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              <span>{option.label}</span>
+                              <span className="text-muted-foreground ml-2 text-xs">({option.description})</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 

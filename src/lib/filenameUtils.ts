@@ -3,7 +3,7 @@ import { format as formatDateFns } from 'date-fns';
 export interface NamingSettings {
   template: string;
   replaceUmlauts: boolean;
-  replaceSpaces: boolean;
+  replaceSpaces: 'none' | 'underscore' | 'hyphen';
   removeSpecialChars: boolean;
   lowercase: boolean;
   dateFormat: string;
@@ -13,7 +13,7 @@ export interface NamingSettings {
 export const DEFAULT_NAMING_SETTINGS: NamingSettings = {
   template: '{datum}_{lieferant}_{betrag}',
   replaceUmlauts: true,
-  replaceSpaces: true,
+  replaceSpaces: 'underscore',
   removeSpecialChars: true,
   lowercase: false,
   dateFormat: 'YYYY-MM-DD',
@@ -85,8 +85,10 @@ function applyTransformations(text: string, settings: NamingSettings): string {
       .replace(/ß/g, 'ss');
   }
 
-  if (settings.replaceSpaces) {
+  if (settings.replaceSpaces === 'underscore') {
     result = result.replace(/\s+/g, '_');
+  } else if (settings.replaceSpaces === 'hyphen') {
+    result = result.replace(/\s+/g, '-');
   }
 
   if (settings.removeSpecialChars) {
@@ -97,8 +99,8 @@ function applyTransformations(text: string, settings: NamingSettings): string {
     result = result.toLowerCase();
   }
 
-  // Clean up multiple underscores
-  result = result.replace(/_+/g, '_').replace(/^_|_$/g, '');
+  // Clean up multiple underscores/hyphens that may result from empty placeholders
+  result = result.replace(/[-_]+/g, (match) => match[0]).replace(/^[-_]|[-_]$/g, '');
 
   return result;
 }
@@ -194,10 +196,21 @@ export function getExportFilename(
 export function parseNamingSettings(data: Record<string, unknown> | null): NamingSettings {
   if (!data) return DEFAULT_NAMING_SETTINGS;
   
+  // Helper for backwards compatibility with boolean replaceSpaces
+  const parseReplaceSpaces = (value: unknown): NamingSettings['replaceSpaces'] => {
+    if (value === 'underscore' || value === 'hyphen' || value === 'none') {
+      return value;
+    }
+    if (typeof value === 'boolean') {
+      return value ? 'underscore' : 'none';
+    }
+    return DEFAULT_NAMING_SETTINGS.replaceSpaces;
+  };
+  
   return {
     template: (data.template as string) || DEFAULT_NAMING_SETTINGS.template,
     replaceUmlauts: data.replaceUmlauts !== undefined ? Boolean(data.replaceUmlauts) : DEFAULT_NAMING_SETTINGS.replaceUmlauts,
-    replaceSpaces: data.replaceSpaces !== undefined ? Boolean(data.replaceSpaces) : DEFAULT_NAMING_SETTINGS.replaceSpaces,
+    replaceSpaces: parseReplaceSpaces(data.replaceSpaces),
     removeSpecialChars: data.removeSpecialChars !== undefined ? Boolean(data.removeSpecialChars) : DEFAULT_NAMING_SETTINGS.removeSpecialChars,
     lowercase: data.lowercase !== undefined ? Boolean(data.lowercase) : DEFAULT_NAMING_SETTINGS.lowercase,
     dateFormat: (data.dateFormat as string) || DEFAULT_NAMING_SETTINGS.dateFormat,
