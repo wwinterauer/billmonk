@@ -15,6 +15,7 @@ interface ExtractionResult {
   receipt_date: string | null;
   category: string | null;
   payment_method: string | null;
+  invoice_number: string | null;
   confidence: number;
 }
 
@@ -61,6 +62,7 @@ Antworte IMMER und AUSSCHLIESSLICH mit validem JSON ohne zusätzliche Erklärung
   "receipt_date": "Datum im Format YYYY-MM-DD",
   "category": "Eine der Kategorien: Büromaterial, Software & Lizenzen, Reisekosten, Bewirtung, Telefon & Internet, Versicherungen, Miete & Betriebskosten, Fahrzeugkosten, Werbung & Marketing, Sonstiges",
   "payment_method": "Zahlungsart falls erkennbar: Überweisung, Kreditkarte, Bar, PayPal, Lastschrift (sonst null)",
+  "invoice_number": "Rechnungsnummer, Belegnummer oder Dokumentnummer. Suche nach Feldern wie 'Rechnungsnummer:', 'Rechnung Nr.:', 'Invoice:', 'Beleg-Nr.:', 'RE-Nr.:', 'Rg.-Nr.:', 'Dok-Nr.:', 'Invoice Number:', Präfixe wie 'RE-', 'RG-', 'INV-', 'RN-' etc. (falls nicht erkennbar: null)",
   "confidence": Konfidenz deiner Erkennung von 0.0 bis 1.0
 }
 
@@ -69,7 +71,10 @@ WICHTIGE REGELN:
 - Falls ein Feld nicht erkennbar ist, setze es auf null
 - Beträge immer als Dezimalzahlen ohne Währungssymbol (z.B. 125.50 statt "€ 125,50")
 - Wenn nur Bruttobetrag erkennbar: versuche Netto und MwSt zu berechnen basierend auf erkennbarem MwSt-Satz
-- Datum muss im Format YYYY-MM-DD sein`;
+- Datum muss im Format YYYY-MM-DD sein
+- Bei der Rechnungsnummer: Extrahiere die komplette Nummer inklusive Präfix (z.B. "RE-2024-00123")`;
+
+
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -155,6 +160,7 @@ WICHTIGE REGELN:
       console.log("Successfully extracted receipt data:", {
         vendor: extractedData.vendor,
         amount_gross: extractedData.amount_gross,
+        invoice_number: extractedData.invoice_number,
         confidence: extractedData.confidence,
       });
 

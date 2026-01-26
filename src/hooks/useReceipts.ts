@@ -206,6 +206,7 @@ export function useReceipts() {
         receipt_date: normalized.receipt_date,
         category: normalized.category,
         payment_method: normalized.payment_method,
+        invoice_number: normalized.invoice_number,
         ai_confidence: normalized.confidence,
         ai_raw_response: normalized as unknown as Json,
         status: 'review',

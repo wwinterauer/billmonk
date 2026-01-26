@@ -10,6 +10,7 @@ export interface ExtractionResult {
   receipt_date: string | null;
   category: string | null;
   payment_method: string | null;
+  invoice_number: string | null;
   confidence: number;
   raw_response?: string;
 }
@@ -109,6 +110,7 @@ export function createEmptyExtractionResult(): ExtractionResult {
     receipt_date: null,
     category: null,
     payment_method: null,
+    invoice_number: null,
     confidence: 0,
   };
 }
