@@ -16,6 +16,7 @@ import {
   TrendingUp,
   TrendingDown,
   Activity,
+  Info,
 } from 'lucide-react';
 import {
   PieChart,
@@ -32,11 +33,16 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -387,6 +393,36 @@ const Reports = () => {
     );
   }, [vendorData, vendorSearch]);
 
+  // VAT data grouped by rate
+  const vatData = useMemo(() => {
+    if (!receipts) return [];
+
+    const grouped = receipts.reduce((acc: Record<string, { rate: number; label: string; gross: number; net: number; vat: number; count: number }>, receipt) => {
+      const rate = receipt.vat_rate || 0;
+      const key = `${rate}%`;
+
+      if (!acc[key]) {
+        acc[key] = {
+          rate: rate,
+          label: key,
+          gross: 0,
+          net: 0,
+          vat: 0,
+          count: 0,
+        };
+      }
+
+      acc[key].gross += receipt.amount_gross || 0;
+      acc[key].net += receipt.amount_net || 0;
+      acc[key].vat += receipt.vat_amount || 0;
+      acc[key].count += 1;
+
+      return acc;
+    }, {});
+
+    return Object.values(grouped).sort((a, b) => b.rate - a.rate);
+  }, [receipts]);
+
   // Quick period selection
   const setQuickPeriod = (period: 'thisMonth' | 'lastMonth' | 'thisYear') => {
     const now = new Date();
@@ -411,13 +447,207 @@ const Reports = () => {
     }
   };
 
-  // Export handlers
-  const exportReport = (formatType: 'pdf' | 'excel' | 'csv') => {
-    toast({
-      title: 'Export gestartet',
-      description: `Der Bericht wird als ${formatType.toUpperCase()} exportiert...`,
+  // Export to PDF
+  const exportToPDF = () => {
+    if (!stats || !dateRange.from || !dateRange.to) return;
+
+    const doc = new jsPDF();
+    const dateStr = format(dateRange.from, 'dd.MM.yyyy', { locale: de });
+    const dateEndStr = format(dateRange.to, 'dd.MM.yyyy', { locale: de });
+
+    doc.setFontSize(18);
+    doc.text('Ausgaben-Bericht', 20, 20);
+
+    doc.setFontSize(12);
+    doc.text(`Zeitraum: ${dateStr} - ${dateEndStr}`, 20, 30);
+
+    doc.setFontSize(14);
+    doc.text('Zusammenfassung', 20, 45);
+
+    doc.setFontSize(10);
+    doc.text(`Gesamtausgaben (Brutto): ${formatCurrency(stats.totalGross)}`, 20, 55);
+    doc.text(`Nettobetrag: ${formatCurrency(stats.totalNet)}`, 20, 62);
+    doc.text(`Vorsteuer: ${formatCurrency(stats.totalVat)}`, 20, 69);
+    doc.text(`Anzahl Belege: ${stats.count}`, 20, 76);
+
+    // Category table
+    doc.setFontSize(14);
+    doc.text('Nach Kategorie', 20, 90);
+
+    const catTableData = categoryData.map((cat) => [
+      cat.name,
+      cat.count.toString(),
+      formatCurrency(cat.amount),
+      formatCurrency(cat.vat),
+    ]);
+
+    autoTable(doc, {
+      startY: 95,
+      head: [['Kategorie', 'Anzahl', 'Brutto', 'Vorsteuer']],
+      body: catTableData,
     });
-    // TODO: Implement actual export logic
+
+    // VAT table
+    const finalY = (doc as any).lastAutoTable?.finalY || 120;
+    doc.setFontSize(14);
+    doc.text('Nach MwSt-Satz', 20, finalY + 15);
+
+    const vatTableData = vatData.map((vat) => [
+      vat.label,
+      vat.count.toString(),
+      formatCurrency(vat.gross),
+      formatCurrency(vat.net),
+      formatCurrency(vat.vat),
+    ]);
+
+    autoTable(doc, {
+      startY: finalY + 20,
+      head: [['MwSt-Satz', 'Anzahl', 'Brutto', 'Netto', 'Vorsteuer']],
+      body: vatTableData,
+    });
+
+    const fileName = `bericht_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}.pdf`;
+    doc.save(fileName);
+
+    toast({
+      title: 'PDF exportiert',
+      description: `Bericht wurde als ${fileName} gespeichert.`,
+    });
+  };
+
+  // Export to Excel
+  const exportToExcel = () => {
+    if (!stats || !receipts || !dateRange.from || !dateRange.to) return;
+
+    const workbook = XLSX.utils.book_new();
+    const dateStr = format(dateRange.from, 'dd.MM.yyyy', { locale: de });
+    const dateEndStr = format(dateRange.to, 'dd.MM.yyyy', { locale: de });
+
+    // Summary sheet
+    const summaryData = [
+      ['Ausgaben-Bericht'],
+      ['Zeitraum', `${dateStr} - ${dateEndStr}`],
+      [''],
+      ['Gesamtausgaben (Brutto)', stats.totalGross],
+      ['Nettobetrag', stats.totalNet],
+      ['Vorsteuer', stats.totalVat],
+      ['Anzahl Belege', stats.count],
+    ];
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Zusammenfassung');
+
+    // Categories sheet
+    const catData = categoryData.map((cat) => ({
+      Kategorie: cat.name,
+      Anzahl: cat.count,
+      Brutto: cat.amount,
+      Netto: cat.amount - cat.vat,
+      Vorsteuer: cat.vat,
+    }));
+    const catSheet = XLSX.utils.json_to_sheet(catData);
+    XLSX.utils.book_append_sheet(workbook, catSheet, 'Kategorien');
+
+    // Vendors sheet
+    const vendorSheetData = vendorData.map((v) => ({
+      Lieferant: v.name,
+      Anzahl: v.count,
+      Brutto: v.amount,
+      Vorsteuer: v.vat,
+    }));
+    const vendorSheet = XLSX.utils.json_to_sheet(vendorSheetData);
+    XLSX.utils.book_append_sheet(workbook, vendorSheet, 'Lieferanten');
+
+    // VAT sheet
+    const vatSheetData = vatData.map((v) => ({
+      'MwSt-Satz': v.label,
+      Anzahl: v.count,
+      Brutto: v.gross,
+      Netto: v.net,
+      Vorsteuer: v.vat,
+    }));
+    const vatSheet = XLSX.utils.json_to_sheet(vatSheetData);
+    XLSX.utils.book_append_sheet(workbook, vatSheet, 'MwSt');
+
+    // All receipts sheet
+    const receiptsData = receipts.map((r) => ({
+      Datum: r.receipt_date,
+      Lieferant: r.vendor_brand || r.vendor,
+      Beschreibung: r.description,
+      Kategorie: r.category,
+      Brutto: r.amount_gross,
+      Netto: r.amount_net,
+      'MwSt-Satz': r.vat_rate,
+      Vorsteuer: r.vat_amount,
+      'Rechnungsnr.': r.invoice_number,
+    }));
+    const receiptsSheet = XLSX.utils.json_to_sheet(receiptsData);
+    XLSX.utils.book_append_sheet(workbook, receiptsSheet, 'Belege');
+
+    const fileName = `bericht_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+
+    toast({
+      title: 'Excel exportiert',
+      description: `Bericht wurde als ${fileName} gespeichert.`,
+    });
+  };
+
+  // Export to CSV
+  const exportToCSV = () => {
+    if (!receipts || !dateRange.from || !dateRange.to) return;
+
+    const headers = [
+      'Datum',
+      'Lieferant',
+      'Beschreibung',
+      'Kategorie',
+      'Brutto',
+      'Netto',
+      'MwSt-Satz',
+      'Vorsteuer',
+      'Rechnungsnr.',
+    ];
+
+    const rows = receipts.map((r) => [
+      r.receipt_date || '',
+      r.vendor_brand || r.vendor || '',
+      r.description || '',
+      r.category || '',
+      r.amount_gross?.toFixed(2) || '',
+      r.amount_net?.toFixed(2) || '',
+      r.vat_rate?.toString() || '',
+      r.vat_amount?.toFixed(2) || '',
+      r.invoice_number || '',
+    ]);
+
+    const csv = [
+      headers.join(';'),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(';')),
+    ].join('\n');
+
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const fileName = `bericht_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}.csv`;
+    saveAs(blob, fileName);
+
+    toast({
+      title: 'CSV exportiert',
+      description: `Bericht wurde als ${fileName} gespeichert.`,
+    });
+  };
+
+  // Export handler
+  const exportReport = (formatType: 'pdf' | 'excel' | 'csv') => {
+    switch (formatType) {
+      case 'pdf':
+        exportToPDF();
+        break;
+      case 'excel':
+        exportToExcel();
+        break;
+      case 'csv':
+        exportToCSV();
+        break;
+    }
   };
 
   // Format date range for display
@@ -992,6 +1222,95 @@ const Reports = () => {
                   </TableRow>
                 </TableFooter>
               </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* VAT Overview Section */}
+        <Card className="border-border/50 mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Vorsteuer-Übersicht</CardTitle>
+            <CardDescription>Aufschlüsselung nach MwSt-Satz</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-2">
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : vatData.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                Keine Daten für den gewählten Zeitraum
+              </div>
+            ) : (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>MwSt-Satz</TableHead>
+                      <TableHead className="text-right">Anzahl</TableHead>
+                      <TableHead className="text-right">Brutto</TableHead>
+                      <TableHead className="text-right">Netto</TableHead>
+                      <TableHead className="text-right">Vorsteuer</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {vatData.map((vat) => (
+                      <TableRow key={vat.label}>
+                        <TableCell>
+                          <Badge variant="outline">{vat.label}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{vat.count}</TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(vat.gross)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(vat.net)}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(vat.vat)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell className="font-medium">Gesamt</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {stats?.count || 0}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(stats?.totalGross || 0)}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(stats?.totalNet || 0)}
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-success">
+                        {formatCurrency(stats?.totalVat || 0)}
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+
+                {/* VAT Note */}
+                <div className="mt-4 p-3 bg-blue-500/10 rounded-lg flex items-start gap-2">
+                  <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-blue-600 dark:text-blue-400">
+                    Die Vorsteuer von{' '}
+                    <strong>{formatCurrency(stats?.totalVat || 0)}</strong> kann in
+                    der UVA für den Zeitraum{' '}
+                    {dateRange.from
+                      ? format(dateRange.from, 'dd.MM.yyyy', { locale: de })
+                      : ''}{' '}
+                    -{' '}
+                    {dateRange.to
+                      ? format(dateRange.to, 'dd.MM.yyyy', { locale: de })
+                      : ''}{' '}
+                    geltend gemacht werden.
+                  </p>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
