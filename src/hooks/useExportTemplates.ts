@@ -14,6 +14,7 @@ export interface ExportColumn {
   visible: boolean;
   order: number;
   width?: number;
+  align?: 'left' | 'center' | 'right';
 }
 
 // Export template type
@@ -38,19 +39,59 @@ export interface ExportTemplate {
 
 // Default columns for new templates
 export const DEFAULT_COLUMNS: ExportColumn[] = [
-  { id: '1', field: 'receipt_date', label: 'Datum', type: 'date', format: 'DD.MM.YYYY', visible: true, order: 0 },
-  { id: '2', field: 'vendor', label: 'Lieferant', type: 'text', format: null, visible: true, order: 1 },
-  { id: '3', field: 'description', label: 'Beschreibung', type: 'text', format: null, visible: true, order: 2 },
-  { id: '4', field: 'invoice_number', label: 'Rechnungsnr.', type: 'text', format: null, visible: true, order: 3 },
-  { id: '5', field: 'category', label: 'Kategorie', type: 'text', format: null, visible: true, order: 4 },
-  { id: '6', field: 'amount_gross', label: 'Brutto', type: 'currency', format: '€ #.##0,00', visible: true, order: 5 },
-  { id: '7', field: 'amount_net', label: 'Netto', type: 'currency', format: '€ #.##0,00', visible: true, order: 6 },
-  { id: '8', field: 'vat_rate', label: 'MwSt-Satz', type: 'percent', format: '#0%', visible: true, order: 7 },
-  { id: '9', field: 'vat_amount', label: 'Vorsteuer', type: 'currency', format: '€ #.##0,00', visible: true, order: 8 },
-  { id: '10', field: 'payment_method', label: 'Zahlungsart', type: 'text', format: null, visible: false, order: 9 },
-  { id: '11', field: 'status', label: 'Status', type: 'text', format: null, visible: false, order: 10 },
-  { id: '12', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 11 },
+  { id: '1', field: 'receipt_date', label: 'Datum', type: 'date', format: 'DD.MM.YYYY', visible: true, order: 0, align: 'left' },
+  { id: '2', field: 'vendor', label: 'Lieferant', type: 'text', format: null, visible: true, order: 1, align: 'left' },
+  { id: '3', field: 'description', label: 'Beschreibung', type: 'text', format: null, visible: true, order: 2, align: 'left' },
+  { id: '4', field: 'invoice_number', label: 'Rechnungsnr.', type: 'text', format: null, visible: true, order: 3, align: 'left' },
+  { id: '5', field: 'category', label: 'Kategorie', type: 'text', format: null, visible: true, order: 4, align: 'left' },
+  { id: '6', field: 'amount_gross', label: 'Brutto', type: 'currency', format: '€ #.##0,00', visible: true, order: 5, align: 'right' },
+  { id: '7', field: 'amount_net', label: 'Netto', type: 'currency', format: '€ #.##0,00', visible: true, order: 6, align: 'right' },
+  { id: '8', field: 'vat_rate', label: 'MwSt-Satz', type: 'percent', format: '#0%', visible: true, order: 7, align: 'right' },
+  { id: '9', field: 'vat_amount', label: 'Vorsteuer', type: 'currency', format: '€ #.##0,00', visible: true, order: 8, align: 'right' },
+  { id: '10', field: 'payment_method', label: 'Zahlungsart', type: 'text', format: null, visible: false, order: 9, align: 'left' },
+  { id: '11', field: 'status', label: 'Status', type: 'text', format: null, visible: false, order: 10, align: 'left' },
+  { id: '12', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 11, align: 'left' },
 ];
+
+// Format preview function
+export const formatPreview = (type: ExportColumn['type'], format: string | null): string => {
+  const sampleValues = {
+    date: new Date('2024-01-15'),
+    currency: 1234.56,
+    percent: 20,
+    number: 1234,
+    text: 'Beispieltext'
+  };
+
+  const value = sampleValues[type];
+
+  if (type === 'date' && format) {
+    const d = value as Date;
+    return format
+      .replace('DD', String(d.getDate()).padStart(2, '0'))
+      .replace('MM', String(d.getMonth() + 1).padStart(2, '0'))
+      .replace('YYYY', String(d.getFullYear()))
+      .replace('YY', String(d.getFullYear()).slice(-2));
+  }
+
+  if (type === 'currency') {
+    const num = value as number;
+    const formatted = num.toLocaleString('de-AT', { minimumFractionDigits: 2 });
+    if (format?.startsWith('€')) return `€ ${formatted}`;
+    if (format?.endsWith('€')) return `${formatted} €`;
+    return formatted;
+  }
+
+  if (type === 'percent') {
+    return `${value}%`;
+  }
+
+  if (type === 'number') {
+    return (value as number).toLocaleString('de-AT');
+  }
+
+  return String(value);
+};
 
 // Field type definitions with format options
 export const FIELD_TYPES = {
