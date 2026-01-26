@@ -31,6 +31,10 @@ import {
   CheckSquare,
   Square,
   Pencil,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  MousePointerClick,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +72,7 @@ import {
   DEFAULT_COLUMNS,
   FIELD_TYPES,
   AVAILABLE_FIELDS,
+  formatPreview,
   type ExportTemplate,
   type ExportColumn,
 } from '@/hooks/useExportTemplates';
@@ -353,6 +358,22 @@ export function ExportTemplateEditor({
     }
   };
 
+  // Generic column update function
+  const updateColumn = (columnId: string, updates: Partial<ExportColumn>) => {
+    if (!editingTemplate) return;
+
+    setEditingTemplate({
+      ...editingTemplate,
+      columns: editingTemplate.columns.map(col =>
+        col.id === columnId ? { ...col, ...updates } : col
+      ),
+    });
+
+    if (selectedColumn?.id === columnId) {
+      setSelectedColumn({ ...selectedColumn, ...updates });
+    }
+  };
+
   // Show/hide all columns
   const showAllColumns = () => {
     if (!editingTemplate) return;
@@ -581,11 +602,14 @@ export function ExportTemplateEditor({
               </Card>
 
               {/* Selected column editor */}
-              {selectedColumn && (
+              {selectedColumn ? (
                 <Card className="border-primary">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">Spalte bearbeiten</CardTitle>
+                      <div>
+                        <CardTitle className="text-base">Spalte bearbeiten</CardTitle>
+                        <CardDescription>{selectedColumn.field}</CardDescription>
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -596,35 +620,33 @@ export function ExportTemplateEditor({
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Column label */}
                     <div className="space-y-2">
-                      <Label>Bezeichnung</Label>
+                      <Label>Spaltenüberschrift</Label>
                       <Input
                         value={selectedColumn.label}
-                        onChange={(e) => updateColumnLabel(selectedColumn.id, e.target.value)}
+                        onChange={(e) => updateColumn(selectedColumn.id, { label: e.target.value })}
+                        placeholder="z.B. Datum"
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Feld</Label>
-                        <Input value={selectedColumn.field} disabled className="bg-muted" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Typ</Label>
-                        <Input
-                          value={FIELD_TYPES[selectedColumn.type]?.label || selectedColumn.type}
-                          disabled
-                          className="bg-muted"
-                        />
-                      </div>
+                    {/* Field type (readonly) */}
+                    <div className="space-y-2">
+                      <Label>Feldtyp</Label>
+                      <Input
+                        value={FIELD_TYPES[selectedColumn.type]?.label || selectedColumn.type}
+                        disabled
+                        className="bg-muted"
+                      />
                     </div>
 
+                    {/* Format (based on type) */}
                     {FIELD_TYPES[selectedColumn.type]?.formats && (
                       <div className="space-y-2">
                         <Label>Format</Label>
                         <Select
                           value={selectedColumn.format || ''}
-                          onValueChange={(val) => updateColumnFormat(selectedColumn.id, val)}
+                          onValueChange={(val) => updateColumn(selectedColumn.id, { format: val })}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Format wählen..." />
@@ -632,7 +654,12 @@ export function ExportTemplateEditor({
                           <SelectContent>
                             {FIELD_TYPES[selectedColumn.type].formats?.map((format) => (
                               <SelectItem key={format} value={format}>
-                                {format}
+                                <span className="flex items-center gap-2">
+                                  {format}
+                                  <span className="text-muted-foreground">
+                                    ({formatPreview(selectedColumn.type, format)})
+                                  </span>
+                                </span>
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -640,13 +667,74 @@ export function ExportTemplateEditor({
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2">
+                    {/* Width */}
+                    <div className="space-y-2">
+                      <Label>Spaltenbreite (optional)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          value={selectedColumn.width || ''}
+                          onChange={(e) => updateColumn(selectedColumn.id, { 
+                            width: e.target.value ? parseInt(e.target.value) : undefined 
+                          })}
+                          placeholder="Auto"
+                          className="w-24"
+                        />
+                        <span className="text-sm text-muted-foreground">Pixel</span>
+                      </div>
+                    </div>
+
+                    {/* Alignment */}
+                    <div className="space-y-2">
+                      <Label>Ausrichtung</Label>
+                      <div className="flex gap-1">
+                        <Button
+                          variant={selectedColumn.align === 'left' || !selectedColumn.align ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => updateColumn(selectedColumn.id, { align: 'left' })}
+                        >
+                          <AlignLeft className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant={selectedColumn.align === 'center' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => updateColumn(selectedColumn.id, { align: 'center' })}
+                        >
+                          <AlignCenter className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant={selectedColumn.align === 'right' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => updateColumn(selectedColumn.id, { align: 'right' })}
+                        >
+                          <AlignRight className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Visibility */}
+                    <div className="flex items-center justify-between">
+                      <Label>Sichtbar im Export</Label>
                       <Switch
                         checked={selectedColumn.visible}
-                        onCheckedChange={() => toggleColumnVisibility(selectedColumn.id)}
+                        onCheckedChange={(v) => updateColumn(selectedColumn.id, { visible: v })}
                       />
-                      <Label>Sichtbar im Export</Label>
                     </div>
+
+                    {/* Preview */}
+                    <div className="pt-4 border-t">
+                      <Label className="text-muted-foreground">Vorschau</Label>
+                      <div className="mt-2 p-3 bg-muted rounded-lg font-mono text-sm">
+                        {formatPreview(selectedColumn.type, selectedColumn.format)}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <MousePointerClick className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                    <p className="text-muted-foreground">Wähle eine Spalte zum Bearbeiten</p>
                   </CardContent>
                 </Card>
               )}
