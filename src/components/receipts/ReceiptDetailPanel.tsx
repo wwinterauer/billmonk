@@ -10,6 +10,8 @@ import {
   FileText,
   ZoomIn,
   AlertCircle,
+  RefreshCw,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar } from '@/components/ui/calendar';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -45,6 +48,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
@@ -53,6 +63,7 @@ import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PdfViewer } from './PdfViewer';
+import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
@@ -96,6 +107,12 @@ export function ReceiptDetailPanel({
   const [fileError, setFileError] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
+  
+  // AI Re-run state
+  const [isRerunning, setIsRerunning] = useState(false);
+  const [hasUnsavedAiChanges, setHasUnsavedAiChanges] = useState(false);
+  const [changedFields, setChangedFields] = useState<Record<string, { old: string; new: string }>>({});
+  const [currentAiConfidence, setCurrentAiConfidence] = useState<number | null>(null);
 
   // Form state
   const [vendor, setVendor] = useState('');
@@ -253,12 +270,107 @@ export function ReceiptDetailPanel({
     }
   };
 
+  // AI Re-run handler
+  const handleRerunAI = async () => {
+    if (!receipt?.file_url || isRerunning || !signedUrl) return;
+
+    setIsRerunning(true);
+    setHasUnsavedAiChanges(false);
+    setChangedFields({});
+
+    try {
+      // 1. Fetch file as blob using the signed URL
+      const response = await fetch(signedUrl);
+      if (!response.ok) {
+        throw new Error('Datei konnte nicht geladen werden');
+      }
+
+      const blob = await response.blob();
+      const file = new File([blob], receipt.file_name || 'receipt', { type: blob.type });
+
+      // 2. Call AI extraction
+      const extracted = await extractReceiptData(file);
+      const normalized = normalizeExtractionResult(extracted);
+
+      if (!normalized) {
+        throw new Error('KI-Erkennung hat keine Daten zurückgegeben');
+      }
+
+      // 3. Track changed fields
+      const changes: Record<string, { old: string; new: string }> = {};
+      
+      const compareAndUpdate = (field: string, oldVal: string, newVal: string | null, setter: (val: string) => void) => {
+        const newValue = newVal || '';
+        if (oldVal !== newValue && newValue) {
+          changes[field] = { old: oldVal, new: newValue };
+          setter(newValue);
+        }
+      };
+
+      compareAndUpdate('Lieferant', vendor, normalized.vendor, setVendor);
+      compareAndUpdate('Beschreibung', description, normalized.description, setDescription);
+      compareAndUpdate('Rechnungsnummer', invoiceNumber, normalized.invoice_number, setInvoiceNumber);
+      compareAndUpdate('Kategorie', category, normalized.category, setCategory);
+      compareAndUpdate('Zahlungsart', paymentMethod, normalized.payment_method, setPaymentMethod);
+      
+      if (normalized.amount_gross !== null) {
+        const newAmount = normalized.amount_gross.toString();
+        if (amountGross !== newAmount) {
+          changes['Bruttobetrag'] = { old: amountGross || '-', new: newAmount };
+          setAmountGross(newAmount);
+        }
+      }
+      
+      if (normalized.vat_rate !== null) {
+        const newRate = normalized.vat_rate.toString();
+        if (vatRate !== newRate) {
+          changes['MwSt-Satz'] = { old: vatRate || '-', new: newRate + '%' };
+          setVatRate(newRate);
+        }
+      }
+      
+      if (normalized.receipt_date) {
+        const newDate = new Date(normalized.receipt_date);
+        const oldDateStr = receiptDate ? format(receiptDate, 'dd.MM.yyyy') : '-';
+        const newDateStr = format(newDate, 'dd.MM.yyyy');
+        if (oldDateStr !== newDateStr) {
+          changes['Datum'] = { old: oldDateStr, new: newDateStr };
+          setReceiptDate(newDate);
+        }
+      }
+
+      // 4. Update confidence
+      setCurrentAiConfidence(normalized.confidence);
+      
+      if (Object.keys(changes).length > 0) {
+        setChangedFields(changes);
+        setHasUnsavedAiChanges(true);
+      }
+
+      toast({
+        title: 'KI-Erkennung abgeschlossen',
+        description: `Konfidenz: ${Math.round(normalized.confidence * 100)}% - ${Object.keys(changes).length} Feld(er) aktualisiert`,
+      });
+
+    } catch (error) {
+      console.error('Rerun AI error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler bei KI-Erkennung',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setIsRerunning(false);
+    }
+  };
+
   const handleSave = async (newStatus?: 'approved' | 'rejected') => {
     if (!receipt) return;
 
     setSaving(true);
     try {
-      await updateReceipt(receipt.id, {
+      // Build update data
+      const updateData: Record<string, unknown> = {
         vendor: vendor || null,
         description: description || null,
         receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null,
@@ -270,8 +382,24 @@ export function ReceiptDetailPanel({
         vat_rate: parseFloat(vatRate) || null,
         payment_method: paymentMethod || null,
         notes: notes || null,
-        ...(newStatus && { status: newStatus }),
-      });
+      };
+
+      // Add status if provided
+      if (newStatus) {
+        updateData.status = newStatus;
+      }
+
+      // Update ai_confidence and ai_processed_at if AI was re-run
+      if (currentAiConfidence !== null) {
+        updateData.ai_confidence = currentAiConfidence;
+        updateData.ai_processed_at = new Date().toISOString();
+      }
+
+      await updateReceipt(receipt.id, updateData as Partial<Receipt>);
+
+      // Reset AI changes state
+      setHasUnsavedAiChanges(false);
+      setChangedFields({});
 
       const statusMessages = {
         approved: 'Beleg freigegeben',
@@ -455,29 +583,83 @@ export function ReceiptDetailPanel({
 
                   {/* Right Column - Form */}
                   <div className="space-y-4">
-                    {/* AI Confidence Box */}
-                    {receipt.ai_confidence && receipt.ai_confidence > 0 && (
-                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-start gap-3">
-                        <Sparkles className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="bg-primary/10 text-primary">
-                              KI-Erkennung: {Math.round(receipt.ai_confidence * 100)}%
-                            </Badge>
-                            <Tooltip>
-                              <TooltipTrigger>
-                                <Info className="h-4 w-4 text-muted-foreground" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="max-w-[200px]">
-                                  Diese Werte wurden automatisch erkannt. 
-                                  Bitte überprüfen und bei Bedarf korrigieren.
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
+                    {/* AI Confidence Box with Re-run Button */}
+                    <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="secondary" className="bg-primary/10 text-primary cursor-help">
+                                KI-Erkennung: {Math.round((currentAiConfidence ?? receipt?.ai_confidence ?? 0) * 100)}%
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-[250px]">
+                              <div className="space-y-1 text-sm">
+                                <p><strong>Erkannt mit:</strong> Lovable AI (Gemini)</p>
+                                {receipt?.created_at && (
+                                  <p><strong>Zeitpunkt:</strong> {format(new Date(receipt.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}</p>
+                                )}
+                                <p><strong>Konfidenz:</strong> {Math.round((currentAiConfidence ?? receipt?.ai_confidence ?? 0) * 100)}%</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
+                        
+                        {/* Re-run AI Button */}
+                        {receipt?.file_url && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                disabled={isRerunning || fileLoading}
+                                className="gap-1"
+                              >
+                                {isRerunning ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4" />
+                                )}
+                                <ChevronDown className="h-3 w-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={handleRerunAI} disabled={isRerunning}>
+                                <Sparkles className="h-4 w-4 mr-2" />
+                                Erneut analysieren
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                                <Info className="h-4 w-4 mr-2" />
+                                Verwendet Lovable AI
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
+                    </div>
+
+                    {/* Unsaved AI Changes Alert */}
+                    {hasUnsavedAiChanges && Object.keys(changedFields).length > 0 && (
+                      <Alert className="bg-amber-50 border-amber-200">
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-amber-800">
+                          <div className="space-y-2">
+                            <p className="font-medium">Neue Werte erkannt – Änderungen noch nicht gespeichert</p>
+                            <div className="text-sm space-y-1">
+                              {Object.entries(changedFields).map(([field, { old, new: newVal }]) => (
+                                <div key={field} className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">{field}:</span>
+                                  <span className="line-through text-muted-foreground">{old || '-'}</span>
+                                  <span>→</span>
+                                  <span className="font-medium text-amber-900">{newVal}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </AlertDescription>
+                      </Alert>
                     )}
 
                     {/* Form Fields */}

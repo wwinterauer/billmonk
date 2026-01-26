@@ -26,6 +26,7 @@ export interface Receipt {
   invoice_number: string | null;
   ai_confidence: number | null;
   ai_raw_response: Json | null;
+  ai_processed_at: string | null;
   bank_transaction_id: string | null;
   created_at: string;
   updated_at: string;
