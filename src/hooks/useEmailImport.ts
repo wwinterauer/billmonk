@@ -509,8 +509,16 @@ export const useEmailImport = () => {
     },
   });
 
-  // Start OAuth flow
-  const startOAuth = async (provider: 'gmail' | 'microsoft') => {
+  // Start OAuth flow - currently only Gmail is supported
+  const startOAuth = async (provider: 'gmail') => {
+    // Only Gmail is supported at the moment
+    if (provider !== 'gmail') {
+      toast.error('Nicht verfügbar', {
+        description: 'Bitte verwende IMAP für diesen Anbieter.',
+      });
+      return;
+    }
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       

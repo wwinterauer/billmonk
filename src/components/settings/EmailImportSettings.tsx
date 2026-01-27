@@ -332,6 +332,13 @@ export const EmailImportSettings: React.FC = () => {
     );
   }
 
+  const [activeTab, setActiveTab] = useState("webhook");
+
+  const handleSwitchToImap = () => {
+    setActiveTab("imap");
+    setShowAddAccountDialog(true);
+  };
+
   return (
     <div className="space-y-6">
       {/* OAuth Provider Connection Section */}
@@ -342,11 +349,14 @@ export const EmailImportSettings: React.FC = () => {
             E-Mail-Konto verbinden
           </CardTitle>
           <CardDescription>
-            Verbinden Sie Gmail oder Microsoft 365 für automatischen Beleg-Import
+            Verbinden Sie Gmail mit OAuth oder nutzen Sie IMAP für andere Anbieter
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <OAuthProviderButtons existingAccounts={emailAccounts} />
+          <OAuthProviderButtons 
+            existingAccounts={emailAccounts} 
+            onSwitchToImap={handleSwitchToImap}
+          />
         </CardContent>
       </Card>
 
@@ -361,7 +371,7 @@ export const EmailImportSettings: React.FC = () => {
           </span>
         </div>
       </div>
-      <Tabs defaultValue="webhook" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="webhook" className="gap-2">
             <Webhook className="h-4 w-4" />
