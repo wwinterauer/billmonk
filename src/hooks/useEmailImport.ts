@@ -509,6 +509,74 @@ export const useEmailImport = () => {
     },
   });
 
+  // Start OAuth flow
+  const startOAuth = async (provider: 'gmail' | 'microsoft') => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        toast.error('Nicht angemeldet', {
+          description: 'Bitte melde dich an, um E-Mail-Konten zu verbinden.',
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('oauth-start', {
+        body: { provider },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      
+      if (!data.success || !data.authUrl) {
+        throw new Error(data.error || 'OAuth konnte nicht gestartet werden');
+      }
+
+      // Redirect zu OAuth Provider
+      window.location.href = data.authUrl;
+      
+    } catch (error: any) {
+      console.error('OAuth Start Error:', error);
+      toast.error('Fehler', {
+        description: error.message || 'OAuth konnte nicht gestartet werden',
+      });
+    }
+  };
+
+  // Disconnect OAuth account
+  const disconnectOAuthAccount = async (accountId: string) => {
+    try {
+      const { error } = await supabase
+        .from('email_accounts')
+        .update({
+          oauth_access_token: null,
+          oauth_refresh_token: null,
+          oauth_token_expires_at: null,
+          is_active: false,
+        })
+        .eq('id', accountId);
+
+      if (error) throw error;
+
+      toast.success('Verbindung getrennt', {
+        description: 'Das E-Mail-Konto wurde getrennt.',
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
+    } catch (error: any) {
+      toast.error('Fehler', {
+        description: error.message,
+      });
+    }
+  };
+
+  // Refetch email accounts helper
+  const refetchEmailAccounts = () => {
+    queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
+  };
+
   return {
     // Webhook connection
     emailConnection,
@@ -531,6 +599,11 @@ export const useEmailImport = () => {
     isDeletingAccount: deleteEmailAccountMutation.isPending,
     syncEmailAccount: syncEmailAccountMutation.mutate,
     isSyncing: syncEmailAccountMutation.isPending,
+    
+    // OAuth functions
+    startOAuth,
+    disconnectOAuthAccount,
+    refetchEmailAccounts,
     
     // Import history & attachments
     importHistory,
