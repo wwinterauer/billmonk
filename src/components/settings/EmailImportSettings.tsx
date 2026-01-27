@@ -60,10 +60,11 @@ import {
   SkipForward,
   FileText,
   Webhook,
+  AlertCircle,
 } from 'lucide-react';
 import { useEmailImport, EmailAccount, EmailAttachment } from '@/hooks/useEmailImport';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 
 interface AddAccountFormData {
@@ -152,6 +153,59 @@ const imapPresets: Record<string, ImapPreset> = {
     color: 'text-yellow-500',
     authType: 'password',
   },
+};
+
+// Sync-Status Badge Komponente für IMAP-Konten
+const SyncStatusBadge = ({ account }: { account: EmailAccount }) => {
+  const status = account.last_sync_status;
+
+  if (status === 'running' || status === 'syncing') {
+    return (
+      <div className="flex items-center gap-2 text-sm text-blue-600">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        <span>Synchronisiert...</span>
+      </div>
+    );
+  }
+
+  if (status === 'success' && account.last_sync_at) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-green-600">
+        <CheckCircle2 className="h-3 w-3" />
+        <span>
+          {formatDistanceToNow(new Date(account.last_sync_at), { addSuffix: true, locale: de })}
+        </span>
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="flex items-center gap-2 text-sm text-red-600">
+        <AlertCircle className="h-3 w-3" />
+        <span className="truncate max-w-[200px]" title={account.last_sync_error || 'Unbekannter Fehler'}>
+          Fehler
+        </span>
+      </div>
+    );
+  }
+
+  if (status === 'partial') {
+    return (
+      <div className="flex items-center gap-2 text-sm text-yellow-600">
+        <AlertCircle className="h-3 w-3" />
+        <span>Teilweise synchronisiert</span>
+      </div>
+    );
+  }
+
+  // idle oder pending
+  return (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Clock className="h-3 w-3" />
+      <span>Noch nicht synchronisiert</span>
+    </div>
+  );
 };
 
 export const EmailImportSettings: React.FC = () => {
@@ -519,96 +573,162 @@ export const EmailImportSettings: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {emailAccounts.map((account) => (
-                    <div key={account.id} className="border rounded-lg p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Mail className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium">{account.display_name || account.email_address}</p>
-                            <p className="text-sm text-muted-foreground">{account.imap_host}</p>
+                  {/* Alle synchronisieren Button */}
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        emailAccounts.forEach(account => {
+                          if (account.is_active && 
+                              account.last_sync_status !== 'running' && 
+                              account.last_sync_status !== 'syncing') {
+                            syncEmailAccount(account.id);
+                          }
+                        });
+                      }}
+                      disabled={emailAccounts.some(a => 
+                        a.last_sync_status === 'running' || a.last_sync_status === 'syncing'
+                      )}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Alle synchronisieren
+                    </Button>
+                  </div>
+
+                  {emailAccounts.map((account) => {
+                    const isSyncingThis = account.last_sync_status === 'running' || account.last_sync_status === 'syncing';
+                    
+                    return (
+                      <div key={account.id} className="border rounded-lg p-4">
+                        <div className="flex items-start justify-between">
+                          {/* Linke Seite: Account-Info */}
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-primary/10 rounded-lg">
+                              <Mail className="h-5 w-5 text-primary" />
+                            </div>
+                            <div className="space-y-1">
+                              <p className="font-medium">{account.display_name || account.email_address}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {account.imap_host}:{account.imap_port}
+                              </p>
+                              {/* Sync-Status */}
+                              <SyncStatusBadge account={account} />
+                              {/* Import-Statistik */}
+                              <p className="text-sm text-muted-foreground">
+                                {account.total_imported || 0} Rechnungen importiert
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Rechte Seite: Aktionen */}
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={account.is_active}
+                              onCheckedChange={(checked) => updateEmailAccount({ id: account.id, is_active: checked })}
+                            />
+                            {/* Sync-Button */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => syncEmailAccount(account.id)}
+                              disabled={isSyncingThis || !account.is_active}
+                            >
+                              {isSyncingThis ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                  Sync läuft...
+                                </>
+                              ) : (
+                                <>
+                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                  Sync
+                                </>
+                              )}
+                            </Button>
+                            {/* Löschen */}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="icon" className="text-destructive">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>E-Mail-Konto entfernen?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Das Konto wird getrennt. Bereits importierte Belege bleiben erhalten.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteEmailAccount(account.id)}
+                                    disabled={isDeletingAccount}
+                                    className="bg-destructive text-destructive-foreground"
+                                  >
+                                    Entfernen
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(account.last_sync_status)}
-                          <Switch
-                            checked={account.is_active}
-                            onCheckedChange={(checked) => updateEmailAccount({ id: account.id, is_active: checked })}
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Sync-Intervall</p>
-                          <p className="font-medium">
-                            {account.sync_interval === 'manual' ? 'Manuell' : account.sync_interval}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Importiert</p>
-                          <p className="font-medium">{account.total_imported}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Letzter Sync</p>
-                          <p className="font-medium">
-                            {account.last_sync_at
-                              ? format(new Date(account.last_sync_at), 'dd.MM. HH:mm', { locale: de })
-                              : '-'}
-                          </p>
-                        </div>
-                      </div>
 
-                      {account.last_sync_error && (
-                        <Alert variant="destructive">
-                          <XCircle className="h-4 w-4" />
-                          <AlertDescription>{account.last_sync_error}</AlertDescription>
-                        </Alert>
-                      )}
+                        {/* Fehler-Anzeige */}
+                        {account.last_sync_status === 'error' && account.last_sync_error && (
+                          <Alert variant="destructive" className="mt-3">
+                            <XCircle className="h-4 w-4" />
+                            <AlertDescription>{account.last_sync_error}</AlertDescription>
+                          </Alert>
+                        )}
 
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => syncEmailAccount(account.id)}
-                          disabled={isSyncing}
-                        >
-                          {isSyncing ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          ) : (
-                            <Play className="h-4 w-4 mr-2" />
-                          )}
-                          Jetzt synchronisieren
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="text-destructive">
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Entfernen
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>E-Mail-Konto entfernen?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Das Konto wird getrennt. Bereits importierte Belege bleiben erhalten.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteEmailAccount(account.id)}
-                                disabled={isDeletingAccount}
-                                className="bg-destructive text-destructive-foreground"
-                              >
-                                Entfernen
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        {/* Filter-Info */}
+                        {((account.sender_filter && account.sender_filter.length > 0) || 
+                          (account.subject_keywords && account.subject_keywords.length > 0)) && (
+                          <div className="mt-3 pt-3 border-t text-sm text-muted-foreground space-y-1">
+                            {account.sender_filter && account.sender_filter.length > 0 && (
+                              <p>
+                                <span className="font-medium">Absender-Filter:</span>{' '}
+                                {account.sender_filter.join(', ')}
+                              </p>
+                            )}
+                            {account.subject_keywords && account.subject_keywords.length > 0 && (
+                              <p>
+                                <span className="font-medium">Betreff-Keywords:</span>{' '}
+                                {account.subject_keywords.join(', ')}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-3 gap-4 text-sm mt-3 pt-3 border-t">
+                          <div>
+                            <p className="text-muted-foreground">Sync-Intervall</p>
+                            <p className="font-medium">
+                              {account.sync_interval === 'manual' ? 'Manuell' : 
+                               account.sync_interval === '5min' ? 'Alle 5 Min.' :
+                               account.sync_interval === '15min' ? 'Alle 15 Min.' :
+                               account.sync_interval === '30min' ? 'Alle 30 Min.' :
+                               account.sync_interval === '1hour' ? 'Stündlich' : account.sync_interval}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Ordner</p>
+                            <p className="font-medium">{account.inbox_folder || 'INBOX'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Letzter Sync</p>
+                            <p className="font-medium">
+                              {account.last_sync_at
+                                ? format(new Date(account.last_sync_at), 'dd.MM. HH:mm', { locale: de })
+                                : '-'}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
