@@ -168,6 +168,60 @@ export function useReceipts() {
     return data;
   };
 
+  // Helper to convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+    });
+  };
+
+  // Check if file is an image that needs conversion
+  const isConvertibleImage = (file: File): boolean => {
+    return ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type);
+  };
+
+  // Convert image to PDF via edge function
+  const convertImageToPdf = async (
+    file: File,
+    userId: string,
+    onProgress?: (progress: number, statusText?: string) => void
+  ): Promise<{ storagePath: string; fileName: string; fileType: string; fileHash: string }> => {
+    onProgress?.(10, 'Bild wird zu PDF konvertiert...');
+    
+    const base64 = await fileToBase64(file);
+    const base64Data = base64.split(',')[1]; // Remove data:image/xxx;base64, prefix
+
+    const { data, error } = await supabase.functions.invoke('convert-image-to-pdf', {
+      body: {
+        imageData: base64Data,
+        fileName: file.name,
+        contentType: file.type,
+        userId: userId,
+      }
+    });
+
+    if (error) {
+      console.error('Image to PDF conversion failed:', error);
+      throw new Error(`Bildkonvertierung fehlgeschlagen: ${error.message}`);
+    }
+
+    if (!data.success) {
+      throw new Error(data.error || 'Bildkonvertierung fehlgeschlagen');
+    }
+
+    onProgress?.(30, 'PDF erstellt...');
+
+    return {
+      storagePath: data.storagePath,
+      fileName: data.fileName,
+      fileType: data.fileType,
+      fileHash: data.fileHash,
+    };
+  };
+
   const uploadReceipt = async (
     file: File, 
     onProgress?: (progress: number, statusText?: string) => void,
@@ -187,34 +241,60 @@ export function useReceipts() {
       throw new Error(validation.error);
     }
 
-    // Generate hash if not provided
-    const fileHash = options?.fileHash || await generateFileHash(file);
+    let storagePath: string;
+    let fileName: string;
+    let fileType: string;
+    let fileHash: string;
 
-    const storagePath = generateStoragePath(user.id, file.name);
-    const fileExtension = getFileExtension(file.name);
+    // Check if image needs conversion to PDF
+    if (isConvertibleImage(file)) {
+      // Convert image to PDF via edge function
+      const result = await convertImageToPdf(file, user.id, onProgress);
+      storagePath = result.storagePath;
+      fileName = result.fileName;
+      fileType = result.fileType;
+      fileHash = result.fileHash;
+    } else {
+      // PDF or other supported file - upload directly
+      fileHash = options?.fileHash || await generateFileHash(file);
+      storagePath = generateStoragePath(user.id, file.name);
+      fileName = file.name;
+      fileType = getFileExtension(file.name);
 
-    // Phase 1: Upload to Storage (0-50%)
-    onProgress?.(5, 'Wird hochgeladen...');
+      // Phase 1: Upload to Storage (0-50%)
+      onProgress?.(5, 'Wird hochgeladen...');
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('receipts')
-      .upload(storagePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('receipts')
+        .upload(storagePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
 
-    if (uploadError) {
-      throw new Error(`Upload fehlgeschlagen: ${uploadError.message}`);
+      if (uploadError) {
+        throw new Error(`Upload fehlgeschlagen: ${uploadError.message}`);
+      }
+
+      storagePath = uploadData.path;
+      onProgress?.(40, 'Wird hochgeladen...');
     }
 
-    onProgress?.(40, 'Wird hochgeladen...');
+    // Check for exact duplicates BEFORE creating DB entry
+    if (!options?.skipDuplicateCheck && !options?.markAsDuplicate) {
+      const existingReceipt = await checkExactDuplicate(fileHash);
+      if (existingReceipt) {
+        // Clean up uploaded file since it's a duplicate
+        await supabase.storage.from('receipts').remove([storagePath]);
+        throw new Error(`DUPLICATE:${JSON.stringify(existingReceipt)}`);
+      }
+    }
 
     // Create database entry with 'processing' status
     const insertData = {
       user_id: user.id,
-      file_url: uploadData.path,
-      file_name: file.name,
-      file_type: fileExtension,
+      file_url: storagePath,
+      file_name: fileName,
+      file_type: fileType,
       file_hash: fileHash,
       status: options?.markAsDuplicate ? 'duplicate' : 'processing',
       is_duplicate: options?.markAsDuplicate || false,

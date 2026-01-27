@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.sync-microsoft]
 verify_jwt = false
+
+[functions.convert-image-to-pdf]
+verify_jwt = false
