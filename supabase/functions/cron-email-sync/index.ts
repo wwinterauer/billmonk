@@ -56,7 +56,7 @@ serve(async (req) => {
     console.log(`Gefunden: ${accounts.length} aktive Accounts, ${availableAccounts.length} verfügbar für Sync`);
 
     const now = new Date();
-    const syncResults: { accountId: string; email: string; status: string; error?: string }[] = [];
+    const syncResults: { accountId: string; email: string; status: string; imported?: number; error?: string }[] = [];
 
     for (const account of availableAccounts) {
       try {
@@ -78,16 +78,16 @@ serve(async (req) => {
           }
         }
 
-        console.log(`${account.email_address}: Starte Sync...`);
-
         // Richtige Sync-Funktion basierend auf OAuth-Provider wählen
         let functionName = "sync-imap-emails"; // Default: IMAP
         
         if (account.oauth_provider === "gmail") {
           functionName = "sync-gmail";
         } else if (account.oauth_provider === "microsoft") {
-          functionName = "sync-microsoft"; // To be implemented
+          functionName = "sync-microsoft";
         }
+
+        console.log(`${account.email_address}: Starte ${functionName}...`);
 
         // Sync-Funktion aufrufen
         const { data: syncResult, error: syncError } = await supabase.functions.invoke(
@@ -105,6 +105,7 @@ serve(async (req) => {
             accountId: account.id, 
             email: account.email_address, 
             status: "success",
+            imported: syncResult.imported || 0,
           });
         } else {
           throw new Error(syncResult?.error || "Unbekannter Fehler");
