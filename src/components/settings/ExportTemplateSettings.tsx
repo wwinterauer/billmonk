@@ -495,7 +495,7 @@ export function ExportTemplateSettings() {
           value={selectedTemplateId || 'new'}
           onValueChange={loadTemplate}
         >
-          <SelectTrigger className="w-[220px]">
+          <SelectTrigger className="w-[320px]">
             <SelectValue placeholder="Vorlage wählen..." />
           </SelectTrigger>
           <SelectContent>
