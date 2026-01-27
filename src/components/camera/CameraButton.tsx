@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Camera } from 'lucide-react';
 import { CameraCapture } from './CameraCapture';
@@ -10,11 +11,16 @@ export function CameraButton() {
   const [showCamera, setShowCamera] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const handleComplete = async (files: File[]) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Nicht angemeldet");
+
+      let storagePath: string;
+      let fileName: string;
+      let fileHash: string;
 
       if (files.length === 1) {
         // Einzelne Seite → bestehende Bild-zu-PDF Konvertierung nutzen
@@ -36,26 +42,9 @@ export function CameraButton() {
         });
 
         if (error) throw error;
-
-        // Receipt erstellen
-        const { error: receiptError } = await supabase
-          .from('receipts')
-          .insert({
-            user_id: user.id,
-            file_url: data.storagePath,
-            file_name: data.fileName,
-            file_type: 'application/pdf',
-            file_hash: data.fileHash,
-            status: 'pending',
-            source: 'camera',
-          });
-
-        if (receiptError) throw receiptError;
-
-        toast({
-          title: "Beleg aufgenommen",
-          description: "Der Beleg wird jetzt von der KI verarbeitet.",
-        });
+        storagePath = data.storagePath;
+        fileName = data.fileName;
+        fileHash = data.fileHash;
 
       } else {
         // Mehrere Seiten → kombinieren
@@ -79,30 +68,48 @@ export function CameraButton() {
         });
 
         if (error) throw error;
-
-        // Receipt erstellen
-        const { error: receiptError } = await supabase
-          .from('receipts')
-          .insert({
-            user_id: user.id,
-            file_url: data.storagePath,
-            file_name: data.fileName,
-            file_type: 'application/pdf',
-            file_hash: data.fileHash,
-            status: 'pending',
-            source: 'camera',
-          });
-
-        if (receiptError) throw receiptError;
-
-        toast({
-          title: "Beleg aufgenommen",
-          description: `${files.length} Seiten wurden zu einem PDF kombiniert.`,
-        });
+        storagePath = data.storagePath;
+        fileName = data.fileName;
+        fileHash = data.fileHash;
       }
 
-      // Receipts-Liste neu laden
+      // Receipt erstellen mit .select() um ID zu bekommen
+      const { data: receipt, error: receiptError } = await supabase
+        .from('receipts')
+        .insert({
+          user_id: user.id,
+          file_url: storagePath,
+          file_name: fileName,
+          file_type: 'application/pdf',
+          file_hash: fileHash,
+          status: 'processing',
+          source: 'camera',
+        })
+        .select()
+        .single();
+
+      if (receiptError) throw receiptError;
+
+      toast({
+        title: "Beleg aufgenommen",
+        description: "KI-Analyse wird gestartet...",
+      });
+
+      // KI-Extraktion triggern
+      supabase.functions.invoke('extract-receipt', {
+        body: { receiptId: receipt.id }
+      }).then(() => {
+        // Query invalidieren nach KI-Verarbeitung
+        queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      }).catch(err => {
+        console.error('KI-Extraktion Fehler:', err);
+      });
+
+      // Receipts-Liste sofort neu laden
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
+
+      // Zur Review-Seite navigieren
+      navigate('/review');
 
     } catch (error: any) {
       console.error('Camera upload error:', error);
