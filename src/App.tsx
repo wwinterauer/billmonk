@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
+import { CameraButton } from "@/components/camera/CameraButton";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -99,6 +100,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
           <InstallPrompt />
+          <CameraButton />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
