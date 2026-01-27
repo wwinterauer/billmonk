@@ -738,6 +738,7 @@ export type Database = {
           duplicate_checked_at: string | null
           duplicate_of: string | null
           duplicate_score: number | null
+          email_attachment_id: string | null
           file_hash: string | null
           file_name: string | null
           file_type: string | null
@@ -749,6 +750,7 @@ export type Database = {
           notes: string | null
           payment_method: string | null
           receipt_date: string | null
+          source: string | null
           status: string | null
           updated_at: string | null
           user_id: string
@@ -774,6 +776,7 @@ export type Database = {
           duplicate_checked_at?: string | null
           duplicate_of?: string | null
           duplicate_score?: number | null
+          email_attachment_id?: string | null
           file_hash?: string | null
           file_name?: string | null
           file_type?: string | null
@@ -785,6 +788,7 @@ export type Database = {
           notes?: string | null
           payment_method?: string | null
           receipt_date?: string | null
+          source?: string | null
           status?: string | null
           updated_at?: string | null
           user_id: string
@@ -810,6 +814,7 @@ export type Database = {
           duplicate_checked_at?: string | null
           duplicate_of?: string | null
           duplicate_score?: number | null
+          email_attachment_id?: string | null
           file_hash?: string | null
           file_name?: string | null
           file_type?: string | null
@@ -821,6 +826,7 @@ export type Database = {
           notes?: string | null
           payment_method?: string | null
           receipt_date?: string | null
+          source?: string | null
           status?: string | null
           updated_at?: string | null
           user_id?: string
@@ -844,6 +850,13 @@ export type Database = {
             columns: ["duplicate_of"]
             isOneToOne: false
             referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_email_attachment_id_fkey"
+            columns: ["email_attachment_id"]
+            isOneToOne: false
+            referencedRelation: "email_attachments"
             referencedColumns: ["id"]
           },
           {
