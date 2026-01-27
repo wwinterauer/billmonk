@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.oauth-callback]
 verify_jwt = false
+
+[functions.sync-gmail]
+verify_jwt = false

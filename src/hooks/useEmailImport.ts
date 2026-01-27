@@ -381,10 +381,25 @@ export const useEmailImport = () => {
     },
   });
 
-  // Trigger manual sync for IMAP account with optimistic UI updates
+  // Trigger manual sync for email account with optimistic UI updates
+  // Automatically selects correct sync function based on oauth_provider
   const syncEmailAccountMutation = useMutation({
     mutationFn: async (accountId: string) => {
-      const { data, error } = await supabase.functions.invoke('sync-imap-emails', {
+      // Find account to determine correct sync function
+      const account = emailAccounts.find(a => a.id === accountId);
+      
+      // Select sync function based on OAuth provider
+      let functionName = 'sync-imap-emails'; // Default: IMAP
+      
+      if (account?.oauth_provider === 'gmail') {
+        functionName = 'sync-gmail';
+      } else if (account?.oauth_provider === 'microsoft') {
+        functionName = 'sync-microsoft'; // To be implemented
+      }
+      
+      console.log(`Syncing account ${accountId} with ${functionName}`);
+      
+      const { data, error } = await supabase.functions.invoke(functionName, {
         body: { accountId },
       });
 

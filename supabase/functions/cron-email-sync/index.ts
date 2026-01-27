@@ -29,10 +29,10 @@ serve(async (req) => {
   try {
     console.log("Starting scheduled email sync check...");
 
-    // Alle aktiven IMAP-Konten laden, die NICHT gerade synchronisieren
+    // Alle aktiven E-Mail-Konten laden (IMAP und OAuth), die NICHT gerade synchronisieren
     const { data: accounts, error: fetchError } = await supabase
       .from("email_accounts")
-      .select("id, email_address, sync_interval, last_sync_at, last_sync_status")
+      .select("id, email_address, sync_interval, last_sync_at, last_sync_status, oauth_provider")
       .eq("is_active", true)
       .neq("sync_interval", "manual");
 
@@ -80,9 +80,18 @@ serve(async (req) => {
 
         console.log(`${account.email_address}: Starte Sync...`);
 
+        // Richtige Sync-Funktion basierend auf OAuth-Provider wählen
+        let functionName = "sync-imap-emails"; // Default: IMAP
+        
+        if (account.oauth_provider === "gmail") {
+          functionName = "sync-gmail";
+        } else if (account.oauth_provider === "microsoft") {
+          functionName = "sync-microsoft"; // To be implemented
+        }
+
         // Sync-Funktion aufrufen
         const { data: syncResult, error: syncError } = await supabase.functions.invoke(
-          "sync-imap-emails",
+          functionName,
           { body: { accountId: account.id } }
         );
 
