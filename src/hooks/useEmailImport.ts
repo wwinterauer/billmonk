@@ -29,6 +29,7 @@ export interface EmailImport {
 }
 
 export type EmailProvider = 'gmail' | 'microsoft' | 'icloud' | 'imap';
+export type OAuthProvider = 'gmail' | 'microsoft';
 
 export interface EmailAccount {
   id: string;
@@ -42,7 +43,7 @@ export interface EmailAccount {
   imap_use_ssl: boolean;
   inbox_folder: string;
   processed_folder: string;
-  sync_interval: 'manual' | '5min' | '15min' | '30min' | '1hour';
+  sync_interval: 'manual' | '5min' | '15min' | '30min' | '1hour' | '6hours' | '12hours' | 'daily';
   is_active: boolean;
   // Sync status fields
   last_sync_at: string | null;
@@ -54,6 +55,12 @@ export interface EmailAccount {
   // Filter fields
   sender_filter: string[] | null;
   subject_keywords: string[] | null;
+  // OAuth fields
+  oauth_provider: OAuthProvider | null;
+  oauth_access_token: string | null;
+  oauth_refresh_token: string | null;
+  oauth_token_expires_at: string | null;
+  oauth_scope: string | null;
   // Timestamps
   created_at: string;
   updated_at: string;
