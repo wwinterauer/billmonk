@@ -289,6 +289,11 @@ export type Database = {
           last_sync_error: string | null
           last_sync_status: string | null
           last_synced_uid: string | null
+          oauth_access_token: string | null
+          oauth_provider: string | null
+          oauth_refresh_token: string | null
+          oauth_scope: string | null
+          oauth_token_expires_at: string | null
           processed_folder: string | null
           provider: string | null
           sender_filter: string[] | null
@@ -315,6 +320,11 @@ export type Database = {
           last_sync_error?: string | null
           last_sync_status?: string | null
           last_synced_uid?: string | null
+          oauth_access_token?: string | null
+          oauth_provider?: string | null
+          oauth_refresh_token?: string | null
+          oauth_scope?: string | null
+          oauth_token_expires_at?: string | null
           processed_folder?: string | null
           provider?: string | null
           sender_filter?: string[] | null
@@ -341,6 +351,11 @@ export type Database = {
           last_sync_error?: string | null
           last_sync_status?: string | null
           last_synced_uid?: string | null
+          oauth_access_token?: string | null
+          oauth_provider?: string | null
+          oauth_refresh_token?: string | null
+          oauth_scope?: string | null
+          oauth_token_expires_at?: string | null
           processed_folder?: string | null
           provider?: string | null
           sender_filter?: string[] | null
@@ -688,6 +703,44 @@ export type Database = {
             columns: ["vendor_learning_id"]
             isOneToOne: false
             referencedRelation: "vendor_learning"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oauth_states: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          provider: string
+          redirect_after: string | null
+          state_token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          provider: string
+          redirect_after?: string | null
+          state_token: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          provider?: string
+          redirect_after?: string | null
+          state_token?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oauth_states_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
