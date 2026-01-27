@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Table, 
@@ -61,8 +62,11 @@ import {
   FileText,
   Webhook,
   AlertCircle,
+  CheckCircle,
+  Link2,
 } from 'lucide-react';
 import { useEmailImport, EmailAccount, EmailAttachment } from '@/hooks/useEmailImport';
+import { OAuthProviderButtons } from './OAuthProviderButtons';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -209,6 +213,7 @@ const SyncStatusBadge = ({ account }: { account: EmailAccount }) => {
 };
 
 export const EmailImportSettings: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     emailConnection,
     emailAccounts,
@@ -232,6 +237,7 @@ export const EmailImportSettings: React.FC = () => {
     isSyncing,
     retryAttachment,
     skipAttachment,
+    refetchEmailAccounts,
   } = useEmailImport();
 
   const [showWebhookInfo, setShowWebhookInfo] = useState(false);
@@ -239,6 +245,31 @@ export const EmailImportSettings: React.FC = () => {
   const [formData, setFormData] = useState<AddAccountFormData>(defaultFormData);
   const [selectedPreset, setSelectedPreset] = useState<string>('');
 
+  // OAuth Callback Handling
+  useEffect(() => {
+    const oauthSuccess = searchParams.get('oauth_success');
+    const oauthError = searchParams.get('oauth_error');
+
+    if (oauthSuccess) {
+      toast.success('Erfolgreich verbunden', {
+        description: `${oauthSuccess === 'gmail' ? 'Gmail' : 'Microsoft 365'} wurde erfolgreich verbunden.`,
+      });
+      // URL bereinigen
+      searchParams.delete('oauth_success');
+      setSearchParams(searchParams, { replace: true });
+      // Accounts neu laden
+      refetchEmailAccounts();
+    }
+
+    if (oauthError) {
+      toast.error('Verbindung fehlgeschlagen', {
+        description: decodeURIComponent(oauthError),
+      });
+      // URL bereinigen
+      searchParams.delete('oauth_error');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, refetchEmailAccounts]);
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success('In Zwischenablage kopiert');
@@ -303,6 +334,33 @@ export const EmailImportSettings: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* OAuth Provider Connection Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Link2 className="h-5 w-5" />
+            E-Mail-Konto verbinden
+          </CardTitle>
+          <CardDescription>
+            Verbinden Sie Gmail oder Microsoft 365 für automatischen Beleg-Import
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <OAuthProviderButtons existingAccounts={emailAccounts} />
+        </CardContent>
+      </Card>
+
+      {/* Divider */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">
+            Oder manuell konfigurieren
+          </span>
+        </div>
+      </div>
       <Tabs defaultValue="webhook" className="space-y-4">
         <TabsList>
           <TabsTrigger value="webhook" className="gap-2">
