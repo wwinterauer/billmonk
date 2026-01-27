@@ -135,24 +135,38 @@ function ReceiptPreviewCard({ receipt, otherReceipt, type, onDelete, onViewDetai
     let blobUrl: string | null = null;
     
     async function loadPreview() {
-      if (!receipt?.file_url) return;
+      if (!receipt?.file_url) {
+        console.log('No file_url for receipt:', receipt?.id);
+        return;
+      }
       
       setPreviewLoading(true);
       setPreviewError(false);
       
       try {
+        console.log('Loading preview for file_url:', receipt.file_url);
+        
         const { data, error } = await supabase.storage
           .from('receipts')
           .createSignedUrl(receipt.file_url, 3600);
 
-        if (error || !data?.signedUrl) {
-          throw new Error('Could not get signed URL');
+        if (error) {
+          console.error('Signed URL error:', error);
+          throw new Error(`Could not get signed URL: ${error.message}`);
+        }
+        
+        if (!data?.signedUrl) {
+          throw new Error('No signed URL returned');
         }
 
+        console.log('Got signed URL, fetching file...');
         const response = await fetch(data.signedUrl);
-        if (!response.ok) throw new Error('Could not fetch file');
+        if (!response.ok) {
+          throw new Error(`Could not fetch file: ${response.status} ${response.statusText}`);
+        }
 
         const blob = await response.blob();
+        console.log('Blob loaded, size:', blob.size, 'type:', blob.type);
         blobUrl = URL.createObjectURL(blob);
         setPreviewUrl(blobUrl);
       } catch (error) {
@@ -170,7 +184,7 @@ function ReceiptPreviewCard({ receipt, otherReceipt, type, onDelete, onViewDetai
         URL.revokeObjectURL(blobUrl);
       }
     };
-  }, [receipt?.file_url]);
+  }, [receipt?.file_url, receipt?.id]);
 
   // Better file type detection
   const fileType = receipt?.file_type?.toLowerCase() || '';
@@ -227,9 +241,10 @@ function ReceiptPreviewCard({ receipt, otherReceipt, type, onDelete, onViewDetai
         {previewLoading ? (
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         ) : previewError ? (
-          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <div className="flex flex-col items-center gap-2 text-muted-foreground p-4 text-center">
             <AlertCircle className="h-8 w-8" />
-            <span className="text-sm">Vorschau nicht verfügbar</span>
+            <span className="text-sm font-medium">Vorschau nicht verfügbar</span>
+            <span className="text-xs opacity-70">{receipt?.file_name || 'Datei nicht gefunden'}</span>
           </div>
         ) : previewUrl ? (
           isPdf ? (
