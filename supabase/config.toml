@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.sync-gmail]
 verify_jwt = false
+
+[functions.sync-microsoft]
+verify_jwt = false
