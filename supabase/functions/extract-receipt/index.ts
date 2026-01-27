@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,11 +28,75 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64, mimeType } = await req.json();
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    if (!imageBase64 || !mimeType) {
+    const body = await req.json();
+    let imageBase64: string;
+    let mimeType: string;
+    let receiptId: string | null = null;
+
+    // Support both direct image upload and receiptId lookup
+    if (body.receiptId) {
+      receiptId = body.receiptId;
+      console.log(`Processing receipt by ID: ${receiptId}`);
+
+      // Fetch receipt from database
+      const { data: receipt, error: receiptError } = await supabase
+        .from('receipts')
+        .select('*')
+        .eq('id', receiptId)
+        .single();
+
+      if (receiptError || !receipt) {
+        console.error("Receipt not found:", receiptError);
+        return new Response(
+          JSON.stringify({ success: false, error: "Receipt not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Download file from storage
+      const { data: fileData, error: downloadError } = await supabase.storage
+        .from('receipts')
+        .download(receipt.file_url);
+
+      if (downloadError || !fileData) {
+        console.error("Failed to download file:", downloadError);
+        return new Response(
+          JSON.stringify({ success: false, error: "Failed to download file" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Convert to base64 - handle large files properly
+      const arrayBuffer = await fileData.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      // Use chunked approach for large files to avoid stack overflow
+      const chunkSize = 8192;
+      let binaryString = '';
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      imageBase64 = btoa(binaryString);
+      mimeType = receipt.file_type === 'pdf' ? 'application/pdf' : `image/${receipt.file_type}`;
+      
+      // For PDFs, we still use application/pdf as mimeType
+      if (receipt.file_name?.endsWith('.pdf') || receipt.file_type === 'application/pdf') {
+        mimeType = 'application/pdf';
+      }
+
+      console.log(`Downloaded file: ${receipt.file_name}, type: ${mimeType}`);
+
+    } else if (body.imageBase64 && body.mimeType) {
+      imageBase64 = body.imageBase64;
+      mimeType = body.mimeType;
+    } else {
       return new Response(
-        JSON.stringify({ success: false, error: "Missing imageBase64 or mimeType" }),
+        JSON.stringify({ success: false, error: "Missing receiptId or imageBase64/mimeType" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -198,11 +263,42 @@ WEITERE REGELN:
         confidence: extractedData.confidence,
       });
 
+      // If receiptId was provided, update the receipt in database
+      if (receiptId) {
+        const { error: updateError } = await supabase
+          .from('receipts')
+          .update({
+            vendor: extractedData.vendor,
+            vendor_brand: extractedData.vendor_brand,
+            description: extractedData.description,
+            amount_gross: extractedData.amount_gross,
+            amount_net: extractedData.amount_net,
+            vat_amount: extractedData.vat_amount,
+            vat_rate: extractedData.vat_rate,
+            receipt_date: extractedData.receipt_date,
+            category: extractedData.category,
+            payment_method: extractedData.payment_method,
+            invoice_number: extractedData.invoice_number,
+            ai_confidence: extractedData.confidence,
+            ai_raw_response: extractedData,
+            ai_processed_at: new Date().toISOString(),
+            status: 'review',
+          })
+          .eq('id', receiptId);
+
+        if (updateError) {
+          console.error("Failed to update receipt:", updateError);
+        } else {
+          console.log(`Receipt ${receiptId} updated with extracted data, status set to 'review'`);
+        }
+      }
+
       return new Response(
         JSON.stringify({ 
           success: true, 
           data: extractedData,
-          raw_response: content 
+          raw_response: content,
+          receiptId: receiptId,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
