@@ -167,10 +167,64 @@ serve(async (req: Request) => {
         // Decode base64 content
         const binaryContent = Uint8Array.from(atob(attachment.content), (c) => c.charCodeAt(0));
         
+        // Generate file hash for duplicate detection
+        const hashBuffer = await crypto.subtle.digest('SHA-256', binaryContent);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
         // Generate unique filename
         const timestamp = Date.now();
         const sanitizedFilename = attachment.filename.replace(/[^a-zA-Z0-9.-]/g, "_");
         const storagePath = `${userId}/${timestamp}_${sanitizedFilename}`;
+
+        // Create email attachment record first
+        const { data: emailAttachment, error: attachmentError } = await supabase
+          .from("email_attachments")
+          .insert({
+            email_connection_id: connection.id,
+            email_import_id: importLog?.id || null,
+            user_id: userId,
+            email_message_id: null,
+            email_subject: emailData.subject,
+            email_from: emailData.from,
+            email_received_at: new Date().toISOString(),
+            attachment_filename: attachment.filename,
+            attachment_content_type: attachment.contentType,
+            attachment_size: attachment.size || binaryContent.length,
+            status: 'processing',
+            file_hash: fileHash,
+            storage_path: storagePath,
+          })
+          .select()
+          .single();
+
+        if (attachmentError) {
+          console.error("Error creating email attachment:", attachmentError);
+          errors.push(`Attachment record failed for ${attachment.filename}: ${attachmentError.message}`);
+          continue;
+        }
+
+        // Check for duplicates by file hash
+        const { data: existingReceipt } = await supabase
+          .from("receipts")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("file_hash", fileHash)
+          .maybeSingle();
+
+        if (existingReceipt) {
+          console.log("Duplicate detected for:", attachment.filename);
+          await supabase
+            .from("email_attachments")
+            .update({ 
+              status: 'duplicate', 
+              is_duplicate: true,
+              duplicate_of: emailAttachment.id,
+              processed_at: new Date().toISOString(),
+            })
+            .eq("id", emailAttachment.id);
+          continue;
+        }
 
         // Upload to storage
         const { error: uploadError } = await supabase.storage
@@ -182,16 +236,15 @@ serve(async (req: Request) => {
 
         if (uploadError) {
           console.error("Upload error:", uploadError);
+          await supabase
+            .from("email_attachments")
+            .update({ status: 'error', error_message: uploadError.message })
+            .eq("id", emailAttachment.id);
           errors.push(`Upload failed for ${attachment.filename}: ${uploadError.message}`);
           continue;
         }
 
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from("receipts")
-          .getPublicUrl(storagePath);
-
-        // Create receipt record
+        // Create receipt record with source and email_attachment_id
         const { data: receipt, error: receiptError } = await supabase
           .from("receipts")
           .insert({
@@ -199,7 +252,10 @@ serve(async (req: Request) => {
             file_name: attachment.filename,
             file_url: storagePath,
             file_type: attachment.contentType,
+            file_hash: fileHash,
             status: "pending",
+            source: "email_webhook",
+            email_attachment_id: emailAttachment.id,
             notes: `Importiert via E-Mail von ${emailData.from}${emailData.subject ? ` - Betreff: ${emailData.subject}` : ""}`,
           })
           .select()
@@ -207,11 +263,25 @@ serve(async (req: Request) => {
 
         if (receiptError) {
           console.error("Error creating receipt:", receiptError);
+          await supabase
+            .from("email_attachments")
+            .update({ status: 'error', error_message: receiptError.message })
+            .eq("id", emailAttachment.id);
           errors.push(`Receipt creation failed for ${attachment.filename}: ${receiptError.message}`);
           continue;
         }
 
-        console.log("Created receipt:", receipt.id);
+        // Update email attachment with receipt reference
+        await supabase
+          .from("email_attachments")
+          .update({ 
+            status: 'imported', 
+            receipt_id: receipt.id,
+            processed_at: new Date().toISOString(),
+          })
+          .eq("id", emailAttachment.id);
+
+        console.log("Created receipt:", receipt.id, "from attachment:", emailAttachment.id);
 
         // Trigger AI extraction (call the existing edge function)
         try {
