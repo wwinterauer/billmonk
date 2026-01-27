@@ -560,7 +560,17 @@ export const EmailImportSettings: React.FC = () => {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {/* Auto-Sync Info Box */}
+              <Alert className="border-primary/20 bg-primary/5">
+                <RefreshCw className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-sm">
+                  <span className="font-medium">Automatische Synchronisation:</span>{' '}
+                  Aktive IMAP-Konten werden automatisch basierend auf dem gewählten Sync-Intervall 
+                  synchronisiert. Du kannst jederzeit auch manuell synchronisieren.
+                </AlertDescription>
+              </Alert>
+
               {emailAccounts.length === 0 ? (
                 <div className="text-center py-8 space-y-4">
                   <Server className="h-12 w-12 mx-auto text-muted-foreground" />
@@ -938,12 +948,18 @@ export const EmailImportSettings: React.FC = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="manual">Manuell</SelectItem>
+                  <SelectItem value="manual">Nur manuell</SelectItem>
                   <SelectItem value="5min">Alle 5 Minuten</SelectItem>
                   <SelectItem value="15min">Alle 15 Minuten</SelectItem>
                   <SelectItem value="30min">Alle 30 Minuten</SelectItem>
                   <SelectItem value="1hour">Stündlich</SelectItem>
+                  <SelectItem value="6hours">Alle 6 Stunden</SelectItem>
+                  <SelectItem value="12hours">Alle 12 Stunden</SelectItem>
+                  <SelectItem value="daily">Täglich</SelectItem>
                 </SelectContent>
+              <p className="text-xs text-muted-foreground mt-1">
+                Wie oft sollen neue E-Mails automatisch abgerufen werden?
+              </p>
               </Select>
             </div>
 

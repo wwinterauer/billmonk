@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.sync-imap-emails]
 verify_jwt = false
+
+[functions.cron-email-sync]
+verify_jwt = false
