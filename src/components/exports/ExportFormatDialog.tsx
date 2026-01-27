@@ -1017,7 +1017,7 @@ export function ExportFormatDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !isExporting && !exportComplete && onOpenChange(v)}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className={exportFormat === 'zip' ? 'max-w-2xl' : 'max-w-lg'}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {getFormatIcon()}
