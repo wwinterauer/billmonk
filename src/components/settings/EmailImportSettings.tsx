@@ -244,6 +244,7 @@ export const EmailImportSettings: React.FC = () => {
   const [showAddAccountDialog, setShowAddAccountDialog] = useState(false);
   const [formData, setFormData] = useState<AddAccountFormData>(defaultFormData);
   const [selectedPreset, setSelectedPreset] = useState<string>('');
+  const [activeTab, setActiveTab] = useState("webhook");
 
   // OAuth Callback Handling
   useEffect(() => {
@@ -331,8 +332,6 @@ export const EmailImportSettings: React.FC = () => {
       </Card>
     );
   }
-
-  const [activeTab, setActiveTab] = useState("webhook");
 
   const handleSwitchToImap = () => {
     setActiveTab("imap");
