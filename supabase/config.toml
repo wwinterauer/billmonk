@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.convert-image-to-pdf]
 verify_jwt = false
+
+[functions.combine-images-to-pdf]
+verify_jwt = false
