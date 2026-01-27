@@ -981,11 +981,22 @@ const Upload = () => {
                           <p className="text-sm text-muted-foreground">
                             {formatFileSize(upload.fileSize)}
                           </p>
+                          {/* Show image-to-PDF conversion hint */}
+                          {isImageFile(upload.file) && (upload.status === 'pending' || (upload.status === 'uploading' && upload.progress < 30)) && (
+                            <div className="flex items-center gap-1.5 mt-1 text-xs text-primary">
+                              <FileText className="h-3 w-3" />
+                              <span>Wird automatisch zu PDF konvertiert</span>
+                            </div>
+                          )}
                           {(upload.status === 'uploading' || upload.status === 'processing') && (
                             <div className="mt-2">
                               <Progress value={upload.progress} className="h-1.5" />
                               <p className="text-xs text-muted-foreground mt-1">
-                                {upload.progress < 50 ? 'Upload' : 'KI-Analyse'}: {upload.progress}%
+                                {upload.progress < 30 && isImageFile(upload.file) 
+                                  ? 'Bild → PDF' 
+                                  : upload.progress < 50 
+                                  ? 'Upload' 
+                                  : 'KI-Analyse'}: {upload.progress}%
                               </p>
                             </div>
                           )}
