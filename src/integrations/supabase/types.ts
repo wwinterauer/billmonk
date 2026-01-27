@@ -345,6 +345,111 @@ export type Database = {
           },
         ]
       }
+      email_attachments: {
+        Row: {
+          attachment_content_type: string | null
+          attachment_filename: string
+          attachment_size: number | null
+          created_at: string | null
+          duplicate_of: string | null
+          email_connection_id: string
+          email_from: string | null
+          email_import_id: string | null
+          email_message_id: string | null
+          email_received_at: string | null
+          email_subject: string | null
+          error_message: string | null
+          file_hash: string | null
+          id: string
+          is_duplicate: boolean | null
+          processed_at: string | null
+          receipt_id: string | null
+          status: string
+          storage_path: string | null
+          user_id: string
+        }
+        Insert: {
+          attachment_content_type?: string | null
+          attachment_filename: string
+          attachment_size?: number | null
+          created_at?: string | null
+          duplicate_of?: string | null
+          email_connection_id: string
+          email_from?: string | null
+          email_import_id?: string | null
+          email_message_id?: string | null
+          email_received_at?: string | null
+          email_subject?: string | null
+          error_message?: string | null
+          file_hash?: string | null
+          id?: string
+          is_duplicate?: boolean | null
+          processed_at?: string | null
+          receipt_id?: string | null
+          status?: string
+          storage_path?: string | null
+          user_id: string
+        }
+        Update: {
+          attachment_content_type?: string | null
+          attachment_filename?: string
+          attachment_size?: number | null
+          created_at?: string | null
+          duplicate_of?: string | null
+          email_connection_id?: string
+          email_from?: string | null
+          email_import_id?: string | null
+          email_message_id?: string | null
+          email_received_at?: string | null
+          email_subject?: string | null
+          error_message?: string | null
+          file_hash?: string | null
+          id?: string
+          is_duplicate?: boolean | null
+          processed_at?: string | null
+          receipt_id?: string | null
+          status?: string
+          storage_path?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_attachments_duplicate_of_fkey"
+            columns: ["duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "email_attachments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_attachments_email_connection_id_fkey"
+            columns: ["email_connection_id"]
+            isOneToOne: false
+            referencedRelation: "email_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_attachments_email_import_id_fkey"
+            columns: ["email_import_id"]
+            isOneToOne: false
+            referencedRelation: "email_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_attachments_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_attachments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_connections: {
         Row: {
           created_at: string | null
