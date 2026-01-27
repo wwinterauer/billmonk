@@ -18,6 +18,7 @@ import BankImport from "./pages/BankImport";
 import Reconciliation from "./pages/Reconciliation";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import ShareReceive from "./pages/ShareReceive";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -97,6 +98,7 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+            <Route path="/share-receive" element={<ShareReceive />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <InstallPrompt />
