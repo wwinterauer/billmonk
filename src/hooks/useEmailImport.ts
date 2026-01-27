@@ -44,10 +44,17 @@ export interface EmailAccount {
   processed_folder: string;
   sync_interval: 'manual' | '5min' | '15min' | '30min' | '1hour';
   is_active: boolean;
+  // Sync status fields
   last_sync_at: string | null;
-  last_sync_status: string;
+  last_sync_status: 'pending' | 'idle' | 'running' | 'syncing' | 'success' | 'partial' | 'error';
   last_sync_error: string | null;
+  last_synced_uid: string | null;
+  last_sync_attempt: string | null;
   total_imported: number;
+  // Filter fields
+  sender_filter: string[] | null;
+  subject_keywords: string[] | null;
+  // Timestamps
   created_at: string;
   updated_at: string;
 }
@@ -367,7 +374,7 @@ export const useEmailImport = () => {
     },
   });
 
-  // Trigger manual sync for IMAP account
+  // Trigger manual sync for IMAP account with optimistic UI updates
   const syncEmailAccountMutation = useMutation({
     mutationFn: async (accountId: string) => {
       const { data, error } = await supabase.functions.invoke('sync-imap-emails', {
@@ -375,16 +382,68 @@ export const useEmailImport = () => {
       });
 
       if (error) throw error;
+      
+      // Check if the response indicates an error
+      if (data && !data.success) {
+        throw new Error(data.error || 'Sync fehlgeschlagen');
+      }
+      
       return data;
     },
-    onSuccess: () => {
+    onMutate: async (accountId: string) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['email-accounts', user?.id] });
+      
+      // Snapshot the previous value
+      const previousAccounts = queryClient.getQueryData(['email-accounts', user?.id]);
+      
+      // Optimistically update to syncing status
+      queryClient.setQueryData(['email-accounts', user?.id], (old: EmailAccount[] | undefined) => 
+        old?.map(acc => 
+          acc.id === accountId 
+            ? { ...acc, last_sync_status: 'running' as const, last_sync_error: null } 
+            : acc
+        ) || []
+      );
+      
+      return { previousAccounts };
+    },
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['email-attachments'] });
-      toast.success('E-Mail-Synchronisation gestartet');
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      
+      const imported = data?.imported || 0;
+      const message = data?.message || `${imported} Rechnungen importiert`;
+      
+      if (imported > 0) {
+        toast.success('Sync erfolgreich', {
+          description: message,
+        });
+      } else {
+        toast.success('Sync abgeschlossen', {
+          description: 'Keine neuen Rechnungen gefunden',
+        });
+      }
     },
-    onError: (error: Error) => {
+    onError: (error: Error, accountId: string, context) => {
       console.error('Error syncing email account:', error);
-      toast.error('Fehler bei der Synchronisation');
+      
+      // Rollback to previous state but with error status
+      queryClient.setQueryData(['email-accounts', user?.id], (old: EmailAccount[] | undefined) => 
+        old?.map(acc => 
+          acc.id === accountId 
+            ? { ...acc, last_sync_status: 'error' as const, last_sync_error: error.message } 
+            : acc
+        ) || []
+      );
+      
+      toast.error('Sync fehlgeschlagen', {
+        description: error.message || 'E-Mails konnten nicht abgerufen werden',
+      });
+      
+      // Refetch to get actual DB state
+      queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
     },
   });
 
