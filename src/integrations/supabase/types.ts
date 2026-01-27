@@ -288,6 +288,7 @@ export type Database = {
           last_sync_error: string | null
           last_sync_status: string | null
           processed_folder: string | null
+          provider: string | null
           sync_interval: string
           total_imported: number | null
           updated_at: string | null
@@ -309,6 +310,7 @@ export type Database = {
           last_sync_error?: string | null
           last_sync_status?: string | null
           processed_folder?: string | null
+          provider?: string | null
           sync_interval?: string
           total_imported?: number | null
           updated_at?: string | null
@@ -330,6 +332,7 @@ export type Database = {
           last_sync_error?: string | null
           last_sync_status?: string | null
           processed_folder?: string | null
+          provider?: string | null
           sync_interval?: string
           total_imported?: number | null
           updated_at?: string | null
