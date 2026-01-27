@@ -271,6 +271,80 @@ export type Database = {
           },
         ]
       }
+      email_accounts: {
+        Row: {
+          created_at: string | null
+          display_name: string | null
+          email_address: string
+          id: string
+          imap_host: string
+          imap_password_encrypted: string
+          imap_port: number
+          imap_use_ssl: boolean | null
+          imap_username: string
+          inbox_folder: string | null
+          is_active: boolean | null
+          last_sync_at: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          processed_folder: string | null
+          sync_interval: string
+          total_imported: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_name?: string | null
+          email_address: string
+          id?: string
+          imap_host: string
+          imap_password_encrypted: string
+          imap_port?: number
+          imap_use_ssl?: boolean | null
+          imap_username: string
+          inbox_folder?: string | null
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          processed_folder?: string | null
+          sync_interval?: string
+          total_imported?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          display_name?: string | null
+          email_address?: string
+          id?: string
+          imap_host?: string
+          imap_password_encrypted?: string
+          imap_port?: number
+          imap_use_ssl?: boolean | null
+          imap_username?: string
+          inbox_folder?: string | null
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          processed_folder?: string | null
+          sync_interval?: string
+          total_imported?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_connections: {
         Row: {
           created_at: string | null
