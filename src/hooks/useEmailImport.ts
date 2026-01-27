@@ -28,11 +28,14 @@ export interface EmailImport {
   error_message: string | null;
 }
 
+export type EmailProvider = 'gmail' | 'microsoft' | 'icloud' | 'imap';
+
 export interface EmailAccount {
   id: string;
   user_id: string;
   email_address: string;
   display_name: string | null;
+  provider: EmailProvider;
   imap_host: string;
   imap_port: number;
   imap_username: string;
