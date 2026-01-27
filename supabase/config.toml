@@ -2,3 +2,9 @@ project_id = "nvvssxykygdxjywncvgd"
 
 [functions.extract-receipt]
 verify_jwt = false
+
+[functions.email-import-webhook]
+verify_jwt = false
+
+[functions.sync-imap-emails]
+verify_jwt = false
