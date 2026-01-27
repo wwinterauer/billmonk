@@ -271,6 +271,107 @@ export type Database = {
           },
         ]
       }
+      email_connections: {
+        Row: {
+          created_at: string | null
+          id: string
+          import_count: number | null
+          import_email: string
+          import_token: string
+          is_active: boolean | null
+          last_import_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          import_count?: number | null
+          import_email: string
+          import_token: string
+          is_active?: boolean | null
+          last_import_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          import_count?: number | null
+          import_email?: string
+          import_token?: string
+          is_active?: boolean | null
+          last_import_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_connections_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_imports: {
+        Row: {
+          attachments_count: number | null
+          email_connection_id: string
+          error_message: string | null
+          from_address: string | null
+          id: string
+          processed_receipts: number | null
+          raw_data: Json | null
+          received_at: string | null
+          status: string | null
+          subject: string | null
+          user_id: string
+        }
+        Insert: {
+          attachments_count?: number | null
+          email_connection_id: string
+          error_message?: string | null
+          from_address?: string | null
+          id?: string
+          processed_receipts?: number | null
+          raw_data?: Json | null
+          received_at?: string | null
+          status?: string | null
+          subject?: string | null
+          user_id: string
+        }
+        Update: {
+          attachments_count?: number | null
+          email_connection_id?: string
+          error_message?: string | null
+          from_address?: string | null
+          id?: string
+          processed_receipts?: number | null
+          raw_data?: Json | null
+          received_at?: string | null
+          status?: string | null
+          subject?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_imports_email_connection_id_fkey"
+            columns: ["email_connection_id"]
+            isOneToOne: false
+            referencedRelation: "email_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_imports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       export_templates: {
         Row: {
           columns: Json
