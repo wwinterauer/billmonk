@@ -285,10 +285,14 @@ export type Database = {
           inbox_folder: string | null
           is_active: boolean | null
           last_sync_at: string | null
+          last_sync_attempt: string | null
           last_sync_error: string | null
           last_sync_status: string | null
+          last_synced_uid: string | null
           processed_folder: string | null
           provider: string | null
+          sender_filter: string[] | null
+          subject_keywords: string[] | null
           sync_interval: string
           total_imported: number | null
           updated_at: string | null
@@ -307,10 +311,14 @@ export type Database = {
           inbox_folder?: string | null
           is_active?: boolean | null
           last_sync_at?: string | null
+          last_sync_attempt?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
+          last_synced_uid?: string | null
           processed_folder?: string | null
           provider?: string | null
+          sender_filter?: string[] | null
+          subject_keywords?: string[] | null
           sync_interval?: string
           total_imported?: number | null
           updated_at?: string | null
@@ -329,10 +337,14 @@ export type Database = {
           inbox_folder?: string | null
           is_active?: boolean | null
           last_sync_at?: string | null
+          last_sync_attempt?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
+          last_synced_uid?: string | null
           processed_folder?: string | null
           provider?: string | null
+          sender_filter?: string[] | null
+          subject_keywords?: string[] | null
           sync_interval?: string
           total_imported?: number | null
           updated_at?: string | null
