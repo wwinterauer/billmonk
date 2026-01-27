@@ -172,15 +172,20 @@ function ReceiptPreviewCard({ receipt, otherReceipt, type, onDelete, onViewDetai
     };
   }, [receipt?.file_url]);
 
-  const isPdf = receipt?.file_type === 'pdf';
-  const isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(receipt?.file_type || '');
+  // Better file type detection
+  const fileType = receipt?.file_type?.toLowerCase() || '';
+  const fileName = receipt?.file_name?.toLowerCase() || '';
+  const isPdf = fileType === 'pdf' || fileType === 'application/pdf' || fileName.endsWith('.pdf');
+  const isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(fileType) || 
+                  fileType.startsWith('image/') ||
+                  /\.(jpg|jpeg|png|webp|gif)$/i.test(fileName);
   const isDuplicate = type === 'duplicate';
 
   if (loading) {
     return (
       <div className="space-y-4 animate-pulse">
         <div className="h-6 bg-muted rounded w-24" />
-        <div className="h-[250px] bg-muted rounded-lg" />
+        <div className="h-[400px] bg-muted rounded-lg" />
         <div className="h-[200px] bg-muted rounded-lg" />
       </div>
     );
@@ -217,8 +222,8 @@ function ReceiptPreviewCard({ receipt, otherReceipt, type, onDelete, onViewDetai
         </span>
       </div>
 
-      {/* Preview */}
-      <div className="h-[250px] bg-muted/50 rounded-lg overflow-hidden border flex items-center justify-center">
+      {/* Preview - larger container */}
+      <div className="h-[400px] bg-muted/50 rounded-lg overflow-hidden border flex items-center justify-center">
         {previewLoading ? (
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         ) : previewError ? (
@@ -460,7 +465,7 @@ export function DuplicateComparisonModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-[95vw] w-[1400px] max-h-[95vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <GitCompare className="w-5 h-5" />
