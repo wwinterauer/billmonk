@@ -493,6 +493,21 @@ const Expenses = () => {
     loadReceipts();
   }, [dateFrom, dateTo]);
 
+  // Handle URL-based duplicate comparison (from ReceiptDetailPanel link)
+  useEffect(() => {
+    const duplicateId = searchParams.get('duplicateCompare');
+    const originalId = searchParams.get('original');
+    
+    if (duplicateId && originalId) {
+      openDuplicateComparison(duplicateId, originalId);
+      // Clear URL params after opening
+      const params = new URLSearchParams(searchParams);
+      params.delete('duplicateCompare');
+      params.delete('original');
+      setSearchParams(params, { replace: true });
+    }
+  }, [searchParams]);
+
   // Handle preset selection
   const handlePresetChange = (preset: DateRangePreset) => {
     setDatePreset(preset);
@@ -1585,6 +1600,23 @@ const Expenses = () => {
               </DropdownMenuContent>
             </DropdownMenu>
             
+            {/* Compare 2 selected receipts */}
+            {selectedIds.size === 2 && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => {
+                  const ids = Array.from(selectedIds);
+                  openDuplicateComparison(ids[0], ids[1]);
+                }}
+                disabled={bulkActionLoading !== null}
+                className="border-primary/50 text-primary hover:bg-primary/10"
+              >
+                <GitCompare className="h-4 w-4 mr-1" />
+                Vergleichen
+              </Button>
+            )}
+            
             {/* Duplicate Check for selected */}
             <Button 
               size="sm" 
@@ -1607,7 +1639,6 @@ const Expenses = () => {
             </Button>
             
             <div className="h-4 w-px bg-border" />
-            
             {/* Delete */}
             <Button 
               size="sm" 
