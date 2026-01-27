@@ -17,7 +17,7 @@ export interface Receipt {
   file_url: string | null;
   file_name: string | null;
   file_type: string | null;
-  status: 'pending' | 'processing' | 'review' | 'approved' | 'rejected' | 'duplicate';
+  status: 'pending' | 'processing' | 'review' | 'approved' | 'rejected' | 'duplicate' | 'not_a_receipt' | 'error';
   vendor: string | null;
   vendor_brand: string | null;
   vendor_id: string | null;

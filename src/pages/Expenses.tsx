@@ -132,6 +132,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   approved: { label: 'Freigegeben', color: 'bg-green-500/10 text-green-600 border-green-500/20' },
   rejected: { label: 'Abgelehnt', color: 'bg-red-500/10 text-red-600 border-red-500/20' },
   duplicate: { label: 'Duplikat', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
+  not_a_receipt: { label: 'Kein Beleg', color: 'bg-gray-500/10 text-gray-600 border-gray-500/20' },
+  error: { label: 'Fehler', color: 'bg-red-500/10 text-red-600 border-red-500/20' },
 };
 
 type DateRangePreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'thisYear' | 'lastYear' | 'all' | 'custom';
@@ -308,6 +310,44 @@ const Expenses = () => {
         variant: 'destructive',
         title: 'Fehler',
         description: 'Konnte Status nicht aktualisieren',
+      });
+    }
+  };
+
+  // Mark as actual receipt and re-analyze
+  const handleMarkAsReceipt = async (receiptId: string) => {
+    try {
+      // Set status to processing
+      await supabase
+        .from('receipts')
+        .update({ status: 'processing', notes: null })
+        .eq('id', receiptId);
+
+      toast({
+        title: 'Wird erneut geprüft',
+        description: 'Das Dokument wird nochmal analysiert.',
+      });
+
+      // Trigger re-extraction with forceExtract flag
+      const { error } = await supabase.functions.invoke('extract-receipt', {
+        body: { receiptId, forceExtract: true }
+      });
+
+      if (error) {
+        console.error('Re-extraction error:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Fehler bei der Analyse',
+          description: error.message,
+        });
+      }
+
+      loadReceipts();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
       });
     }
   };
@@ -1934,6 +1974,18 @@ const Expenses = () => {
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
+                              )}
+                              {/* "Doch ein Beleg" button for not_a_receipt status */}
+                              {receipt.status === 'not_a_receipt' && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                                  onClick={() => handleMarkAsReceipt(receipt.id)}
+                                  title="Doch ein Beleg - Neu analysieren"
+                                >
+                                  <RefreshCw className="h-4 w-4" />
+                                </Button>
                               )}
                               <Button
                                 variant="ghost"

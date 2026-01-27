@@ -7,6 +7,9 @@ const corsHeaders = {
 };
 
 interface ExtractionResult {
+  is_receipt: boolean;
+  document_type?: string;
+  reason?: string;
   vendor: string | null;
   vendor_brand: string | null;
   description: string | null;
@@ -36,11 +39,12 @@ serve(async (req) => {
     let imageBase64: string;
     let mimeType: string;
     let receiptId: string | null = null;
+    const forceExtract = body.forceExtract === true;
 
     // Support both direct image upload and receiptId lookup
     if (body.receiptId) {
       receiptId = body.receiptId;
-      console.log(`Processing receipt by ID: ${receiptId}`);
+      console.log(`Processing receipt by ID: ${receiptId}${forceExtract ? ' (forced)' : ''}`);
 
       // Fetch receipt from database
       const { data: receipt, error: receiptError } = await supabase
@@ -112,67 +116,60 @@ serve(async (req) => {
 
     console.log("Calling Lovable AI Gateway for receipt extraction...");
 
-    const systemPrompt = `Du bist ein Experte für die Analyse von Belegen und Rechnungen. 
-Extrahiere präzise alle relevanten Informationen aus dem Bild.
+    const systemPrompt = `Du bist ein Experte für die Analyse von Dokumenten und Rechnungen. 
+Analysiere das Dokument und entscheide zuerst, ob es sich um einen Finanzbeleg handelt.
 Antworte IMMER und AUSSCHLIESSLICH mit validem JSON ohne zusätzliche Erklärungen oder Markdown.`;
 
-    const userPrompt = `Analysiere diesen Beleg/diese Rechnung und extrahiere folgende Informationen im JSON-Format:
+    const userPrompt = `Analysiere dieses Dokument in zwei Schritten:
 
+SCHRITT 1: DOKUMENTEN-TYP ERKENNEN
+Prüfe ob dies eine Rechnung, Quittung, Kassenbon, Gutschrift, Lieferschein mit Preisen oder ähnlicher Finanzbeleg ist.
+
+WENN NEIN (z.B. Foto, Brief, Vertrag ohne Rechnung, Formular, Werbung, Angebot, Bestellung):
+Antworte NUR mit:
 {
+  "is_receipt": false,
+  "document_type": "<erkannter Dokumenttyp>",
+  "reason": "<kurze Begründung warum es kein Beleg ist>"
+}
+
+WENN JA, weiter mit Schritt 2:
+
+SCHRITT 2: BELEG-DATEN EXTRAHIEREN
+Extrahiere folgende Informationen im JSON-Format:
+{
+  "is_receipt": true,
   "vendor": "Offizieller/rechtlicher Firmenname des Lieferanten",
-  "vendor_brand": "Markenname/Handelsname falls abweichend vom rechtlichen Namen (sonst null)",
+  "vendor_brand": "Markenname falls abweichend vom rechtlichen Namen (sonst null)",
   "description": "Zusammenfassung aller Rechnungspositionen (max 100 Zeichen)",
   "amount_gross": Bruttobetrag als Zahl,
   "amount_net": Nettobetrag als Zahl (falls erkennbar, sonst null),
   "vat_amount": MwSt-Betrag als Zahl (falls erkennbar, sonst null),
-  "vat_rate": MwSt-Satz als Zahl (z.B. 20 für 20%, typisch in AT/DE: 19, 20, 7, 10),
+  "vat_rate": MwSt-Satz als Zahl (z.B. 20 für 20%),
   "receipt_date": "Datum im Format YYYY-MM-DD",
-  "category": "Eine der Kategorien: Büromaterial, Software & Lizenzen, Reisekosten, Bewirtung, Telefon & Internet, Versicherungen, Miete & Betriebskosten, Fahrzeugkosten, Werbung & Marketing, Sonstiges",
-  "payment_method": "Zahlungsart falls erkennbar: Überweisung, Kreditkarte, Bar, PayPal, Lastschrift (sonst null)",
-  "invoice_number": "Rechnungsnummer, Belegnummer oder Dokumentnummer. Suche nach Feldern wie 'Rechnungsnummer:', 'Rechnung Nr.:', 'Invoice:', 'Beleg-Nr.:', 'RE-Nr.:', 'Rg.-Nr.:', 'Dok-Nr.:', 'Invoice Number:', Präfixe wie 'RE-', 'RG-', 'INV-', 'RN-' etc. (falls nicht erkennbar: null)",
-  "confidence": Konfidenz deiner Erkennung von 0.0 bis 1.0
+  "category": "Kategorie: Büromaterial, Software & Lizenzen, Reisekosten, Bewirtung, Telefon & Internet, Versicherungen, Miete & Betriebskosten, Fahrzeugkosten, Werbung & Marketing, Sonstiges",
+  "payment_method": "Zahlungsart: Überweisung, Kreditkarte, Bar, PayPal, Lastschrift (sonst null)",
+  "invoice_number": "Rechnungsnummer/Belegnummer (suche nach 'Rechnungsnummer:', 'RE-Nr.:', 'Invoice:', etc.)",
+  "confidence": Konfidenz von 0.0 bis 1.0
 }
 
 WICHTIGE REGELN FÜR LIEFERANT/VENDOR:
-- "vendor" = Offizieller/rechtlicher Firmenname. Priorisiere diese Quellen:
-  1. HÖCHSTE PRIORITÄT: Impressum/Fußbereich der Rechnung:
-     - Firmenname bei 'Firmenbuchnummer', 'FN', 'FB-Nr.', 'HRB', 'Handelsregister'
-     - Firmenname bei 'UID', 'ATU', 'USt-IdNr.', 'Umsatzsteuer-ID'
-     - Firmenname bei 'Firmensitz', 'Sitz der Gesellschaft'
-     - Gesellschaftsform: 'GmbH', 'AG', 'e.U.', 'OG', 'KG', 'S.à r.l.', 'Ltd.'
-  2. MITTLERE PRIORITÄT: Rechnungskopf mit vollständigem Firmennamen, Adressblock des Absenders
-  3. NIEDRIGE PRIORITÄT: Logo-Text (Logos zeigen oft nur Markennamen)
-- "vendor_brand" = Markenname wenn abweichend (z.B. Logo zeigt "MediaMarkt" aber rechtlich "Media Markt E-Business GmbH")
+- "vendor" = Offizieller/rechtlicher Firmenname. Priorisiere:
+  1. HÖCHSTE PRIORITÄT: Impressum/Fußbereich (Firmenbuchnummer, UID, Handelsregister)
+  2. MITTLERE PRIORITÄT: Rechnungskopf mit vollständigem Firmennamen
+  3. NIEDRIGE PRIORITÄT: Logo-Text
+- "vendor_brand" = Markenname wenn abweichend (z.B. Logo: "MediaMarkt" → rechtlich: "Media Markt E-Business GmbH")
 
-WICHTIGE REGELN FÜR BESCHREIBUNG/POSITIONEN:
-- Fasse ALLE Rechnungspositionen in einer kurzen, aussagekräftigen Beschreibung zusammen
-- Maximal 100 Zeichen
-- Trenne mehrere Positionen mit Komma
-- Beispiele:
-  - "Büromaterial, Druckerpapier A4, Kugelschreiber"
-  - "Monatsmiete Büro Jänner 2024"
-  - "Webhosting, Domain-Verlängerung"
-  - "Beratungsleistung IT-Security (8h)"
-  - "Kaffeevollautomat Wartung, Reinigungstabletten"
-- Bei sehr vielen Positionen: Die wichtigsten/teuersten zuerst, dann "u.a." oder "etc."
-- KEINE Preise in der Beschreibung
-- KEINE Währungssymbole
-- Beschreibe WAS gekauft wurde, nicht WER der Lieferant ist
-  
-BEISPIELE FÜR VENDOR:
-- Logo: 'Amazon' → Fuß: 'Amazon EU S.à r.l.' → vendor: "Amazon EU S.à r.l.", vendor_brand: "Amazon"
-- Logo: 'IKEA' → Fuß: 'IKEA Austria GmbH' → vendor: "IKEA Austria GmbH", vendor_brand: null (gleich)
-- Logo: 'BILLA' → Fuß: 'REWE International AG' → vendor: "REWE International AG", vendor_brand: "BILLA"
+WICHTIGE REGELN FÜR BESCHREIBUNG:
+- Fasse ALLE Rechnungspositionen zusammen (max 100 Zeichen)
+- Trenne mit Komma, keine Preise
+- Bei vielen Positionen: wichtigste zuerst, dann "u.a."
 
 WEITERE REGELN:
-- Antworte NUR mit dem JSON, keine zusätzlichen Erklärungen oder Markdown-Codeblöcke
-- Falls ein Feld nicht erkennbar ist, setze es auf null
-- Beträge immer als Dezimalzahlen ohne Währungssymbol (z.B. 125.50 statt "€ 125,50")
-- Wenn nur Bruttobetrag erkennbar: versuche Netto und MwSt zu berechnen basierend auf erkennbarem MwSt-Satz
-- Datum muss im Format YYYY-MM-DD sein
-- Bei der Rechnungsnummer: Extrahiere die komplette Nummer inklusive Präfix (z.B. "RE-2024-00123")`;
-
-
+- Antworte NUR mit JSON, keine Markdown-Codeblöcke
+- Unerkennbare Felder auf null setzen
+- Beträge als Dezimalzahlen ohne Währungssymbol
+- Datum im Format YYYY-MM-DD`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -255,6 +252,46 @@ WEITERE REGELN:
     try {
       const extractedData: ExtractionResult = JSON.parse(cleanedContent);
       
+      // Check if document is NOT a receipt
+      if (extractedData.is_receipt === false) {
+        console.log("Document is NOT a receipt:", {
+          document_type: extractedData.document_type,
+          reason: extractedData.reason,
+        });
+
+        // Update receipt with not_a_receipt status
+        if (receiptId) {
+          const { error: updateError } = await supabase
+            .from('receipts')
+            .update({
+              status: 'not_a_receipt',
+              ai_confidence: 0,
+              notes: `Kein Beleg: ${extractedData.document_type || 'Unbekanntes Dokument'}. ${extractedData.reason || ''}`,
+              ai_raw_response: extractedData,
+              ai_processed_at: new Date().toISOString(),
+            })
+            .eq('id', receiptId);
+
+          if (updateError) {
+            console.error("Failed to update receipt:", updateError);
+          } else {
+            console.log(`Receipt ${receiptId} marked as not_a_receipt`);
+          }
+        }
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            is_receipt: false,
+            document_type: extractedData.document_type,
+            reason: extractedData.reason,
+            receiptId: receiptId,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Document IS a receipt - proceed with normal extraction
       console.log("Successfully extracted receipt data:", {
         vendor: extractedData.vendor,
         vendor_brand: extractedData.vendor_brand,
@@ -296,6 +333,7 @@ WEITERE REGELN:
       return new Response(
         JSON.stringify({ 
           success: true, 
+          is_receipt: true,
           data: extractedData,
           raw_response: content,
           receiptId: receiptId,
