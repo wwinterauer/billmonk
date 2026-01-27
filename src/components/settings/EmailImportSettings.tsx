@@ -92,41 +92,65 @@ const defaultFormData: AddAccountFormData = {
   sync_interval: 'manual',
 };
 
-// Common IMAP presets with help text
-const imapPresets: Record<string, { host: string; port: number; helpText: string; helpUrl?: string }> = {
+// Provider types
+type AuthType = 'oauth' | 'app-password' | 'password';
+
+interface ImapPreset {
+  host: string;
+  port: number;
+  helpText: string;
+  helpUrl?: string;
+  color: string;
+  authType: AuthType;
+}
+
+// Common IMAP presets with help text and styling
+const imapPresets: Record<string, ImapPreset> = {
   gmail: { 
     host: 'imap.gmail.com', 
     port: 993,
     helpText: 'Verwenden Sie ein App-Passwort von myaccount.google.com/apppasswords',
-    helpUrl: 'https://myaccount.google.com/apppasswords'
+    helpUrl: 'https://myaccount.google.com/apppasswords',
+    color: 'text-red-500',
+    authType: 'app-password',
   },
   outlook: { 
     host: 'outlook.office365.com', 
     port: 993,
     helpText: 'Verwenden Sie Ihr Microsoft-Passwort oder ein App-Passwort bei aktivierter 2FA',
-    helpUrl: 'https://account.microsoft.com/security'
+    helpUrl: 'https://account.microsoft.com/security',
+    color: 'text-blue-500',
+    authType: 'oauth',
   },
   yahoo: { 
     host: 'imap.mail.yahoo.com', 
     port: 993,
     helpText: 'Generieren Sie ein App-Passwort unter Kontosicherheit',
-    helpUrl: 'https://login.yahoo.com/account/security'
+    helpUrl: 'https://login.yahoo.com/account/security',
+    color: 'text-purple-500',
+    authType: 'app-password',
   },
   icloud: { 
     host: 'imap.mail.me.com', 
     port: 993,
     helpText: 'Erstellen Sie ein app-spezifisches Passwort auf appleid.apple.com',
-    helpUrl: 'https://appleid.apple.com/account/manage'
+    helpUrl: 'https://appleid.apple.com/account/manage',
+    color: 'text-gray-500',
+    authType: 'app-password',
   },
   gmx: { 
     host: 'imap.gmx.net', 
     port: 993,
     helpText: 'Aktivieren Sie IMAP in den GMX-Einstellungen unter E-Mail → POP3/IMAP',
+    color: 'text-blue-600',
+    authType: 'password',
   },
   webde: { 
     host: 'imap.web.de', 
     port: 993,
     helpText: 'Aktivieren Sie IMAP in den Web.de-Einstellungen unter E-Mail → POP3/IMAP',
+    color: 'text-yellow-500',
+    authType: 'password',
   },
 };
 
