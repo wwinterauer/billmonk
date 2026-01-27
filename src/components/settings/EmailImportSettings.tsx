@@ -92,14 +92,42 @@ const defaultFormData: AddAccountFormData = {
   sync_interval: 'manual',
 };
 
-// Common IMAP presets
-const imapPresets: Record<string, { host: string; port: number }> = {
-  gmail: { host: 'imap.gmail.com', port: 993 },
-  outlook: { host: 'outlook.office365.com', port: 993 },
-  yahoo: { host: 'imap.mail.yahoo.com', port: 993 },
-  icloud: { host: 'imap.mail.me.com', port: 993 },
-  gmx: { host: 'imap.gmx.net', port: 993 },
-  webde: { host: 'imap.web.de', port: 993 },
+// Common IMAP presets with help text
+const imapPresets: Record<string, { host: string; port: number; helpText: string; helpUrl?: string }> = {
+  gmail: { 
+    host: 'imap.gmail.com', 
+    port: 993,
+    helpText: 'Verwenden Sie ein App-Passwort von myaccount.google.com/apppasswords',
+    helpUrl: 'https://myaccount.google.com/apppasswords'
+  },
+  outlook: { 
+    host: 'outlook.office365.com', 
+    port: 993,
+    helpText: 'Verwenden Sie Ihr Microsoft-Passwort oder ein App-Passwort bei aktivierter 2FA',
+    helpUrl: 'https://account.microsoft.com/security'
+  },
+  yahoo: { 
+    host: 'imap.mail.yahoo.com', 
+    port: 993,
+    helpText: 'Generieren Sie ein App-Passwort unter Kontosicherheit',
+    helpUrl: 'https://login.yahoo.com/account/security'
+  },
+  icloud: { 
+    host: 'imap.mail.me.com', 
+    port: 993,
+    helpText: 'Erstellen Sie ein app-spezifisches Passwort auf appleid.apple.com',
+    helpUrl: 'https://appleid.apple.com/account/manage'
+  },
+  gmx: { 
+    host: 'imap.gmx.net', 
+    port: 993,
+    helpText: 'Aktivieren Sie IMAP in den GMX-Einstellungen unter E-Mail → POP3/IMAP',
+  },
+  webde: { 
+    host: 'imap.web.de', 
+    port: 993,
+    helpText: 'Aktivieren Sie IMAP in den Web.de-Einstellungen unter E-Mail → POP3/IMAP',
+  },
 };
 
 export const EmailImportSettings: React.FC = () => {
@@ -674,6 +702,21 @@ export const EmailImportSettings: React.FC = () => {
                   <SelectItem value="webde">Web.de</SelectItem>
                 </SelectContent>
               </Select>
+              {selectedPreset && imapPresets[selectedPreset] && (
+                <Alert className="mt-2">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    {imapPresets[selectedPreset].helpText}
+                    {imapPresets[selectedPreset].helpUrl && (
+                      <Button variant="link" size="sm" className="h-auto p-0 ml-1" asChild>
+                        <a href={imapPresets[selectedPreset].helpUrl} target="_blank" rel="noopener noreferrer">
+                          Anleitung <ExternalLink className="h-3 w-3 ml-1" />
+                        </a>
+                      </Button>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
