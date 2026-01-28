@@ -6,6 +6,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface TaxRateDetail {
+  rate: number;
+  net_amount: number;
+  tax_amount: number;
+  description?: string;
+}
+
 interface ExtractionResult {
   is_receipt: boolean;
   document_type?: string;
@@ -17,6 +24,8 @@ interface ExtractionResult {
   amount_net: number | null;
   vat_amount: number | null;
   vat_rate: number | null;
+  is_mixed_tax_rate?: boolean;
+  tax_rate_details?: TaxRateDetail[] | null;
   receipt_date: string | null;
   category: string | null;
   payment_method: string | null;
@@ -414,10 +423,25 @@ WICHTIGE REGELN FÜR STEUER (MwSt./USt.) - GEZIELT NACH % SUCHEN:
    - "20% MwSt/USt: xxx" ← HIER steht oft der Steuersatz!
    - "Brutto: xxx" / "Gesamtbetrag: xxx"
 
-5. MEHRERE STEUERSÄTZE auf einer Rechnung:
-   - z.B. "7% MwSt 3,50 / 19% MwSt 9,50"
-   - Nimm den HÖHEREN Steuersatz als vat_rate (19%)
-   - Summiere alle MwSt-Beträge für vat_amount
+5. MEHRERE STEUERSÄTZE auf einer Rechnung (z.B. Supermarkt, Amazon):
+   Erkennungs-Muster:
+   - "10% MwSt: 5,00 / 20% MwSt: 12,00"
+   - "Summe 7%: ... / Summe 19%: ..."
+   - "A = 20%, B = 10%" (oft bei Kassenbons)
+   - Mehrere Zeilen mit unterschiedlichen %-Angaben
+   
+   **Vorgehen bei MEHREREN Steuersätzen:**
+   - Setze is_mixed_tax_rate = true
+   - Setze vat_rate = null (da nicht eindeutig)
+   - Erfasse GESAMT-Brutto (amount_gross), GESAMT-Netto (amount_net), GESAMT-Steuer (vat_amount)
+   - Speichere Details in tax_rate_details:
+     [{"rate": 10, "net_amount": 50.00, "tax_amount": 5.00, "description": "Lebensmittel"},
+      {"rate": 20, "net_amount": 82.50, "tax_amount": 12.50, "description": "Sonstiges"}]
+   
+   **Bei EINEM Steuersatz:**
+   - Setze is_mixed_tax_rate = false
+   - Setze vat_rate = der erkannte Satz
+   - tax_rate_details = null
 
 6. VALIDIERUNG - Übliche Steuersätze:
    - Österreich: 0%, 10%, 13%, 20%
@@ -434,7 +458,26 @@ WEITERE REGELN:
 - Antworte NUR mit JSON, keine Markdown-Codeblöcke
 - Unerkennbare Felder auf null setzen
 - Beträge als Dezimalzahlen ohne Währungssymbol
-- Datum im Format YYYY-MM-DD`;
+- Datum im Format YYYY-MM-DD
+
+**JSON-Ausgabeformat:**
+{
+  "is_receipt": true,
+  "vendor": "...",
+  "vendor_brand": "..." oder null,
+  "description": "...",
+  "amount_gross": 150.00,
+  "amount_net": 132.50,
+  "vat_amount": 17.50,
+  "vat_rate": 20 oder null (bei gemischt),
+  "is_mixed_tax_rate": false oder true,
+  "tax_rate_details": null oder [...],
+  "receipt_date": "YYYY-MM-DD",
+  "category": "...",
+  "payment_method": "...",
+  "invoice_number": "...",
+  "confidence": 0.95
+}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -633,6 +676,8 @@ WEITERE REGELN:
             vat_amount: extractedData.vat_amount,
             vat_rate: finalVatRate,
             vat_rate_source: vatRateSource,
+            is_mixed_tax_rate: extractedData.is_mixed_tax_rate || false,
+            tax_rate_details: extractedData.tax_rate_details || null,
             receipt_date: extractedData.receipt_date,
             category: extractedData.category,
             payment_method: extractedData.payment_method,

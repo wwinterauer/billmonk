@@ -116,11 +116,21 @@ interface ReceiptDetailPanelProps {
 }
 
 const VAT_RATES = [
-  { value: '20', label: '20%' },
-  { value: '13', label: '13%' },
-  { value: '10', label: '10%' },
-  { value: '0', label: '0%' },
+  { value: '20', label: '20% (AT normal)' },
+  { value: '19', label: '19% (DE normal)' },
+  { value: '13', label: '13% (AT ermäßigt)' },
+  { value: '10', label: '10% (AT ermäßigt)' },
+  { value: '7', label: '7% (DE ermäßigt)' },
+  { value: '0', label: '0% (Steuerfrei)' },
+  { value: 'mixed', label: 'Gemischt (mehrere Sätze)' },
 ];
+
+interface TaxRateDetail {
+  rate: number;
+  net_amount: number;
+  tax_amount: number;
+  description?: string;
+}
 
 const PAYMENT_METHODS = [
   { value: 'Überweisung', label: 'Überweisung' },
@@ -206,6 +216,8 @@ export function ReceiptDetailPanel({
   const [category, setCategory] = useState('');
   const [amountGross, setAmountGross] = useState('');
   const [vatRate, setVatRate] = useState('20');
+  const [isMixedTaxRate, setIsMixedTaxRate] = useState(false);
+  const [taxRateDetails, setTaxRateDetails] = useState<TaxRateDetail[] | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -223,6 +235,17 @@ export function ReceiptDetailPanel({
   // Calculated values
   const calculatedValues = useMemo(() => {
     const gross = parseFloat(amountGross) || 0;
+    
+    // Bei gemischten Steuersätzen: Netto direkt aus den Details berechnen
+    if (isMixedTaxRate && taxRateDetails && taxRateDetails.length > 0) {
+      const totalNet = taxRateDetails.reduce((sum, d) => sum + (d.net_amount || 0), 0);
+      const totalVat = taxRateDetails.reduce((sum, d) => sum + (d.tax_amount || 0), 0);
+      return {
+        net: totalNet,
+        vat: totalVat,
+      };
+    }
+    
     const rate = parseFloat(vatRate) || 0;
     const net = gross / (1 + rate / 100);
     const vat = gross - net;
@@ -230,7 +253,7 @@ export function ReceiptDetailPanel({
       net: isNaN(net) ? 0 : net,
       vat: isNaN(vat) ? 0 : vat,
     };
-  }, [amountGross, vatRate]);
+  }, [amountGross, vatRate, isMixedTaxRate, taxRateDetails]);
 
   // Generated filename based on current form values
   const generatedFilename = useMemo(() => {
@@ -372,6 +395,10 @@ export function ReceiptDetailPanel({
           setCategory(data.category || '');
           setAmountGross(data.amount_gross?.toString() || '');
           setVatRate(data.vat_rate?.toString() || '20');
+          // Handle mixed tax rate fields (may not be in types yet)
+          const receiptData = data as unknown as Record<string, unknown>;
+          setIsMixedTaxRate((receiptData.is_mixed_tax_rate as boolean) || false);
+          setTaxRateDetails((receiptData.tax_rate_details as TaxRateDetail[]) || null);
           setPaymentMethod(data.payment_method || '');
           setNotes(data.notes || '');
           setSelectedVendorId(data.vendor_id || null);
@@ -866,7 +893,9 @@ export function ReceiptDetailPanel({
         amount_gross: parseFloat(amountGross) || null,
         amount_net: calculatedValues.net || null,
         vat_amount: calculatedValues.vat || null,
-        vat_rate: parseFloat(vatRate) || null,
+        vat_rate: isMixedTaxRate ? null : (parseFloat(vatRate) || null),
+        is_mixed_tax_rate: isMixedTaxRate,
+        tax_rate_details: isMixedTaxRate ? taxRateDetails : null,
         payment_method: paymentMethod || null,
         notes: notes || null,
         user_modified_fields: Array.from(modifiedFields),
@@ -1561,13 +1590,28 @@ export function ReceiptDetailPanel({
                       <LearnableField
                         fieldName="vat_rate"
                         label="MwSt-Satz"
-                        value={parseFloat(vatRate) || null}
+                        value={isMixedTaxRate ? null : (parseFloat(vatRate) || null)}
                         originalValue={originalReceipt?.vat_rate}
                         vendorLearning={vendorLearning}
-                        onReset={() => setVatRate(originalReceipt?.vat_rate?.toString() || '20')}
-                        vatRateSource={(receipt as any)?.vat_rate_source as 'ai' | 'learned' | 'manual' | null}
+                        onReset={() => {
+                          setVatRate(originalReceipt?.vat_rate?.toString() || '20');
+                          setIsMixedTaxRate(false);
+                        }}
+                        vatRateSource={(receipt as unknown as Record<string, unknown>)?.vat_rate_source as 'ai' | 'learned' | 'manual' | null}
                       >
-                        <Select value={vatRate} onValueChange={setVatRate}>
+                        <Select 
+                          value={isMixedTaxRate ? 'mixed' : vatRate} 
+                          onValueChange={(value) => {
+                            if (value === 'mixed') {
+                              setIsMixedTaxRate(true);
+                              setVatRate('0');
+                            } else {
+                              setIsMixedTaxRate(false);
+                              setVatRate(value);
+                              setTaxRateDetails(null);
+                            }
+                          }}
+                        >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -1582,6 +1626,28 @@ export function ReceiptDetailPanel({
                       </LearnableField>
                     </div>
 
+                    {/* Mixed Tax Rate Details */}
+                    {isMixedTaxRate && taxRateDetails && taxRateDetails.length > 0 && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          <span className="text-sm font-medium text-amber-800">Mehrere Steuersätze erkannt</span>
+                        </div>
+                        <div className="space-y-1">
+                          {taxRateDetails.map((detail, idx) => (
+                            <div key={idx} className="flex justify-between text-sm">
+                              <span className="text-amber-700">
+                                {detail.rate}% {detail.description && `(${detail.description})`}
+                              </span>
+                              <span className="text-amber-800">
+                                Netto: €{detail.net_amount?.toFixed(2)} / MwSt: €{detail.tax_amount?.toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Net & VAT Amount (calculated) */}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -1593,7 +1659,12 @@ export function ReceiptDetailPanel({
                         />
                       </div>
                       <div>
-                        <Label>MwSt-Betrag</Label>
+                        <Label className="flex items-center gap-1">
+                          MwSt-Betrag
+                          {isMixedTaxRate && (
+                            <span className="text-xs text-muted-foreground">(gemischt)</span>
+                          )}
+                        </Label>
                         <Input
                           value={formatCurrency(calculatedValues.vat)}
                           readOnly

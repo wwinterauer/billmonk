@@ -935,6 +935,7 @@ export type Database = {
           id: string
           invoice_number: string | null
           is_duplicate: boolean | null
+          is_mixed_tax_rate: boolean | null
           is_no_receipt_entry: boolean | null
           line_items_raw: Json | null
           notes: string | null
@@ -946,6 +947,7 @@ export type Database = {
           split_from_receipt_id: string | null
           split_suggestion: Json | null
           status: string | null
+          tax_rate_details: Json | null
           updated_at: string | null
           user_id: string
           user_modified_fields: string[] | null
@@ -981,6 +983,7 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           is_duplicate?: boolean | null
+          is_mixed_tax_rate?: boolean | null
           is_no_receipt_entry?: boolean | null
           line_items_raw?: Json | null
           notes?: string | null
@@ -992,6 +995,7 @@ export type Database = {
           split_from_receipt_id?: string | null
           split_suggestion?: Json | null
           status?: string | null
+          tax_rate_details?: Json | null
           updated_at?: string | null
           user_id: string
           user_modified_fields?: string[] | null
@@ -1027,6 +1031,7 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           is_duplicate?: boolean | null
+          is_mixed_tax_rate?: boolean | null
           is_no_receipt_entry?: boolean | null
           line_items_raw?: Json | null
           notes?: string | null
@@ -1038,6 +1043,7 @@ export type Database = {
           split_from_receipt_id?: string | null
           split_suggestion?: Json | null
           status?: string | null
+          tax_rate_details?: Json | null
           updated_at?: string | null
           user_id?: string
           user_modified_fields?: string[] | null
