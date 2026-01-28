@@ -51,12 +51,12 @@ interface FileUpload extends UploadProgress {
   duplicateScore?: number;
 }
 
-// Represents a receipt loaded from the database (processing/pending status)
+// Represents a receipt loaded from the database (processing/pending/recently completed status)
 interface PendingReceiptFromDB {
   id: string;
   fileName: string;
   fileUrl: string | null;
-  status: 'pending' | 'processing';
+  status: 'pending' | 'processing' | 'review';
   aiConfidence: number | null;
   createdAt: string;
   vendor: string | null;
@@ -110,11 +110,14 @@ const Upload = () => {
       }
 
       try {
+        // Get the timestamp for 2 hours ago to show recently processed receipts
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
         const { data, error } = await supabase
           .from('receipts')
           .select('id, file_name, file_url, status, ai_confidence, created_at, vendor, amount_gross')
           .eq('user_id', user.id)
-          .in('status', ['processing', 'pending'])
+          .or(`status.in.(processing,pending),and(status.eq.review,created_at.gte.${twoHoursAgo})`)
           .order('created_at', { ascending: false })
           .limit(200);
 
@@ -125,7 +128,7 @@ const Upload = () => {
             id: r.id,
             fileName: r.file_name || 'Unbekannte Datei',
             fileUrl: r.file_url,
-            status: r.status as 'pending' | 'processing',
+            status: r.status as 'pending' | 'processing' | 'review',
             aiConfidence: r.ai_confidence,
             createdAt: r.created_at,
             vendor: r.vendor,
@@ -1105,11 +1108,13 @@ const Upload = () => {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-primary animate-pulse" />
-                      Belege in Bearbeitung
+                      <Sparkles className="h-5 w-5 text-primary" />
+                      Aktuelle Upload-Session
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {filteredPendingReceipts.length} Beleg{filteredPendingReceipts.length !== 1 ? 'e' : ''} werden verarbeitet
+                      {filteredPendingReceipts.filter(r => r.status === 'review').length} fertig, {' '}
+                      {filteredPendingReceipts.filter(r => r.status === 'processing').length} in Analyse, {' '}
+                      {filteredPendingReceipts.filter(r => r.status === 'pending').length} wartend
                     </p>
                   </div>
                   <Button 
@@ -1120,46 +1125,66 @@ const Upload = () => {
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto">
                     {filteredPendingReceipts.map((receipt) => (
                       <motion.div
                         key={receipt.id}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="flex items-center gap-4 p-4 rounded-lg bg-muted/30"
+                        className={`flex items-center gap-4 p-3 rounded-lg ${
+                          receipt.status === 'review' 
+                            ? 'bg-success/10 border border-success/20' 
+                            : 'bg-muted/30'
+                        }`}
                       >
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <FileText className="h-5 w-5 text-primary" />
+                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          receipt.status === 'review' 
+                            ? 'bg-success' 
+                            : 'bg-primary/10'
+                        }`}>
+                          {receipt.status === 'review' ? (
+                            <Check className="h-4 w-4 text-success-foreground" />
+                          ) : (
+                            <FileText className="h-4 w-4 text-primary" />
+                          )}
                         </div>
                         
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="font-medium text-foreground truncate">
-                              {truncateFileName(receipt.fileName)}
+                            <p className="font-medium text-foreground truncate text-sm">
+                              {truncateFileName(receipt.fileName, 40)}
                             </p>
                             <Badge 
                               variant="secondary" 
                               className={`text-xs ${
-                                receipt.status === 'processing' 
+                                receipt.status === 'review'
+                                  ? 'bg-success/20 text-success-foreground border-success/30'
+                                  : receipt.status === 'processing' 
                                   ? 'bg-primary/20 text-primary' 
                                   : 'bg-muted text-muted-foreground'
                               }`}
                             >
-                              {receipt.status === 'processing' ? 'KI-Analyse' : 'Wartend'}
+                              {receipt.status === 'review' 
+                                ? `Fertig${receipt.aiConfidence ? ` (${Math.round(receipt.aiConfidence * 100)}%)` : ''}`
+                                : receipt.status === 'processing' 
+                                ? 'KI-Analyse' 
+                                : 'Wartend'}
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                            <span>{format(new Date(receipt.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })}</span>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span>{format(new Date(receipt.createdAt), 'HH:mm', { locale: de })}</span>
                             {receipt.vendor && <span>• {receipt.vendor}</span>}
                             {receipt.amountGross && <span>• € {receipt.amountGross.toFixed(2)}</span>}
                           </div>
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          {receipt.status === 'processing' ? (
-                            <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                          {receipt.status === 'review' ? (
+                            <Check className="h-4 w-4 text-success" />
+                          ) : receipt.status === 'processing' ? (
+                            <Sparkles className="h-4 w-4 text-primary animate-pulse" />
                           ) : (
-                            <Clock className="h-5 w-5 text-muted-foreground" />
+                            <Clock className="h-4 w-4 text-muted-foreground" />
                           )}
                         </div>
                       </motion.div>
