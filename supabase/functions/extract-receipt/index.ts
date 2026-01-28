@@ -310,6 +310,53 @@ WEITERE REGELN:
 
       // If receiptId was provided, update the receipt in database
       if (receiptId) {
+        // Check for learned VAT rate
+        let finalVatRate = extractedData.vat_rate;
+        let vatRateSource: 'ai' | 'learned' = 'ai';
+
+        // First get the receipt to find user_id and vendor_id
+        const { data: receiptInfo } = await supabase
+          .from('receipts')
+          .select('user_id, vendor_id')
+          .eq('id', receiptId)
+          .single();
+
+        if (receiptInfo?.user_id && extractedData.vendor) {
+          // Try to find vendor by name for VAT learning
+          const { data: vendorMatch } = await supabase
+            .from('vendors')
+            .select('id')
+            .eq('user_id', receiptInfo.user_id)
+            .or(`display_name.ilike.${extractedData.vendor},legal_name.ilike.${extractedData.vendor}`)
+            .maybeSingle();
+
+          const vendorId = receiptInfo.vendor_id || vendorMatch?.id;
+
+          if (vendorId) {
+            // Check for learned VAT rate
+            const { data: learning } = await supabase
+              .from('vendor_learning')
+              .select('default_vat_rate, vat_rate_confidence, vat_rate_corrections')
+              .eq('vendor_id', vendorId)
+              .eq('user_id', receiptInfo.user_id)
+              .eq('is_active', true)
+              .maybeSingle();
+
+            // Use learned rate if confidence >= 70% or at least 3 corrections
+            if (learning?.default_vat_rate !== null && learning?.default_vat_rate !== undefined) {
+              const shouldUseLearned = 
+                (learning.vat_rate_confidence ?? 0) >= 70 || 
+                (learning.vat_rate_corrections ?? 0) >= 3;
+
+              if (shouldUseLearned) {
+                console.log(`[VAT Learning] Using learned rate ${learning.default_vat_rate}% for vendor (AI: ${extractedData.vat_rate}%, confidence: ${learning.vat_rate_confidence}%)`);
+                finalVatRate = Number(learning.default_vat_rate);
+                vatRateSource = 'learned';
+              }
+            }
+          }
+        }
+
         const { error: updateError } = await supabase
           .from('receipts')
           .update({
@@ -319,7 +366,8 @@ WEITERE REGELN:
             amount_gross: extractedData.amount_gross,
             amount_net: extractedData.amount_net,
             vat_amount: extractedData.vat_amount,
-            vat_rate: extractedData.vat_rate,
+            vat_rate: finalVatRate,
+            vat_rate_source: vatRateSource,
             receipt_date: extractedData.receipt_date,
             category: extractedData.category,
             payment_method: extractedData.payment_method,
@@ -334,7 +382,7 @@ WEITERE REGELN:
         if (updateError) {
           console.error("Failed to update receipt:", updateError);
         } else {
-          console.log(`Receipt ${receiptId} updated with extracted data, status set to 'review'`);
+          console.log(`Receipt ${receiptId} updated with extracted data (VAT source: ${vatRateSource}), status set to 'review'`);
         }
       }
 
