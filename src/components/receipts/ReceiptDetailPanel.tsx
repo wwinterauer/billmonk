@@ -775,7 +775,7 @@ export function ReceiptDetailPanel({
     try {
       // If rejecting, use rejectReceipt to clear file_hash for re-upload capability
       if (newStatus === 'rejected') {
-        await rejectReceipt(receipt.id, { deleteFile: true });
+        await rejectReceipt(receipt.id, { deleteFile: true, reason: 'Manuell abgelehnt' });
         
         toast({
           title: 'Beleg abgelehnt',

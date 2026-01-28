@@ -910,7 +910,7 @@ const Expenses = () => {
     try {
       for (const id of selectedIds) {
         // Use rejectReceipt to clear file_hash for re-upload capability
-        await rejectReceipt(id, { deleteFile: true });
+        await rejectReceipt(id, { deleteFile: true, reason: 'Manuell abgelehnt (Massenverarbeitung)' });
       }
       setReceipts(prev => prev.map(r => 
         selectedIds.has(r.id) ? { ...r, status: 'rejected' as const, file_hash: null } : r
