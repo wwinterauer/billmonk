@@ -10,8 +10,6 @@ import {
   ZoomIn,
   ZoomOut,
   AlertCircle,
-  RefreshCw,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Pencil,
@@ -19,13 +17,6 @@ import {
   Check,
   RotateCcw,
   Copy,
-  Building,
-  Hash,
-  CalendarIcon as CalendarIconLucide,
-  Euro,
-  Percent,
-  MousePointer,
-  Square,
   Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -64,22 +55,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
@@ -89,8 +69,8 @@ import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PdfViewer } from './PdfViewer';
-import { extractReceiptData, normalizeExtractionResult, fetchDescriptionSettings, processDescription, DEFAULT_DESCRIPTION_SETTINGS, type DescriptionSettings } from '@/services/aiService';
-import { matchOrCreateVendor } from '@/services/vendorMatchingService';
+import { fetchDescriptionSettings, processDescription, DEFAULT_DESCRIPTION_SETTINGS, type DescriptionSettings } from '@/services/aiService';
+
 import { VendorAutocomplete } from './VendorAutocomplete';
 import { 
   generateFileName, 
@@ -107,6 +87,7 @@ import { LearnableField } from './LearnableField';
 import { SaveWithLearningDialog, type FieldChange } from './SaveWithLearningDialog';
 import { ManualTrainingModal } from './ManualTrainingModal';
 import { SourceBadge, NoReceiptBadge } from './SourceBadge';
+import { ReanalyzeOptions } from './ReanalyzeOptions';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
@@ -144,17 +125,6 @@ const PAYMENT_METHODS = [
   { value: 'Sonstige', label: 'Sonstige' },
 ];
 
-// Fields that can be selectively re-analyzed by AI
-const REANALYZABLE_FIELDS = [
-  { id: 'vendor', label: 'Lieferant', icon: Building },
-  { id: 'invoice_number', label: 'Rechnungsnummer', icon: Hash },
-  { id: 'receipt_date', label: 'Datum', icon: CalendarIconLucide },
-  { id: 'amount_gross', label: 'Bruttobetrag', icon: Euro },
-  { id: 'amount_net', label: 'Nettobetrag', icon: Euro },
-  { id: 'vat_rate', label: 'MwSt-Satz', icon: Percent },
-  { id: 'vat_amount', label: 'Vorsteuer', icon: Percent },
-  { id: 'description', label: 'Beschreibung', icon: FileText },
-] as const;
 
 export function ReceiptDetailPanel({ 
   receiptId, 
@@ -184,16 +154,11 @@ export function ReceiptDetailPanel({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   
-  // AI Re-run state
-  const [isRerunning, setIsRerunning] = useState(false);
+  // AI Re-analysis state (managed by ReanalyzeOptions but tracked here for change display)
   const [hasUnsavedAiChanges, setHasUnsavedAiChanges] = useState(false);
   const [changedFields, setChangedFields] = useState<Record<string, { old: string; new: string }>>({});
   const [currentAiConfidence, setCurrentAiConfidence] = useState<number | null>(null);
   
-  // Selective field reanalysis state
-  const [showFieldSelectDialog, setShowFieldSelectDialog] = useState(false);
-  const [selectedReanalysisFields, setSelectedReanalysisFields] = useState<string[]>([]);
-  const [showFullReanalyzeConfirm, setShowFullReanalyzeConfirm] = useState(false);
 
   // Filename editing state
   const [isEditingFilename, setIsEditingFilename] = useState(false);
@@ -569,202 +534,6 @@ export function ReceiptDetailPanel({
     navigator.clipboard.writeText(displayFilename);
     toast({ title: 'Dateiname kopiert' });
   }, [displayFilename, toast]);
-
-  // AI Re-run handler - supports selective field reanalysis
-  const reanalyzeFields = async (fieldsToUpdate: string[]) => {
-    if (!receipt?.file_url || isRerunning || !signedUrl || !user) return;
-    if (fieldsToUpdate.length === 0) return;
-
-    setIsRerunning(true);
-    setHasUnsavedAiChanges(false);
-    setChangedFields({});
-
-    try {
-      // 1. Fetch file as blob using the signed URL
-      const response = await fetch(signedUrl);
-      if (!response.ok) {
-        throw new Error('Datei konnte nicht geladen werden');
-      }
-
-      const blob = await response.blob();
-      const file = new File([blob], receipt.file_name || 'receipt', { type: blob.type });
-
-      // 2. Call AI extraction
-      const extracted = await extractReceiptData(file);
-      const normalized = normalizeExtractionResult(extracted);
-
-      if (!normalized) {
-        throw new Error('KI-Erkennung hat keine Daten zurückgegeben');
-      }
-
-      // 3. Track changed fields
-      const changes: Record<string, { old: string; new: string }> = {};
-      
-      const shouldUpdate = (fieldId: string) => fieldsToUpdate.includes(fieldId);
-      
-      const compareAndUpdate = (fieldId: string, displayName: string, oldVal: string, newVal: string | null, setter: (val: string) => void) => {
-        if (!shouldUpdate(fieldId)) return;
-        const newValue = newVal || '';
-        if (oldVal !== newValue && newValue) {
-          changes[displayName] = { old: oldVal || '-', new: newValue };
-          setter(newValue);
-        }
-      };
-
-      // Update vendor if selected
-      if (shouldUpdate('vendor')) {
-        const vendorName = normalized.vendor_brand || normalized.vendor;
-        const matchedVendor = await matchOrCreateVendor(vendorName, user.id);
-        
-        if (matchedVendor) {
-          setSelectedVendorId(matchedVendor.id);
-          if (matchedVendor.display_name !== vendor) {
-            changes['Lieferant'] = { old: vendor || '-', new: matchedVendor.display_name };
-            setVendor(matchedVendor.display_name);
-          }
-          // Track vendor_brand changes
-          if (normalized.vendor_brand && normalized.vendor_brand !== vendorBrand) {
-            changes['Marke'] = { old: vendorBrand || '-', new: normalized.vendor_brand };
-            setVendorBrand(normalized.vendor_brand);
-          }
-        } else {
-          compareAndUpdate('vendor', 'Lieferant', vendor, normalized.vendor, setVendor);
-          // Track vendor_brand changes
-          if (normalized.vendor_brand && normalized.vendor_brand !== vendorBrand) {
-            changes['Marke'] = { old: vendorBrand || '-', new: normalized.vendor_brand };
-            setVendorBrand(normalized.vendor_brand);
-          }
-        }
-      }
-
-      compareAndUpdate('description', 'Beschreibung', description, normalized.description, setDescription);
-      compareAndUpdate('invoice_number', 'Rechnungsnummer', invoiceNumber, normalized.invoice_number, setInvoiceNumber);
-      
-      if (shouldUpdate('receipt_date') && normalized.receipt_date) {
-        const newDate = new Date(normalized.receipt_date);
-        const oldDateStr = receiptDate ? format(receiptDate, 'dd.MM.yyyy') : '-';
-        const newDateStr = format(newDate, 'dd.MM.yyyy');
-        if (oldDateStr !== newDateStr) {
-          changes['Datum'] = { old: oldDateStr, new: newDateStr };
-          setReceiptDate(newDate);
-        }
-      }
-      
-      if (shouldUpdate('amount_gross') && normalized.amount_gross !== null) {
-        const newAmount = normalized.amount_gross.toString();
-        if (amountGross !== newAmount) {
-          changes['Bruttobetrag'] = { old: amountGross || '-', new: newAmount };
-          setAmountGross(newAmount);
-        }
-      }
-      
-      if (shouldUpdate('vat_rate')) {
-        // Handle mixed tax rates
-        if (normalized.is_mixed_tax_rate) {
-          if (!isMixedTaxRate) {
-            changes['MwSt-Satz'] = { old: vatRate ? vatRate + '%' : '-', new: 'Gemischt' };
-          }
-          setIsMixedTaxRate(true);
-          setVatRate('mixed');
-          if (normalized.tax_rate_details) {
-            setTaxRateDetails(normalized.tax_rate_details);
-          }
-        } else if (normalized.vat_rate !== null) {
-          const newRate = normalized.vat_rate.toString();
-          if (vatRate !== newRate) {
-            changes['MwSt-Satz'] = { old: isMixedTaxRate ? 'Gemischt' : (vatRate || '-'), new: newRate + '%' };
-            setVatRate(newRate);
-          }
-          setIsMixedTaxRate(false);
-          setTaxRateDetails(null);
-        }
-      }
-
-      // 4. Update confidence
-      setCurrentAiConfidence(normalized.confidence);
-      
-      if (Object.keys(changes).length > 0) {
-        setChangedFields(changes);
-        setHasUnsavedAiChanges(true);
-      }
-
-      toast({
-        title: 'KI-Erkennung abgeschlossen',
-        description: `Konfidenz: ${Math.round(normalized.confidence * 100)}% - ${Object.keys(changes).length} Feld(er) aktualisiert`,
-      });
-
-    } catch (error) {
-      console.error('Rerun AI error:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Fehler bei KI-Erkennung',
-        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
-      });
-    } finally {
-      setIsRerunning(false);
-    }
-  };
-
-  // General reanalysis modes
-  const reanalyzeGeneral = async (mode: 'smart' | 'empty' | 'full') => {
-    let fieldsToAnalyze: string[];
-    
-    switch (mode) {
-      case 'smart':
-        // Only fields the user has NOT manually modified
-        fieldsToAnalyze = REANALYZABLE_FIELDS
-          .map(f => f.id)
-          .filter(id => !receipt?.user_modified_fields?.includes(id));
-        
-        if (fieldsToAnalyze.length === 0) {
-          toast({
-            title: 'Alle Felder wurden bereits manuell bearbeitet',
-            description: 'Nutze "Komplett neu" um alle Felder zu überschreiben',
-          });
-          return;
-        }
-        break;
-      
-      case 'empty':
-        // Only empty fields
-        fieldsToAnalyze = REANALYZABLE_FIELDS
-          .map(f => f.id)
-          .filter(id => {
-            const value = receipt?.[id as keyof Receipt];
-            return !value || value === '';
-          });
-        
-        if (fieldsToAnalyze.length === 0) {
-          toast({
-            title: 'Alle Felder haben bereits Werte',
-          });
-          return;
-        }
-        break;
-      
-      case 'full':
-        // All fields
-        fieldsToAnalyze = REANALYZABLE_FIELDS.map(f => f.id);
-        break;
-    }
-    
-    await reanalyzeFields(fieldsToAnalyze);
-  };
-
-  // Reanalyze only fields that haven't been manually modified
-  const reanalyzeUnmodifiedFields = () => {
-    const modifiedFields = receipt?.user_modified_fields || [];
-    const unmodifiedFields = REANALYZABLE_FIELDS
-      .map(f => f.id)
-      .filter(id => !modifiedFields.includes(id));
-    reanalyzeFields(unmodifiedFields);
-  };
-
-  // Reanalyze a single field
-  const reanalyzeSingleField = (fieldId: string) => {
-    reanalyzeFields([fieldId]);
-  };
-
 
   // Fields that are tracked for manual modifications
   const TRACKABLE_FIELDS = [
@@ -1149,15 +918,6 @@ export function ReceiptDetailPanel({
 
               {/* RIGHT COLUMN - Form Only */}
               <div className="w-1/2 flex flex-col bg-background relative">
-                {/* Loading Overlay during reanalysis */}
-                {isRerunning && (
-                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-lg backdrop-blur-sm">
-                    <div className="text-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-                      <p className="text-sm text-muted-foreground mt-2">Analysiere...</p>
-                    </div>
-                  </div>
-                )}
                 {/* AI Badge Header */}
                 <div className="flex items-center justify-between p-4 border-b">
                   <div className="flex items-center gap-2">
@@ -1194,138 +954,81 @@ export function ReceiptDetailPanel({
                     )}
                   </div>
                   
-                  {/* Re-run AI Button */}
+                  {/* Re-run AI Button - uses shared ReanalyzeOptions component */}
                   {receipt?.file_url && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          disabled={isRerunning || fileLoading}
-                          className="gap-1"
-                        >
-                          {isRerunning ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <RefreshCw className="h-4 w-4" />
-                          )}
-                          KI-Analyse
-                          <ChevronDown className="h-3 w-3 ml-1" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-64">
-                        {/* OPTION 1: General Re-Analysis */}
-                        <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                          Generelle Analyse
-                        </DropdownMenuLabel>
+                    <ReanalyzeOptions
+                      receiptId={receipt.id}
+                      fileUrl={receipt.file_url}
+                      fileName={receipt.file_name}
+                      signedUrl={signedUrl}
+                      userModifiedFields={receipt.user_modified_fields || []}
+                      currentFormData={{
+                        vendor,
+                        vendor_brand: vendorBrand,
+                        description,
+                        invoice_number: invoiceNumber,
+                        receipt_date: receiptDate,
+                        amount_gross: amountGross,
+                        vat_rate: vatRate,
+                      }}
+                      onFieldsUpdated={(updates) => {
+                        const changes: Record<string, { old: string; new: string }> = {};
                         
-                        <DropdownMenuItem onClick={() => reanalyzeGeneral('smart')}>
-                          <Sparkles className="w-4 h-4 mr-2 text-primary" />
-                          <div className="flex-1">
-                            <p>Intelligent</p>
-                            <p className="text-xs text-muted-foreground">Schützt manuell bearbeitete Felder</p>
-                          </div>
-                          {(receipt.user_modified_fields?.length || 0) > 0 && (
-                            <Badge variant="outline" className="text-xs ml-2">
-                              {REANALYZABLE_FIELDS.length - (receipt.user_modified_fields?.length || 0)} Felder
-                            </Badge>
-                          )}
-                        </DropdownMenuItem>
+                        if (updates.vendor !== undefined) {
+                          if (vendor !== updates.vendor) {
+                            changes['Lieferant'] = { old: vendor || '-', new: updates.vendor };
+                          }
+                          setVendor(updates.vendor);
+                        }
+                        if (updates.vendor_brand !== undefined) {
+                          if (vendorBrand !== updates.vendor_brand) {
+                            changes['Markenname'] = { old: vendorBrand || '-', new: updates.vendor_brand };
+                          }
+                          setVendorBrand(updates.vendor_brand);
+                        }
+                        if (updates.description !== undefined) {
+                          if (description !== updates.description) {
+                            changes['Beschreibung'] = { old: description || '-', new: updates.description };
+                          }
+                          setDescription(updates.description);
+                        }
+                        if (updates.invoice_number !== undefined) {
+                          if (invoiceNumber !== updates.invoice_number) {
+                            changes['Rechnungsnr.'] = { old: invoiceNumber || '-', new: updates.invoice_number };
+                          }
+                          setInvoiceNumber(updates.invoice_number);
+                        }
+                        if (updates.receipt_date !== undefined) {
+                          const oldDateStr = receiptDate ? format(receiptDate, 'dd.MM.yyyy') : '-';
+                          const newDateStr = format(updates.receipt_date, 'dd.MM.yyyy');
+                          if (oldDateStr !== newDateStr) {
+                            changes['Datum'] = { old: oldDateStr, new: newDateStr };
+                          }
+                          setReceiptDate(updates.receipt_date);
+                        }
+                        if (updates.amount_gross !== undefined) {
+                          if (amountGross !== updates.amount_gross) {
+                            changes['Bruttobetrag'] = { old: amountGross || '-', new: updates.amount_gross };
+                          }
+                          setAmountGross(updates.amount_gross);
+                        }
+                        if (updates.vat_rate !== undefined) {
+                          if (vatRate !== updates.vat_rate) {
+                            changes['MwSt-Satz'] = { old: vatRate || '-', new: updates.vat_rate + '%' };
+                          }
+                          setVatRate(updates.vat_rate);
+                        }
+                        if (updates.confidence !== undefined) {
+                          setCurrentAiConfidence(updates.confidence);
+                        }
                         
-                        <DropdownMenuItem onClick={() => reanalyzeGeneral('empty')}>
-                          <Square className="w-4 h-4 mr-2 text-blue-500" />
-                          <div className="flex-1">
-                            <p>Nur leere Felder</p>
-                            <p className="text-xs text-muted-foreground">Füllt nur fehlende Werte</p>
-                          </div>
-                        </DropdownMenuItem>
-                        
-                        <DropdownMenuItem 
-                          onClick={() => setShowFullReanalyzeConfirm(true)}
-                          className="text-orange-600 focus:text-orange-600"
-                        >
-                          <AlertTriangle className="w-4 h-4 mr-2" />
-                          <div className="flex-1">
-                            <p>Komplett neu</p>
-                            <p className="text-xs text-orange-400">Überschreibt alle Felder</p>
-                          </div>
-                        </DropdownMenuItem>
-                        
-                        <DropdownMenuSeparator />
-                        
-                        {/* OPTION 2: Field-wise Analysis */}
-                        <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                          Einzelne Felder analysieren
-                        </DropdownMenuLabel>
-                        
-                        <DropdownMenuItem onClick={() => setShowFieldSelectDialog(true)}>
-                          <MousePointer className="w-4 h-4 mr-2 text-muted-foreground" />
-                          <div className="flex-1">
-                            <p>Felder auswählen...</p>
-                            <p className="text-xs text-muted-foreground">Wähle gezielt welche Felder</p>
-                          </div>
-                        </DropdownMenuItem>
-                        
-                        <DropdownMenuSeparator />
-                        
-                        {/* Quick Access for individual fields */}
-                        <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                          Schnellzugriff
-                        </DropdownMenuLabel>
-                        
-                        <div className="grid grid-cols-2 gap-1 p-1">
-                          <DropdownMenuItem 
-                            onClick={() => reanalyzeSingleField('vendor')}
-                            className="flex-col items-start py-1.5"
-                          >
-                            <div className="flex items-center gap-1">
-                              <Building className="w-3 h-3" />
-                              <span className="text-xs">Lieferant</span>
-                            </div>
-                          </DropdownMenuItem>
-                          
-                          <DropdownMenuItem 
-                            onClick={() => reanalyzeSingleField('invoice_number')}
-                            className="flex-col items-start py-1.5"
-                          >
-                            <div className="flex items-center gap-1">
-                              <Hash className="w-3 h-3" />
-                              <span className="text-xs">Rechnungsnr.</span>
-                            </div>
-                          </DropdownMenuItem>
-                          
-                          <DropdownMenuItem 
-                            onClick={() => reanalyzeSingleField('receipt_date')}
-                            className="flex-col items-start py-1.5"
-                          >
-                            <div className="flex items-center gap-1">
-                              <CalendarIconLucide className="w-3 h-3" />
-                              <span className="text-xs">Datum</span>
-                            </div>
-                          </DropdownMenuItem>
-                          
-                          <DropdownMenuItem 
-                            onClick={() => reanalyzeFields(['amount_gross', 'amount_net', 'vat_amount', 'vat_rate'])}
-                            className="flex-col items-start py-1.5"
-                          >
-                            <div className="flex items-center gap-1">
-                              <Euro className="w-3 h-3" />
-                              <span className="text-xs">Beträge</span>
-                            </div>
-                          </DropdownMenuItem>
-                          
-                          <DropdownMenuItem 
-                            onClick={() => reanalyzeSingleField('description')}
-                            className="flex-col items-start py-1.5 col-span-2"
-                          >
-                            <div className="flex items-center gap-1">
-                              <FileText className="w-3 h-3" />
-                              <span className="text-xs">Beschreibung</span>
-                            </div>
-                          </DropdownMenuItem>
-                        </div>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                        if (Object.keys(changes).length > 0) {
+                          setChangedFields(changes);
+                          setHasUnsavedAiChanges(true);
+                        }
+                      }}
+                      disabled={fileLoading}
+                    />
                   )}
 
                   {/* Manual Training Button - shown when confidence is low */}
@@ -1877,165 +1580,6 @@ export function ReceiptDetailPanel({
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Löschen
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Field Selection Dialog for Re-analysis */}
-      <Dialog open={showFieldSelectDialog} onOpenChange={setShowFieldSelectDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Felder neu analysieren</DialogTitle>
-            <DialogDescription>
-              Wähle die Felder die neu erkannt werden sollen.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-4">
-            <div className="grid grid-cols-2 gap-2">
-              {REANALYZABLE_FIELDS.map(field => {
-                const Icon = field.icon;
-                const currentValue = receipt?.[field.id as keyof Receipt];
-                const isModified = receipt?.user_modified_fields?.includes(field.id);
-                const isSelected = selectedReanalysisFields.includes(field.id);
-                
-                return (
-                  <button
-                    key={field.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedReanalysisFields(prev =>
-                        prev.includes(field.id)
-                          ? prev.filter(f => f !== field.id)
-                          : [...prev, field.id]
-                      );
-                    }}
-                    className={cn(
-                      "flex items-start gap-2 p-3 border rounded-lg text-left transition-all",
-                      isSelected 
-                        ? "border-primary bg-primary/5" 
-                        : "hover:bg-muted"
-                    )}
-                  >
-                    <Checkbox 
-                      checked={isSelected} 
-                      className="mt-0.5 pointer-events-none" 
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1">
-                        <Icon className="w-3 h-3 text-muted-foreground" />
-                        <span className="text-sm font-medium">{field.label}</span>
-                        {isModified && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Pencil className="w-3 h-3 text-orange-500" />
-                            </TooltipTrigger>
-                            <TooltipContent>Manuell bearbeitet</TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {currentValue?.toString() || '(leer)'}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            
-            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setSelectedReanalysisFields(REANALYZABLE_FIELDS.map(f => f.id))}
-              >
-                Alle
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setSelectedReanalysisFields([])}
-              >
-                Keine
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setSelectedReanalysisFields(
-                  REANALYZABLE_FIELDS.filter(f => !receipt?.[f.id as keyof Receipt]).map(f => f.id)
-                )}
-              >
-                Nur leere
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setSelectedReanalysisFields(
-                  REANALYZABLE_FIELDS.filter(f => !receipt?.user_modified_fields?.includes(f.id)).map(f => f.id)
-                )}
-              >
-                Nur unveränderte
-              </Button>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowFieldSelectDialog(false)}>
-              Abbrechen
-            </Button>
-            <Button 
-              onClick={() => {
-                reanalyzeFields(selectedReanalysisFields);
-                setShowFieldSelectDialog(false);
-              }}
-              disabled={selectedReanalysisFields.length === 0}
-            >
-              {selectedReanalysisFields.length} Feld(er) analysieren
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Full Re-analyze Confirmation */}
-      <AlertDialog open={showFullReanalyzeConfirm} onOpenChange={setShowFullReanalyzeConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
-              <AlertTriangle className="w-5 h-5" />
-              Komplett neu analysieren?
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div>
-                <p>ALLE Felder werden überschrieben, auch deine manuellen Korrekturen.</p>
-                
-                {(receipt?.user_modified_fields?.length || 0) > 0 && (
-                  <div className="mt-3 p-2 bg-orange-50 rounded border border-orange-200">
-                    <p className="text-sm text-orange-800 font-medium mb-1">
-                      Folgende Felder wurden manuell bearbeitet:
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {receipt?.user_modified_fields?.map(fieldId => (
-                        <Badge key={fieldId} variant="outline" className="text-xs">
-                          {REANALYZABLE_FIELDS.find(f => f.id === fieldId)?.label || fieldId}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                reanalyzeGeneral('full');
-                setShowFullReanalyzeConfirm(false);
-              }}
-              className="bg-orange-600 hover:bg-orange-700"
-            >
-              Ja, alles überschreiben
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
