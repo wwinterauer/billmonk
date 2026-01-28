@@ -35,6 +35,7 @@ import {
   Sparkles,
   FileText,
   Building,
+  Briefcase,
   Hash,
   CalendarIcon,
   Euro,
@@ -49,7 +50,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 // Fields that can be selectively re-analyzed by AI
 const REANALYZABLE_FIELDS = [
-  { id: 'vendor', label: 'Lieferant', icon: Building },
+  { id: 'vendor', label: 'Lieferant (Markenname)', icon: Building },
+  { id: 'vendor_brand', label: 'Lieferant (Rechtlicher Name)', icon: Briefcase },
   { id: 'invoice_number', label: 'Rechnungsnummer', icon: Hash },
   { id: 'receipt_date', label: 'Datum', icon: CalendarIcon },
   { id: 'amount_gross', label: 'Bruttobetrag', icon: Euro },
@@ -351,7 +353,17 @@ export function ReanalyzeOptions({
             >
               <div className="flex items-center gap-1">
                 <Building className="w-3 h-3" />
-                <span className="text-xs">Lieferant</span>
+                <span className="text-xs">Markenname</span>
+              </div>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onClick={() => reanalyzeSingleField('vendor_brand')}
+              className="flex-col items-start py-1.5"
+            >
+              <div className="flex items-center gap-1">
+                <Briefcase className="w-3 h-3" />
+                <span className="text-xs">Rechtl. Name</span>
               </div>
             </DropdownMenuItem>
 
