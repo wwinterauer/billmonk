@@ -1318,6 +1318,23 @@ export function ReceiptDetailPanel({
                       </Alert>
                     )}
 
+                    {/* Non-Receipt Document Hint */}
+                    {receipt?.category === 'Keine Rechnung' && (
+                      <Alert className="bg-muted/50 border-muted-foreground/20">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <AlertDescription>
+                          <div className="space-y-1">
+                            <p className="font-medium text-foreground">
+                              Erkannt als: {receipt.notes?.replace('Dokumenttyp: ', '').split('.')[0] || 'Sonstiges Dokument'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Dieses Dokument wurde nicht als Rechnung erkannt. Sie können die Kategorie ändern falls es doch ein Beleg ist.
+                            </p>
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
                     {/* Vendor with Autocomplete */}
                     <VendorAutocomplete
                       value={vendor}
