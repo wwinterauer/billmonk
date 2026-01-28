@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -57,24 +57,24 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [reviewCount, setReviewCount] = useState<number>(0);
 
   // Fetch review count
+  const fetchReviewCount = useCallback(async () => {
+    if (!user) {
+      setReviewCount(0);
+      return;
+    }
+
+    const { count, error } = await supabase
+      .from('receipts')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('status', 'review');
+
+    if (!error && count !== null) {
+      setReviewCount(count);
+    }
+  }, [user]);
+
   useEffect(() => {
-    const fetchReviewCount = async () => {
-      if (!user) {
-        setReviewCount(0);
-        return;
-      }
-
-      const { count, error } = await supabase
-        .from('receipts')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'review');
-
-      if (!error && count !== null) {
-        setReviewCount(count);
-      }
-    };
-
     fetchReviewCount();
 
     // Subscribe to changes in receipts table
@@ -93,10 +93,17 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       )
       .subscribe();
 
+    // Listen for custom event to refresh count (triggered by React Query invalidation)
+    const handleRefreshCount = () => {
+      fetchReviewCount();
+    };
+    window.addEventListener('refresh-review-count', handleRefreshCount);
+
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('refresh-review-count', handleRefreshCount);
     };
-  }, [user]);
+  }, [user, fetchReviewCount]);
 
   const getBadgeCount = (badgeKey?: string): number | null => {
     if (badgeKey === 'review') {
