@@ -258,8 +258,9 @@ const Review = () => {
           loadImage(newReceipts[nextIndex]);
         }
 
-        // Invalidate receipts query to update sidebar badge
+        // Invalidate receipts query and trigger sidebar refresh
         queryClient.invalidateQueries({ queryKey: ['receipts'] });
+        window.dispatchEvent(new CustomEvent('refresh-review-count'));
 
         toast({
           title: newStatus === 'approved' ? 'Beleg freigegeben' : 'Beleg abgelehnt',
@@ -306,8 +307,9 @@ const Review = () => {
         await updateReceipt(receipt.id, { status: 'approved' });
       }
       setReceipts([]);
-      // Invalidate receipts query to update sidebar badge
+      // Invalidate receipts query and trigger sidebar refresh
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      window.dispatchEvent(new CustomEvent('refresh-review-count'));
       toast({ title: `${receipts.length} Belege freigegeben` });
     } catch (error) {
       toast({
