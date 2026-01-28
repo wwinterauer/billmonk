@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Upload as UploadIcon, 
@@ -40,6 +40,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface FileUpload extends UploadProgress {
   file: File;
@@ -47,6 +49,18 @@ interface FileUpload extends UploadProgress {
   fileHash?: string;
   isDuplicate?: boolean;
   duplicateScore?: number;
+}
+
+// Represents a receipt loaded from the database (processing/pending status)
+interface PendingReceiptFromDB {
+  id: string;
+  fileName: string;
+  fileUrl: string | null;
+  status: 'pending' | 'processing';
+  aiConfidence: number | null;
+  createdAt: string;
+  vendor: string | null;
+  amountGross: number | null;
 }
 
 interface VendorDecisionQueueItem {
@@ -58,8 +72,11 @@ interface VendorDecisionQueueItem {
 }
 
 const Upload = () => {
+  const { user } = useAuth();
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploads, setUploads] = useState<Map<string, FileUpload>>(new Map());
+  const [pendingReceipts, setPendingReceipts] = useState<PendingReceiptFromDB[]>([]);
+  const [loadingPendingReceipts, setLoadingPendingReceipts] = useState(true);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [duplicateInfo, setDuplicateInfo] = useState<DuplicateInfo | null>(null);
   
@@ -83,6 +100,47 @@ const Upload = () => {
     MAX_FILE_SIZE, 
     MAX_FILES 
   } = useReceipts();
+
+  // Load pending/processing receipts from database on mount
+  useEffect(() => {
+    const loadPendingReceipts = async () => {
+      if (!user) {
+        setLoadingPendingReceipts(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('receipts')
+          .select('id, file_name, file_url, status, ai_confidence, created_at, vendor, amount_gross')
+          .eq('user_id', user.id)
+          .in('status', ['processing', 'pending'])
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (error) {
+          console.error('Error loading pending receipts:', error);
+        } else if (data) {
+          setPendingReceipts(data.map(r => ({
+            id: r.id,
+            fileName: r.file_name || 'Unbekannte Datei',
+            fileUrl: r.file_url,
+            status: r.status as 'pending' | 'processing',
+            aiConfidence: r.ai_confidence,
+            createdAt: r.created_at,
+            vendor: r.vendor,
+            amountGross: r.amount_gross,
+          })));
+        }
+      } catch (err) {
+        console.error('Failed to load pending receipts:', err);
+      } finally {
+        setLoadingPendingReceipts(false);
+      }
+    };
+
+    loadPendingReceipts();
+  }, [user]);
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -684,6 +742,11 @@ const Upload = () => {
   const isAnyProcessing = uploadsArray.some(u => u.status === 'uploading' || u.status === 'processing');
   const canRemove = (status: UploadStatus) => status !== 'uploading' && status !== 'processing';
 
+  // Combine active uploads with pending receipts from DB (exclude already shown in uploads)
+  const uploadReceiptIds = new Set(uploadsArray.filter(u => u.receipt?.id).map(u => u.receipt!.id));
+  const filteredPendingReceipts = pendingReceipts.filter(pr => !uploadReceiptIds.has(pr.id));
+  const hasPendingItems = uploadsArray.length > 0 || filteredPendingReceipts.length > 0;
+
   const handleContinue = () => {
     navigate('/expenses');
   };
@@ -924,7 +987,7 @@ const Upload = () => {
           </Card>
         </motion.div>
 
-        {/* Upload Progress */}
+        {/* Upload Progress - Active Uploads */}
         <AnimatePresence>
           {uploadsArray.length > 0 && (
             <motion.div
@@ -932,10 +995,10 @@ const Upload = () => {
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
             >
-              <Card className="border-border/50">
+              <Card className="border-border/50 mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle className="text-lg">Hochgeladene Dateien</CardTitle>
+                    <CardTitle className="text-lg">Aktuelle Uploads</CardTitle>
                     {completedCount > 0 && (
                       <p className="text-sm text-muted-foreground mt-1">
                         {completedCount} Beleg{completedCount !== 1 ? 'e' : ''} verarbeitet
@@ -1029,6 +1092,94 @@ const Upload = () => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Pending Receipts from Database - Shown when navigating back to page */}
+        <AnimatePresence>
+          {filteredPendingReceipts.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+            >
+              <Card className="border-border/50">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                      Belege in Bearbeitung
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {filteredPendingReceipts.length} Beleg{filteredPendingReceipts.length !== 1 ? 'e' : ''} werden verarbeitet
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline"
+                    onClick={() => navigate('/expenses')}
+                  >
+                    Zur Übersicht
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {filteredPendingReceipts.map((receipt) => (
+                      <motion.div
+                        key={receipt.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex items-center gap-4 p-4 rounded-lg bg-muted/30"
+                      >
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <FileText className="h-5 w-5 text-primary" />
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-foreground truncate">
+                              {truncateFileName(receipt.fileName)}
+                            </p>
+                            <Badge 
+                              variant="secondary" 
+                              className={`text-xs ${
+                                receipt.status === 'processing' 
+                                  ? 'bg-primary/20 text-primary' 
+                                  : 'bg-muted text-muted-foreground'
+                              }`}
+                            >
+                              {receipt.status === 'processing' ? 'KI-Analyse' : 'Wartend'}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                            <span>{format(new Date(receipt.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })}</span>
+                            {receipt.vendor && <span>• {receipt.vendor}</span>}
+                            {receipt.amountGross && <span>• € {receipt.amountGross.toFixed(2)}</span>}
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          {receipt.status === 'processing' ? (
+                            <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                          ) : (
+                            <Clock className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Loading State for Pending Receipts */}
+        {loadingPendingReceipts && uploadsArray.length === 0 && (
+          <Card className="border-border/50">
+            <CardContent className="p-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 text-primary animate-spin mr-3" />
+              <span className="text-muted-foreground">Lade Uploads...</span>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Duplicate Warning Dialog */}
         <AlertDialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
