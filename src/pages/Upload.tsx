@@ -725,12 +725,32 @@ const Upload = () => {
   };
 
   const handleCancelDuplicate = () => {
-    // Remove the pending upload for this specific duplicate
+    // Remove the pending upload for this specific duplicate only
     if (currentDuplicate) {
       removeUpload(currentDuplicate.uploadId);
     }
     // Show next duplicate or close dialog
     setTimeout(showNextDuplicate, 100);
+  };
+
+  const handleSkipAllDuplicates = () => {
+    // Remove current duplicate upload
+    if (currentDuplicate) {
+      removeUpload(currentDuplicate.uploadId);
+    }
+    // Remove all remaining duplicates in queue
+    duplicateQueue.forEach(item => {
+      removeUpload(item.uploadId);
+    });
+    // Clear the queue and close dialog
+    setDuplicateQueue([]);
+    setCurrentDuplicate(null);
+    setShowDuplicateDialog(false);
+    
+    toast({
+      title: 'Duplikate übersprungen',
+      description: `${duplicateQueue.length + 1} Duplikat${duplicateQueue.length > 0 ? 'e' : ''} wurden nicht hochgeladen.`,
+    });
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -1288,75 +1308,105 @@ const Upload = () => {
                   </Badge>
                 )}
               </AlertDialogTitle>
-              <AlertDialogDescription>
-                Diese Datei wurde bereits hochgeladen.
+              <AlertDialogDescription className="text-base">
+                Diese Datei existiert bereits in deinem Archiv.
               </AlertDialogDescription>
             </AlertDialogHeader>
             
             {currentDuplicate && (
-              <div className="py-4 space-y-3">
-                {/* Current file being checked */}
-                <div className="p-3 bg-warning/10 rounded-lg border border-warning/30">
-                  <p className="text-sm font-medium mb-1">Aktuelle Datei:</p>
-                  <p className="text-sm break-all">{currentDuplicate.upload.fileName}</p>
-                </div>
-                
-                {/* Existing receipt info */}
-                <div className="p-4 bg-muted/50 rounded-lg border">
-                  <p className="text-sm font-medium mb-3">Vorhandener Beleg:</p>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
-                      <span className="text-muted-foreground shrink-0">Datei:</span>
-                      <span className="font-medium break-all" title={currentDuplicate.duplicateInfo.original.file_name || '–'}>
-                        {currentDuplicate.duplicateInfo.original.file_name || '–'}
-                      </span>
+              <div className="py-4 space-y-4">
+                {/* Visual comparison */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* New file */}
+                  <div className="p-4 bg-warning/10 rounded-lg border-2 border-warning/40">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="h-8 w-8 rounded-lg bg-warning flex items-center justify-center">
+                        <UploadIcon className="h-4 w-4 text-warning-foreground" />
+                      </div>
+                      <span className="font-semibold text-warning">Neue Datei</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Lieferant:</span>
-                      <span className="font-medium">
-                        {currentDuplicate.duplicateInfo.original.vendor || '–'}
-                      </span>
+                    <p className="text-sm break-all font-medium">{currentDuplicate.upload.fileName}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatFileSize(currentDuplicate.upload.fileSize)}
+                    </p>
+                  </div>
+                  
+                  {/* Existing file */}
+                  <div className="p-4 bg-muted/50 rounded-lg border-2 border-border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <FileText className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="font-semibold text-foreground">Bereits vorhanden</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Betrag:</span>
-                      <span className="font-medium">
-                        {currentDuplicate.duplicateInfo.original.amount_gross 
-                          ? `€ ${currentDuplicate.duplicateInfo.original.amount_gross.toFixed(2)}` 
-                          : '–'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Datum:</span>
-                      <span className="font-medium">
-                        {currentDuplicate.duplicateInfo.original.receipt_date 
-                          ? format(new Date(currentDuplicate.duplicateInfo.original.receipt_date), 'dd.MM.yyyy', { locale: de })
-                          : '–'}
-                      </span>
+                    <p className="text-sm break-all font-medium">
+                      {currentDuplicate.duplicateInfo.original.file_name || '–'}
+                    </p>
+                    <div className="mt-3 space-y-1.5 text-sm">
+                      {currentDuplicate.duplicateInfo.original.vendor && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Lieferant:</span>
+                          <span className="font-medium">{currentDuplicate.duplicateInfo.original.vendor}</span>
+                        </div>
+                      )}
+                      {currentDuplicate.duplicateInfo.original.amount_gross && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Betrag:</span>
+                          <span className="font-medium">€ {currentDuplicate.duplicateInfo.original.amount_gross.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {currentDuplicate.duplicateInfo.original.receipt_date && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Datum:</span>
+                          <span className="font-medium">
+                            {format(new Date(currentDuplicate.duplicateInfo.original.receipt_date), 'dd.MM.yyyy', { locale: de })}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
+                </div>
+                
+                {/* Info hint */}
+                <div className="flex items-start gap-2 p-3 bg-muted/30 rounded-lg text-sm text-muted-foreground">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>Identische Dateien werden anhand ihres Inhalts erkannt (Hash-Vergleich).</span>
                 </div>
               </div>
             )}
             
-            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-              <AlertDialogCancel onClick={handleCancelDuplicate}>
-                Überspringen
-              </AlertDialogCancel>
-              <Button 
-                variant="outline"
-                onClick={handleViewOriginal}
-                className="flex items-center gap-2"
-              >
-                <Eye className="w-4 h-4" />
-                Original anzeigen
-              </Button>
-              <AlertDialogAction
-                onClick={handleProceedWithDuplicate}
-                className="bg-warning text-warning-foreground hover:bg-warning/90"
-              >
-                <Copy className="w-4 h-4 mr-2" />
-                Trotzdem hochladen
-              </AlertDialogAction>
+            <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+              <div className="flex gap-2 w-full sm:w-auto">
+                <AlertDialogCancel onClick={handleCancelDuplicate} className="flex-1 sm:flex-none">
+                  Überspringen
+                </AlertDialogCancel>
+                {duplicateQueueCount > 0 && (
+                  <Button 
+                    variant="outline"
+                    onClick={handleSkipAllDuplicates}
+                    className="flex-1 sm:flex-none text-muted-foreground"
+                  >
+                    Alle überspringen ({duplicateQueueCount + 1})
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button 
+                  variant="outline"
+                  onClick={handleViewOriginal}
+                  className="flex items-center gap-2 flex-1 sm:flex-none"
+                >
+                  <Eye className="w-4 h-4" />
+                  Original anzeigen
+                </Button>
+                <AlertDialogAction
+                  onClick={handleProceedWithDuplicate}
+                  className="bg-warning text-warning-foreground hover:bg-warning/90 flex-1 sm:flex-none"
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  Trotzdem hochladen
+                </AlertDialogAction>
+              </div>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
