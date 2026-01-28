@@ -19,6 +19,7 @@ import Reconciliation from "./pages/Reconciliation";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import ShareReceive from "./pages/ShareReceive";
+import Checklists from "./pages/Checklists";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -95,6 +96,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/checklists" 
+              element={
+                <ProtectedRoute>
+                  <Checklists />
                 </ProtectedRoute>
               } 
             />

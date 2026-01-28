@@ -13,7 +13,8 @@ import {
   ChevronRight,
   LogOut,
   User,
-  FileUp
+  FileUp,
+  ClipboardList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +44,7 @@ const navigation: NavItem[] = [
   { name: 'Kontoabgleich', href: '/reconciliation', icon: Building2 },
   { name: 'Konto-Import', href: '/bank-import', icon: FileUp },
   { name: 'Berichte', href: '/reports', icon: BarChart3 },
+  { name: 'Checklisten', href: '/checklists', icon: ClipboardList },
   { name: 'Einstellungen', href: '/settings', icon: Settings },
 ];
 
