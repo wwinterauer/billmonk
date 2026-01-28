@@ -622,12 +622,16 @@ export function ReceiptDetailPanel({
             changes['Lieferant'] = { old: vendor || '-', new: matchedVendor.display_name };
             setVendor(matchedVendor.display_name);
           }
-          if (normalized.vendor_brand) {
+          // Track vendor_brand changes
+          if (normalized.vendor_brand && normalized.vendor_brand !== vendorBrand) {
+            changes['Marke'] = { old: vendorBrand || '-', new: normalized.vendor_brand };
             setVendorBrand(normalized.vendor_brand);
           }
         } else {
           compareAndUpdate('vendor', 'Lieferant', vendor, normalized.vendor, setVendor);
-          if (normalized.vendor_brand) {
+          // Track vendor_brand changes
+          if (normalized.vendor_brand && normalized.vendor_brand !== vendorBrand) {
+            changes['Marke'] = { old: vendorBrand || '-', new: normalized.vendor_brand };
             setVendorBrand(normalized.vendor_brand);
           }
         }
@@ -654,11 +658,25 @@ export function ReceiptDetailPanel({
         }
       }
       
-      if (shouldUpdate('vat_rate') && normalized.vat_rate !== null) {
-        const newRate = normalized.vat_rate.toString();
-        if (vatRate !== newRate) {
-          changes['MwSt-Satz'] = { old: vatRate || '-', new: newRate + '%' };
-          setVatRate(newRate);
+      if (shouldUpdate('vat_rate')) {
+        // Handle mixed tax rates
+        if (normalized.is_mixed_tax_rate) {
+          if (!isMixedTaxRate) {
+            changes['MwSt-Satz'] = { old: vatRate ? vatRate + '%' : '-', new: 'Gemischt' };
+          }
+          setIsMixedTaxRate(true);
+          setVatRate('mixed');
+          if (normalized.tax_rate_details) {
+            setTaxRateDetails(normalized.tax_rate_details);
+          }
+        } else if (normalized.vat_rate !== null) {
+          const newRate = normalized.vat_rate.toString();
+          if (vatRate !== newRate) {
+            changes['MwSt-Satz'] = { old: isMixedTaxRate ? 'Gemischt' : (vatRate || '-'), new: newRate + '%' };
+            setVatRate(newRate);
+          }
+          setIsMixedTaxRate(false);
+          setTaxRateDetails(null);
         }
       }
 
