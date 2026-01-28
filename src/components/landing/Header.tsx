@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Sparkles, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -23,6 +24,9 @@ export function Header() {
             <Sparkles className="h-5 w-5 text-primary-foreground" />
           </div>
           <span className="text-xl font-bold text-foreground">XpenzAi</span>
+          <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
+            Beta
+          </Badge>
         </Link>
 
         {/* Desktop Navigation */}
@@ -34,10 +38,10 @@ export function Header() {
             Features
           </button>
           <button
-            onClick={() => scrollToSection('pricing')}
+            onClick={() => scrollToSection('how-it-works')}
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
-            Preise
+            So funktioniert's
           </button>
           <Link to="/login">
             <Button variant="ghost" size="sm">
@@ -46,7 +50,7 @@ export function Header() {
           </Link>
           <Link to="/register">
             <Button size="sm" className="gradient-primary shadow-primary hover:opacity-90 transition-opacity">
-              Kostenlos starten
+              Kostenlos testen
             </Button>
           </Link>
         </nav>
@@ -77,10 +81,10 @@ export function Header() {
                 Features
               </button>
               <button
-                onClick={() => scrollToSection('pricing')}
+                onClick={() => scrollToSection('how-it-works')}
                 className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors text-left"
               >
-                Preise
+                So funktioniert's
               </button>
               <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
                 <Button variant="ghost" className="w-full justify-start">
@@ -89,7 +93,7 @@ export function Header() {
               </Link>
               <Link to="/register" onClick={() => setMobileMenuOpen(false)}>
                 <Button className="w-full gradient-primary">
-                  Kostenlos starten
+                  Kostenlos testen
                 </Button>
               </Link>
             </nav>
