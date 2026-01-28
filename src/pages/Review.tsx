@@ -63,12 +63,13 @@ import { CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const VAT_RATES = [
-  { value: '20', label: '20%' },
-  { value: '19', label: '19%' },
-  { value: '13', label: '13%' },
-  { value: '10', label: '10%' },
-  { value: '7', label: '7%' },
-  { value: '0', label: '0%' },
+  { value: '20', label: '20% (AT normal)' },
+  { value: '19', label: '19% (DE normal)' },
+  { value: '13', label: '13% (AT ermäßigt)' },
+  { value: '10', label: '10% (AT ermäßigt)' },
+  { value: '7', label: '7% (DE ermäßigt)' },
+  { value: '0', label: '0% (Steuerfrei)' },
+  { value: 'mixed', label: 'Gemischt (mehrere Sätze)' },
 ];
 
 const PAYMENT_METHODS = [
@@ -83,6 +84,13 @@ const PAYMENT_METHODS = [
   { value: 'Sonstige', label: 'Sonstige' },
 ];
 
+interface TaxRateDetail {
+  rate: number;
+  net_amount: number;
+  tax_amount: number;
+  description?: string;
+}
+
 interface FormData {
   vendor: string;
   vendor_brand: string;
@@ -92,6 +100,8 @@ interface FormData {
   category: string;
   amount_gross: string;
   vat_rate: string;
+  is_mixed_tax_rate: boolean;
+  tax_rate_details: TaxRateDetail[] | null;
   payment_method: string;
 }
 
@@ -122,6 +132,8 @@ const Review = () => {
     category: '',
     amount_gross: '',
     vat_rate: '20',
+    is_mixed_tax_rate: false,
+    tax_rate_details: null,
     payment_method: '',
   });
 
@@ -185,6 +197,7 @@ const Review = () => {
 
   // Populate form with receipt data
   const populateForm = (receipt: Receipt) => {
+    const receiptData = receipt as unknown as Record<string, unknown>;
     setFormData({
       vendor: receipt.vendor || '',
       vendor_brand: receipt.vendor_brand || '',
@@ -194,6 +207,8 @@ const Review = () => {
       category: receipt.category || '',
       amount_gross: receipt.amount_gross?.toString() || '',
       vat_rate: receipt.vat_rate?.toString() || '20',
+      is_mixed_tax_rate: (receiptData.is_mixed_tax_rate as boolean) || false,
+      tax_rate_details: (receiptData.tax_rate_details as TaxRateDetail[]) || null,
       payment_method: receipt.payment_method || '',
     });
     setAiConfidence(receipt.ai_confidence ?? null);
@@ -237,11 +252,19 @@ const Review = () => {
   // Calculate net amount and VAT
   const calculations = useMemo(() => {
     const gross = parseFloat(formData.amount_gross) || 0;
+    
+    // Bei gemischten Steuersätzen: Netto aus den Details
+    if (formData.is_mixed_tax_rate && formData.tax_rate_details && formData.tax_rate_details.length > 0) {
+      const totalNet = formData.tax_rate_details.reduce((sum, d) => sum + (d.net_amount || 0), 0);
+      const totalVat = formData.tax_rate_details.reduce((sum, d) => sum + (d.tax_amount || 0), 0);
+      return { net: totalNet, vat: totalVat };
+    }
+    
     const vatRate = parseFloat(formData.vat_rate) || 0;
     const net = gross / (1 + vatRate / 100);
     const vat = gross - net;
     return { net, vat };
-  }, [formData.amount_gross, formData.vat_rate]);
+  }, [formData.amount_gross, formData.vat_rate, formData.is_mixed_tax_rate, formData.tax_rate_details]);
 
   // Get confidence indicator color
   const getConfidenceColor = (confidence: number | null | undefined): string => {
@@ -264,16 +287,19 @@ const Review = () => {
     setSaving(true);
     try {
       const gross = parseFloat(formData.amount_gross) || null;
-      const vatRate = parseFloat(formData.vat_rate) || null;
+      const vatRate = formData.is_mixed_tax_rate ? null : (parseFloat(formData.vat_rate) || null);
       let net = null;
       let vatAmount = null;
       
-      if (gross && vatRate !== null) {
+      if (formData.is_mixed_tax_rate && formData.tax_rate_details) {
+        net = formData.tax_rate_details.reduce((sum, d) => sum + (d.net_amount || 0), 0);
+        vatAmount = formData.tax_rate_details.reduce((sum, d) => sum + (d.tax_amount || 0), 0);
+      } else if (gross && vatRate !== null) {
         net = gross / (1 + vatRate / 100);
         vatAmount = gross - net;
       }
 
-      const updateData: Partial<Receipt> = {
+      const updateData: Record<string, unknown> = {
         vendor: formData.vendor || null,
         vendor_brand: formData.vendor_brand || null,
         invoice_number: formData.invoice_number || null,
@@ -284,6 +310,8 @@ const Review = () => {
         amount_net: net,
         vat_rate: vatRate,
         vat_amount: vatAmount,
+        is_mixed_tax_rate: formData.is_mixed_tax_rate,
+        tax_rate_details: formData.is_mixed_tax_rate ? formData.tax_rate_details : null,
         payment_method: formData.payment_method || null,
       };
 
@@ -291,7 +319,7 @@ const Review = () => {
         updateData.status = newStatus as Receipt['status'];
       }
 
-      await updateReceipt(currentReceipt.id, updateData);
+      await updateReceipt(currentReceipt.id, updateData as Partial<Receipt>);
 
       if (newStatus) {
         // Remove from list and go to next
@@ -943,8 +971,14 @@ const Review = () => {
                           </Tooltip>
                         </div>
                         <Select
-                          value={formData.vat_rate}
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, vat_rate: value }))}
+                          value={formData.is_mixed_tax_rate ? 'mixed' : formData.vat_rate}
+                          onValueChange={(value) => {
+                            if (value === 'mixed') {
+                              setFormData(prev => ({ ...prev, vat_rate: '0', is_mixed_tax_rate: true }));
+                            } else {
+                              setFormData(prev => ({ ...prev, vat_rate: value, is_mixed_tax_rate: false, tax_rate_details: null }));
+                            }
+                          }}
                         >
                           <SelectTrigger>
                             <SelectValue />
@@ -960,6 +994,28 @@ const Review = () => {
                       </div>
                     </div>
 
+                    {/* Mixed Tax Rate Details */}
+                    {formData.is_mixed_tax_rate && formData.tax_rate_details && formData.tax_rate_details.length > 0 && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          <span className="text-sm font-medium text-amber-800">Mehrere Steuersätze erkannt</span>
+                        </div>
+                        <div className="space-y-1">
+                          {formData.tax_rate_details.map((detail, idx) => (
+                            <div key={idx} className="flex justify-between text-sm">
+                              <span className="text-amber-700">
+                                {detail.rate}% {detail.description && `(${detail.description})`}
+                              </span>
+                              <span className="text-amber-800">
+                                Netto: €{detail.net_amount?.toFixed(2)} / MwSt: €{detail.tax_amount?.toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Calculated Fields (readonly) */}
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -971,7 +1027,12 @@ const Review = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-muted-foreground">MwSt-Betrag (berechnet)</Label>
+                        <Label className="text-muted-foreground flex items-center gap-1">
+                          MwSt-Betrag (berechnet)
+                          {formData.is_mixed_tax_rate && (
+                            <span className="text-xs">(gemischt)</span>
+                          )}
+                        </Label>
                         <Input
                           value={calculations.vat ? `€ ${calculations.vat.toFixed(2)}` : '—'}
                           readOnly
