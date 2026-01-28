@@ -44,14 +44,19 @@ export async function checkForDuplicates(
     matchReasons: []
   };
 
+  // Define which statuses count as "active" duplicates
+  // Rejected and not_a_receipt files should NOT block new uploads
+  const activeStatuses = ['pending', 'processing', 'review', 'approved', 'duplicate'];
+
   try {
     // 1. Exact hash match (100% - identical file)
     if (fileHash) {
       const { data: hashMatch } = await supabase
         .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date')
+        .select('id, vendor, amount_gross, receipt_date, status')
         .eq('user_id', userId)
         .eq('file_hash', fileHash)
+        .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
         .maybeSingle();
@@ -72,10 +77,11 @@ export async function checkForDuplicates(
       const vendorPrefix = receiptData.vendor.substring(0, 10);
       const { data: invoiceMatch } = await supabase
         .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date')
+        .select('id, vendor, amount_gross, receipt_date, status')
         .eq('user_id', userId)
         .eq('invoice_number', receiptData.invoice_number)
         .ilike('vendor', `%${vendorPrefix}%`)
+        .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
         .maybeSingle();
@@ -96,11 +102,12 @@ export async function checkForDuplicates(
       const vendorPrefix = receiptData.vendor.substring(0, 10);
       const { data: amountMatch } = await supabase
         .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date, invoice_number')
+        .select('id, vendor, amount_gross, receipt_date, invoice_number, status')
         .eq('user_id', userId)
         .eq('amount_gross', receiptData.amount_gross)
         .eq('receipt_date', receiptData.receipt_date)
         .ilike('vendor', `%${vendorPrefix}%`)
+        .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
         .maybeSingle();
@@ -127,12 +134,13 @@ export async function checkForDuplicates(
       const vendorPrefix = receiptData.vendor.substring(0, 10);
       const { data: nearMatch } = await supabase
         .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date')
+        .select('id, vendor, amount_gross, receipt_date, status')
         .eq('user_id', userId)
         .eq('amount_gross', receiptData.amount_gross)
         .gte('receipt_date', dateFrom.toISOString().split('T')[0])
         .lte('receipt_date', dateTo.toISOString().split('T')[0])
         .ilike('vendor', `%${vendorPrefix}%`)
+        .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
         .maybeSingle();
@@ -152,9 +160,10 @@ export async function checkForDuplicates(
     if (receiptData.invoice_number) {
       const { data: invoiceOnlyMatch } = await supabase
         .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date')
+        .select('id, vendor, amount_gross, receipt_date, status')
         .eq('user_id', userId)
         .eq('invoice_number', receiptData.invoice_number)
+        .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
         .maybeSingle();
@@ -174,10 +183,11 @@ export async function checkForDuplicates(
     if (receiptData.amount_gross && receiptData.receipt_date) {
       const { data: amountDateMatch } = await supabase
         .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date')
+        .select('id, vendor, amount_gross, receipt_date, status')
         .eq('user_id', userId)
         .eq('amount_gross', receiptData.amount_gross)
         .eq('receipt_date', receiptData.receipt_date)
+        .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
         .maybeSingle();
