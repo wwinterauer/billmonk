@@ -813,9 +813,13 @@ export type Database = {
           is_duplicate: boolean | null
           line_items_raw: Json | null
           notes: string | null
+          original_pages: number[] | null
+          page_count: number | null
           payment_method: string | null
           receipt_date: string | null
           source: string | null
+          split_from_receipt_id: string | null
+          split_suggestion: Json | null
           status: string | null
           updated_at: string | null
           user_id: string
@@ -852,9 +856,13 @@ export type Database = {
           is_duplicate?: boolean | null
           line_items_raw?: Json | null
           notes?: string | null
+          original_pages?: number[] | null
+          page_count?: number | null
           payment_method?: string | null
           receipt_date?: string | null
           source?: string | null
+          split_from_receipt_id?: string | null
+          split_suggestion?: Json | null
           status?: string | null
           updated_at?: string | null
           user_id: string
@@ -891,9 +899,13 @@ export type Database = {
           is_duplicate?: boolean | null
           line_items_raw?: Json | null
           notes?: string | null
+          original_pages?: number[] | null
+          page_count?: number | null
           payment_method?: string | null
           receipt_date?: string | null
           source?: string | null
+          split_from_receipt_id?: string | null
+          split_suggestion?: Json | null
           status?: string | null
           updated_at?: string | null
           user_id?: string
@@ -925,6 +937,13 @@ export type Database = {
             columns: ["email_attachment_id"]
             isOneToOne: false
             referencedRelation: "email_attachments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_split_from_receipt_id_fkey"
+            columns: ["split_from_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
             referencedColumns: ["id"]
           },
           {

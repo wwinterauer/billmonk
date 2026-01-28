@@ -17,7 +17,7 @@ export interface Receipt {
   file_url: string | null;
   file_name: string | null;
   file_type: string | null;
-  status: 'pending' | 'processing' | 'review' | 'approved' | 'rejected' | 'duplicate' | 'not_a_receipt' | 'error';
+  status: 'pending' | 'processing' | 'review' | 'approved' | 'rejected' | 'duplicate' | 'not_a_receipt' | 'error' | 'needs_splitting' | 'split';
   vendor: string | null;
   vendor_brand: string | null;
   vendor_id: string | null;
@@ -45,6 +45,11 @@ export interface Receipt {
   duplicate_checked_at: string | null;
   // Tracking modified fields
   user_modified_fields: string[] | null;
+  // PDF splitting fields
+  page_count: number | null;
+  split_suggestion: Json | null;
+  split_from_receipt_id: string | null;
+  original_pages: number[] | null;
   created_at: string;
   updated_at: string;
 }

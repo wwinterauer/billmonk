@@ -19,6 +19,7 @@ import {
   Download
 } from 'lucide-react';
 import { PdfViewer } from '@/components/receipts/PdfViewer';
+import { MultiInvoiceAlert } from '@/components/receipts/MultiInvoiceAlert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -111,15 +112,21 @@ const Review = () => {
     payment_method: '',
   });
 
-  // Load receipts with status='review'
+  // Load receipts with status='review' or 'needs_splitting'
   const loadReceipts = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getReceipts({ status: 'review' });
-      setReceipts(data);
-      if (data.length > 0) {
-        populateForm(data[0]);
-        loadImage(data[0]);
+      // Get both review and needs_splitting receipts
+      const reviewData = await getReceipts({ status: 'review' });
+      const splittingData = await getReceipts({ status: 'needs_splitting' as any });
+      
+      // Combine and sort by created_at (splitting first, then review)
+      const allData = [...splittingData, ...reviewData];
+      
+      setReceipts(allData);
+      if (allData.length > 0) {
+        populateForm(allData[0]);
+        loadImage(allData[0]);
       }
     } catch (error) {
       toast({
@@ -490,6 +497,23 @@ const Review = () => {
               </CardHeader>
 
               <CardContent>
+                {/* Multi-Invoice Alert for PDFs with multiple invoices */}
+                {currentReceipt?.status === 'needs_splitting' && (
+                  <div className="mb-6">
+                    <MultiInvoiceAlert
+                      receiptId={currentReceipt.id}
+                      splitSuggestion={currentReceipt.split_suggestion as any}
+                      onSplitClick={() => {
+                        // TODO: Open PDF split dialog
+                        toast({
+                          title: "PDF-Aufteilung",
+                          description: "Diese Funktion wird in Kürze verfügbar sein.",
+                        });
+                      }}
+                    />
+                  </div>
+                )}
+
                 {/* Hint for non-receipt documents */}
                 {currentReceipt?.category === 'Keine Rechnung' && (
                   <div className="mb-6 p-4 bg-muted/50 border border-muted-foreground/20 rounded-lg flex items-start gap-3">
