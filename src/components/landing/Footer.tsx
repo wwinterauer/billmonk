@@ -1,33 +1,83 @@
 import { Link } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Mail, MapPin, User } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 export function Footer() {
   return (
     <footer className="py-12 bg-background border-t border-border">
       <div className="container">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary">
-              <Sparkles className="h-4 w-4 text-primary-foreground" />
+        <div className="grid md:grid-cols-3 gap-8 mb-8">
+          {/* Brand */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary">
+                <Sparkles className="h-4 w-4 text-primary-foreground" />
+              </div>
+              <span className="text-lg font-bold text-foreground">XpenzAi</span>
+              <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
+                Beta
+              </Badge>
             </div>
-            <span className="text-lg font-bold text-foreground">XpenzAi</span>
-            <span className="text-sm text-muted-foreground ml-2">© 2025 XpenzAi</span>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              KI-gestützte Belegverwaltung für Kleinunternehmer, Freelancer und Vermieter. Made in Austria.
+            </p>
           </div>
 
-          <nav className="flex flex-wrap justify-center gap-6 text-sm">
-            <Link to="/impressum" className="text-muted-foreground hover:text-foreground transition-colors">
-              Impressum
-            </Link>
-            <Link to="/datenschutz" className="text-muted-foreground hover:text-foreground transition-colors">
+          {/* Links */}
+          <div>
+            <h3 className="font-semibold text-foreground mb-4">Produkt</h3>
+            <nav className="flex flex-col gap-2 text-sm">
+              <Link to="/register" className="text-muted-foreground hover:text-foreground transition-colors">
+                Kostenlos starten
+              </Link>
+              <Link to="/login" className="text-muted-foreground hover:text-foreground transition-colors">
+                Login
+              </Link>
+              <button
+                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                className="text-muted-foreground hover:text-foreground transition-colors text-left"
+              >
+                Features
+              </button>
+            </nav>
+          </div>
+
+          {/* Impressum */}
+          <div id="impressum">
+            <h3 className="font-semibold text-foreground mb-4">Impressum</h3>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <div className="flex items-start gap-2">
+                <User className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>Wilfried Winterauer</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>Gschwandt 48, 4822 Bad Goisern</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Mail className="h-4 w-4 mt-0.5 shrink-0" />
+                <a 
+                  href="mailto:w.winterauer@gmail.com" 
+                  className="hover:text-foreground transition-colors"
+                >
+                  w.winterauer@gmail.com
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Separator className="my-6" />
+
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+          <p>© 2025 XpenzAi. Alle Rechte vorbehalten.</p>
+          <div className="flex items-center gap-4">
+            <Link to="/datenschutz" className="hover:text-foreground transition-colors">
               Datenschutz
             </Link>
-            <Link to="/agb" className="text-muted-foreground hover:text-foreground transition-colors">
-              AGB
-            </Link>
-          </nav>
-
-          <div className="text-sm text-muted-foreground">
-            Made with ❤️ in Austria 🇦🇹
+            <span>•</span>
+            <span>Made with ❤️ in Austria 🇦🇹</span>
           </div>
         </div>
       </div>
