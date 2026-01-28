@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.combine-images-to-pdf]
 verify_jwt = false
+
+[functions.split-pdf]
+verify_jwt = false
