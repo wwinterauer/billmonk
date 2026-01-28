@@ -430,7 +430,7 @@ const Settings = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7 lg:w-[1100px]">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="naming" className="gap-2">
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Umbenennung</span>
