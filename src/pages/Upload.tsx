@@ -194,16 +194,17 @@ const Upload = () => {
 
     if (validFiles.length === 0) return;
 
-    // Check total count including existing pending/uploading files
-    const pendingCount = Array.from(uploads.values()).filter(
+    // Check total count including only actively uploading/processing files (not completed ones)
+    const activeUploadCount = Array.from(uploads.values()).filter(
       u => u.status === 'pending' || u.status === 'uploading' || u.status === 'processing'
     ).length;
 
-    if (pendingCount + validFiles.length > MAX_FILES) {
+    // Only check against active uploads, not completed ones
+    if (activeUploadCount + validFiles.length > MAX_FILES) {
       toast({
         variant: 'destructive',
         title: 'Zu viele Dateien',
-        description: `Maximal ${MAX_FILES} Dateien gleichzeitig erlaubt.`,
+        description: `Maximal ${MAX_FILES} Dateien gleichzeitig erlaubt. Aktuell ${activeUploadCount} in Bearbeitung.`,
       });
       return;
     }
