@@ -186,20 +186,69 @@ const Expenses = () => {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Date range filter state
+  // Date range filter state - persist to localStorage
+  const STORAGE_KEY = 'expenses-date-filter';
   const currentDate = new Date();
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => {
+  
+  const getInitialDateState = () => {
+    // First check URL params
     const fromParam = searchParams.get('from');
-    return fromParam ? new Date(fromParam) : startOfMonth(currentDate);
-  });
-  const [dateTo, setDateTo] = useState<Date | undefined>(() => {
     const toParam = searchParams.get('to');
-    return toParam ? new Date(toParam) : endOfMonth(currentDate);
-  });
-  const [datePreset, setDatePreset] = useState<DateRangePreset>(() => {
-    if (searchParams.get('from') || searchParams.get('to')) return 'custom';
-    return 'thisMonth';
-  });
+    
+    if (fromParam || toParam) {
+      return {
+        from: fromParam ? new Date(fromParam) : undefined,
+        to: toParam ? new Date(toParam) : undefined,
+        preset: 'custom' as DateRangePreset
+      };
+    }
+    
+    // Then check localStorage
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // If preset is not 'custom', recalculate dates based on current date
+        if (parsed.preset && parsed.preset !== 'custom' && parsed.preset !== 'all') {
+          const presetDates = getPresetDates(parsed.preset);
+          return {
+            from: presetDates.from,
+            to: presetDates.to,
+            preset: parsed.preset as DateRangePreset
+          };
+        }
+        return {
+          from: parsed.from ? new Date(parsed.from) : undefined,
+          to: parsed.to ? new Date(parsed.to) : undefined,
+          preset: (parsed.preset || 'custom') as DateRangePreset
+        };
+      } catch {
+        // Fall through to default
+      }
+    }
+    
+    // Default to current month only for first-time users
+    return {
+      from: startOfMonth(currentDate),
+      to: endOfMonth(currentDate),
+      preset: 'thisMonth' as DateRangePreset
+    };
+  };
+  
+  const initialState = getInitialDateState();
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(initialState.from);
+  const [dateTo, setDateTo] = useState<Date | undefined>(initialState.to);
+  const [datePreset, setDatePreset] = useState<DateRangePreset>(initialState.preset);
+  
+  // Save date filter to localStorage whenever it changes
+  useEffect(() => {
+    const filterState = {
+      from: dateFrom?.toISOString(),
+      to: dateTo?.toISOString(),
+      preset: datePreset
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filterState));
+  }, [dateFrom, dateTo, datePreset]);
 
   // Other filter state
   const [statusFilter, setStatusFilter] = useState<string>(() => 
