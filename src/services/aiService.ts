@@ -6,6 +6,13 @@ import {
   type DescriptionSettings 
 } from "@/lib/descriptionUtils";
 
+export interface TaxRateDetail {
+  rate: number;
+  net_amount: number;
+  tax_amount: number;
+  description?: string;
+}
+
 export interface ExtractionResult {
   vendor: string | null;
   vendor_brand: string | null;
@@ -14,6 +21,8 @@ export interface ExtractionResult {
   amount_net: number | null;
   vat_amount: number | null;
   vat_rate: number | null;
+  is_mixed_tax_rate?: boolean;
+  tax_rate_details?: TaxRateDetail[] | null;
   receipt_date: string | null;
   category: string | null;
   payment_method: string | null;
@@ -122,6 +131,8 @@ export function createEmptyExtractionResult(): ExtractionResult {
     amount_net: null,
     vat_amount: null,
     vat_rate: null,
+    is_mixed_tax_rate: false,
+    tax_rate_details: null,
     receipt_date: null,
     category: null,
     payment_method: null,
@@ -155,8 +166,18 @@ export function normalizeExtractionResult(
     normalized.vat_rate = Number(normalized.vat_rate) || null;
   }
 
-  // Calculate missing values if possible
-  if (normalized.amount_gross && normalized.vat_rate && !normalized.amount_net) {
+  // Normalize tax_rate_details
+  if (normalized.tax_rate_details && Array.isArray(normalized.tax_rate_details)) {
+    normalized.tax_rate_details = normalized.tax_rate_details.map(detail => ({
+      rate: Number(detail.rate) || 0,
+      net_amount: Number(detail.net_amount) || 0,
+      tax_amount: Number(detail.tax_amount) || 0,
+      description: detail.description || undefined,
+    }));
+  }
+
+  // Calculate missing values if possible (only for non-mixed rates)
+  if (normalized.amount_gross && normalized.vat_rate && !normalized.amount_net && !normalized.is_mixed_tax_rate) {
     normalized.amount_net = normalized.amount_gross / (1 + normalized.vat_rate / 100);
     normalized.vat_amount = normalized.amount_gross - normalized.amount_net;
   }
