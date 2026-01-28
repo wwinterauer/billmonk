@@ -1421,7 +1421,52 @@ export function ReceiptDetailPanel({
                       </Alert>
                     )}
 
-                    {/* Vendor with Autocomplete */}
+                    {/* Vendor Brand/Marke */}
+                    <div>
+                      <Label htmlFor="vendorBrand" className="flex items-center gap-2">
+                        Lieferant (Marke)
+                        {selectedVendorId && (
+                          <span className="text-xs font-normal text-muted-foreground">(aus Lieferantenstamm)</span>
+                        )}
+                      </Label>
+                      {selectedVendorId ? (
+                        // Read-only when linked to a vendor
+                        <div className="flex items-center gap-2">
+                          <Input
+                            id="vendorBrand"
+                            value={vendorBrand || vendor}
+                            readOnly
+                            disabled
+                            className="text-muted-foreground bg-muted/50"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="shrink-0 text-xs"
+                            onClick={() => {
+                              window.open('/settings?tab=vendors', '_blank');
+                            }}
+                          >
+                            <Settings className="w-3 h-3 mr-1" />
+                            Bearbeiten
+                          </Button>
+                        </div>
+                      ) : (
+                        // Editable when no vendor linked (new vendor)
+                        <Input
+                          id="vendorBrand"
+                          value={vendorBrand}
+                          onChange={(e) => setVendorBrand(e.target.value)}
+                          placeholder="z.B. Amazon, spusu, MediaMarkt"
+                        />
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Bekannter Name/Marke des Lieferanten
+                      </p>
+                    </div>
+
+                    {/* Vendor Legal Name */}
                     <VendorAutocomplete
                       value={vendor}
                       vendorId={selectedVendorId}
@@ -1431,58 +1476,8 @@ export function ReceiptDetailPanel({
                       }}
                       onVendorSelect={handleVendorSelect}
                       disabled={saving}
+                      label="Lieferant (rechtlicher Name)"
                     />
-                    
-                    {/* Brand name field - shown if exists or if vendor looks like a legal name */}
-                    {(vendorBrand || vendor.match(/(GmbH|AG|e\.U\.|OG|KG|Ltd\.|S\.à r\.l\.|ApS|Inc\.|Corp\.)/i)) && (
-                      <div>
-                        <Label htmlFor="vendorBrand" className="text-muted-foreground flex items-center gap-2">
-                          Markenname
-                          {selectedVendorId && (
-                            <span className="text-xs font-normal">(aus Lieferantenstamm)</span>
-                          )}
-                        </Label>
-                        {selectedVendorId ? (
-                          // Read-only when linked to a vendor
-                          <div className="flex items-center gap-2">
-                            <Input
-                              id="vendorBrand"
-                              value={vendorBrand}
-                              readOnly
-                              disabled
-                              className="text-muted-foreground bg-muted/50"
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="shrink-0 text-xs"
-                              onClick={() => {
-                                window.open('/settings?tab=vendors', '_blank');
-                              }}
-                            >
-                              <Settings className="w-3 h-3 mr-1" />
-                              Bearbeiten
-                            </Button>
-                          </div>
-                        ) : (
-                          // Editable when no vendor linked (new vendor)
-                          <Input
-                            id="vendorBrand"
-                            value={vendorBrand}
-                            onChange={(e) => setVendorBrand(e.target.value)}
-                            placeholder="z.B. Amazon, spusu, MediaMarkt"
-                            className="text-muted-foreground"
-                          />
-                        )}
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {selectedVendorId 
-                            ? 'Änderungen nur in der Lieferantenverwaltung möglich'
-                            : 'Bekannter Name/Marke falls abweichend vom rechtlichen Namen'
-                          }
-                        </p>
-                      </div>
-                    )}
 
                     {/* Description with character counter */}
                     <div className="space-y-2">
