@@ -382,11 +382,66 @@ Extrahiere folgende Informationen im JSON-Format:
 }
 
 WICHTIGE REGELN FÜR LIEFERANT/VENDOR:
-- "vendor" = Offizieller/rechtlicher Firmenname. Priorisiere:
+- "vendor" = Offizieller/rechtlicher Firmenname MIT Rechtsform. Priorisiere:
   1. HÖCHSTE PRIORITÄT: Impressum/Fußbereich (Firmenbuchnummer, UID, Handelsregister)
   2. MITTLERE PRIORITÄT: Rechnungskopf mit vollständigem Firmennamen
   3. NIEDRIGE PRIORITÄT: Logo-Text
 - "vendor_brand" = Markenname wenn abweichend (z.B. Logo: "MediaMarkt" → rechtlich: "Media Markt E-Business GmbH")
+
+**ERKENNBARE RECHTSFORMEN (DACH-Raum & International):**
+
+Österreich:
+- GmbH, Gesellschaft mbH, Gesellschaft mit beschränkter Haftung
+- AG, Aktiengesellschaft
+- OG, Offene Gesellschaft
+- KG, Kommanditgesellschaft
+- GmbH & Co KG, Gesellschaft mbH & Co KG
+- e.U., eingetragener Unternehmer
+- GesbR, Gesellschaft bürgerlichen Rechts
+- Gen, Genossenschaft
+- Verein
+
+Deutschland:
+- GmbH, Gesellschaft mit beschränkter Haftung
+- AG, Aktiengesellschaft
+- UG (haftungsbeschränkt), Unternehmergesellschaft
+- OHG, Offene Handelsgesellschaft
+- KG, Kommanditgesellschaft
+- GmbH & Co. KG
+- e.K., eingetragener Kaufmann
+- GbR, Gesellschaft bürgerlichen Rechts
+- PartG, Partnerschaftsgesellschaft
+
+Schweiz:
+- AG, Aktiengesellschaft
+- GmbH, Gesellschaft mit beschränkter Haftung
+- Sàrl (französisch für GmbH)
+- SA (französisch für AG)
+
+International:
+- Ltd., Limited
+- LLC, Limited Liability Company
+- Inc., Incorporated
+- S.à r.l., S.A.
+- B.V., N.V. (Niederlande)
+- S.r.l., S.p.A. (Italien)
+
+**Beispiele für vendor-Feld:**
+| Auf der Rechnung | vendor |
+|------------------|--------|
+| troii Software GmbH | troii Software GmbH |
+| Müller Gesellschaft mbH | Müller Gesellschaft mbH |
+| Schmidt Gesellschaft mit beschränkter Haftung | Schmidt Gesellschaft mit beschränkter Haftung |
+| Weber GmbH & Co KG | Weber GmbH & Co KG |
+| Bauer e.U. | Bauer e.U. |
+| Amazon EU S.à r.l. | Amazon EU S.à r.l. |
+| Apple Distribution International Ltd. | Apple Distribution International Ltd. |
+
+**Wichtig für vendor:**
+- Erfasse den Namen MIT der Rechtsform
+- Achte auf die korrekte Schreibweise (GmbH vs Gesellschaft mbH)
+- Bei mehreren Firmennamen: Nimm den des RECHNUNGSSTELLERS (nicht des Empfängers)
+- UID/ATU-Nummer ist NICHT Teil des Firmennamens
 
 WICHTIGE REGELN FÜR BESCHREIBUNG:
 - Fasse ALLE Rechnungspositionen zusammen (max 100 Zeichen)
