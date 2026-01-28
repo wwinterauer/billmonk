@@ -384,19 +384,51 @@ WICHTIGE REGELN FÜR BESCHREIBUNG:
 - Trenne mit Komma, keine Preise
 - Bei vielen Positionen: wichtigste zuerst, dann "u.a."
 
-WICHTIGE REGELN FÜR STEUER (MwSt./USt.):
-- "MwSt." und "USt." sind SYNONYME (Mehrwertsteuer = Umsatzsteuer)
-- Suche nach ALLEN folgenden Begriffen: MwSt., USt., Mehrwertsteuer, Umsatzsteuer, VAT, Steuer, Tax
-- Österreichische Rechnungen verwenden oft "USt." statt "MwSt."
-- Achte auf Zeilen wie:
-  - "20% MwSt.: 51,84 EUR" → vat_rate: 20, vat_amount: 51.84
-  - "20.00% USt.: 51.84 EUR" → vat_rate: 20, vat_amount: 51.84
-  - "inkl. 20% USt." → vat_rate: 20
-  - "zzgl. 19% MwSt." → vat_rate: 19
-  - "VAT 20%: €51.84" → vat_rate: 20, vat_amount: 51.84
-- Übliche Steuersätze:
-  - Österreich: 20% (normal), 10%/13% (ermäßigt), 0%
-  - Deutschland: 19% (normal), 7% (ermäßigt), 0%
+WICHTIGE REGELN FÜR STEUER (MwSt./USt.) - GEZIELT NACH % SUCHEN:
+
+1. SUCHE NACH PROZENTZEICHEN (%):
+   - Scanne das GESAMTE Dokument nach allen Vorkommen von "%"
+   - Typische Muster: "20%", "20,00%", "20.00 %", "20 %"
+   - Die Zahl DIREKT VOR dem % ist oft der Steuersatz!
+
+2. KONTEXT PRÜFEN - Diese Begriffe deuten auf MwSt hin:
+   - "MwSt", "MwSt.", "Mehrwertsteuer"
+   - "USt", "USt.", "Umsatzsteuer" (häufig in Österreich!)
+   - "VAT", "Value Added Tax", "TVA"
+   - "Steuer", "Tax"
+   - "inkl.", "zzgl.", "enthält", "davon"
+
+3. TYPISCHE ZEILEN-MUSTER erkennen:
+   - "20% MwSt.: 51,84 EUR" → vat_rate: 20, vat_amount: 51.84
+   - "20.00% USt.: € 51.84" → vat_rate: 20, vat_amount: 51.84
+   - "inkl. 20% Umsatzsteuer" → vat_rate: 20
+   - "inkl. 20 % MwSt." → vat_rate: 20
+   - "davon 20% USt 51,84" → vat_rate: 20, vat_amount: 51.84
+   - "Netto 259,20 / 20% / Brutto 311,04" → vat_rate: 20
+   - "VAT 19%: €9.50" → vat_rate: 19, vat_amount: 9.50
+   - "zzgl. 19% MwSt." → vat_rate: 19
+
+4. SUMMENBLOCK AM ENDE PRÜFEN:
+   Suche am Dokumentende nach:
+   - "Netto: xxx" / "Summe netto: xxx"
+   - "20% MwSt/USt: xxx" ← HIER steht oft der Steuersatz!
+   - "Brutto: xxx" / "Gesamtbetrag: xxx"
+
+5. MEHRERE STEUERSÄTZE auf einer Rechnung:
+   - z.B. "7% MwSt 3,50 / 19% MwSt 9,50"
+   - Nimm den HÖHEREN Steuersatz als vat_rate (19%)
+   - Summiere alle MwSt-Beträge für vat_amount
+
+6. VALIDIERUNG - Übliche Steuersätze:
+   - Österreich: 0%, 10%, 13%, 20%
+   - Deutschland: 0%, 7%, 19%
+   - Schweiz: 0%, 2.5%, 3.7%, 7.7%
+   - Falls unüblicher Wert (z.B. 25%, 15%): nochmal prüfen!
+
+7. BERECHNUNG ZUR KONTROLLE (wenn Netto+Brutto vorhanden):
+   - Formel: ((Brutto / Netto) - 1) * 100 = Steuersatz
+   - Beispiel: Brutto 311,04€, Netto 259,20€ → (311.04/259.20 - 1) * 100 = 20%
+   - Nutze dies zur Validierung des gefundenen Satzes
 
 WEITERE REGELN:
 - Antworte NUR mit JSON, keine Markdown-Codeblöcke
