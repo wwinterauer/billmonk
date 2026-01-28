@@ -13,8 +13,6 @@ import {
   Sparkles,
   Clock,
   PenLine,
-  AlertTriangle,
-  Eye,
   Copy
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,17 +23,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useToast } from '@/hooks/use-toast';
-import { useReceipts, type UploadProgress, type UploadStatus, type Receipt, type DuplicateInfo, type MatchedVendor, type VendorSuggestion } from '@/hooks/useReceipts';
+import { useReceipts, type UploadProgress, type UploadStatus, type Receipt, type MatchedVendor, type VendorSuggestion } from '@/hooks/useReceipts';
 import { VendorSelectionDialog } from '@/components/receipts/VendorSelectionDialog';
+import { DuplicateCheckDialog, type FileCheckResult } from '@/components/upload/DuplicateCheckDialog';
+import { FileCheckProgress } from '@/components/upload/FileCheckProgress';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,10 +62,12 @@ interface VendorDecisionQueueItem {
   suggestions: VendorSuggestion[];
 }
 
-interface DuplicateQueueItem {
-  uploadId: string;
-  upload: FileUpload;
-  duplicateInfo: DuplicateInfo;
+// Upload phase state
+type UploadPhase = 'idle' | 'checking' | 'resolving-duplicates' | 'uploading';
+
+interface CheckProgress {
+  current: number;
+  total: number;
 }
 
 const Upload = () => {
@@ -82,11 +76,12 @@ const Upload = () => {
   const [uploads, setUploads] = useState<Map<string, FileUpload>>(new Map());
   const [pendingReceipts, setPendingReceipts] = useState<PendingReceiptFromDB[]>([]);
   const [loadingPendingReceipts, setLoadingPendingReceipts] = useState(true);
-  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
-  const [duplicateQueue, setDuplicateQueue] = useState<DuplicateQueueItem[]>([]);
-  const [currentDuplicate, setCurrentDuplicate] = useState<DuplicateQueueItem | null>(null);
-  const [totalDuplicatesInBatch, setTotalDuplicatesInBatch] = useState(0); // Track total for progress display
-  const [processedDuplicatesCount, setProcessedDuplicatesCount] = useState(0); // Track processed count
+  
+  // Phase-based state for batch duplicate checking
+  const [uploadPhase, setUploadPhase] = useState<UploadPhase>('idle');
+  const [checkProgress, setCheckProgress] = useState<CheckProgress>({ current: 0, total: 0 });
+  const [duplicatesToResolve, setDuplicatesToResolve] = useState<FileCheckResult[]>([]);
+  const [nonDuplicateFiles, setNonDuplicateFiles] = useState<{ file: File; hash: string }[]>([]);
   
   // Vendor selection states
   const [showVendorSelectionDialog, setShowVendorSelectionDialog] = useState(false);
@@ -101,7 +96,6 @@ const Upload = () => {
   const { 
     validateFiles, 
     uploadAndProcessReceipt, 
-    checkExactDuplicate, 
     generateFileHash,
     finalizeReceiptWithVendor,
     createVendorForReceipt,
@@ -181,6 +175,58 @@ const Upload = () => {
     return undefined;
   };
 
+  // Check all files for duplicates in batch, then show dialog
+  const checkFilesForDuplicates = async (files: File[]): Promise<{
+    duplicates: FileCheckResult[];
+    nonDuplicates: { file: File; hash: string }[];
+  }> => {
+    const results: FileCheckResult[] = [];
+    
+    // Calculate all hashes in parallel for speed
+    const hashPromises = files.map(async (file) => {
+      const hash = await generateFileHash(file);
+      return { file, hash };
+    });
+    
+    const filesWithHashes = await Promise.all(hashPromises);
+    
+    // Get all hashes to check in one query
+    const hashes = filesWithHashes.map(f => f.hash);
+    
+    const { data: existingReceipts } = await supabase
+      .from('receipts')
+      .select('id, file_name, file_url, file_hash, vendor, amount_gross, receipt_date')
+      .eq('user_id', user!.id)
+      .in('file_hash', hashes);
+    
+    const existingMap = new Map(
+      (existingReceipts || []).map(r => [r.file_hash, r])
+    );
+    
+    // Categorize files
+    for (const { file, hash } of filesWithHashes) {
+      const existing = existingMap.get(hash);
+      results.push({
+        file,
+        hash,
+        isDuplicate: !!existing,
+        existingReceipt: existing ? {
+          id: existing.id,
+          file_name: existing.file_name,
+          file_url: existing.file_url,
+          vendor: existing.vendor,
+          amount_gross: existing.amount_gross,
+          receipt_date: existing.receipt_date,
+        } : undefined,
+      });
+    }
+    
+    return {
+      duplicates: results.filter(r => r.isDuplicate),
+      nonDuplicates: results.filter(r => !r.isDuplicate).map(r => ({ file: r.file, hash: r.hash })),
+    };
+  };
+
   const processFiles = async (files: File[]) => {
     const { validFiles, errors } = validateFiles(files);
 
@@ -199,7 +245,6 @@ const Upload = () => {
       u => u.status === 'pending' || u.status === 'uploading' || u.status === 'processing'
     ).length;
 
-    // Only check against active uploads, not completed ones
     if (activeUploadCount + validFiles.length > MAX_FILES) {
       toast({
         variant: 'destructive',
@@ -209,11 +254,96 @@ const Upload = () => {
       return;
     }
 
-    // Add files to upload queue
-    const newUploads = new Map(uploads);
-    const filesToUpload: FileUpload[] = [];
+    // Phase 1: Check all files for duplicates
+    setUploadPhase('checking');
+    setCheckProgress({ current: 0, total: validFiles.length });
 
-    for (const file of validFiles) {
+    try {
+      // Update progress as we check
+      let checked = 0;
+      const progressInterval = setInterval(() => {
+        checked = Math.min(checked + Math.ceil(validFiles.length / 10), validFiles.length);
+        setCheckProgress({ current: checked, total: validFiles.length });
+      }, 100);
+
+      const { duplicates, nonDuplicates } = await checkFilesForDuplicates(validFiles);
+      
+      clearInterval(progressInterval);
+      setCheckProgress({ current: validFiles.length, total: validFiles.length });
+
+      // Store non-duplicates for later upload
+      setNonDuplicateFiles(nonDuplicates);
+
+      if (duplicates.length > 0) {
+        // Phase 2: Show dialog for all duplicates at once
+        setDuplicatesToResolve(duplicates);
+        setUploadPhase('resolving-duplicates');
+      } else {
+        // No duplicates - start uploading directly
+        setUploadPhase('uploading');
+        await startUploading(nonDuplicates, []);
+      }
+    } catch (error) {
+      console.error('Error checking files:', error);
+      setUploadPhase('idle');
+      toast({
+        variant: 'destructive',
+        title: 'Fehler beim Prüfen',
+        description: 'Die Dateien konnten nicht auf Duplikate geprüft werden.',
+      });
+    }
+  };
+
+  // Handle decisions from duplicate dialog
+  const handleDuplicateDecisions = async (decisions: Map<File, 'skip' | 'upload'>) => {
+    setUploadPhase('uploading');
+    
+    // Collect files to upload based on decisions
+    const duplicatesToUpload: { file: File; hash: string; duplicateOfId: string }[] = [];
+    
+    for (const [file, decision] of decisions) {
+      if (decision === 'upload') {
+        const duplicateInfo = duplicatesToResolve.find(d => d.file === file);
+        if (duplicateInfo) {
+          duplicatesToUpload.push({
+            file,
+            hash: duplicateInfo.hash,
+            duplicateOfId: duplicateInfo.existingReceipt!.id,
+          });
+        }
+      }
+    }
+    
+    // Clear duplicate state
+    setDuplicatesToResolve([]);
+    
+    // Start uploading all files
+    await startUploading(nonDuplicateFiles, duplicatesToUpload);
+  };
+
+  // Handle cancel from duplicate dialog
+  const handleDuplicateCancel = () => {
+    setUploadPhase('idle');
+    setDuplicatesToResolve([]);
+    setNonDuplicateFiles([]);
+    
+    toast({
+      title: 'Upload abgebrochen',
+      description: 'Der Vorgang wurde abgebrochen.',
+    });
+  };
+
+  // Start uploading files after duplicate resolution
+  const startUploading = async (
+    nonDuplicates: { file: File; hash: string }[],
+    duplicatesToUpload: { file: File; hash: string; duplicateOfId: string }[]
+  ) => {
+    // Add all files to upload queue
+    const newUploads = new Map(uploads);
+    const filesToUpload: { upload: FileUpload; isDuplicate: boolean; duplicateOfId?: string }[] = [];
+
+    // Add non-duplicates
+    for (const { file, hash } of nonDuplicates) {
       const id = crypto.randomUUID();
       const upload: FileUpload = {
         id,
@@ -224,21 +354,56 @@ const Upload = () => {
         statusText: 'Warten...',
         file,
         previewUrl: createPreviewUrl(file),
+        fileHash: hash,
       };
       newUploads.set(id, upload);
-      filesToUpload.push(upload);
+      filesToUpload.push({ upload, isDuplicate: false });
+    }
+
+    // Add duplicates that user chose to upload
+    for (const { file, hash, duplicateOfId } of duplicatesToUpload) {
+      const id = crypto.randomUUID();
+      const upload: FileUpload = {
+        id,
+        fileName: file.name,
+        fileSize: file.size,
+        progress: 0,
+        status: 'pending',
+        statusText: 'Warten...',
+        file,
+        previewUrl: createPreviewUrl(file),
+        fileHash: hash,
+      };
+      newUploads.set(id, upload);
+      filesToUpload.push({ upload, isDuplicate: true, duplicateOfId });
     }
 
     setUploads(newUploads);
+    setNonDuplicateFiles([]);
+    setUploadPhase('idle');
+
+    // Show summary toast
+    const skippedCount = duplicatesToResolve.length - duplicatesToUpload.length;
+    if (skippedCount > 0 || duplicatesToUpload.length > 0) {
+      toast({
+        title: 'Duplikat-Prüfung abgeschlossen',
+        description: `${nonDuplicates.length + duplicatesToUpload.length} Dateien werden hochgeladen${skippedCount > 0 ? `, ${skippedCount} übersprungen` : ''}.`,
+      });
+    }
 
     // Start uploading files sequentially
-    for (const upload of filesToUpload) {
-      await uploadFile(upload);
+    for (const { upload, isDuplicate, duplicateOfId } of filesToUpload) {
+      await uploadFile(upload, {
+        skipDuplicateCheck: true,
+        markAsDuplicate: isDuplicate,
+        duplicateOfId,
+        fileHash: upload.fileHash,
+      });
     }
   };
 
   const uploadFile = async (upload: FileUpload, options?: { skipDuplicateCheck?: boolean; markAsDuplicate?: boolean; duplicateOfId?: string; fileHash?: string }) => {
-    // Update status to checking for duplicates
+    // Update status to uploading
     setUploads(prev => {
       const updated = new Map(prev);
       const current = updated.get(upload.id);
@@ -246,86 +411,16 @@ const Upload = () => {
         updated.set(upload.id, { 
           ...current, 
           status: 'uploading', 
-          progress: 2,
-          statusText: 'Prüfe auf Duplikate...'
+          progress: 5,
+          statusText: 'Wird hochgeladen...',
+          fileHash: options?.fileHash || current.fileHash,
         });
       }
       return updated;
     });
 
     try {
-      // Generate hash for duplicate check
       const fileHash = options?.fileHash || await generateFileHash(upload.file);
-
-      // Check for exact duplicates (same file hash) BEFORE upload
-      if (!options?.skipDuplicateCheck && !options?.markAsDuplicate) {
-        const existingReceipt = await checkExactDuplicate(fileHash);
-        
-        if (existingReceipt) {
-          // Add to duplicate queue for individual handling
-          const duplicateItem: DuplicateQueueItem = {
-            uploadId: upload.id,
-            upload: { ...upload, fileHash },
-            duplicateInfo: {
-              type: 'exact',
-              original: existingReceipt,
-              file: upload.file,
-              fileHash: fileHash,
-            },
-          };
-          
-          setDuplicateQueue(prev => {
-            const newQueue = [...prev, duplicateItem];
-            // Initialize batch counter when adding first duplicate
-            if (prev.length === 0 && !currentDuplicate) {
-              setTotalDuplicatesInBatch(newQueue.length);
-              setProcessedDuplicatesCount(0);
-            } else {
-              // Update total if we're adding more to an existing batch
-              setTotalDuplicatesInBatch(t => t + 1);
-            }
-            return newQueue;
-          });
-          
-          // Show dialog if not already open
-          if (!showDuplicateDialog) {
-            setTimeout(() => showNextDuplicate(), 100);
-          }
-          
-          // Mark upload as duplicate in UI
-          setUploads(prev => {
-            const updated = new Map(prev);
-            const current = updated.get(upload.id);
-            if (current) {
-              updated.set(upload.id, { 
-                ...current, 
-                status: 'pending',
-                progress: 0,
-                statusText: 'Duplikat gefunden',
-                fileHash: fileHash,
-              });
-            }
-            return updated;
-          });
-          return;
-        }
-      }
-
-      // Update status to uploading
-      setUploads(prev => {
-        const updated = new Map(prev);
-        const current = updated.get(upload.id);
-        if (current) {
-          updated.set(upload.id, { 
-            ...current, 
-            status: 'uploading', 
-            progress: 5,
-            statusText: 'Wird hochgeladen...',
-            fileHash: fileHash,
-          });
-        }
-        return updated;
-      });
 
       const result = await uploadAndProcessReceipt(upload.file, (progress, statusText) => {
         setUploads(prev => {
@@ -690,120 +785,6 @@ const Upload = () => {
     ? vendorDecisionQueue.filter(q => q.detectedName === currentVendorDecision.detectedName).length
     : 0;
 
-  // Duplicate queue handlers
-  const showNextDuplicate = () => {
-    setDuplicateQueue(prev => {
-      if (prev.length === 0) {
-        // Reset counters when done
-        setShowDuplicateDialog(false);
-        setCurrentDuplicate(null);
-        setTotalDuplicatesInBatch(0);
-        setProcessedDuplicatesCount(0);
-        return prev;
-      }
-      
-      const [next, ...rest] = prev;
-      setCurrentDuplicate(next);
-      setShowDuplicateDialog(true);
-      setProcessedDuplicatesCount(p => p + 1);
-      return rest;
-    });
-  };
-
-  const handleProceedWithDuplicate = async () => {
-    if (!currentDuplicate) return;
-    
-    const { upload, duplicateInfo } = currentDuplicate;
-    
-    // Upload the file with duplicate flag
-    await uploadFile(upload, {
-      skipDuplicateCheck: true,
-      markAsDuplicate: true,
-      duplicateOfId: duplicateInfo.original.id,
-      fileHash: duplicateInfo.fileHash,
-    });
-    
-    // Show next duplicate or close dialog
-    setTimeout(showNextDuplicate, 100);
-  };
-
-  const handleViewOriginal = () => {
-    if (currentDuplicate?.duplicateInfo.original.id) {
-      window.open(`/expenses?receipt=${currentDuplicate.duplicateInfo.original.id}`, '_blank');
-    }
-  };
-
-  const handleCancelDuplicate = () => {
-    // Remove the pending upload for this specific duplicate only
-    if (currentDuplicate) {
-      removeUpload(currentDuplicate.uploadId);
-    }
-    // Show next duplicate or close dialog
-    setTimeout(showNextDuplicate, 100);
-  };
-
-  const handleSkipAllDuplicates = () => {
-    const totalSkipped = duplicateQueue.length + (currentDuplicate ? 1 : 0);
-    
-    // Remove current duplicate upload
-    if (currentDuplicate) {
-      removeUpload(currentDuplicate.uploadId);
-    }
-    // Remove all remaining duplicates in queue
-    duplicateQueue.forEach(item => {
-      removeUpload(item.uploadId);
-    });
-    // Clear the queue and close dialog
-    setDuplicateQueue([]);
-    setCurrentDuplicate(null);
-    setShowDuplicateDialog(false);
-    setTotalDuplicatesInBatch(0);
-    setProcessedDuplicatesCount(0);
-    
-    toast({
-      title: 'Duplikate übersprungen',
-      description: `${totalSkipped} Duplikat${totalSkipped !== 1 ? 'e' : ''} wurden nicht hochgeladen.`,
-    });
-  };
-
-  const handleUploadAllDuplicates = async () => {
-    const totalToUpload = duplicateQueue.length + (currentDuplicate ? 1 : 0);
-    
-    // Upload current duplicate
-    if (currentDuplicate) {
-      const { upload, duplicateInfo } = currentDuplicate;
-      await uploadFile(upload, {
-        skipDuplicateCheck: true,
-        markAsDuplicate: true,
-        duplicateOfId: duplicateInfo.original.id,
-        fileHash: duplicateInfo.fileHash,
-      });
-    }
-    
-    // Upload all remaining duplicates
-    for (const item of duplicateQueue) {
-      const { upload, duplicateInfo } = item;
-      await uploadFile(upload, {
-        skipDuplicateCheck: true,
-        markAsDuplicate: true,
-        duplicateOfId: duplicateInfo.original.id,
-        fileHash: duplicateInfo.fileHash,
-      });
-    }
-    
-    // Clear the queue and close dialog
-    setDuplicateQueue([]);
-    setCurrentDuplicate(null);
-    setShowDuplicateDialog(false);
-    setTotalDuplicatesInBatch(0);
-    setProcessedDuplicatesCount(0);
-    
-    toast({
-      title: 'Duplikate hochgeladen',
-      description: `${totalToUpload} Duplikat${totalToUpload !== 1 ? 'e' : ''} wurden als Kopie hochgeladen.`,
-    });
-  };
-
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
@@ -848,7 +829,6 @@ const Upload = () => {
   // Combine active uploads with pending receipts from DB (exclude already shown in uploads)
   const uploadReceiptIds = new Set(uploadsArray.filter(u => u.receipt?.id).map(u => u.receipt!.id));
   const filteredPendingReceipts = pendingReceipts.filter(pr => !uploadReceiptIds.has(pr.id));
-  const _hasPendingItems = uploadsArray.length > 0 || filteredPendingReceipts.length > 0;
 
   const handleContinue = () => {
     navigate('/expenses');
@@ -976,119 +956,128 @@ const Upload = () => {
           <p className="text-muted-foreground">Lade deine Belege hoch und lass die KI sie analysieren</p>
         </div>
 
-        {/* Upload Area */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <Card className="border-border/50 mb-8">
-            <CardContent className="p-8">
-              <div
-                onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
-                onDragLeave={() => setIsDragOver(false)}
-                onDrop={handleDrop}
-                className={`
-                  border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200
-                  ${isDragOver 
-                    ? 'border-primary bg-primary/10 scale-[1.02]' 
-                    : 'border-border hover:border-primary/50 hover:bg-muted/30'
-                  }
-                `}
-              >
-                <div className="h-16 w-16 rounded-2xl gradient-primary mx-auto mb-6 flex items-center justify-center">
-                  <UploadIcon className="h-8 w-8 text-primary-foreground" />
+        {/* File Check Progress - shown during checking phase */}
+        {uploadPhase === 'checking' && (
+          <FileCheckProgress current={checkProgress.current} total={checkProgress.total} />
+        )}
+
+        {/* Upload Area - only show when idle or uploading */}
+        {(uploadPhase === 'idle' || uploadPhase === 'uploading') && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card className="border-border/50 mb-8">
+              <CardContent className="p-8">
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                  onDragLeave={() => setIsDragOver(false)}
+                  onDrop={handleDrop}
+                  className={`
+                    border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200
+                    ${isDragOver 
+                      ? 'border-primary bg-primary/10 scale-[1.02]' 
+                      : 'border-border hover:border-primary/50 hover:bg-muted/30'
+                    }
+                  `}
+                >
+                  <div className="h-16 w-16 rounded-2xl gradient-primary mx-auto mb-6 flex items-center justify-center">
+                    <UploadIcon className="h-8 w-8 text-primary-foreground" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">
+                    Belege hierher ziehen
+                  </h3>
+                  <p className="text-muted-foreground mb-6">oder</p>
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      id="file-upload"
+                      multiple
+                      accept=".pdf,.jpg,.jpeg,.png,.webp"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <label htmlFor="file-upload">
+                      <Button asChild className="gradient-primary hover:opacity-90 cursor-pointer">
+                        <span>Dateien auswählen</span>
+                      </Button>
+                    </label>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-4">
+                    PDF, JPG, PNG, WebP bis {MAX_FILE_SIZE / 1024 / 1024}MB • Max. {MAX_FILES} Dateien
+                  </p>
+                  <div className="flex items-center justify-center gap-2 mt-4 text-sm text-primary">
+                    <Sparkles className="h-4 w-4" />
+                    <span>KI-Erkennung analysiert automatisch Lieferant, Betrag & MwSt</span>
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold text-foreground mb-2">
-                  Belege hierher ziehen
-                </h3>
-                <p className="text-muted-foreground mb-6">oder</p>
-                <div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    id="file-upload"
-                    multiple
-                    accept=".pdf,.jpg,.jpeg,.png,.webp"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
-                  <label htmlFor="file-upload">
-                    <Button asChild className="gradient-primary hover:opacity-90 cursor-pointer">
-                      <span>Dateien auswählen</span>
-                    </Button>
-                  </label>
-                </div>
-                <p className="text-sm text-muted-foreground mt-4">
-                  PDF, JPG, PNG, WebP bis {MAX_FILE_SIZE / 1024 / 1024}MB • Max. {MAX_FILES} Dateien
-                </p>
-                <div className="flex items-center justify-center gap-2 mt-4 text-sm text-primary">
-                  <Sparkles className="h-4 w-4" />
-                  <span>KI-Erkennung analysiert automatisch Lieferant, Betrag & MwSt</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Cloud Import */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-        >
-          <Card className="border-border/50 mb-8">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Cloud className="h-5 w-5" />
-                Cloud Import
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid sm:grid-cols-3 gap-4">
-                <Button 
-                  variant="outline" 
-                  className="h-auto py-4 flex-col gap-2 relative overflow-hidden"
-                  onClick={() => handleCloudImport('OneDrive')}
-                >
-                  <Badge className="absolute top-2 right-2 text-xs bg-muted text-muted-foreground">
-                    Coming Soon
-                  </Badge>
-                  <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                    <Cloud className="h-5 w-5 text-blue-500" />
-                  </div>
-                  <span className="text-muted-foreground">OneDrive</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-auto py-4 flex-col gap-2 relative overflow-hidden"
-                  onClick={() => handleCloudImport('Google Drive')}
-                >
-                  <Badge className="absolute top-2 right-2 text-xs bg-muted text-muted-foreground">
-                    Coming Soon
-                  </Badge>
-                  <div className="h-10 w-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
-                    <Cloud className="h-5 w-5 text-yellow-500" />
-                  </div>
-                  <span className="text-muted-foreground">Google Drive</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-auto py-4 flex-col gap-2 relative overflow-hidden"
-                  onClick={() => handleCloudImport('Dropbox')}
-                >
-                  <Badge className="absolute top-2 right-2 text-xs bg-muted text-muted-foreground">
-                    Coming Soon
-                  </Badge>
-                  <div className="h-10 w-10 rounded-lg bg-blue-600/10 flex items-center justify-center">
-                    <Cloud className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <span className="text-muted-foreground">Dropbox</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+        {(uploadPhase === 'idle' || uploadPhase === 'uploading') && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
+          >
+            <Card className="border-border/50 mb-8">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Cloud className="h-5 w-5" />
+                  Cloud Import
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid sm:grid-cols-3 gap-4">
+                  <Button 
+                    variant="outline" 
+                    className="h-auto py-4 flex-col gap-2 relative overflow-hidden"
+                    onClick={() => handleCloudImport('OneDrive')}
+                  >
+                    <Badge className="absolute top-2 right-2 text-xs bg-muted text-muted-foreground">
+                      Coming Soon
+                    </Badge>
+                    <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                      <Cloud className="h-5 w-5 text-blue-500" />
+                    </div>
+                    <span className="text-muted-foreground">OneDrive</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="h-auto py-4 flex-col gap-2 relative overflow-hidden"
+                    onClick={() => handleCloudImport('Google Drive')}
+                  >
+                    <Badge className="absolute top-2 right-2 text-xs bg-muted text-muted-foreground">
+                      Coming Soon
+                    </Badge>
+                    <div className="h-10 w-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+                      <Cloud className="h-5 w-5 text-yellow-500" />
+                    </div>
+                    <span className="text-muted-foreground">Google Drive</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="h-auto py-4 flex-col gap-2 relative overflow-hidden"
+                    onClick={() => handleCloudImport('Dropbox')}
+                  >
+                    <Badge className="absolute top-2 right-2 text-xs bg-muted text-muted-foreground">
+                      Coming Soon
+                    </Badge>
+                    <div className="h-10 w-10 rounded-lg bg-blue-600/10 flex items-center justify-center">
+                      <Cloud className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <span className="text-muted-foreground">Dropbox</span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Upload Progress - Active Uploads */}
         <AnimatePresence>
@@ -1344,150 +1333,14 @@ const Upload = () => {
           </Card>
         )}
 
-        {/* Duplicate Warning Dialog */}
-        <AlertDialog open={showDuplicateDialog} onOpenChange={() => {
-          // Don't close on overlay click - user must make a choice
-        }}>
-          <AlertDialogContent className="max-w-2xl w-[95vw]" onEscapeKeyDown={(e) => e.preventDefault()}>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2 text-warning">
-                <AlertTriangle className="w-5 h-5" />
-                <span>Duplikat erkannt</span>
-                {totalDuplicatesInBatch > 1 && (
-                  <Badge variant="secondary" className="ml-2 bg-warning/20 text-warning border-warning/30">
-                    {processedDuplicatesCount} von {totalDuplicatesInBatch}
-                  </Badge>
-                )}
-              </AlertDialogTitle>
-              <AlertDialogDescription className="text-base">
-                Diese Datei existiert bereits in deinem Archiv.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            
-            {currentDuplicate && (
-              <div className="py-4 space-y-4">
-                {/* Visual comparison */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* New file */}
-                  <div className="p-4 bg-warning/10 rounded-lg border-2 border-warning/40">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="h-8 w-8 rounded-lg bg-warning flex items-center justify-center">
-                        <UploadIcon className="h-4 w-4 text-warning-foreground" />
-                      </div>
-                      <span className="font-semibold text-warning">Neue Datei</span>
-                    </div>
-                    <p className="text-sm break-all font-medium">{currentDuplicate.upload.fileName}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {formatFileSize(currentDuplicate.upload.fileSize)}
-                    </p>
-                  </div>
-                  
-                  {/* Existing file */}
-                  <div className="p-4 bg-muted/50 rounded-lg border-2 border-border">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <FileText className="h-4 w-4 text-primary" />
-                      </div>
-                      <span className="font-semibold text-foreground">Bereits vorhanden</span>
-                    </div>
-                    <p className="text-sm break-all font-medium">
-                      {currentDuplicate.duplicateInfo.original.file_name || '–'}
-                    </p>
-                    <div className="mt-3 space-y-1.5 text-sm">
-                      {currentDuplicate.duplicateInfo.original.vendor && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">Lieferant:</span>
-                          <span className="font-medium">{currentDuplicate.duplicateInfo.original.vendor}</span>
-                        </div>
-                      )}
-                      {currentDuplicate.duplicateInfo.original.amount_gross && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">Betrag:</span>
-                          <span className="font-medium">€ {currentDuplicate.duplicateInfo.original.amount_gross.toFixed(2)}</span>
-                        </div>
-                      )}
-                      {currentDuplicate.duplicateInfo.original.receipt_date && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">Datum:</span>
-                          <span className="font-medium">
-                            {format(new Date(currentDuplicate.duplicateInfo.original.receipt_date), 'dd.MM.yyyy', { locale: de })}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <Button 
-                      variant="link" 
-                      size="sm" 
-                      className="p-0 h-auto text-xs mt-2"
-                      onClick={handleViewOriginal}
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      Original ansehen
-                    </Button>
-                  </div>
-                </div>
-                
-                {/* Info hint */}
-                <div className="flex items-start gap-2 p-3 bg-muted/30 rounded-lg text-sm text-muted-foreground">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>Identische Dateien werden anhand ihres Inhalts erkannt (Hash-Vergleich).</span>
-                </div>
-              </div>
-            )}
-            
-            <AlertDialogFooter className="flex-col gap-4 sm:flex-col">
-              {/* Actions for this file */}
-              <div className="flex justify-center gap-3 w-full">
-                <Button 
-                  variant="outline"
-                  onClick={handleCancelDuplicate}
-                  className="flex-1 max-w-[180px]"
-                >
-                  Überspringen
-                </Button>
-                <Button
-                  onClick={handleProceedWithDuplicate}
-                  className="bg-warning text-warning-foreground hover:bg-warning/90 flex-1 max-w-[180px]"
-                >
-                  <Copy className="w-4 h-4 mr-2" />
-                  Hochladen
-                </Button>
-              </div>
-              
-              {/* Bulk actions - only shown when more than 1 remaining */}
-              {(duplicateQueue.length > 0) && (
-                <>
-                  <div className="relative w-full">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-3 text-muted-foreground">
-                        Für alle {duplicateQueue.length + 1} verbleibenden
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex justify-center gap-3 w-full">
-                    <Button 
-                      variant="ghost"
-                      onClick={handleSkipAllDuplicates}
-                      className="text-muted-foreground"
-                    >
-                      Alle überspringen
-                    </Button>
-                    <Button 
-                      variant="ghost"
-                      onClick={handleUploadAllDuplicates}
-                      className="text-warning"
-                    >
-                      Alle hochladen
-                    </Button>
-                  </div>
-                </>
-              )}
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* Duplicate Check Dialog */}
+        <DuplicateCheckDialog
+          open={uploadPhase === 'resolving-duplicates'}
+          duplicates={duplicatesToResolve}
+          nonDuplicateCount={nonDuplicateFiles.length}
+          onComplete={handleDuplicateDecisions}
+          onCancel={handleDuplicateCancel}
+        />
 
         {/* Vendor Selection Dialog */}
         <VendorSelectionDialog
