@@ -1,4 +1,4 @@
-import { CheckCircle, ArrowRight, RefreshCw, Circle, Lightbulb } from 'lucide-react';
+import { CheckCircle, ArrowRight, RefreshCw, Circle, Lightbulb, FileX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
@@ -13,6 +13,7 @@ interface ImportResult {
   skippedIncome: number;
   skippedDuplicates: number;
   possibleMatches: number;
+  noReceiptEntries?: number;
 }
 
 interface ImportResultDialogProps {
@@ -54,6 +55,15 @@ export function ImportResultDialog({
               <strong>{result.imported}</strong> Buchungen importiert
             </span>
           </div>
+          
+          {result.noReceiptEntries && result.noReceiptEntries > 0 && (
+            <div className="flex items-center gap-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 -mx-3">
+              <FileX className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <span className="text-blue-700 dark:text-blue-300">
+                <strong>{result.noReceiptEntries}</strong> Ausgaben ohne Rechnung erfasst
+              </span>
+            </div>
+          )}
           
           {result.skippedIncome > 0 && (
             <div className="flex items-center gap-3 py-2">

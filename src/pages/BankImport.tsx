@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { useBankImport, parseCsvFile, ParsedTransaction, ParseResult } from '@/hooks/useBankImport';
+import { parseCsvFile, ParsedTransaction, ParseResult } from '@/hooks/useBankImport';
 import { ImportPreviewModal } from '@/components/bank-import/ImportPreviewModal';
 import { ImportResultDialog } from '@/components/bank-import/ImportResultDialog';
 import { ImportHistoryTable } from '@/components/bank-import/ImportHistoryTable';
@@ -70,6 +70,7 @@ export default function BankImport() {
   const [selectedBank, setSelectedBank] = useState<string>('');
   const [onlyExpenses, setOnlyExpenses] = useState(true);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
+  const [createNoReceiptEntries, setCreateNoReceiptEntries] = useState(true);
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   
@@ -87,6 +88,7 @@ export default function BankImport() {
     skippedIncome: 0,
     skippedDuplicates: 0,
     possibleMatches: 0,
+    noReceiptEntries: 0,
   });
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -238,7 +240,15 @@ export default function BankImport() {
       const total = transactionsToImport.length;
       let imported = 0;
       let skippedDuplicates = 0;
+      let noReceiptEntriesCreated = 0;
       const skippedIncome = onlyExpenses ? parseResult.income : 0;
+      
+      // Load active keywords for auto-creation of no-receipt entries
+      const { data: keywords } = await supabase
+        .from('bank_import_keywords')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true);
       
       // Create import batch record first
       const dateFromValue = transactionsToImport.length > 0
@@ -284,7 +294,7 @@ export default function BankImport() {
         }
         
         // Insert transaction
-        const { error: txError } = await supabase
+        const { data: insertedTx, error: txError } = await supabase
           .from('bank_transactions')
           .insert({
             user_id: user.id,
@@ -296,7 +306,9 @@ export default function BankImport() {
             status: 'unmatched',
             import_batch_id: importBatch.id,
             raw_data: tx.rawData,
-          });
+          })
+          .select()
+          .single();
         
         if (txError) {
           console.error('Transaction insert error:', txError);
@@ -304,6 +316,45 @@ export default function BankImport() {
         }
         
         imported++;
+        
+        // Check for keyword match and create no-receipt entry if enabled
+        if (createNoReceiptEntries && tx.isExpense && keywords && keywords.length > 0) {
+          const matchedKeyword = keywords.find(kw => 
+            tx.description.toLowerCase().includes(kw.keyword.toLowerCase())
+          );
+          
+          if (matchedKeyword) {
+            // Create receipt entry without physical receipt
+            const { error: receiptError } = await supabase
+              .from('receipts')
+              .insert({
+                user_id: user.id,
+                vendor: matchedKeyword.keyword,
+                description: matchedKeyword.description_template || tx.description,
+                amount_gross: tx.amount,
+                receipt_date: format(tx.date, 'yyyy-MM-dd'),
+                category: matchedKeyword.category,
+                vat_rate: matchedKeyword.tax_rate || 0,
+                status: 'approved',
+                source: 'bank_import',
+                is_no_receipt_entry: true,
+                bank_import_keyword_id: matchedKeyword.id,
+                bank_transaction_reference: tx.description,
+                bank_transaction_id: insertedTx?.id,
+                notes: 'Automatisch erstellt aus Bankbuchung - Keine Rechnung vorhanden',
+              });
+            
+            if (!receiptError) {
+              noReceiptEntriesCreated++;
+              
+              // Update transaction status to matched
+              await supabase
+                .from('bank_transactions')
+                .update({ status: 'matched' })
+                .eq('id', insertedTx.id);
+            }
+          }
+        }
       }
       
       // Update import batch with final counts
@@ -327,6 +378,7 @@ export default function BankImport() {
         skippedIncome,
         skippedDuplicates,
         possibleMatches: matchCount || 0,
+        noReceiptEntries: noReceiptEntriesCreated,
       });
       
       // Invalidate queries to refresh data
@@ -505,6 +557,16 @@ export default function BankImport() {
                       />
                       <Label htmlFor="skip-duplicates" className="cursor-pointer">
                         Bereits importierte Buchungen überspringen
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="create-no-receipt-entries"
+                        checked={createNoReceiptEntries}
+                        onCheckedChange={(checked) => setCreateNoReceiptEntries(checked as boolean)}
+                      />
+                      <Label htmlFor="create-no-receipt-entries" className="cursor-pointer">
+                        Bankgebühren/Versicherungen automatisch erfassen
                       </Label>
                     </div>
                   </div>
