@@ -443,6 +443,10 @@ const Settings = () => {
               <Tags className="h-4 w-4" />
               <span className="hidden sm:inline">Kategorien</span>
             </TabsTrigger>
+            <TabsTrigger value="bank-keywords" className="gap-2">
+              <Landmark className="h-4 w-4" />
+              <span className="hidden sm:inline">Bank</span>
+            </TabsTrigger>
             <TabsTrigger value="vendors" className="gap-2">
               <Building className="h-4 w-4" />
               <span className="hidden sm:inline">Lieferanten</span>
@@ -458,10 +462,6 @@ const Settings = () => {
             <TabsTrigger value="email-import" className="gap-2">
               <Mail className="h-4 w-4" />
               <span className="hidden sm:inline">E-Mail</span>
-            </TabsTrigger>
-            <TabsTrigger value="bank-keywords" className="gap-2">
-              <Landmark className="h-4 w-4" />
-              <span className="hidden sm:inline">Bank</span>
             </TabsTrigger>
           </TabsList>
 
