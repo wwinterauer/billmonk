@@ -30,8 +30,6 @@ import { VendorSelectionDialog } from '@/components/receipts/VendorSelectionDial
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -87,6 +85,8 @@ const Upload = () => {
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [duplicateQueue, setDuplicateQueue] = useState<DuplicateQueueItem[]>([]);
   const [currentDuplicate, setCurrentDuplicate] = useState<DuplicateQueueItem | null>(null);
+  const [totalDuplicatesInBatch, setTotalDuplicatesInBatch] = useState(0); // Track total for progress display
+  const [processedDuplicatesCount, setProcessedDuplicatesCount] = useState(0); // Track processed count
   
   // Vendor selection states
   const [showVendorSelectionDialog, setShowVendorSelectionDialog] = useState(false);
@@ -274,7 +274,18 @@ const Upload = () => {
             },
           };
           
-          setDuplicateQueue(prev => [...prev, duplicateItem]);
+          setDuplicateQueue(prev => {
+            const newQueue = [...prev, duplicateItem];
+            // Initialize batch counter when adding first duplicate
+            if (prev.length === 0 && !currentDuplicate) {
+              setTotalDuplicatesInBatch(newQueue.length);
+              setProcessedDuplicatesCount(0);
+            } else {
+              // Update total if we're adding more to an existing batch
+              setTotalDuplicatesInBatch(t => t + 1);
+            }
+            return newQueue;
+          });
           
           // Show dialog if not already open
           if (!showDuplicateDialog) {
@@ -683,19 +694,21 @@ const Upload = () => {
   const showNextDuplicate = () => {
     setDuplicateQueue(prev => {
       if (prev.length === 0) {
+        // Reset counters when done
         setShowDuplicateDialog(false);
         setCurrentDuplicate(null);
+        setTotalDuplicatesInBatch(0);
+        setProcessedDuplicatesCount(0);
         return prev;
       }
       
       const [next, ...rest] = prev;
       setCurrentDuplicate(next);
       setShowDuplicateDialog(true);
+      setProcessedDuplicatesCount(p => p + 1);
       return rest;
     });
   };
-
-  const duplicateQueueCount = duplicateQueue.length;
 
   const handleProceedWithDuplicate = async () => {
     if (!currentDuplicate) return;
@@ -716,13 +729,8 @@ const Upload = () => {
 
   const handleViewOriginal = () => {
     if (currentDuplicate?.duplicateInfo.original.id) {
-      navigate(`/expenses?receipt=${currentDuplicate.duplicateInfo.original.id}`);
+      window.open(`/expenses?receipt=${currentDuplicate.duplicateInfo.original.id}`, '_blank');
     }
-    // Remove current upload and show next
-    if (currentDuplicate) {
-      removeUpload(currentDuplicate.uploadId);
-    }
-    setTimeout(showNextDuplicate, 100);
   };
 
   const handleCancelDuplicate = () => {
@@ -735,6 +743,8 @@ const Upload = () => {
   };
 
   const handleSkipAllDuplicates = () => {
+    const totalSkipped = duplicateQueue.length + (currentDuplicate ? 1 : 0);
+    
     // Remove current duplicate upload
     if (currentDuplicate) {
       removeUpload(currentDuplicate.uploadId);
@@ -747,10 +757,50 @@ const Upload = () => {
     setDuplicateQueue([]);
     setCurrentDuplicate(null);
     setShowDuplicateDialog(false);
+    setTotalDuplicatesInBatch(0);
+    setProcessedDuplicatesCount(0);
     
     toast({
       title: 'Duplikate übersprungen',
-      description: `${duplicateQueue.length + 1} Duplikat${duplicateQueue.length > 0 ? 'e' : ''} wurden nicht hochgeladen.`,
+      description: `${totalSkipped} Duplikat${totalSkipped !== 1 ? 'e' : ''} wurden nicht hochgeladen.`,
+    });
+  };
+
+  const handleUploadAllDuplicates = async () => {
+    const totalToUpload = duplicateQueue.length + (currentDuplicate ? 1 : 0);
+    
+    // Upload current duplicate
+    if (currentDuplicate) {
+      const { upload, duplicateInfo } = currentDuplicate;
+      await uploadFile(upload, {
+        skipDuplicateCheck: true,
+        markAsDuplicate: true,
+        duplicateOfId: duplicateInfo.original.id,
+        fileHash: duplicateInfo.fileHash,
+      });
+    }
+    
+    // Upload all remaining duplicates
+    for (const item of duplicateQueue) {
+      const { upload, duplicateInfo } = item;
+      await uploadFile(upload, {
+        skipDuplicateCheck: true,
+        markAsDuplicate: true,
+        duplicateOfId: duplicateInfo.original.id,
+        fileHash: duplicateInfo.fileHash,
+      });
+    }
+    
+    // Clear the queue and close dialog
+    setDuplicateQueue([]);
+    setCurrentDuplicate(null);
+    setShowDuplicateDialog(false);
+    setTotalDuplicatesInBatch(0);
+    setProcessedDuplicatesCount(0);
+    
+    toast({
+      title: 'Duplikate hochgeladen',
+      description: `${totalToUpload} Duplikat${totalToUpload !== 1 ? 'e' : ''} wurden als Kopie hochgeladen.`,
     });
   };
 
@@ -798,7 +848,7 @@ const Upload = () => {
   // Combine active uploads with pending receipts from DB (exclude already shown in uploads)
   const uploadReceiptIds = new Set(uploadsArray.filter(u => u.receipt?.id).map(u => u.receipt!.id));
   const filteredPendingReceipts = pendingReceipts.filter(pr => !uploadReceiptIds.has(pr.id));
-  const hasPendingItems = uploadsArray.length > 0 || filteredPendingReceipts.length > 0;
+  const _hasPendingItems = uploadsArray.length > 0 || filteredPendingReceipts.length > 0;
 
   const handleContinue = () => {
     navigate('/expenses');
@@ -1294,7 +1344,7 @@ const Upload = () => {
           </Card>
         )}
 
-        {/* Duplicate Warning Dialog - Using Dialog instead of AlertDialog for more control */}
+        {/* Duplicate Warning Dialog */}
         <AlertDialog open={showDuplicateDialog} onOpenChange={() => {
           // Don't close on overlay click - user must make a choice
         }}>
@@ -1302,10 +1352,10 @@ const Upload = () => {
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2 text-warning">
                 <AlertTriangle className="w-5 h-5" />
-                Duplikat erkannt
-                {duplicateQueueCount > 0 && (
+                <span>Duplikat erkannt</span>
+                {totalDuplicatesInBatch > 1 && (
                   <Badge variant="secondary" className="ml-2 bg-warning/20 text-warning border-warning/30">
-                    +{duplicateQueueCount} weitere
+                    {processedDuplicatesCount} von {totalDuplicatesInBatch}
                   </Badge>
                 )}
               </AlertDialogTitle>
@@ -1365,6 +1415,15 @@ const Upload = () => {
                         </div>
                       )}
                     </div>
+                    <Button 
+                      variant="link" 
+                      size="sm" 
+                      className="p-0 h-auto text-xs mt-2"
+                      onClick={handleViewOriginal}
+                    >
+                      <Eye className="w-3 h-3 mr-1" />
+                      Original ansehen
+                    </Button>
                   </div>
                 </div>
                 
@@ -1376,45 +1435,56 @@ const Upload = () => {
               </div>
             )}
             
-            <AlertDialogFooter className="flex-col gap-3 sm:flex-row sm:gap-2">
-              {/* Skip buttons row */}
-              <div className="flex gap-2 w-full sm:w-auto order-last sm:order-first">
+            <AlertDialogFooter className="flex-col gap-4 sm:flex-col">
+              {/* Actions for this file */}
+              <div className="flex justify-center gap-3 w-full">
                 <Button 
-                  variant="ghost"
+                  variant="outline"
                   onClick={handleCancelDuplicate}
-                  className="flex-1 sm:flex-none"
+                  className="flex-1 max-w-[180px]"
                 >
                   Überspringen
                 </Button>
-                {duplicateQueueCount > 0 && (
-                  <Button 
-                    variant="ghost"
-                    onClick={handleSkipAllDuplicates}
-                    className="flex-1 sm:flex-none text-muted-foreground"
-                  >
-                    Alle überspringen ({duplicateQueueCount + 1})
-                  </Button>
-                )}
-              </div>
-              
-              {/* Action buttons row */}
-              <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
-                <Button 
-                  variant="outline"
-                  onClick={handleViewOriginal}
-                  className="flex items-center gap-2 flex-1 sm:flex-none"
-                >
-                  <Eye className="w-4 h-4" />
-                  Original
-                </Button>
                 <Button
                   onClick={handleProceedWithDuplicate}
-                  className="bg-warning text-warning-foreground hover:bg-warning/90 flex-1 sm:flex-none"
+                  className="bg-warning text-warning-foreground hover:bg-warning/90 flex-1 max-w-[180px]"
                 >
                   <Copy className="w-4 h-4 mr-2" />
-                  Trotzdem hochladen
+                  Hochladen
                 </Button>
               </div>
+              
+              {/* Bulk actions - only shown when more than 1 remaining */}
+              {(duplicateQueue.length > 0) && (
+                <>
+                  <div className="relative w-full">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-border" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-3 text-muted-foreground">
+                        Für alle {duplicateQueue.length + 1} verbleibenden
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex justify-center gap-3 w-full">
+                    <Button 
+                      variant="ghost"
+                      onClick={handleSkipAllDuplicates}
+                      className="text-muted-foreground"
+                    >
+                      Alle überspringen
+                    </Button>
+                    <Button 
+                      variant="ghost"
+                      onClick={handleUploadAllDuplicates}
+                      className="text-warning"
+                    >
+                      Alle hochladen
+                    </Button>
+                  </div>
+                </>
+              )}
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
