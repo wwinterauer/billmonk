@@ -47,6 +47,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronRight,
+  Copy,
 } from 'lucide-react';
 
 interface ChecklistLink {
@@ -181,6 +182,55 @@ export default function Checklists() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['checklists'] });
       toast({ title: 'Checkliste gelöscht' });
+    },
+  });
+
+  const copyChecklistMutation = useMutation({
+    mutationFn: async (checklist: Checklist) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Nicht angemeldet');
+
+      // Create new checklist with "(Kopie)" suffix
+      const { data: newChecklist, error: checklistError } = await supabase
+        .from('checklists')
+        .insert({
+          user_id: user.id,
+          name: `${checklist.name} (Kopie)`,
+          description: checklist.description,
+          color: checklist.color,
+        })
+        .select()
+        .single();
+
+      if (checklistError) throw checklistError;
+
+      // Copy all items (unchecked)
+      if (checklist.items && checklist.items.length > 0) {
+        const itemsToInsert = checklist.items.map((item, idx) => ({
+          user_id: user.id,
+          checklist_id: newChecklist.id,
+          name: item.name,
+          notes: item.notes,
+          links: JSON.parse(JSON.stringify(item.links || [])),
+          sort_order: idx,
+          is_completed: false,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('checklist_items')
+          .insert(itemsToInsert);
+
+        if (itemsError) throw itemsError;
+      }
+
+      return newChecklist;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checklists'] });
+      toast({ title: 'Checkliste kopiert' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -425,6 +475,16 @@ export default function Checklists() {
                             }}>
                               <Pencil className="h-4 w-4 mr-2" />
                               Bearbeiten
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyChecklistMutation.mutate(checklist);
+                              }}
+                              disabled={copyChecklistMutation.isPending}
+                            >
+                              <Copy className="h-4 w-4 mr-2" />
+                              Kopieren
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
