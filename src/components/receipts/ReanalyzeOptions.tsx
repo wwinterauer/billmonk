@@ -50,8 +50,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 // Fields that can be selectively re-analyzed by AI
 const REANALYZABLE_FIELDS = [
-  { id: 'vendor', label: 'Lieferant (Markenname)', icon: Building },
-  { id: 'vendor_brand', label: 'Lieferant (Rechtlicher Name)', icon: Briefcase },
+  { id: 'vendor_brand', label: 'Markenname', icon: Building },
+  { id: 'vendor', label: 'Rechtl. Name', icon: Briefcase },
   { id: 'invoice_number', label: 'Rechnungsnummer', icon: Hash },
   { id: 'receipt_date', label: 'Datum', icon: CalendarIcon },
   { id: 'amount_gross', label: 'Bruttobetrag', icon: Euro },
@@ -348,7 +348,7 @@ export function ReanalyzeOptions({
 
           <div className="grid grid-cols-2 gap-1 p-1">
             <DropdownMenuItem
-              onClick={() => reanalyzeSingleField('vendor')}
+              onClick={() => reanalyzeSingleField('vendor_brand')}
               className="flex-col items-start py-1.5"
             >
               <div className="flex items-center gap-1">
@@ -358,7 +358,7 @@ export function ReanalyzeOptions({
             </DropdownMenuItem>
 
             <DropdownMenuItem
-              onClick={() => reanalyzeSingleField('vendor_brand')}
+              onClick={() => reanalyzeSingleField('vendor')}
               className="flex-col items-start py-1.5"
             >
               <div className="flex items-center gap-1">
