@@ -28,6 +28,7 @@ interface VendorAutocompleteProps {
   onChange: (value: string, vendorId?: string | null) => void;
   onVendorSelect: (vendor: VendorWithCategory) => void;
   disabled?: boolean;
+  label?: string;
 }
 
 export function VendorAutocomplete({
@@ -36,6 +37,7 @@ export function VendorAutocomplete({
   onChange,
   onVendorSelect,
   disabled = false,
+  label = 'Lieferant',
 }: VendorAutocompleteProps) {
   const { user } = useAuth();
   const [vendorSearch, setVendorSearch] = useState('');
@@ -177,7 +179,7 @@ export function VendorAutocomplete({
 
   return (
     <div className="relative" ref={containerRef}>
-      <Label className="mb-1.5 block">Lieferant (rechtlicher Name)</Label>
+      <Label className="mb-1.5 block">{label}</Label>
 
       <div className="relative">
         <Input
