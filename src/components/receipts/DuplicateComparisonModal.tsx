@@ -132,56 +132,78 @@ function ReceiptPreviewCard({ receipt, otherReceipt, type, onDelete, onViewDetai
   const [previewError, setPreviewError] = useState(false);
 
   useEffect(() => {
-    let blobUrl: string | null = null;
+    let isCancelled = false;
+    let currentBlobUrl: string | null = null;
     
     async function loadPreview() {
       if (!receipt?.file_url) {
-        console.log('No file_url for receipt:', receipt?.id);
+        console.log('[Preview] No file_url for receipt:', receipt?.id);
         return;
       }
       
       setPreviewLoading(true);
       setPreviewError(false);
+      setPreviewUrl(null);
       
       try {
-        console.log('Loading preview for file_url:', receipt.file_url);
+        console.log('[Preview] Loading file_url:', receipt.file_url);
         
+        // Get signed URL
         const { data, error } = await supabase.storage
           .from('receipts')
           .createSignedUrl(receipt.file_url, 3600);
 
+        if (isCancelled) return;
+
         if (error) {
-          console.error('Signed URL error:', error);
-          throw new Error(`Could not get signed URL: ${error.message}`);
+          console.error('[Preview] Signed URL error:', error);
+          throw new Error(`Signed URL failed: ${error.message}`);
         }
         
         if (!data?.signedUrl) {
           throw new Error('No signed URL returned');
         }
 
-        console.log('Got signed URL, fetching file...');
+        console.log('[Preview] Fetching blob from signed URL...');
+        
+        // Fetch the file as blob
         const response = await fetch(data.signedUrl);
+        
+        if (isCancelled) return;
+        
         if (!response.ok) {
-          throw new Error(`Could not fetch file: ${response.status} ${response.statusText}`);
+          throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
         }
 
         const blob = await response.blob();
-        console.log('Blob loaded, size:', blob.size, 'type:', blob.type);
-        blobUrl = URL.createObjectURL(blob);
-        setPreviewUrl(blobUrl);
-      } catch (error) {
-        console.error('Preview load error:', error);
-        setPreviewError(true);
-      } finally {
+        
+        if (isCancelled) {
+          return;
+        }
+        
+        console.log('[Preview] Blob loaded - size:', blob.size, 'type:', blob.type);
+        
+        // Create blob URL and set state
+        currentBlobUrl = URL.createObjectURL(blob);
+        setPreviewUrl(currentBlobUrl);
         setPreviewLoading(false);
+        
+      } catch (error) {
+        if (!isCancelled) {
+          console.error('[Preview] Load error:', error);
+          setPreviewError(true);
+          setPreviewLoading(false);
+        }
       }
     }
 
     loadPreview();
 
     return () => {
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
+      isCancelled = true;
+      if (currentBlobUrl) {
+        console.log('[Preview] Cleanup - revoking blob URL');
+        URL.revokeObjectURL(currentBlobUrl);
       }
     };
   }, [receipt?.file_url, receipt?.id]);
