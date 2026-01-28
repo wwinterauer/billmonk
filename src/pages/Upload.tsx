@@ -116,7 +116,7 @@ const Upload = () => {
           .eq('user_id', user.id)
           .in('status', ['processing', 'pending'])
           .order('created_at', { ascending: false })
-          .limit(50);
+          .limit(200);
 
         if (error) {
           console.error('Error loading pending receipts:', error);
