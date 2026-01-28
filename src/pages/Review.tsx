@@ -485,6 +485,20 @@ const Review = () => {
               </CardHeader>
 
               <CardContent>
+                {/* Hint for non-receipt documents */}
+                {currentReceipt?.category === 'Keine Rechnung' && (
+                  <div className="mb-6 p-4 bg-muted/50 border border-muted-foreground/20 rounded-lg flex items-start gap-3">
+                    <FileText className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-foreground">
+                        Erkannt als: {currentReceipt.notes?.replace('Dokumenttyp: ', '').split('.')[0] || 'Sonstiges Dokument'}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Dieses Dokument wurde nicht als Rechnung erkannt. Sie können die Kategorie ändern falls es doch ein Beleg ist.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <div className="grid lg:grid-cols-2 gap-8">
                   {/* Left Side - Image Preview */}
                   <div className="lg:col-span-1">
