@@ -71,6 +71,12 @@ interface VendorDecisionQueueItem {
   suggestions: VendorSuggestion[];
 }
 
+interface DuplicateQueueItem {
+  uploadId: string;
+  upload: FileUpload;
+  duplicateInfo: DuplicateInfo;
+}
+
 const Upload = () => {
   const { user } = useAuth();
   const [isDragOver, setIsDragOver] = useState(false);
@@ -78,7 +84,8 @@ const Upload = () => {
   const [pendingReceipts, setPendingReceipts] = useState<PendingReceiptFromDB[]>([]);
   const [loadingPendingReceipts, setLoadingPendingReceipts] = useState(true);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
-  const [duplicateInfo, setDuplicateInfo] = useState<DuplicateInfo | null>(null);
+  const [duplicateQueue, setDuplicateQueue] = useState<DuplicateQueueItem[]>([]);
+  const [currentDuplicate, setCurrentDuplicate] = useState<DuplicateQueueItem | null>(null);
   
   // Vendor selection states
   const [showVendorSelectionDialog, setShowVendorSelectionDialog] = useState(false);
@@ -252,14 +259,24 @@ const Upload = () => {
         const existingReceipt = await checkExactDuplicate(fileHash);
         
         if (existingReceipt) {
-          // Show duplicate dialog
-          setDuplicateInfo({
-            type: 'exact',
-            original: existingReceipt,
-            file: upload.file,
-            fileHash: fileHash,
-          });
-          setShowDuplicateDialog(true);
+          // Add to duplicate queue for individual handling
+          const duplicateItem: DuplicateQueueItem = {
+            uploadId: upload.id,
+            upload: { ...upload, fileHash },
+            duplicateInfo: {
+              type: 'exact',
+              original: existingReceipt,
+              file: upload.file,
+              fileHash: fileHash,
+            },
+          };
+          
+          setDuplicateQueue(prev => [...prev, duplicateItem]);
+          
+          // Show dialog if not already open
+          if (!showDuplicateDialog) {
+            setTimeout(() => showNextDuplicate(), 100);
+          }
           
           // Mark upload as duplicate in UI
           setUploads(prev => {
@@ -659,49 +676,59 @@ const Upload = () => {
     ? vendorDecisionQueue.filter(q => q.detectedName === currentVendorDecision.detectedName).length
     : 0;
 
+  // Duplicate queue handlers
+  const showNextDuplicate = () => {
+    setDuplicateQueue(prev => {
+      if (prev.length === 0) {
+        setShowDuplicateDialog(false);
+        setCurrentDuplicate(null);
+        return prev;
+      }
+      
+      const [next, ...rest] = prev;
+      setCurrentDuplicate(next);
+      setShowDuplicateDialog(true);
+      return rest;
+    });
+  };
+
+  const duplicateQueueCount = duplicateQueue.length;
+
   const handleProceedWithDuplicate = async () => {
-    if (!duplicateInfo) return;
+    if (!currentDuplicate) return;
     
-    setShowDuplicateDialog(false);
+    const { upload, duplicateInfo } = currentDuplicate;
     
-    // Find the upload entry for this file
-    const uploadEntry = Array.from(uploads.entries()).find(
-      ([_, u]) => u.file === duplicateInfo.file
-    );
+    // Upload the file with duplicate flag
+    await uploadFile(upload, {
+      skipDuplicateCheck: true,
+      markAsDuplicate: true,
+      duplicateOfId: duplicateInfo.original.id,
+      fileHash: duplicateInfo.fileHash,
+    });
     
-    if (uploadEntry) {
-      const [_id, upload] = uploadEntry;
-      await uploadFile(upload, {
-        skipDuplicateCheck: true,
-        markAsDuplicate: true,
-        duplicateOfId: duplicateInfo.original.id,
-        fileHash: duplicateInfo.fileHash,
-      });
-    }
-    
-    setDuplicateInfo(null);
+    // Show next duplicate or close dialog
+    setTimeout(showNextDuplicate, 100);
   };
 
   const handleViewOriginal = () => {
-    if (duplicateInfo?.original.id) {
-      navigate(`/expenses?receipt=${duplicateInfo.original.id}`);
+    if (currentDuplicate?.duplicateInfo.original.id) {
+      navigate(`/expenses?receipt=${currentDuplicate.duplicateInfo.original.id}`);
     }
-    setShowDuplicateDialog(false);
-    setDuplicateInfo(null);
+    // Remove current upload and show next
+    if (currentDuplicate) {
+      removeUpload(currentDuplicate.uploadId);
+    }
+    setTimeout(showNextDuplicate, 100);
   };
 
   const handleCancelDuplicate = () => {
-    // Remove the pending upload
-    if (duplicateInfo) {
-      const uploadEntry = Array.from(uploads.entries()).find(
-        ([_, u]) => u.file === duplicateInfo.file
-      );
-      if (uploadEntry) {
-        removeUpload(uploadEntry[0]);
-      }
+    // Remove the pending upload for this specific duplicate
+    if (currentDuplicate) {
+      removeUpload(currentDuplicate.uploadId);
     }
-    setShowDuplicateDialog(false);
-    setDuplicateInfo(null);
+    // Show next duplicate or close dialog
+    setTimeout(showNextDuplicate, 100);
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -1222,48 +1249,62 @@ const Upload = () => {
         )}
 
         {/* Duplicate Warning Dialog */}
-        <AlertDialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <AlertDialog open={showDuplicateDialog} onOpenChange={(open) => {
+          if (!open) handleCancelDuplicate();
+        }}>
           <AlertDialogContent className="max-w-2xl w-[95vw]">
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2 text-warning">
                 <AlertTriangle className="w-5 h-5" />
                 Duplikat erkannt
+                {duplicateQueueCount > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    +{duplicateQueueCount} weitere
+                  </Badge>
+                )}
               </AlertDialogTitle>
               <AlertDialogDescription>
                 Diese Datei wurde bereits hochgeladen.
               </AlertDialogDescription>
             </AlertDialogHeader>
             
-            {duplicateInfo && (
-              <div className="py-4">
+            {currentDuplicate && (
+              <div className="py-4 space-y-3">
+                {/* Current file being checked */}
+                <div className="p-3 bg-warning/10 rounded-lg border border-warning/30">
+                  <p className="text-sm font-medium mb-1">Aktuelle Datei:</p>
+                  <p className="text-sm break-all">{currentDuplicate.upload.fileName}</p>
+                </div>
+                
+                {/* Existing receipt info */}
                 <div className="p-4 bg-muted/50 rounded-lg border">
                   <p className="text-sm font-medium mb-3">Vorhandener Beleg:</p>
                   <div className="space-y-2 text-sm">
                     <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                       <span className="text-muted-foreground shrink-0">Datei:</span>
-                      <span className="font-medium break-all" title={duplicateInfo.original.file_name || '–'}>
-                        {duplicateInfo.original.file_name || '–'}
+                      <span className="font-medium break-all" title={currentDuplicate.duplicateInfo.original.file_name || '–'}>
+                        {currentDuplicate.duplicateInfo.original.file_name || '–'}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Lieferant:</span>
                       <span className="font-medium">
-                        {duplicateInfo.original.vendor || '–'}
+                        {currentDuplicate.duplicateInfo.original.vendor || '–'}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Betrag:</span>
                       <span className="font-medium">
-                        {duplicateInfo.original.amount_gross 
-                          ? `€ ${duplicateInfo.original.amount_gross.toFixed(2)}` 
+                        {currentDuplicate.duplicateInfo.original.amount_gross 
+                          ? `€ ${currentDuplicate.duplicateInfo.original.amount_gross.toFixed(2)}` 
                           : '–'}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Datum:</span>
                       <span className="font-medium">
-                        {duplicateInfo.original.receipt_date 
-                          ? format(new Date(duplicateInfo.original.receipt_date), 'dd.MM.yyyy', { locale: de })
+                        {currentDuplicate.duplicateInfo.original.receipt_date 
+                          ? format(new Date(currentDuplicate.duplicateInfo.original.receipt_date), 'dd.MM.yyyy', { locale: de })
                           : '–'}
                       </span>
                     </div>
@@ -1274,7 +1315,7 @@ const Upload = () => {
             
             <AlertDialogFooter className="flex-col sm:flex-row gap-2">
               <AlertDialogCancel onClick={handleCancelDuplicate}>
-                Abbrechen
+                Überspringen
               </AlertDialogCancel>
               <Button 
                 variant="outline"
