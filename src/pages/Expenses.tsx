@@ -94,12 +94,13 @@ import { ExportTemplateEditor } from '@/components/exports/ExportTemplateEditor'
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { Copy } from 'lucide-react';
+import { Copy, Scissors, Layers } from 'lucide-react';
 import { checkForDuplicates, type DuplicateCheckResult } from '@/services/duplicateDetectionService';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
 import { useAuth } from '@/contexts/AuthContext';
+import { SplitSuggestionDialog } from '@/components/receipts/SplitSuggestionDialog';
 
 type SortField = 'receipt_date' | 'vendor' | 'invoice_number' | 'amount_gross';
 type SortDirection = 'asc' | 'desc';
@@ -134,6 +135,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   duplicate: { label: 'Duplikat', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
   not_a_receipt: { label: 'Kein Beleg', color: 'bg-gray-500/10 text-gray-600 border-gray-500/20' },
   error: { label: 'Fehler', color: 'bg-red-500/10 text-red-600 border-red-500/20' },
+  needs_splitting: { label: 'Aufteilen', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
+  split: { label: 'Aufgeteilt', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
 };
 
 type DateRangePreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'thisYear' | 'lastYear' | 'all' | 'custom';
@@ -266,6 +269,21 @@ const Expenses = () => {
   }
   const [foundDuplicates, setFoundDuplicates] = useState<FoundDuplicate[]>([]);
   const [showDuplicateResults, setShowDuplicateResults] = useState(false);
+
+  // Split suggestion dialog state
+  const [splitDialogOpen, setSplitDialogOpen] = useState(false);
+  const [splitDialogReceipt, setSplitDialogReceipt] = useState<Receipt | null>(null);
+
+  const openSplitDialog = (receipt: Receipt) => {
+    setSplitDialogReceipt(receipt);
+    setSplitDialogOpen(true);
+  };
+
+  const closeSplitDialog = () => {
+    setSplitDialogOpen(false);
+    setSplitDialogReceipt(null);
+    loadReceipts();
+  };
 
   const openReceiptDetail = (id: string) => {
     setSelectedReceiptId(id);
@@ -1919,13 +1937,30 @@ const Expenses = () => {
                           )}
                           {visibleColumns.has('status') && (
                             <TableCell>
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <Badge 
                                   variant="outline" 
                                   className={STATUS_CONFIG[receipt.status]?.color || ''}
                                 >
+                                  {receipt.status === 'split' && <Scissors className="w-3 h-3 mr-1" />}
+                                  {receipt.status === 'needs_splitting' && <Scissors className="w-3 h-3 mr-1" />}
                                   {STATUS_CONFIG[receipt.status]?.label || receipt.status}
                                 </Badge>
+                                {/* Split-from indicator for child receipts */}
+                                {receipt.split_from_receipt_id && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
+                                  >
+                                    <Layers className="w-3 h-3 mr-1" />
+                                    Teil
+                                    {receipt.original_pages && receipt.original_pages.length > 0 && (
+                                      <span className="ml-1 opacity-75">
+                                        (S. {receipt.original_pages.join(', ')})
+                                      </span>
+                                    )}
+                                  </Badge>
+                                )}
                                 {receipt.is_duplicate && (
                                   <Badge 
                                     variant="outline" 
@@ -1978,6 +2013,18 @@ const Expenses = () => {
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
+                              )}
+                              {/* Split button for needs_splitting status */}
+                              {receipt.status === 'needs_splitting' && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                                  onClick={() => openSplitDialog(receipt)}
+                                  title="PDF aufteilen"
+                                >
+                                  <Scissors className="h-4 w-4" />
+                                </Button>
                               )}
                               {/* "Doch ein Beleg" button for not_a_receipt status */}
                               {receipt.status === 'not_a_receipt' && (
@@ -2339,6 +2386,21 @@ const Expenses = () => {
         format={selectedExportFormat}
         dateRange={{ from: dateFrom, to: dateTo }}
       />
+
+      {/* Split Suggestion Dialog */}
+      {splitDialogReceipt && (
+        <SplitSuggestionDialog
+          open={splitDialogOpen}
+          onClose={closeSplitDialog}
+          receipt={{
+            id: splitDialogReceipt.id,
+            file_name: splitDialogReceipt.file_name || '',
+            file_url: splitDialogReceipt.file_url || '',
+            page_count: splitDialogReceipt.page_count || 1,
+            split_suggestion: splitDialogReceipt.split_suggestion as any,
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 };
