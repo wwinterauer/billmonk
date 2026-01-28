@@ -479,14 +479,16 @@ export default function Checklists() {
                                 />
 
                                 <div className="flex-1 min-w-0">
-                                  <span className={item.is_completed ? 'line-through text-muted-foreground' : ''}>
-                                    {item.name}
-                                  </span>
-                                  {item.notes && (
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                      {item.notes}
-                                    </p>
-                                  )}
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={item.is_completed ? 'line-through text-muted-foreground' : ''}>
+                                      {item.name}
+                                    </span>
+                                    {item.notes && (
+                                      <span className="text-sm text-muted-foreground">
+                                        — {item.notes}
+                                      </span>
+                                    )}
+                                  </div>
                                   {item.links && item.links.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mt-2">
                                       {item.links.map((link, idx) => (
