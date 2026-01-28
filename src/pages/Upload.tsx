@@ -191,13 +191,15 @@ const Upload = () => {
     const filesWithHashes = await Promise.all(hashPromises);
     
     // Get all hashes to check in one query
+    // Only consider certain statuses as duplicates - exclude rejected/not_a_receipt
     const hashes = filesWithHashes.map(f => f.hash);
     
     const { data: existingReceipts } = await supabase
       .from('receipts')
-      .select('id, file_name, file_url, file_hash, vendor, amount_gross, receipt_date')
+      .select('id, file_name, file_url, file_hash, vendor, amount_gross, receipt_date, status')
       .eq('user_id', user!.id)
-      .in('file_hash', hashes);
+      .in('file_hash', hashes)
+      .in('status', ['pending', 'processing', 'review', 'approved', 'duplicate']);
     
     const existingMap = new Map(
       (existingReceipts || []).map(r => [r.file_hash, r])
