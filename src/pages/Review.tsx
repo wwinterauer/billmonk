@@ -739,54 +739,54 @@ const Review = () => {
 
                   {/* Right Side - Form */}
                   <div className="lg:col-span-1 space-y-6">
-                    {/* Vendor (Brand Name) */}
+                    {/* Vendor Brand Name (Markenname) */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="vendor">Lieferant (Markenname)</Label>
+                        <Label htmlFor="vendor_brand">Lieferant (Markenname)</Label>
                         <Tooltip>
                           <TooltipTrigger>
                             <div className={cn(
                               'h-2 w-2 rounded-full',
-                              getConfidenceColor(getFieldConfidence(currentReceipt?.vendor, currentReceipt?.ai_confidence))
+                              getConfidenceColor(getFieldConfidence(currentReceipt?.vendor_brand, currentReceipt?.ai_confidence))
                             )} />
                           </TooltipTrigger>
                           <TooltipContent>
-                            {currentReceipt?.vendor ? 'Von KI erkannt' : 'Nicht erkannt'}
+                            {currentReceipt?.vendor_brand ? 'Von KI erkannt' : 'Nicht erkannt'}
                           </TooltipContent>
                         </Tooltip>
-                      </div>
-                      <Input
-                        id="vendor"
-                        value={formData.vendor}
-                        onChange={(e) => setFormData(prev => ({ ...prev, vendor: e.target.value }))}
-                        placeholder="z.B. timr, Amazon, A1"
-                      />
-                    </div>
-
-                    {/* Legal Company Name (optional, compact) */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="vendor_brand" className="text-sm text-muted-foreground">
-                          Rechtlicher Firmenname
-                        </Label>
-                        {currentReceipt?.vendor_brand && (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <div className={cn(
-                                'h-2 w-2 rounded-full',
-                                getConfidenceColor(getFieldConfidence(currentReceipt?.vendor_brand, currentReceipt?.ai_confidence))
-                              )} />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {currentReceipt?.vendor_brand ? 'Von KI erkannt' : 'Nicht erkannt'}
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
                       </div>
                       <Input
                         id="vendor_brand"
                         value={formData.vendor_brand}
                         onChange={(e) => setFormData(prev => ({ ...prev, vendor_brand: e.target.value }))}
+                        placeholder="z.B. timr, Amazon, A1"
+                      />
+                    </div>
+
+                    {/* Legal Company Name (Rechtlicher Firmenname) */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="vendor" className="text-sm text-muted-foreground">
+                          Rechtlicher Firmenname
+                        </Label>
+                        {currentReceipt?.vendor && (
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <div className={cn(
+                                'h-2 w-2 rounded-full',
+                                getConfidenceColor(getFieldConfidence(currentReceipt?.vendor, currentReceipt?.ai_confidence))
+                              )} />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {currentReceipt?.vendor ? 'Von KI erkannt' : 'Nicht erkannt'}
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                      <Input
+                        id="vendor"
+                        value={formData.vendor}
+                        onChange={(e) => setFormData(prev => ({ ...prev, vendor: e.target.value }))}
                         placeholder="z.B. troii Software GmbH"
                         className="text-sm"
                       />

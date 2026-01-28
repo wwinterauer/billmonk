@@ -49,9 +49,11 @@ import { extractReceiptData, normalizeExtractionResult } from '@/services/aiServ
 import { supabase } from '@/integrations/supabase/client';
 
 // Fields that can be selectively re-analyzed by AI
+// Fields that can be selectively re-analyzed by AI
+// IMPORTANT: vendor = Rechtlicher Firmenname, vendor_brand = Markenname
 const REANALYZABLE_FIELDS = [
   { id: 'vendor_brand', label: 'Markenname', icon: Building },
-  { id: 'vendor', label: 'Rechtl. Name', icon: Briefcase },
+  { id: 'vendor', label: 'Rechtl. Firmenname', icon: Briefcase },
   { id: 'invoice_number', label: 'Rechnungsnummer', icon: Hash },
   { id: 'receipt_date', label: 'Datum', icon: CalendarIcon },
   { id: 'amount_gross', label: 'Bruttobetrag', icon: Euro },
@@ -139,12 +141,16 @@ export function ReanalyzeOptions({
 
       const shouldUpdate = (fieldId: string) => fieldsToUpdate.includes(fieldId);
 
+      // vendor = Rechtlicher Firmenname (legal name)
       if (shouldUpdate('vendor') && normalized.vendor) {
         updates.vendor = normalized.vendor;
-        if (normalized.vendor_brand) {
-          updates.vendor_brand = normalized.vendor_brand;
-        }
-        changes.push('Lieferant');
+        changes.push('Rechtl. Firmenname');
+      }
+
+      // vendor_brand = Markenname (brand name)
+      if (shouldUpdate('vendor_brand') && normalized.vendor_brand) {
+        updates.vendor_brand = normalized.vendor_brand;
+        changes.push('Markenname');
       }
 
       if (shouldUpdate('description') && normalized.description) {
