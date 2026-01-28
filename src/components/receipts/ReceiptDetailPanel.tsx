@@ -149,7 +149,7 @@ export function ReceiptDetailPanel({
 }: ReceiptDetailPanelProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { getReceipt, updateReceipt, deleteReceipt } = useReceipts();
+  const { getReceipt, updateReceipt, rejectReceipt, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
 
@@ -773,6 +773,25 @@ export function ReceiptDetailPanel({
 
     setSaving(true);
     try {
+      // If rejecting, use rejectReceipt to clear file_hash for re-upload capability
+      if (newStatus === 'rejected') {
+        await rejectReceipt(receipt.id, { deleteFile: true });
+        
+        toast({
+          title: 'Beleg abgelehnt',
+          description: 'Die Datei kann erneut hochgeladen werden',
+        });
+
+        // Reset AI changes state
+        setHasUnsavedAiChanges(false);
+        setChangedFields({});
+
+        // Notify parent
+        onUpdate?.();
+        setSaving(false);
+        return;
+      }
+
       // Process description according to user settings
       const processedDescription = description 
         ? processDescription(description, descriptionSettings)
