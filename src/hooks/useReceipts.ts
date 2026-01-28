@@ -805,6 +805,56 @@ export function useReceipts() {
     return updated as Receipt;
   };
 
+  /**
+   * Reject a receipt and clear duplicate-detection data so the file can be re-uploaded.
+   * This clears file_hash to prevent duplicate detection and optionally deletes the file from storage.
+   */
+  const rejectReceipt = async (id: string, options?: { deleteFile?: boolean }): Promise<Receipt> => {
+    if (!user) {
+      throw new Error('Nicht angemeldet');
+    }
+
+    // Get receipt to find file URL if we need to delete
+    const receipt = await getReceipt(id);
+    if (!receipt) {
+      throw new Error('Beleg nicht gefunden');
+    }
+
+    // Update status to rejected and clear file_hash to allow re-upload
+    const updateData: Partial<Receipt> = {
+      status: 'rejected',
+      file_hash: null, // Clear hash so same file can be uploaded again
+      is_duplicate: false,
+      duplicate_of: null,
+      duplicate_score: null,
+    };
+
+    const { data: updated, error } = await supabase
+      .from('receipts')
+      .update(updateData)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Fehler beim Ablehnen: ${error.message}`);
+    }
+
+    // Optionally delete file from storage
+    if (options?.deleteFile && receipt.file_url) {
+      const { error: storageError } = await supabase.storage
+        .from('receipts')
+        .remove([receipt.file_url]);
+
+      if (storageError) {
+        console.error('Storage deletion on reject failed:', storageError);
+      }
+    }
+
+    return updated as Receipt;
+  };
+
   const deleteReceipt = async (id: string): Promise<void> => {
     if (!user) {
       throw new Error('Nicht angemeldet');
@@ -868,6 +918,7 @@ export function useReceipts() {
     getReceipts,
     getReceipt,
     updateReceipt,
+    rejectReceipt,
     deleteReceipt,
     getReceiptFileUrl,
     checkExactDuplicate,

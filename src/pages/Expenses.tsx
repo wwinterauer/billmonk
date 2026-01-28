@@ -175,7 +175,7 @@ const Expenses = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { getReceipts, updateReceipt, deleteReceipt, processReceiptWithAI } = useReceipts();
+  const { getReceipts, updateReceipt, rejectReceipt, deleteReceipt, processReceiptWithAI } = useReceipts();
   const { categories } = useCategories();
 
   // Data state
@@ -909,14 +909,18 @@ const Expenses = () => {
     setBulkActionLoading('reject');
     try {
       for (const id of selectedIds) {
-        await updateReceipt(id, { status: 'rejected' });
+        // Use rejectReceipt to clear file_hash for re-upload capability
+        await rejectReceipt(id, { deleteFile: true });
       }
       setReceipts(prev => prev.map(r => 
-        selectedIds.has(r.id) ? { ...r, status: 'rejected' as const } : r
+        selectedIds.has(r.id) ? { ...r, status: 'rejected' as const, file_hash: null } : r
       ));
       const count = selectedIds.size;
       setSelectedIds(new Set());
-      toast({ title: `${count} Belege abgelehnt` });
+      toast({ 
+        title: `${count} Belege abgelehnt`,
+        description: 'Dateien können erneut hochgeladen werden'
+      });
     } catch (error) {
       toast({
         variant: 'destructive',

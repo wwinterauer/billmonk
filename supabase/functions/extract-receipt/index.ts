@@ -259,7 +259,7 @@ WEITERE REGELN:
           reason: extractedData.reason,
         });
 
-        // Update receipt with not_a_receipt status
+        // Update receipt with not_a_receipt status and clear file_hash for re-upload
         if (receiptId) {
           const { error: updateError } = await supabase
             .from('receipts')
@@ -269,13 +269,18 @@ WEITERE REGELN:
               notes: `Kein Beleg: ${extractedData.document_type || 'Unbekanntes Dokument'}. ${extractedData.reason || ''}`,
               ai_raw_response: extractedData,
               ai_processed_at: new Date().toISOString(),
+              // Clear duplicate detection fields so file can be re-uploaded
+              file_hash: null,
+              is_duplicate: false,
+              duplicate_of: null,
+              duplicate_score: null,
             })
             .eq('id', receiptId);
 
           if (updateError) {
             console.error("Failed to update receipt:", updateError);
           } else {
-            console.log(`Receipt ${receiptId} marked as not_a_receipt`);
+            console.log(`Receipt ${receiptId} marked as not_a_receipt, file_hash cleared for re-upload`);
           }
         }
 
