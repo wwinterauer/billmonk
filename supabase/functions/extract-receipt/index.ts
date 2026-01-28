@@ -252,35 +252,37 @@ WEITERE REGELN:
     try {
       const extractedData: ExtractionResult = JSON.parse(cleanedContent);
       
-      // Check if document is NOT a receipt
+      // Check if document is NOT a receipt - save it with "Keine Rechnung" category
+      // These can be supplementary documents (detail pages, attachments, etc.)
       if (extractedData.is_receipt === false) {
-        console.log("Document is NOT a receipt:", {
+        console.log("Document is NOT a receipt - saving as supplementary document:", {
           document_type: extractedData.document_type,
           reason: extractedData.reason,
         });
 
-        // Update receipt with not_a_receipt status and clear file_hash for re-upload
+        // Save as normal document with "Keine Rechnung" category instead of rejecting
         if (receiptId) {
+          const documentDescription = extractedData.document_type 
+            ? `${extractedData.document_type}${extractedData.reason ? `: ${extractedData.reason}` : ''}`
+            : 'Kein Rechnungsdokument';
+
           const { error: updateError } = await supabase
             .from('receipts')
             .update({
-              status: 'not_a_receipt',
-              ai_confidence: 0,
-              notes: `Kein Beleg: ${extractedData.document_type || 'Unbekanntes Dokument'}. ${extractedData.reason || ''}`,
+              status: 'review', // Set to review so user can process it
+              category: 'Keine Rechnung', // Special category for non-receipt documents
+              description: documentDescription.substring(0, 100), // Truncate to max length
+              ai_confidence: 0.5, // Medium confidence as it's a valid document, just not a receipt
+              notes: `Dokumenttyp: ${extractedData.document_type || 'Unbekannt'}. ${extractedData.reason || 'Kann als Hilfsdokument verwendet werden.'}`,
               ai_raw_response: extractedData,
               ai_processed_at: new Date().toISOString(),
-              // Clear duplicate detection fields so file can be re-uploaded
-              file_hash: null,
-              is_duplicate: false,
-              duplicate_of: null,
-              duplicate_score: null,
             })
             .eq('id', receiptId);
 
           if (updateError) {
             console.error("Failed to update receipt:", updateError);
           } else {
-            console.log(`Receipt ${receiptId} marked as not_a_receipt, file_hash cleared for re-upload`);
+            console.log(`Receipt ${receiptId} saved with category 'Keine Rechnung' for review`);
           }
         }
 
@@ -288,6 +290,7 @@ WEITERE REGELN:
           JSON.stringify({ 
             success: true, 
             is_receipt: false,
+            saved_as_supplementary: true,
             document_type: extractedData.document_type,
             reason: extractedData.reason,
             receiptId: receiptId,
