@@ -16,10 +16,12 @@ import {
   SkipForward,
   Loader2,
   AlertTriangle,
-  Download
+  Download,
+  RefreshCw,
 } from 'lucide-react';
 import { PdfViewer } from '@/components/receipts/PdfViewer';
 import { MultiInvoiceAlert } from '@/components/receipts/MultiInvoiceAlert';
+import { ReanalyzeOptions } from '@/components/receipts/ReanalyzeOptions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -58,6 +60,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarIcon } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const VAT_RATES = [
   { value: '20', label: '20%' },
@@ -101,9 +104,11 @@ const Review = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [formData, setFormData] = useState<FormData>({
     vendor: '',
     vendor_brand: '',
@@ -154,11 +159,14 @@ const Review = () => {
     setImageLoading(true);
     setImageError(null);
     setImageUrl(null);
+    setSignedUrl(null);
+    setAiConfidence(receipt.ai_confidence ?? null);
     
     if (receipt.file_url) {
       try {
         const url = await getReceiptFileUrl(receipt.file_url);
         setImageUrl(url);
+        setSignedUrl(url); // Store for reanalysis
       } catch (error) {
         console.error('Failed to load image:', error);
         setImageError(error instanceof Error ? error.message : 'Fehler beim Laden der Vorschau');
@@ -184,7 +192,34 @@ const Review = () => {
       vat_rate: receipt.vat_rate?.toString() || '20',
       payment_method: receipt.payment_method || '',
     });
+    setAiConfidence(receipt.ai_confidence ?? null);
   };
+
+  // Handle reanalysis updates
+  const handleReanalysisUpdate = useCallback((updates: {
+    vendor?: string;
+    vendor_brand?: string;
+    description?: string;
+    invoice_number?: string;
+    receipt_date?: Date;
+    amount_gross?: string;
+    vat_rate?: string;
+    confidence?: number;
+  }) => {
+    setFormData(prev => ({
+      ...prev,
+      vendor: updates.vendor ?? prev.vendor,
+      vendor_brand: updates.vendor_brand ?? prev.vendor_brand,
+      description: updates.description ?? prev.description,
+      invoice_number: updates.invoice_number ?? prev.invoice_number,
+      receipt_date: updates.receipt_date ?? prev.receipt_date,
+      amount_gross: updates.amount_gross ?? prev.amount_gross,
+      vat_rate: updates.vat_rate ?? prev.vat_rate,
+    }));
+    if (updates.confidence !== undefined) {
+      setAiConfidence(updates.confidence);
+    }
+  }, []);
 
   // Navigate to receipt
   const goToReceipt = useCallback((index: number) => {
@@ -485,24 +520,46 @@ const Review = () => {
             transition={{ duration: 0.2 }}
           >
             <Card>
-              {/* Confidence Header */}
+              {/* Confidence Header with Reanalyze */}
               <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <Sparkles className="h-5 w-5 text-primary" />
                     <div>
                       <CardTitle className="text-lg">
-                        KI-Erkennung: {Math.round((currentReceipt?.ai_confidence || 0) * 100)}%
+                        KI-Erkennung: {Math.round((aiConfidence ?? currentReceipt?.ai_confidence ?? 0) * 100)}%
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
                         Basierend auf Lovable AI Analyse
                       </p>
                     </div>
                   </div>
-                  <Progress 
-                    value={(currentReceipt?.ai_confidence || 0) * 100} 
-                    className="w-32 h-2"
-                  />
+                  <div className="flex items-center gap-3">
+                    <Progress 
+                      value={(aiConfidence ?? currentReceipt?.ai_confidence ?? 0) * 100} 
+                      className="w-24 h-2"
+                    />
+                    {currentReceipt && (
+                      <ReanalyzeOptions
+                        receiptId={currentReceipt.id}
+                        fileUrl={currentReceipt.file_url}
+                        fileName={currentReceipt.file_name}
+                        signedUrl={signedUrl}
+                        userModifiedFields={currentReceipt.user_modified_fields || []}
+                        currentFormData={{
+                          vendor: formData.vendor,
+                          vendor_brand: formData.vendor_brand,
+                          description: formData.description,
+                          invoice_number: formData.invoice_number,
+                          receipt_date: formData.receipt_date,
+                          amount_gross: formData.amount_gross,
+                          vat_rate: formData.vat_rate,
+                        }}
+                        onFieldsUpdated={handleReanalysisUpdate}
+                        disabled={imageLoading}
+                      />
+                    )}
+                  </div>
                 </div>
               </CardHeader>
 
