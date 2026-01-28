@@ -78,6 +78,8 @@ const PAYMENT_METHODS = [
 
 interface FormData {
   vendor: string;
+  vendor_brand: string;
+  invoice_number: string;
   description: string;
   receipt_date: Date | null;
   category: string;
@@ -104,6 +106,8 @@ const Review = () => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     vendor: '',
+    vendor_brand: '',
+    invoice_number: '',
     description: '',
     receipt_date: null,
     category: '',
@@ -171,6 +175,8 @@ const Review = () => {
   const populateForm = (receipt: Receipt) => {
     setFormData({
       vendor: receipt.vendor || '',
+      vendor_brand: receipt.vendor_brand || '',
+      invoice_number: receipt.invoice_number || '',
       description: receipt.description || '',
       receipt_date: receipt.receipt_date ? new Date(receipt.receipt_date) : null,
       category: receipt.category || '',
@@ -230,6 +236,8 @@ const Review = () => {
 
       const updateData: Partial<Receipt> = {
         vendor: formData.vendor || null,
+        vendor_brand: formData.vendor_brand || null,
+        invoice_number: formData.invoice_number || null,
         description: formData.description || null,
         receipt_date: formData.receipt_date ? format(formData.receipt_date, 'yyyy-MM-dd') : null,
         category: formData.category || null,
@@ -642,10 +650,10 @@ const Review = () => {
 
                   {/* Right Side - Form */}
                   <div className="lg:col-span-1 space-y-6">
-                    {/* Vendor */}
+                    {/* Vendor (Brand Name) */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="vendor">Lieferant</Label>
+                        <Label htmlFor="vendor">Lieferant (Markenname)</Label>
                         <Tooltip>
                           <TooltipTrigger>
                             <div className={cn(
@@ -662,7 +670,36 @@ const Review = () => {
                         id="vendor"
                         value={formData.vendor}
                         onChange={(e) => setFormData(prev => ({ ...prev, vendor: e.target.value }))}
-                        placeholder="z.B. Amazon, Office Depot"
+                        placeholder="z.B. timr, Amazon, A1"
+                      />
+                    </div>
+
+                    {/* Legal Company Name (optional, compact) */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="vendor_brand" className="text-sm text-muted-foreground">
+                          Rechtlicher Firmenname
+                        </Label>
+                        {currentReceipt?.vendor_brand && (
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <div className={cn(
+                                'h-2 w-2 rounded-full',
+                                getConfidenceColor(getFieldConfidence(currentReceipt?.vendor_brand, currentReceipt?.ai_confidence))
+                              )} />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {currentReceipt?.vendor_brand ? 'Von KI erkannt' : 'Nicht erkannt'}
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                      <Input
+                        id="vendor_brand"
+                        value={formData.vendor_brand}
+                        onChange={(e) => setFormData(prev => ({ ...prev, vendor_brand: e.target.value }))}
+                        placeholder="z.B. troii Software GmbH"
+                        className="text-sm"
                       />
                     </div>
 
@@ -690,8 +727,32 @@ const Review = () => {
                       />
                     </div>
 
-                    {/* Date & Category Row */}
+                    {/* Invoice Number & Date Row */}
                     <div className="grid sm:grid-cols-2 gap-4">
+                      {/* Invoice Number */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="invoice_number">Rechnungsnummer</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <div className={cn(
+                                'h-2 w-2 rounded-full',
+                                getConfidenceColor(getFieldConfidence(currentReceipt?.invoice_number, currentReceipt?.ai_confidence))
+                              )} />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {currentReceipt?.invoice_number ? 'Von KI erkannt' : 'Nicht erkannt'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Input
+                          id="invoice_number"
+                          value={formData.invoice_number}
+                          onChange={(e) => setFormData(prev => ({ ...prev, invoice_number: e.target.value }))}
+                          placeholder="z.B. 150659225"
+                        />
+                      </div>
+
                       {/* Date */}
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
@@ -735,39 +796,39 @@ const Review = () => {
                           </PopoverContent>
                         </Popover>
                       </div>
+                    </div>
 
-                      {/* Category */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Label>Kategorie</Label>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <div className={cn(
-                                'h-2 w-2 rounded-full',
-                                getConfidenceColor(getFieldConfidence(currentReceipt?.category, currentReceipt?.ai_confidence))
-                              )} />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {currentReceipt?.category ? 'Von KI erkannt' : 'Nicht erkannt'}
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        <Select
-                          value={formData.category}
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Kategorie wählen" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map(cat => (
-                              <SelectItem key={cat.id} value={cat.name}>
-                                {cat.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                    {/* Category */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label>Kategorie</Label>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <div className={cn(
+                              'h-2 w-2 rounded-full',
+                              getConfidenceColor(getFieldConfidence(currentReceipt?.category, currentReceipt?.ai_confidence))
+                            )} />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {currentReceipt?.category ? 'Von KI erkannt' : 'Nicht erkannt'}
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
+                      <Select
+                        value={formData.category}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Kategorie wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map(cat => (
+                            <SelectItem key={cat.id} value={cat.name}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {/* Amount & VAT Row */}
