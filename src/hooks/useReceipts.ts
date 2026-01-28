@@ -809,7 +809,7 @@ export function useReceipts() {
    * Reject a receipt and clear duplicate-detection data so the file can be re-uploaded.
    * This clears file_hash to prevent duplicate detection and optionally deletes the file from storage.
    */
-  const rejectReceipt = async (id: string, options?: { deleteFile?: boolean }): Promise<Receipt> => {
+  const rejectReceipt = async (id: string, options?: { deleteFile?: boolean; reason?: string }): Promise<Receipt> => {
     if (!user) {
       throw new Error('Nicht angemeldet');
     }
@@ -827,6 +827,7 @@ export function useReceipts() {
       is_duplicate: false,
       duplicate_of: null,
       duplicate_score: null,
+      notes: options?.reason || 'Manuell abgelehnt',
     };
 
     const { data: updated, error } = await supabase
