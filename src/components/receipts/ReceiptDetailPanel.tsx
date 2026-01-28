@@ -106,6 +106,7 @@ import { useVendorLearning } from '@/hooks/useVendorLearning';
 import { LearnableField } from './LearnableField';
 import { SaveWithLearningDialog, type FieldChange } from './SaveWithLearningDialog';
 import { ManualTrainingModal } from './ManualTrainingModal';
+import { SourceBadge, NoReceiptBadge } from './SourceBadge';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
@@ -161,6 +162,11 @@ export function ReceiptDetailPanel({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [emailData, setEmailData] = useState<{
+    email_from: string | null;
+    email_subject: string | null;
+    email_received_at: string | null;
+  } | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
@@ -328,6 +334,7 @@ export function ReceiptDetailPanel({
   useEffect(() => {
     if (!receiptId || !open) {
       setReceipt(null);
+      setEmailData(null);
       setPreviewBlobUrl(null);
       setSignedUrl(null);
       setFileError(false);
@@ -337,11 +344,25 @@ export function ReceiptDetailPanel({
 
     const loadReceipt = async () => {
       setLoading(true);
+      setEmailData(null);
       try {
         const data = await getReceipt(receiptId);
         if (data) {
           setReceipt(data);
           setOriginalReceipt(data); // Store original for change tracking
+          
+          // Load email attachment data if this is an email-imported receipt
+          if (data.email_attachment_id) {
+            const { data: emailAttachment } = await supabase
+              .from('email_attachments')
+              .select('email_from, email_subject, email_received_at')
+              .eq('id', data.email_attachment_id)
+              .single();
+            
+            if (emailAttachment) {
+              setEmailData(emailAttachment);
+            }
+          }
           // Populate form
           setVendor(data.vendor || '');
           setVendorBrand(data.vendor_brand || '');
@@ -1110,6 +1131,20 @@ export function ReceiptDetailPanel({
                         </div>
                       </TooltipContent>
                     </Tooltip>
+                    
+                    {/* Source Badge */}
+                    {receipt && (
+                      <SourceBadge 
+                        receipt={receipt} 
+                        emailData={emailData}
+                        compact 
+                      />
+                    )}
+                    
+                    {/* No Receipt Badge */}
+                    {receipt?.is_no_receipt_entry && (
+                      <NoReceiptBadge compact />
+                    )}
                   </div>
                   
                   {/* Re-run AI Button */}
