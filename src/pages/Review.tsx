@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
@@ -15,8 +16,7 @@ import {
   SkipForward,
   Loader2,
   AlertTriangle,
-  Download,
-  ExternalLink
+  Download
 } from 'lucide-react';
 import { PdfViewer } from '@/components/receipts/PdfViewer';
 import { Button } from '@/components/ui/button';
@@ -90,6 +90,7 @@ const Review = () => {
   const { toast } = useToast();
   const { getReceipts, updateReceipt, getReceiptFileUrl } = useReceipts();
   const { categories } = useCategories();
+  const queryClient = useQueryClient();
 
   // State
   const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -250,6 +251,9 @@ const Review = () => {
           loadImage(newReceipts[nextIndex]);
         }
 
+        // Invalidate receipts query to update sidebar badge
+        queryClient.invalidateQueries({ queryKey: ['receipts'] });
+
         toast({
           title: newStatus === 'approved' ? 'Beleg freigegeben' : 'Beleg abgelehnt',
         });
@@ -295,6 +299,8 @@ const Review = () => {
         await updateReceipt(receipt.id, { status: 'approved' });
       }
       setReceipts([]);
+      // Invalidate receipts query to update sidebar badge
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
       toast({ title: `${receipts.length} Belege freigegeben` });
     } catch (error) {
       toast({
@@ -329,7 +335,6 @@ const Review = () => {
 
   // Reviewed count for progress
   const totalToReview = receipts.length;
-  const reviewedCount = 0; // This would come from a separate counter in a real app
 
   if (loading) {
     return (
