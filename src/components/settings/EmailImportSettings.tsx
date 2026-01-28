@@ -127,6 +127,14 @@ const imapPresets: Record<string, ImapPreset> = {
     color: 'text-blue-500',
     authType: 'oauth',
   },
+  ionos: { 
+    host: 'imap.ionos.de', 
+    port: 993,
+    helpText: 'Verwenden Sie Ihr IONOS E-Mail-Passwort. Bei 2FA erstellen Sie ein App-Passwort unter my.ionos.de',
+    helpUrl: 'https://my.ionos.de',
+    color: 'text-blue-700',
+    authType: 'password',
+  },
   yahoo: { 
     host: 'imap.mail.yahoo.com', 
     port: 993,
@@ -917,6 +925,7 @@ export const EmailImportSettings: React.FC = () => {
                 <SelectContent>
                   <SelectItem value="gmail">Gmail</SelectItem>
                   <SelectItem value="outlook">Outlook / Office 365</SelectItem>
+                  <SelectItem value="ionos">IONOS (1&1)</SelectItem>
                   <SelectItem value="yahoo">Yahoo</SelectItem>
                   <SelectItem value="icloud">iCloud</SelectItem>
                   <SelectItem value="gmx">GMX</SelectItem>
