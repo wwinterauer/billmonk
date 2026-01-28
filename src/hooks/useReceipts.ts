@@ -94,7 +94,7 @@ export interface VendorDecisionPending {
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_FILES = 50; // Allow up to 50 files at once (business users have unlimited storage)
+const MAX_FILES = 200; // Allow up to 200 files at once (business users have unlimited storage)
 
 // Export types for external use
 export type { MatchedVendor, VendorSuggestion, FindOrCreateVendorResult };
