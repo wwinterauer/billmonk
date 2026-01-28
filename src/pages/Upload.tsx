@@ -1223,7 +1223,7 @@ const Upload = () => {
 
         {/* Duplicate Warning Dialog */}
         <AlertDialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
-          <AlertDialogContent className="max-w-lg">
+          <AlertDialogContent className="max-w-2xl w-[95vw]">
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2 text-warning">
                 <AlertTriangle className="w-5 h-5" />
@@ -1239,9 +1239,9 @@ const Upload = () => {
                 <div className="p-4 bg-muted/50 rounded-lg border">
                   <p className="text-sm font-medium mb-3">Vorhandener Beleg:</p>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between gap-4">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                       <span className="text-muted-foreground shrink-0">Datei:</span>
-                      <span className="font-medium truncate" title={duplicateInfo.original.file_name || '–'}>
+                      <span className="font-medium break-all" title={duplicateInfo.original.file_name || '–'}>
                         {duplicateInfo.original.file_name || '–'}
                       </span>
                     </div>
