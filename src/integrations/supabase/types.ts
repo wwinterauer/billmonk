@@ -822,6 +822,7 @@ export type Database = {
           user_modified_fields: string[] | null
           vat_amount: number | null
           vat_rate: number | null
+          vat_rate_source: string | null
           vendor: string | null
           vendor_brand: string | null
           vendor_id: string | null
@@ -860,6 +861,7 @@ export type Database = {
           user_modified_fields?: string[] | null
           vat_amount?: number | null
           vat_rate?: number | null
+          vat_rate_source?: string | null
           vendor?: string | null
           vendor_brand?: string | null
           vendor_id?: string | null
@@ -898,6 +900,7 @@ export type Database = {
           user_modified_fields?: string[] | null
           vat_amount?: number | null
           vat_rate?: number | null
+          vat_rate_source?: string | null
           vendor?: string | null
           vendor_brand?: string | null
           vendor_id?: string | null
@@ -944,6 +947,7 @@ export type Database = {
         Row: {
           confidence_boost: number | null
           created_at: string | null
+          default_vat_rate: number | null
           field_patterns: Json | null
           id: string
           is_active: boolean | null
@@ -955,11 +959,14 @@ export type Database = {
           total_corrections: number | null
           updated_at: string | null
           user_id: string
+          vat_rate_confidence: number | null
+          vat_rate_corrections: number | null
           vendor_id: string
         }
         Insert: {
           confidence_boost?: number | null
           created_at?: string | null
+          default_vat_rate?: number | null
           field_patterns?: Json | null
           id?: string
           is_active?: boolean | null
@@ -971,11 +978,14 @@ export type Database = {
           total_corrections?: number | null
           updated_at?: string | null
           user_id: string
+          vat_rate_confidence?: number | null
+          vat_rate_corrections?: number | null
           vendor_id: string
         }
         Update: {
           confidence_boost?: number | null
           created_at?: string | null
+          default_vat_rate?: number | null
           field_patterns?: Json | null
           id?: string
           is_active?: boolean | null
@@ -987,6 +997,8 @@ export type Database = {
           total_corrections?: number | null
           updated_at?: string | null
           user_id?: string
+          vat_rate_confidence?: number | null
+          vat_rate_corrections?: number | null
           vendor_id?: string
         }
         Relationships: [
@@ -1002,6 +1014,51 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendor_vat_rates: {
+        Row: {
+          created_at: string | null
+          frequency: number | null
+          id: string
+          last_used_at: string | null
+          user_id: string
+          vat_rate: number
+          vendor_learning_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          frequency?: number | null
+          id?: string
+          last_used_at?: string | null
+          user_id: string
+          vat_rate: number
+          vendor_learning_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          frequency?: number | null
+          id?: string
+          last_used_at?: string | null
+          user_id?: string
+          vat_rate?: number
+          vendor_learning_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_vat_rates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_vat_rates_vendor_learning_id_fkey"
+            columns: ["vendor_learning_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_learning"
             referencedColumns: ["id"]
           },
         ]

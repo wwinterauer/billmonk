@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCallback } from 'react';
 import type { Json } from '@/integrations/supabase/types';
+import { recordVatRateCorrection } from '@/services/vatLearningService';
 
 interface CorrectionData {
   fieldName: string;
@@ -243,6 +244,14 @@ export function useCorrectionTracking() {
         detectedValue, 
         correctedValue
       );
+      
+      // 3b. Special handling for VAT rate corrections
+      if (fieldName === 'vat_rate') {
+        const vatRate = parseFloat(String(correctedValue).replace(',', '.')) || 0;
+        const originalVatRate = parseFloat(String(detectedValue).replace(',', '.')) || null;
+        await recordVatRateCorrection(vendorId, user.id, vatRate, originalVatRate);
+        console.log(`[VAT Learning] Recorded correction: ${originalVatRate}% → ${vatRate}%`);
+      }
       
       // 4. Update learning level
       await updateLearningLevel(learning.id, vendorId);

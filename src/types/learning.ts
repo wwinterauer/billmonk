@@ -15,6 +15,10 @@ export interface VendorLearning {
   last_successful_at: string | null;
   created_at: string;
   updated_at: string;
+  // VAT learning fields
+  default_vat_rate?: number | null;
+  vat_rate_confidence?: number;
+  vat_rate_corrections?: number;
 }
 
 export interface FieldPattern {

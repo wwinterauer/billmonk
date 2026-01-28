@@ -36,6 +36,10 @@ function parseVendorLearning(data: {
     last_successful_at: data.last_successful_at,
     created_at: data.created_at ?? '',
     updated_at: data.updated_at ?? '',
+    // VAT learning fields
+    default_vat_rate: (data as any).default_vat_rate ?? null,
+    vat_rate_confidence: (data as any).vat_rate_confidence ?? 0,
+    vat_rate_corrections: (data as any).vat_rate_corrections ?? 0,
   };
 }
 

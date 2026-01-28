@@ -20,6 +20,8 @@ interface LearnableFieldProps {
   className?: string;
   labelExtra?: ReactNode;
   children: ReactNode;
+  /** For vat_rate field: indicate if value comes from learning */
+  vatRateSource?: 'ai' | 'learned' | 'manual' | null;
 }
 
 // Helper to format display value
@@ -43,6 +45,7 @@ export function LearnableField({
   className,
   labelExtra,
   children,
+  vatRateSource,
 }: LearnableFieldProps) {
   // Normalize values for comparison
   const normalizedValue = value === undefined ? null : value;
@@ -54,6 +57,14 @@ export function LearnableField({
   const fieldPatterns = vendorLearning?.field_patterns as Record<string, FieldPattern> | undefined;
   const fieldPattern = fieldPatterns?.[fieldName];
   const hasLearning = fieldPattern && (fieldPattern.confidence || 0) > 70;
+  
+  // Special handling for vat_rate field: show learned indicator from VAT learning
+  const isVatRateField = fieldName === 'vat_rate';
+  const hasVatRateLearning = isVatRateField && vendorLearning && 
+    vendorLearning.default_vat_rate !== null && 
+    vendorLearning.default_vat_rate !== undefined &&
+    ((vendorLearning.vat_rate_confidence ?? 0) >= 70 || (vendorLearning.vat_rate_corrections ?? 0) >= 3);
+  const isVatFromLearning = vatRateSource === 'learned' || hasVatRateLearning;
 
   return (
     <div className={className}>
@@ -64,8 +75,30 @@ export function LearnableField({
         </Label>
         
         <div className="flex items-center gap-1.5">
-          {/* Learning indicator */}
-          {hasLearning && (
+          {/* VAT rate learned indicator (special, green) */}
+          {isVatFromLearning && isVatRateField && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-green-50 text-green-700 border-green-200">
+                  <Brain className="w-3 h-3 mr-1" />
+                  Gelernt
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <p className="font-medium">MwSt-Satz wurde für diesen Lieferanten gelernt</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Konfidenz: {vendorLearning?.vat_rate_confidence ?? 0}% • 
+                  {vendorLearning?.vat_rate_corrections ?? 0} Korrekturen
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Standard: {vendorLearning?.default_vat_rate}%
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+          
+          {/* Learning indicator (for other fields) */}
+          {hasLearning && !isVatRateField && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-violet-50 text-violet-700 border-violet-200">

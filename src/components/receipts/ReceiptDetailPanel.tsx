@@ -1526,6 +1526,7 @@ export function ReceiptDetailPanel({
                         originalValue={originalReceipt?.vat_rate}
                         vendorLearning={vendorLearning}
                         onReset={() => setVatRate(originalReceipt?.vat_rate?.toString() || '20')}
+                        vatRateSource={(receipt as any)?.vat_rate_source as 'ai' | 'learned' | 'manual' | null}
                       >
                         <Select value={vatRate} onValueChange={setVatRate}>
                           <SelectTrigger>
