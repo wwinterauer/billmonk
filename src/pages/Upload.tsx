@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Upload as UploadIcon, 
@@ -27,6 +27,7 @@ import { useReceipts, type UploadProgress, type UploadStatus, type Receipt, type
 import { VendorSelectionDialog } from '@/components/receipts/VendorSelectionDialog';
 import { DuplicateCheckDialog, type FileCheckResult } from '@/components/upload/DuplicateCheckDialog';
 import { FileCheckProgress } from '@/components/upload/FileCheckProgress';
+import { UploadStatusFilter, type UploadFilterStatus, type UploadStatusCounts } from '@/components/upload/UploadStatusFilter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -76,6 +77,7 @@ const Upload = () => {
   const [uploads, setUploads] = useState<Map<string, FileUpload>>(new Map());
   const [pendingReceipts, setPendingReceipts] = useState<PendingReceiptFromDB[]>([]);
   const [loadingPendingReceipts, setLoadingPendingReceipts] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<UploadFilterStatus>('all');
   
   // Phase-based state for batch duplicate checking
   const [uploadPhase, setUploadPhase] = useState<UploadPhase>('idle');
@@ -830,7 +832,58 @@ const Upload = () => {
 
   // Combine active uploads with pending receipts from DB (exclude already shown in uploads)
   const uploadReceiptIds = new Set(uploadsArray.filter(u => u.receipt?.id).map(u => u.receipt!.id));
-  const filteredPendingReceipts = pendingReceipts.filter(pr => !uploadReceiptIds.has(pr.id));
+  const allPendingReceipts = pendingReceipts.filter(pr => !uploadReceiptIds.has(pr.id));
+
+  // Calculate status counts for filter
+  const statusCounts = useMemo((): UploadStatusCounts => {
+    const counts: UploadStatusCounts = {
+      all: allPendingReceipts.length,
+      success: 0,
+      processing: 0,
+      pending: 0,
+      duplicate: 0,
+      error: 0,
+      skipped: 0,
+    };
+
+    allPendingReceipts.forEach(r => {
+      if (r.status === 'review') {
+        counts.success++;
+      } else if (r.status === 'processing') {
+        counts.processing++;
+      } else if (r.status === 'pending') {
+        counts.pending++;
+      } else if (r.status === 'duplicate') {
+        counts.duplicate++;
+      } else if (r.status === 'rejected' || r.status === 'not_a_receipt') {
+        counts.skipped++;
+      }
+    });
+
+    return counts;
+  }, [allPendingReceipts]);
+
+  // Filter receipts based on active filter
+  const filteredPendingReceipts = useMemo(() => {
+    if (activeFilter === 'all') return allPendingReceipts;
+    
+    return allPendingReceipts.filter(r => {
+      switch (activeFilter) {
+        case 'success':
+          return r.status === 'review';
+        case 'processing':
+          return r.status === 'processing';
+        case 'pending':
+          return r.status === 'pending';
+        case 'duplicate':
+          return r.status === 'duplicate';
+        case 'skipped':
+          return r.status === 'rejected' || r.status === 'not_a_receipt';
+        default:
+          return true;
+      }
+    });
+  }, [allPendingReceipts, activeFilter]);
 
   const handleContinue = () => {
     navigate('/expenses');
@@ -1189,41 +1242,47 @@ const Upload = () => {
 
         {/* Pending Receipts from Database - Shown when navigating back to page */}
         <AnimatePresence>
-          {filteredPendingReceipts.length > 0 && (
+          {allPendingReceipts.length > 0 && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
             >
               <Card className="border-border/50">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-primary" />
-                      Aktuelle Upload-Session
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {filteredPendingReceipts.filter(r => r.status === 'review').length} fertig, {' '}
-                      {filteredPendingReceipts.filter(r => r.status === 'processing').length} in Analyse, {' '}
-                      {filteredPendingReceipts.filter(r => r.status === 'pending').length} wartend
-                      {filteredPendingReceipts.filter(r => r.status === 'duplicate').length > 0 && (
-                        <>, {filteredPendingReceipts.filter(r => r.status === 'duplicate').length} Duplikate</>
-                      )}
-                      {filteredPendingReceipts.filter(r => r.status === 'rejected' || r.status === 'not_a_receipt').length > 0 && (
-                        <>, {filteredPendingReceipts.filter(r => r.status === 'rejected' || r.status === 'not_a_receipt').length} abgelehnt</>
-                      )}
-                    </p>
+                <CardHeader className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-primary" />
+                        Aktuelle Upload-Session
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {statusCounts.all} Belege insgesamt
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline"
+                      onClick={() => navigate('/review')}
+                    >
+                      Zur Überprüfung
+                    </Button>
                   </div>
-                  <Button 
-                    variant="outline"
-                    onClick={() => navigate('/expenses')}
-                  >
-                    Zur Übersicht
-                  </Button>
+                  
+                  {/* Status Filter */}
+                  <UploadStatusFilter
+                    counts={statusCounts}
+                    activeFilter={activeFilter}
+                    onFilterChange={setActiveFilter}
+                  />
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                    {filteredPendingReceipts.map((receipt) => (
+                    {filteredPendingReceipts.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        Keine Belege mit diesem Status
+                      </div>
+                    ) : (
+                    filteredPendingReceipts.map((receipt) => (
                       <motion.div
                         key={receipt.id}
                         initial={{ opacity: 0, x: -20 }}
@@ -1317,7 +1376,8 @@ const Upload = () => {
                           )}
                         </div>
                       </motion.div>
-                    ))}
+                    ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
