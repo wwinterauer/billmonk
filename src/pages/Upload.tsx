@@ -1293,17 +1293,17 @@ const Upload = () => {
           </Card>
         )}
 
-        {/* Duplicate Warning Dialog */}
-        <AlertDialog open={showDuplicateDialog} onOpenChange={(open) => {
-          if (!open) handleCancelDuplicate();
+        {/* Duplicate Warning Dialog - Using Dialog instead of AlertDialog for more control */}
+        <AlertDialog open={showDuplicateDialog} onOpenChange={() => {
+          // Don't close on overlay click - user must make a choice
         }}>
-          <AlertDialogContent className="max-w-2xl w-[95vw]">
+          <AlertDialogContent className="max-w-2xl w-[95vw]" onEscapeKeyDown={(e) => e.preventDefault()}>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2 text-warning">
                 <AlertTriangle className="w-5 h-5" />
                 Duplikat erkannt
                 {duplicateQueueCount > 0 && (
-                  <Badge variant="secondary" className="ml-2">
+                  <Badge variant="secondary" className="ml-2 bg-warning/20 text-warning border-warning/30">
                     +{duplicateQueueCount} weitere
                   </Badge>
                 )}
@@ -1375,14 +1375,19 @@ const Upload = () => {
               </div>
             )}
             
-            <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
-              <div className="flex gap-2 w-full sm:w-auto">
-                <AlertDialogCancel onClick={handleCancelDuplicate} className="flex-1 sm:flex-none">
+            <AlertDialogFooter className="flex-col gap-3 sm:flex-row sm:gap-2">
+              {/* Skip buttons row */}
+              <div className="flex gap-2 w-full sm:w-auto order-last sm:order-first">
+                <Button 
+                  variant="ghost"
+                  onClick={handleCancelDuplicate}
+                  className="flex-1 sm:flex-none"
+                >
                   Überspringen
-                </AlertDialogCancel>
+                </Button>
                 {duplicateQueueCount > 0 && (
                   <Button 
-                    variant="outline"
+                    variant="ghost"
                     onClick={handleSkipAllDuplicates}
                     className="flex-1 sm:flex-none text-muted-foreground"
                   >
@@ -1390,22 +1395,24 @@ const Upload = () => {
                   </Button>
                 )}
               </div>
-              <div className="flex gap-2 w-full sm:w-auto">
+              
+              {/* Action buttons row */}
+              <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
                 <Button 
                   variant="outline"
                   onClick={handleViewOriginal}
                   className="flex items-center gap-2 flex-1 sm:flex-none"
                 >
                   <Eye className="w-4 h-4" />
-                  Original anzeigen
+                  Original
                 </Button>
-                <AlertDialogAction
+                <Button
                   onClick={handleProceedWithDuplicate}
                   className="bg-warning text-warning-foreground hover:bg-warning/90 flex-1 sm:flex-none"
                 >
                   <Copy className="w-4 h-4 mr-2" />
                   Trotzdem hochladen
-                </AlertDialogAction>
+                </Button>
               </div>
             </AlertDialogFooter>
           </AlertDialogContent>
