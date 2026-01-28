@@ -29,6 +29,8 @@ interface VendorAutocompleteProps {
   onVendorSelect: (vendor: VendorWithCategory) => void;
   disabled?: boolean;
   label?: string;
+  hideLabel?: boolean;
+  placeholder?: string;
 }
 
 export function VendorAutocomplete({
@@ -38,6 +40,8 @@ export function VendorAutocomplete({
   onVendorSelect,
   disabled = false,
   label = 'Lieferant',
+  hideLabel = false,
+  placeholder = 'z.B. troii Software GmbH',
 }: VendorAutocompleteProps) {
   const { user } = useAuth();
   const [vendorSearch, setVendorSearch] = useState('');
@@ -179,7 +183,7 @@ export function VendorAutocomplete({
 
   return (
     <div className="relative" ref={containerRef}>
-      <Label className="mb-1.5 block">{label}</Label>
+      {!hideLabel && <Label className="mb-1.5 block">{label}</Label>}
 
       <div className="relative">
         <Input
@@ -190,7 +194,7 @@ export function VendorAutocomplete({
             setVendorSearch(value);
             setShowVendorDropdown(true);
           }}
-          placeholder="Lieferant eingeben oder auswählen..."
+          placeholder={placeholder}
           className="pr-10"
           disabled={disabled}
         />
