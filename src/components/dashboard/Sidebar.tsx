@@ -162,9 +162,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   {badgeCount !== null && (
                     <Badge 
                       variant="destructive" 
-                      className="ml-auto h-5 w-5 p-0 flex items-center justify-center text-xs"
+                      className="ml-auto h-auto min-w-5 px-1.5 py-0.5 flex items-center justify-center text-xs"
                     >
-                      {badgeCount > 99 ? '99+' : badgeCount}
+                      {badgeCount}
                     </Badge>
                   )}
                 </>
@@ -172,9 +172,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               {collapsed && badgeCount !== null && (
                 <Badge 
                   variant="destructive" 
-                  className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-xs"
+                  className="absolute -top-1 -right-1 h-auto min-w-4 px-1 py-0 flex items-center justify-center text-[10px]"
                 >
-                  {badgeCount > 9 ? '9+' : badgeCount}
+                  {badgeCount}
                 </Badge>
               )}
             </Link>
