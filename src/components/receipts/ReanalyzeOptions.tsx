@@ -376,22 +376,42 @@ export function ReanalyzeOptions({
             </DropdownMenuItem>
 
             <DropdownMenuItem
-              onClick={() => reanalyzeFields(['amount_gross', 'amount_net', 'vat_amount', 'vat_rate'])}
+              onClick={() => reanalyzeSingleField('amount_gross')}
               className="flex-col items-start py-1.5"
             >
               <div className="flex items-center gap-1">
                 <Euro className="w-3 h-3" />
-                <span className="text-xs">Beträge</span>
+                <span className="text-xs">Bruttobetrag</span>
+              </div>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onClick={() => reanalyzeSingleField('vat_rate')}
+              className="flex-col items-start py-1.5"
+            >
+              <div className="flex items-center gap-1">
+                <Percent className="w-3 h-3" />
+                <span className="text-xs">MwSt-Satz</span>
               </div>
             </DropdownMenuItem>
 
             <DropdownMenuItem
               onClick={() => reanalyzeSingleField('description')}
-              className="flex-col items-start py-1.5 col-span-2"
+              className="flex-col items-start py-1.5"
             >
               <div className="flex items-center gap-1">
                 <FileText className="w-3 h-3" />
                 <span className="text-xs">Beschreibung</span>
+              </div>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onClick={() => reanalyzeFields(['amount_gross', 'amount_net', 'vat_amount', 'vat_rate'])}
+              className="flex-col items-start py-1.5"
+            >
+              <div className="flex items-center gap-1">
+                <Euro className="w-3 h-3" />
+                <span className="text-xs">Alle Beträge</span>
               </div>
             </DropdownMenuItem>
           </div>
