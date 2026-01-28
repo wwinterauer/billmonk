@@ -56,7 +56,7 @@ interface PendingReceiptFromDB {
   id: string;
   fileName: string;
   fileUrl: string | null;
-  status: 'pending' | 'processing' | 'review' | 'rejected' | 'not_a_receipt';
+  status: 'pending' | 'processing' | 'review' | 'rejected' | 'not_a_receipt' | 'duplicate';
   aiConfidence: number | null;
   createdAt: string;
   vendor: string | null;
@@ -125,7 +125,7 @@ const Upload = () => {
           .from('receipts')
           .select('id, file_name, file_url, status, ai_confidence, created_at, vendor, amount_gross, notes')
           .eq('user_id', user.id)
-          .or(`status.in.(processing,pending,not_a_receipt),and(status.in.(review,rejected),created_at.gte.${twoHoursAgo})`)
+          .or(`status.in.(processing,pending,not_a_receipt,duplicate),and(status.in.(review,rejected),created_at.gte.${twoHoursAgo})`)
           .order('created_at', { ascending: false })
           .limit(200);
 
@@ -136,7 +136,7 @@ const Upload = () => {
             id: r.id,
             fileName: r.file_name || 'Unbekannte Datei',
             fileUrl: r.file_url,
-            status: r.status as 'pending' | 'processing' | 'review' | 'rejected' | 'not_a_receipt',
+            status: r.status as 'pending' | 'processing' | 'review' | 'rejected' | 'not_a_receipt' | 'duplicate',
             aiConfidence: r.ai_confidence,
             createdAt: r.created_at,
             vendor: r.vendor,
@@ -1144,6 +1144,9 @@ const Upload = () => {
                       {filteredPendingReceipts.filter(r => r.status === 'review').length} fertig, {' '}
                       {filteredPendingReceipts.filter(r => r.status === 'processing').length} in Analyse, {' '}
                       {filteredPendingReceipts.filter(r => r.status === 'pending').length} wartend
+                      {filteredPendingReceipts.filter(r => r.status === 'duplicate').length > 0 && (
+                        <>, {filteredPendingReceipts.filter(r => r.status === 'duplicate').length} Duplikate</>
+                      )}
                       {filteredPendingReceipts.filter(r => r.status === 'rejected' || r.status === 'not_a_receipt').length > 0 && (
                         <>, {filteredPendingReceipts.filter(r => r.status === 'rejected' || r.status === 'not_a_receipt').length} abgelehnt</>
                       )}
@@ -1166,6 +1169,8 @@ const Upload = () => {
                         className={`flex items-center gap-4 p-3 rounded-lg ${
                           receipt.status === 'review' 
                             ? 'bg-success/10 border border-success/20' 
+                            : receipt.status === 'duplicate'
+                            ? 'bg-warning/10 border border-warning/20'
                             : (receipt.status === 'rejected' || receipt.status === 'not_a_receipt')
                             ? 'bg-destructive/10 border border-destructive/20'
                             : 'bg-muted/30'
@@ -1174,12 +1179,16 @@ const Upload = () => {
                         <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
                           receipt.status === 'review' 
                             ? 'bg-success' 
+                            : receipt.status === 'duplicate'
+                            ? 'bg-warning'
                             : (receipt.status === 'rejected' || receipt.status === 'not_a_receipt')
                             ? 'bg-destructive'
                             : 'bg-primary/10'
                         }`}>
                           {receipt.status === 'review' ? (
                             <Check className="h-4 w-4 text-success-foreground" />
+                          ) : receipt.status === 'duplicate' ? (
+                            <Copy className="h-4 w-4 text-warning-foreground" />
                           ) : (receipt.status === 'rejected' || receipt.status === 'not_a_receipt') ? (
                             <XCircle className="h-4 w-4 text-destructive-foreground" />
                           ) : (
@@ -1197,6 +1206,8 @@ const Upload = () => {
                               className={`text-xs ${
                                 receipt.status === 'review'
                                   ? 'bg-success/20 text-success-foreground border-success/30'
+                                  : receipt.status === 'duplicate'
+                                  ? 'bg-warning/20 text-warning border-warning/30'
                                   : (receipt.status === 'rejected' || receipt.status === 'not_a_receipt')
                                   ? 'bg-destructive/20 text-destructive border-destructive/30'
                                   : receipt.status === 'processing' 
@@ -1206,6 +1217,8 @@ const Upload = () => {
                             >
                               {receipt.status === 'review' 
                                 ? `Fertig${receipt.aiConfidence ? ` (${Math.round(receipt.aiConfidence * 100)}%)` : ''}`
+                                : receipt.status === 'duplicate'
+                                ? 'Duplikat'
                                 : receipt.status === 'not_a_receipt'
                                 ? 'Kein Beleg'
                                 : receipt.status === 'rejected'
@@ -1231,6 +1244,8 @@ const Upload = () => {
                         <div className="flex items-center gap-2">
                           {receipt.status === 'review' ? (
                             <Check className="h-4 w-4 text-success" />
+                          ) : receipt.status === 'duplicate' ? (
+                            <Copy className="h-4 w-4 text-warning" />
                           ) : (receipt.status === 'rejected' || receipt.status === 'not_a_receipt') ? (
                             <XCircle className="h-4 w-4 text-destructive" />
                           ) : receipt.status === 'processing' ? (
