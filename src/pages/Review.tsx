@@ -503,12 +503,9 @@ const Review = () => {
                     <MultiInvoiceAlert
                       receiptId={currentReceipt.id}
                       splitSuggestion={currentReceipt.split_suggestion as any}
-                      onSplitClick={() => {
-                        // TODO: Open PDF split dialog
-                        toast({
-                          title: "PDF-Aufteilung",
-                          description: "Diese Funktion wird in Kürze verfügbar sein.",
-                        });
+                      pageCount={currentReceipt.page_count || 1}
+                      onSplitComplete={() => {
+                        queryClient.invalidateQueries({ queryKey: ['receipts'] });
                       }}
                     />
                   </div>
