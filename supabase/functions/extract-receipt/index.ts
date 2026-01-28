@@ -384,6 +384,20 @@ WICHTIGE REGELN FÜR BESCHREIBUNG:
 - Trenne mit Komma, keine Preise
 - Bei vielen Positionen: wichtigste zuerst, dann "u.a."
 
+WICHTIGE REGELN FÜR STEUER (MwSt./USt.):
+- "MwSt." und "USt." sind SYNONYME (Mehrwertsteuer = Umsatzsteuer)
+- Suche nach ALLEN folgenden Begriffen: MwSt., USt., Mehrwertsteuer, Umsatzsteuer, VAT, Steuer, Tax
+- Österreichische Rechnungen verwenden oft "USt." statt "MwSt."
+- Achte auf Zeilen wie:
+  - "20% MwSt.: 51,84 EUR" → vat_rate: 20, vat_amount: 51.84
+  - "20.00% USt.: 51.84 EUR" → vat_rate: 20, vat_amount: 51.84
+  - "inkl. 20% USt." → vat_rate: 20
+  - "zzgl. 19% MwSt." → vat_rate: 19
+  - "VAT 20%: €51.84" → vat_rate: 20, vat_amount: 51.84
+- Übliche Steuersätze:
+  - Österreich: 20% (normal), 10%/13% (ermäßigt), 0%
+  - Deutschland: 19% (normal), 7% (ermäßigt), 0%
+
 WEITERE REGELN:
 - Antworte NUR mit JSON, keine Markdown-Codeblöcke
 - Unerkennbare Felder auf null setzen
