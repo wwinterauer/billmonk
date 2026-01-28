@@ -49,6 +49,7 @@ import { VendorManagement } from '@/components/settings/VendorManagement';
 import { ExportTemplateSettings } from '@/components/settings/ExportTemplateSettings';
 import { DescriptionSettings } from '@/components/settings/DescriptionSettings';
 import { AILearningSettings } from '@/components/settings/AILearningSettings';
+import { ProcessingRetry } from '@/components/settings/ProcessingRetry';
 import { EmailImportSettings } from '@/components/settings/EmailImportSettings';
 import type { Json } from '@/integrations/supabase/types';
 
@@ -846,7 +847,11 @@ const Settings = () => {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
         >
+          {/* Processing Retry */}
+          <ProcessingRetry />
+          
           <Card>
             <CardHeader>
               <div className="flex items-center gap-3">
