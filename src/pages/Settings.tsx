@@ -20,6 +20,7 @@ import {
   Sparkles,
   Brain,
   Mail,
+  Landmark,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,6 +52,7 @@ import { DescriptionSettings } from '@/components/settings/DescriptionSettings';
 import { AILearningSettings } from '@/components/settings/AILearningSettings';
 import { ProcessingRetry } from '@/components/settings/ProcessingRetry';
 import { EmailImportSettings } from '@/components/settings/EmailImportSettings';
+import { BankImportKeywords } from '@/components/settings/BankImportKeywords';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
@@ -456,6 +458,10 @@ const Settings = () => {
             <TabsTrigger value="email-import" className="gap-2">
               <Mail className="h-4 w-4" />
               <span className="hidden sm:inline">E-Mail</span>
+            </TabsTrigger>
+            <TabsTrigger value="bank-keywords" className="gap-2">
+              <Landmark className="h-4 w-4" />
+              <span className="hidden sm:inline">Bank</span>
             </TabsTrigger>
           </TabsList>
 
@@ -880,6 +886,16 @@ const Settings = () => {
           animate={{ opacity: 1, y: 0 }}
         >
           <EmailImportSettings />
+        </motion.div>
+      </TabsContent>
+
+      {/* Bank Keywords Tab */}
+      <TabsContent value="bank-keywords">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <BankImportKeywords />
         </motion.div>
       </TabsContent>
     </Tabs>

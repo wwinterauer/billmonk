@@ -52,6 +52,42 @@ export type Database = {
           },
         ]
       }
+      bank_import_keywords: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description_template: string | null
+          id: string
+          is_active: boolean | null
+          keyword: string
+          tax_rate: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description_template?: string | null
+          id?: string
+          is_active?: boolean | null
+          keyword: string
+          tax_rate?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description_template?: string | null
+          id?: string
+          is_active?: boolean | null
+          keyword?: string
+          tax_rate?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       bank_imports: {
         Row: {
           bank_account_id: string | null
@@ -794,7 +830,9 @@ export type Database = {
           ai_raw_response: Json | null
           amount_gross: number | null
           amount_net: number | null
+          bank_import_keyword_id: string | null
           bank_transaction_id: string | null
+          bank_transaction_reference: string | null
           category: string | null
           created_at: string | null
           currency: string | null
@@ -811,6 +849,7 @@ export type Database = {
           id: string
           invoice_number: string | null
           is_duplicate: boolean | null
+          is_no_receipt_entry: boolean | null
           line_items_raw: Json | null
           notes: string | null
           original_pages: number[] | null
@@ -837,7 +876,9 @@ export type Database = {
           ai_raw_response?: Json | null
           amount_gross?: number | null
           amount_net?: number | null
+          bank_import_keyword_id?: string | null
           bank_transaction_id?: string | null
+          bank_transaction_reference?: string | null
           category?: string | null
           created_at?: string | null
           currency?: string | null
@@ -854,6 +895,7 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           is_duplicate?: boolean | null
+          is_no_receipt_entry?: boolean | null
           line_items_raw?: Json | null
           notes?: string | null
           original_pages?: number[] | null
@@ -880,7 +922,9 @@ export type Database = {
           ai_raw_response?: Json | null
           amount_gross?: number | null
           amount_net?: number | null
+          bank_import_keyword_id?: string | null
           bank_transaction_id?: string | null
+          bank_transaction_reference?: string | null
           category?: string | null
           created_at?: string | null
           currency?: string | null
@@ -897,6 +941,7 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           is_duplicate?: boolean | null
+          is_no_receipt_entry?: boolean | null
           line_items_raw?: Json | null
           notes?: string | null
           original_pages?: number[] | null
@@ -918,6 +963,13 @@ export type Database = {
           vendor_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "receipts_bank_import_keyword_id_fkey"
+            columns: ["bank_import_keyword_id"]
+            isOneToOne: false
+            referencedRelation: "bank_import_keywords"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "receipts_bank_transaction_id_fkey"
             columns: ["bank_transaction_id"]
