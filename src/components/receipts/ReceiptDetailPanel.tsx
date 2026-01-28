@@ -1127,7 +1127,7 @@ export function ReceiptDetailPanel({
                     {/* Vendor Brand/Marke */}
                     <div>
                       <Label htmlFor="vendorBrand" className="flex items-center gap-2">
-                        Lieferant (Marke)
+                        Lieferant (Markenname)
                         {selectedVendorId && (
                           <span className="text-xs font-normal text-muted-foreground">(aus Lieferantenstamm)</span>
                         )}
@@ -1161,26 +1161,29 @@ export function ReceiptDetailPanel({
                           id="vendorBrand"
                           value={vendorBrand}
                           onChange={(e) => setVendorBrand(e.target.value)}
-                          placeholder="z.B. Amazon, spusu, MediaMarkt"
+                          placeholder="z.B. timr, Amazon, A1"
                         />
                       )}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Bekannter Name/Marke des Lieferanten
-                      </p>
                     </div>
 
                     {/* Vendor Legal Name */}
-                    <VendorAutocomplete
-                      value={vendor}
-                      vendorId={selectedVendorId}
-                      onChange={(value, id) => {
-                        setVendor(value);
-                        setSelectedVendorId(id || null);
-                      }}
-                      onVendorSelect={handleVendorSelect}
-                      disabled={saving}
-                      label="Lieferant (rechtlicher Name)"
-                    />
+                    <div className="space-y-2">
+                      <Label htmlFor="vendorLegal" className="text-sm text-muted-foreground">
+                        Rechtlicher Firmenname
+                      </Label>
+                      <VendorAutocomplete
+                        value={vendor}
+                        vendorId={selectedVendorId}
+                        onChange={(value, id) => {
+                          setVendor(value);
+                          setSelectedVendorId(id || null);
+                        }}
+                        onVendorSelect={handleVendorSelect}
+                        disabled={saving}
+                        hideLabel
+                        placeholder="z.B. troii Software GmbH"
+                      />
+                    </div>
 
                     {/* Description with character counter */}
                     <div className="space-y-2">
