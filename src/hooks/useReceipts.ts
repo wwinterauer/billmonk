@@ -50,8 +50,23 @@ export interface Receipt {
   split_suggestion: Json | null;
   split_from_receipt_id: string | null;
   original_pages: number[] | null;
+  // Source tracking
+  source: string | null;
+  email_attachment_id: string | null;
+  is_no_receipt_entry: boolean | null;
+  bank_import_keyword_id: string | null;
+  bank_transaction_reference: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Extended receipt with email attachment data
+export interface ReceiptWithEmailData extends Receipt {
+  email_attachments?: {
+    email_from: string | null;
+    email_subject: string | null;
+    email_received_at: string | null;
+  } | null;
 }
 
 export interface DuplicateInfo {

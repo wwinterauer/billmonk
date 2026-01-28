@@ -101,6 +101,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
 import { useAuth } from '@/contexts/AuthContext';
 import { SplitSuggestionDialog } from '@/components/receipts/SplitSuggestionDialog';
+import { SourceBadge, NoReceiptBadge } from '@/components/receipts/SourceBadge';
 
 type SortField = 'receipt_date' | 'vendor' | 'invoice_number' | 'amount_gross';
 type SortDirection = 'asc' | 'desc';
@@ -1975,6 +1976,14 @@ const Expenses = () => {
                                     <Copy className="w-3 h-3 mr-1" />
                                     {receipt.duplicate_score || 0}%
                                   </Badge>
+                                )}
+                                {/* Source Badge for email imports */}
+                                {receipt.source?.startsWith('email_') && (
+                                  <SourceBadge receipt={receipt} compact />
+                                )}
+                                {/* No Receipt Badge */}
+                                {receipt.is_no_receipt_entry && (
+                                  <NoReceiptBadge compact />
                                 )}
                               </div>
                             </TableCell>
