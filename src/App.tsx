@@ -20,6 +20,7 @@ import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import ShareReceive from "./pages/ShareReceive";
 import Checklists from "./pages/Checklists";
+import Datenschutz from "./pages/Datenschutz";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -108,6 +109,7 @@ const App = () => (
               } 
             />
             <Route path="/share-receive" element={<ShareReceive />} />
+            <Route path="/datenschutz" element={<Datenschutz />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <InstallPrompt />
