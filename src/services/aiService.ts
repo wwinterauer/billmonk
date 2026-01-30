@@ -153,17 +153,23 @@ export function normalizeExtractionResult(
   const normalized = { ...result };
 
   // Ensure amounts are numbers or null
-  if (normalized.amount_gross !== null) {
-    normalized.amount_gross = Number(normalized.amount_gross) || null;
+  // Note: We use isNaN check instead of || null because 0 is a valid value
+  if (normalized.amount_gross !== null && normalized.amount_gross !== undefined) {
+    const num = Number(normalized.amount_gross);
+    normalized.amount_gross = isNaN(num) ? null : num;
   }
-  if (normalized.amount_net !== null) {
-    normalized.amount_net = Number(normalized.amount_net) || null;
+  if (normalized.amount_net !== null && normalized.amount_net !== undefined) {
+    const num = Number(normalized.amount_net);
+    normalized.amount_net = isNaN(num) ? null : num;
   }
-  if (normalized.vat_amount !== null) {
-    normalized.vat_amount = Number(normalized.vat_amount) || null;
+  if (normalized.vat_amount !== null && normalized.vat_amount !== undefined) {
+    const num = Number(normalized.vat_amount);
+    normalized.vat_amount = isNaN(num) ? null : num;
   }
-  if (normalized.vat_rate !== null) {
-    normalized.vat_rate = Number(normalized.vat_rate) || null;
+  // IMPORTANT: vat_rate of 0 is valid (e.g., tax-free, reverse-charge, Kleinunternehmer)
+  if (normalized.vat_rate !== null && normalized.vat_rate !== undefined) {
+    const num = Number(normalized.vat_rate);
+    normalized.vat_rate = isNaN(num) ? null : num;
   }
 
   // Normalize tax_rate_details

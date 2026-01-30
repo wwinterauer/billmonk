@@ -239,7 +239,8 @@ const Review = () => {
       receipt_date: receipt.receipt_date ? new Date(receipt.receipt_date) : null,
       category: receipt.category || '',
       amount_gross: receipt.amount_gross?.toString() || '',
-      vat_rate: receipt.vat_rate?.toString() || '20',
+      // IMPORTANT: 0% VAT is valid, so we need to check for null/undefined specifically
+      vat_rate: receipt.vat_rate !== null && receipt.vat_rate !== undefined ? receipt.vat_rate.toString() : '20',
       is_mixed_tax_rate: (receiptData.is_mixed_tax_rate as boolean) || false,
       tax_rate_details: (receiptData.tax_rate_details as TaxRateDetail[]) || null,
       payment_method: receipt.payment_method || '',
