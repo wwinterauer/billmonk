@@ -484,23 +484,43 @@ WICHTIGE REGELN FÜR STEUER (MwSt./USt.) - GEZIELT NACH % SUCHEN:
    - "Brutto: xxx" / "Gesamtbetrag: xxx"
 
 5. MEHRERE STEUERSÄTZE auf einer Rechnung (z.B. Supermarkt, Amazon):
-   Erkennungs-Muster:
+   
+   **WICHTIG: Österreichische Supermarkt-Kassenbons (HOFER, BILLA, SPAR, LIDL, PENNY):**
+   Am Ende des Kassenbons steht oft ein MwSt-Block in diesem Format:
+   
+   MWST.A 10.0%      5.40  Netto 54.00
+   MWST.B 20.0%     25.58  Netto 127.91
+   
+   oder:
+   
+   A=10.0%   Netto  54.00  Steuer  5.40
+   B=20.0%   Netto 127.91  Steuer 25.58
+   
+   WENN du solche Zeilen siehst → is_mixed_tax_rate = true!
+   
+   **Weitere Erkennungs-Muster für gemischte Steuersätze:**
    - "10% MwSt: 5,00 / 20% MwSt: 12,00"
    - "Summe 7%: ... / Summe 19%: ..."
-   - "A = 20%, B = 10%" (oft bei Kassenbons)
-   - Mehrere Zeilen mit unterschiedlichen %-Angaben
+   - "A = 20%, B = 10%" oder "MWST.A ... MWST.B ..."
+   - Mehrere Zeilen mit unterschiedlichen %-Angaben im Summenblock
+   - Bei Produkten: Buchstaben-Kennzeichen wie "A", "B" neben Preisen
+   
+   **PRÜFUNG: Scanne den MwSt/Summenblock am Ende des Belegs:**
+   - Wenn dort MEHRERE Prozentsätze aufgelistet sind → gemischte Steuersätze!
+   - Beispiel HOFER: "MWST.A 10.0% ... MWST.B 20.0% ..." → is_mixed_tax_rate = true
    
    **Vorgehen bei MEHREREN Steuersätzen:**
    - Setze is_mixed_tax_rate = true
    - Setze vat_rate = null (da nicht eindeutig)
    - Erfasse GESAMT-Brutto (amount_gross), GESAMT-Netto (amount_net), GESAMT-Steuer (vat_amount)
+   - Berechne: amount_net = Summe aller Netto-Beträge, vat_amount = Summe aller Steuerbeträge
    - Speichere Details in tax_rate_details:
-     [{"rate": 10, "net_amount": 50.00, "tax_amount": 5.00, "description": "Lebensmittel"},
-      {"rate": 20, "net_amount": 82.50, "tax_amount": 12.50, "description": "Sonstiges"}]
+     [{"rate": 10, "net_amount": 54.00, "tax_amount": 5.40, "description": "Ermäßigt (10%)"},
+      {"rate": 20, "net_amount": 127.91, "tax_amount": 25.58, "description": "Normal (20%)"}]
    
-   **Bei EINEM Steuersatz:**
+   **Bei NUR EINEM Steuersatz:**
    - Setze is_mixed_tax_rate = false
-   - Setze vat_rate = der erkannte Satz
+   - Setze vat_rate = der erkannte Satz (z.B. 20)
    - tax_rate_details = null
 
 6. VALIDIERUNG - Übliche Steuersätze nach Land:
