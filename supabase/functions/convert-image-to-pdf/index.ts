@@ -17,12 +17,34 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { imageData, fileName, contentType, userId } = await req.json();
+    // SECURITY FIX: Authenticate user from JWT token instead of accepting userId from body
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Nicht authentifiziert" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    console.log(`[convert-image-to-pdf] Converting ${fileName} for user ${userId}`);
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error("[convert-image-to-pdf] Auth error:", authError?.message);
+      return new Response(
+        JSON.stringify({ success: false, error: "Ungültiger Token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    if (!imageData || !fileName || !userId) {
-      throw new Error("imageData, fileName und userId sind erforderlich");
+    // Use authenticated user ID instead of body-provided userId
+    const userId = user.id;
+    const { imageData, fileName, contentType } = await req.json();
+
+    console.log(`[convert-image-to-pdf] Converting ${fileName} for authenticated user ${userId}`);
+
+    if (!imageData || !fileName) {
+      throw new Error("imageData und fileName sind erforderlich");
     }
 
     // Base64 zu Uint8Array
@@ -34,7 +56,7 @@ serve(async (req) => {
     
     // Bild einbetten basierend auf Typ
     let image;
-    const lowerContentType = contentType.toLowerCase();
+    const lowerContentType = contentType?.toLowerCase() || '';
     
     if (lowerContentType.includes("png")) {
       console.log(`[convert-image-to-pdf] Embedding PNG image`);

@@ -281,6 +281,19 @@ export const useEmailImport = () => {
     },
   });
 
+  // Helper function to encrypt password server-side using AES-GCM
+  const encryptPasswordServerSide = async (password: string): Promise<string> => {
+    const { data, error } = await supabase.functions.invoke('encrypt-password', {
+      body: { password },
+    });
+    
+    if (error || !data?.success) {
+      throw new Error(data?.error || 'Passwort-Verschlüsselung fehlgeschlagen');
+    }
+    
+    return data.encrypted;
+  };
+
   // Add IMAP email account
   const addEmailAccountMutation = useMutation({
     mutationFn: async (account: {
@@ -297,11 +310,10 @@ export const useEmailImport = () => {
     }) => {
       if (!user?.id) throw new Error('Nicht angemeldet');
 
-      // Note: IMAP passwords are stored encrypted in the database
-      // The actual password is only used server-side by edge functions
-      // For better security, OAuth-based connections (Gmail, Microsoft) are preferred
-      // as they don't require storing user passwords
-      const encryptedPassword = btoa(account.imap_password);
+      // SECURITY: Encrypt password server-side using AES-GCM
+      // This ensures passwords are never stored as plain Base64 which is trivially reversible
+      // OAuth-based connections (Gmail, Microsoft) are still preferred as they don't require storing passwords
+      const encryptedPassword = await encryptPasswordServerSide(account.imap_password);
 
       const { data, error } = await supabase
         .from('email_accounts')
@@ -340,9 +352,10 @@ export const useEmailImport = () => {
     mutationFn: async ({ id, ...updates }: Partial<EmailAccount> & { id: string; imap_password?: string }) => {
       const updateData: Record<string, unknown> = { ...updates };
       
-      // Handle password update
+      // Handle password update - encrypt server-side using AES-GCM
       if ('imap_password' in updates && updates.imap_password) {
-        updateData.imap_password_encrypted = btoa(updates.imap_password as string);
+        const encryptedPassword = await encryptPasswordServerSide(updates.imap_password as string);
+        updateData.imap_password_encrypted = encryptedPassword;
         delete updateData.imap_password;
       }
 

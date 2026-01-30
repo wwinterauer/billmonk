@@ -204,9 +204,10 @@ export function useReceipts() {
   };
 
   // Convert image to PDF via edge function
+  // Note: userId parameter kept for API compatibility but not used - auth extracted from JWT
   const convertImageToPdf = async (
     file: File,
-    userId: string,
+    _userId: string, // Kept for backward compatibility, not sent to server
     onProgress?: (progress: number, statusText?: string) => void
   ): Promise<{ storagePath: string; fileName: string; fileType: string; fileHash: string }> => {
     onProgress?.(10, 'Bild wird zu PDF konvertiert...');
@@ -214,12 +215,12 @@ export function useReceipts() {
     const base64 = await fileToBase64(file);
     const base64Data = base64.split(',')[1]; // Remove data:image/xxx;base64, prefix
 
+    // Security: userId is now extracted from auth token server-side
     const { data, error } = await supabase.functions.invoke('convert-image-to-pdf', {
       body: {
         imageData: base64Data,
         fileName: file.name,
         contentType: file.type,
-        userId: userId,
       }
     });
 

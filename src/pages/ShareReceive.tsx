@@ -137,7 +137,6 @@ export default function ShareReceive() {
           imageData: base64.split(',')[1],
           fileName: file.name,
           contentType: file.type,
-          userId: userId,
         }
       });
 

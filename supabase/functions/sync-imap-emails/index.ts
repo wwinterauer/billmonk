@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { decryptPassword } from "../_shared/crypto.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -401,8 +402,8 @@ serve(async (req) => {
       })
       .eq("id", accountId);
 
-    // Passwort dekodieren (Base64 -> Text)
-    const password = atob(account.imap_password_encrypted);
+    // Passwort entschlüsseln (AES-GCM mit Fallback auf Base64 für alte Einträge)
+    const password = await decryptPassword(account.imap_password_encrypted);
 
     // IMAP-Verbindung herstellen
     client = new SimpleImapClient({
