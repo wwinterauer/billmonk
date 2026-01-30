@@ -53,6 +53,7 @@ import { AILearningSettings } from '@/components/settings/AILearningSettings';
 import { ProcessingRetry } from '@/components/settings/ProcessingRetry';
 import { EmailImportSettings } from '@/components/settings/EmailImportSettings';
 import { BankImportKeywords } from '@/components/settings/BankImportKeywords';
+import { TagManagement } from '@/components/settings/TagManagement';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
@@ -178,7 +179,7 @@ const Settings = () => {
   // Handle tab from URL query parameter - must be before any early returns
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['naming', 'recognition', 'categories', 'vendors', 'export', 'ai-learning', 'email-import'];
+  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'vendors', 'export', 'ai-learning', 'email-import'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'naming';
   const [activeTab, setActiveTab] = useState(initialTab);
   
@@ -430,7 +431,7 @@ const Settings = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="naming" className="gap-2">
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Umbenennung</span>
@@ -442,6 +443,10 @@ const Settings = () => {
             <TabsTrigger value="categories" className="gap-2">
               <Tags className="h-4 w-4" />
               <span className="hidden sm:inline">Kategorien</span>
+            </TabsTrigger>
+            <TabsTrigger value="tags" className="gap-2">
+              <Hash className="h-4 w-4" />
+              <span className="hidden sm:inline">Tags</span>
             </TabsTrigger>
             <TabsTrigger value="bank-keywords" className="gap-2">
               <Landmark className="h-4 w-4" />
@@ -896,6 +901,33 @@ const Settings = () => {
           animate={{ opacity: 1, y: 0 }}
         >
           <BankImportKeywords />
+        </motion.div>
+      </TabsContent>
+
+      {/* Tags Tab */}
+      <TabsContent value="tags">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Hash className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>Tags verwalten</CardTitle>
+                  <CardDescription>
+                    Organisiere Belege mit Tags für Projekte, Baustellen oder Veranstaltungen
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <TagManagement />
+            </CardContent>
+          </Card>
         </motion.div>
       </TabsContent>
     </Tabs>
