@@ -549,13 +549,32 @@ Erkenne das Land aus:
 
 Setze vendor_country als ISO-2-Code: AT, DE, CH, IT, FR, NL, ES, etc.
 
-Schritt B: SONDERFÄLLE ERKENNEN
-Setze special_vat_case wenn einer dieser Hinweise gefunden wird:
+Schritt B: 0% STEUERSATZ ERKENNEN
+**WICHTIG: 0% ist ein GÜLTIGER Steuersatz!**
+Wenn auf der Rechnung explizit steht:
+- "0% USt", "0,00% USt", "0.00% USt", "0% MwSt", "0,00% MwSt"
+- "USt 0%", "MwSt 0%", "VAT 0%"
+- "Steuersatz: 0%", "Steuersatz: 0.00%"
+- "USt.-Betrag: 0,00" oder "MwSt: € 0,00" (mit Steuersatz 0%)
+
+Dann setze:
+- vat_rate: 0 (NICHT null!)
+- vat_amount: 0
+- amount_net = amount_gross (da keine Steuer)
+
+Schritt C: SONDERFÄLLE ERKENNEN
+Setze special_vat_case NUR wenn einer dieser EXPLIZITEN Hinweise gefunden wird:
 - "Kleinunternehmer gemäß § 6 UStG" (AT) → special_vat_case: "kleinunternehmer", vat_rate: 0
 - "Kleinunternehmerregelung § 19 UStG" (DE) → special_vat_case: "kleinunternehmer", vat_rate: 0
 - "Reverse Charge" / "Steuerschuldnerschaft" → special_vat_case: "reverse_charge", vat_rate: 0
-- "Innergemeinschaftliche Lieferung" → special_vat_case: "ig_lieferung", vat_rate: 0
-- "Steuerfreie Ausfuhrlieferung" → special_vat_case: "export", vat_rate: 0
+- "Innergemeinschaftliche Lieferung" / "innergemeinschaftl. Lieferung" → special_vat_case: "ig_lieferung", vat_rate: 0
+- "Steuerfreie Ausfuhrlieferung" / "Ausfuhr" → special_vat_case: "export", vat_rate: 0
+- "Differenzbesteuerung" / "§ 25a UStG" → special_vat_case: null, vat_rate: 0 (Gebrauchtwarenhandel)
+
+**WENN 0% USt EXPLIZIT STEHT ABER KEIN SONDERFALL-HINWEIS:**
+- Setze vat_rate: 0, vat_amount: 0
+- Setze special_vat_case: null (kein Sonderfall erkennbar)
+- Dies ist trotzdem ein gültiger 0%-Beleg!
 
 Schritt C: VAT KONFIDENZ BEWERTEN
 Setze vat_confidence (0.00 - 1.00):
