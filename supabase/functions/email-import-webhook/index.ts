@@ -3,8 +3,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-signature",
 };
+
+// Rate limiting: Track requests per token
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const RATE_LIMIT_MAX_REQUESTS = 50; // Max 50 emails per hour per token
+
+// Maximum file size per attachment (10MB)
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+// Maximum total attachments per email
+const MAX_ATTACHMENTS_PER_EMAIL = 20;
 
 interface EmailAttachment {
   filename: string;
@@ -22,6 +32,50 @@ interface InboundEmail {
   attachments?: EmailAttachment[];
   // Token from email address like receipts+TOKEN@domain.com
   token?: string;
+}
+
+// Check rate limit for a token
+function checkRateLimit(token: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const record = rateLimitMap.get(token);
+
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(token, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1 };
+  }
+
+  if (record.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  record.count++;
+  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - record.count };
+}
+
+// Validate file content type
+function isValidContentType(contentType: string | undefined, filename: string): boolean {
+  const validMimeTypes = [
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+  ];
+  
+  const validExtensions = [".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp"];
+  const ext = filename.toLowerCase().match(/\.[^.]+$/)?.[0] || "";
+  
+  return validMimeTypes.includes(contentType?.toLowerCase() || "") || validExtensions.includes(ext);
+}
+
+// Sanitize filename to prevent path traversal
+function sanitizeFilename(filename: string): string {
+  // Remove path components and special characters
+  return filename
+    .replace(/[\/\\:*?"<>|]/g, "_")
+    .replace(/\.\./g, "_")
+    .replace(/^\.+/, "")
+    .slice(0, 255);
 }
 
 serve(async (req: Request) => {
@@ -99,11 +153,25 @@ serve(async (req: Request) => {
       }
     }
 
-    if (!token) {
-      console.error("No token found in email address");
+    if (!token || token.length < 12) {
+      console.error("No valid token found in email address");
       return new Response(JSON.stringify({ error: "Invalid import address" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Rate limiting check before database lookup
+    const rateLimit = checkRateLimit(token);
+    if (!rateLimit.allowed) {
+      console.warn("Rate limit exceeded for token:", token.slice(0, 4) + "...");
+      return new Response(JSON.stringify({ error: "Rate limit exceeded. Try again later." }), {
+        status: 429,
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "Retry-After": "3600",
+        },
       });
     }
 
@@ -116,7 +184,8 @@ serve(async (req: Request) => {
       .single();
 
     if (connectionError || !connection) {
-      console.error("Email connection not found for token:", token);
+      // Log failed attempts for security monitoring (don't expose token in logs)
+      console.error("Email connection not found for token:", token.slice(0, 4) + "...");
       return new Response(JSON.stringify({ error: "Invalid or inactive import address" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -149,13 +218,32 @@ serve(async (req: Request) => {
       console.error("Error creating import log:", importError);
     }
 
-    // Process attachments
-    const validAttachments = (emailData.attachments || []).filter((att) => {
-      const validTypes = ["application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp"];
-      return validTypes.includes(att.contentType?.toLowerCase() || "") || 
-             att.filename?.toLowerCase().endsWith(".pdf") ||
-             att.filename?.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/);
-    });
+    // Process attachments with security validation
+    const attachments = emailData.attachments || [];
+    
+    // Limit number of attachments
+    if (attachments.length > MAX_ATTACHMENTS_PER_EMAIL) {
+      console.warn(`Too many attachments (${attachments.length}), limiting to ${MAX_ATTACHMENTS_PER_EMAIL}`);
+    }
+    
+    const validAttachments = attachments
+      .slice(0, MAX_ATTACHMENTS_PER_EMAIL)
+      .filter((att) => {
+        // Validate content type and extension
+        if (!isValidContentType(att.contentType, att.filename || "")) {
+          console.log(`Skipping invalid content type: ${att.contentType} for ${att.filename}`);
+          return false;
+        }
+        
+        // Validate file size
+        const size = att.size || (att.content ? att.content.length * 0.75 : 0); // Base64 is ~4/3 of original
+        if (size > MAX_ATTACHMENT_SIZE) {
+          console.log(`Skipping oversized file: ${att.filename} (${size} bytes)`);
+          return false;
+        }
+        
+        return true;
+      });
 
     console.log("Valid attachments to process:", validAttachments.length);
 
@@ -172,10 +260,11 @@ serve(async (req: Request) => {
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         
-        // Generate unique filename
+        // Generate unique filename with proper sanitization
         const timestamp = Date.now();
-        const sanitizedFilename = attachment.filename.replace(/[^a-zA-Z0-9.-]/g, "_");
-        const storagePath = `${userId}/${timestamp}_${sanitizedFilename}`;
+        const randomSuffix = crypto.randomUUID().slice(0, 8);
+        const sanitizedFilename = sanitizeFilename(attachment.filename || "attachment");
+        const storagePath = `${userId}/${timestamp}_${randomSuffix}_${sanitizedFilename}`;
 
         // Create email attachment record first
         const { data: emailAttachment, error: attachmentError } = await supabase
