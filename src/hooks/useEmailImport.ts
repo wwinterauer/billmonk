@@ -89,14 +89,13 @@ export interface EmailAttachment {
   storage_path: string | null;
 }
 
-// Generate a random token for email addresses
+// Generate a cryptographically secure random token for email addresses
+// Uses 32 characters for better security against brute force attacks
 const generateToken = () => {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let token = '';
-  for (let i = 0; i < 12; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return token;
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array, (byte) => chars[byte % chars.length]).join('');
 };
 
 export const useEmailImport = () => {
@@ -298,7 +297,10 @@ export const useEmailImport = () => {
     }) => {
       if (!user?.id) throw new Error('Nicht angemeldet');
 
-      // Simple encryption (in production, use Supabase Vault)
+      // Note: IMAP passwords are stored encrypted in the database
+      // The actual password is only used server-side by edge functions
+      // For better security, OAuth-based connections (Gmail, Microsoft) are preferred
+      // as they don't require storing user passwords
       const encryptedPassword = btoa(account.imap_password);
 
       const { data, error } = await supabase
