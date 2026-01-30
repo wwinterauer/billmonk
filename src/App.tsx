@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { CameraButton } from "@/components/camera/CameraButton";
+import { CookieBanner } from "@/components/CookieBanner";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -114,6 +115,7 @@ const App = () => (
           </Routes>
           <InstallPrompt />
           <CameraButton />
+          <CookieBanner />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
