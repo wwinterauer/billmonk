@@ -31,6 +31,11 @@ interface ExtractionResult {
   payment_method: string | null;
   invoice_number: string | null;
   confidence: number;
+  // New international VAT fields
+  vendor_country?: string | null;
+  vat_confidence?: number | null;
+  vat_detection_method?: 'explicit' | 'calculated' | 'learned' | 'estimated' | null;
+  special_vat_case?: 'kleinunternehmer' | 'reverse_charge' | 'ig_lieferung' | 'export' | null;
 }
 
 interface MultiInvoiceResult {
@@ -498,16 +503,52 @@ WICHTIGE REGELN FÜR STEUER (MwSt./USt.) - GEZIELT NACH % SUCHEN:
    - Setze vat_rate = der erkannte Satz
    - tax_rate_details = null
 
-6. VALIDIERUNG - Übliche Steuersätze:
-   - Österreich: 0%, 10%, 13%, 20%
-   - Deutschland: 0%, 7%, 19%
-   - Schweiz: 0%, 2.5%, 3.7%, 7.7%
+6. VALIDIERUNG - Übliche Steuersätze nach Land:
+   - Österreich (AT): 0%, 10%, 13%, 20%
+   - Deutschland (DE): 0%, 7%, 19%
+   - Schweiz (CH): 0%, 2.6%, 3.8%, 8.1% (seit 2024)
+   - Italien (IT): 0%, 4%, 5%, 10%, 22%
+   - Frankreich (FR): 0%, 2.1%, 5.5%, 10%, 20%
+   - Niederlande (NL): 0%, 9%, 21%
+   - Spanien (ES): 0%, 4%, 10%, 21%
    - Falls unüblicher Wert (z.B. 25%, 15%): nochmal prüfen!
 
 7. BERECHNUNG ZUR KONTROLLE (wenn Netto+Brutto vorhanden):
    - Formel: ((Brutto / Netto) - 1) * 100 = Steuersatz
    - Beispiel: Brutto 311,04€, Netto 259,20€ → (311.04/259.20 - 1) * 100 = 20%
    - Nutze dies zur Validierung des gefundenen Satzes
+
+**ERWEITERT: Länder-Erkennung und internationale MwSt**
+
+Schritt A: LAND DES RECHNUNGSSTELLERS ERKENNEN
+Erkenne das Land aus:
+- UID-Nummer Format: ATU=Österreich, DE=Deutschland, CHE=Schweiz, IT=Italien, FR=Frankreich
+- Adresse im Briefkopf (PLZ, Stadt, Land)
+- Währung (CHF → Schweiz)
+- Sprache und Begriffe
+
+Setze vendor_country als ISO-2-Code: AT, DE, CH, IT, FR, NL, ES, etc.
+
+Schritt B: SONDERFÄLLE ERKENNEN
+Setze special_vat_case wenn einer dieser Hinweise gefunden wird:
+- "Kleinunternehmer gemäß § 6 UStG" (AT) → special_vat_case: "kleinunternehmer", vat_rate: 0
+- "Kleinunternehmerregelung § 19 UStG" (DE) → special_vat_case: "kleinunternehmer", vat_rate: 0
+- "Reverse Charge" / "Steuerschuldnerschaft" → special_vat_case: "reverse_charge", vat_rate: 0
+- "Innergemeinschaftliche Lieferung" → special_vat_case: "ig_lieferung", vat_rate: 0
+- "Steuerfreie Ausfuhrlieferung" → special_vat_case: "export", vat_rate: 0
+
+Schritt C: VAT KONFIDENZ BEWERTEN
+Setze vat_confidence (0.00 - 1.00):
+- 0.95-1.00: MwSt explizit angegeben UND Berechnung stimmt (Brutto = Netto + MwSt)
+- 0.80-0.94: MwSt explizit angegeben ODER aus Berechnung eindeutig
+- 0.50-0.79: MwSt aus Kontext abgeleitet, nicht explizit
+- 0.20-0.49: MwSt geschätzt basierend auf Land/Branche
+- 0.00-0.19: Keine MwSt-Information gefunden
+
+Setze vat_detection_method:
+- "explicit": MwSt-Satz stand explizit auf der Rechnung
+- "calculated": Aus Brutto/Netto-Differenz berechnet
+- "estimated": Geschätzt basierend auf Land/Kontext
 
 WEITERE REGELN:
 - Antworte NUR mit JSON, keine Markdown-Codeblöcke
@@ -531,7 +572,20 @@ WEITERE REGELN:
   "category": "...",
   "payment_method": "...",
   "invoice_number": "...",
-  "confidence": 0.95
+  "confidence": 0.95,
+  "vendor_country": "AT",
+  "vat_confidence": 0.92,
+  "vat_detection_method": "explicit",
+  "special_vat_case": null
+}
+
+Beispiel Kleinunternehmer:
+{
+  "vat_rate": 0,
+  "vendor_country": "AT",
+  "vat_confidence": 0.95,
+  "vat_detection_method": "explicit",
+  "special_vat_case": "kleinunternehmer"
 }`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -741,6 +795,11 @@ WEITERE REGELN:
             ai_raw_response: extractedData,
             ai_processed_at: new Date().toISOString(),
             status: 'review',
+            // New international VAT fields
+            vendor_country: extractedData.vendor_country || null,
+            vat_confidence: vatRateSource === 'learned' ? 1.0 : (extractedData.vat_confidence || null),
+            vat_detection_method: vatRateSource === 'learned' ? 'learned' : (extractedData.vat_detection_method || null),
+            special_vat_case: extractedData.special_vat_case || null,
           })
           .eq('id', receiptId);
 

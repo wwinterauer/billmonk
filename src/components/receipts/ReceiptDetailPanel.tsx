@@ -31,7 +31,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -98,15 +100,44 @@ interface ReceiptDetailPanelProps {
   onUpdate: () => void;
 }
 
-const VAT_RATES = [
-  { value: '20', label: '20% (AT normal)' },
-  { value: '19', label: '19% (DE normal)' },
-  { value: '13', label: '13% (AT ermäßigt)' },
-  { value: '10', label: '10% (AT ermäßigt)' },
-  { value: '7', label: '7% (DE ermäßigt)' },
-  { value: '0', label: '0% (Steuerfrei)' },
-  { value: 'mixed', label: 'Gemischt (mehrere Sätze)' },
+// International VAT rates grouped by country
+const VAT_RATE_GROUPS = [
+  {
+    label: 'Österreich',
+    rates: [
+      { value: '20', label: '20% (Normal)' },
+      { value: '13', label: '13% (Ermäßigt)' },
+      { value: '10', label: '10% (Ermäßigt)' },
+    ],
+  },
+  {
+    label: 'Deutschland',
+    rates: [
+      { value: '19', label: '19% (Normal)' },
+      { value: '7', label: '7% (Ermäßigt)' },
+    ],
+  },
+  {
+    label: 'Schweiz',
+    rates: [
+      { value: '8.1', label: '8.1% (Normal)' },
+      { value: '3.8', label: '3.8% (Beherbergung)' },
+      { value: '2.6', label: '2.6% (Ermäßigt)' },
+    ],
+  },
+  {
+    label: 'EU / Sonstige',
+    rates: [
+      { value: '22', label: '22% (IT)' },
+      { value: '21', label: '21% (ES/NL)' },
+      { value: '0', label: '0% (Steuerfrei)' },
+      { value: 'mixed', label: 'Gemischt (mehrere)' },
+    ],
+  },
 ];
+
+// Flattened list for backward compatibility  
+const VAT_RATES = VAT_RATE_GROUPS.flatMap(g => g.rates);
 
 interface TaxRateDetail {
   rate: number;
@@ -1320,32 +1351,69 @@ export function ReceiptDetailPanel({
                         }}
                         vatRateSource={(receipt as unknown as Record<string, unknown>)?.vat_rate_source as 'ai' | 'learned' | 'manual' | null}
                       >
-                        <Select 
-                          value={isMixedTaxRate ? 'mixed' : vatRate} 
-                          onValueChange={(value) => {
-                            if (value === 'mixed') {
-                              setIsMixedTaxRate(true);
-                              setVatRate('0');
-                            } else {
-                              setIsMixedTaxRate(false);
-                              setVatRate(value);
-                              setTaxRateDetails(null);
-                            }
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {VAT_RATES.map((rate) => (
-                              <SelectItem key={rate.value} value={rate.value}>
-                                {rate.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-2">
+                          <Select 
+                            value={isMixedTaxRate ? 'mixed' : vatRate} 
+                            onValueChange={(value) => {
+                              if (value === 'mixed') {
+                                setIsMixedTaxRate(true);
+                                setVatRate('0');
+                              } else {
+                                setIsMixedTaxRate(false);
+                                setVatRate(value);
+                                setTaxRateDetails(null);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {VAT_RATE_GROUPS.map(group => (
+                                <SelectGroup key={group.label}>
+                                  <SelectLabel>{group.label}</SelectLabel>
+                                  {group.rates.map(rate => (
+                                    <SelectItem key={rate.value} value={rate.value}>
+                                      {rate.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {/* Low VAT confidence warning */}
+                          {(receipt as unknown as Record<string, unknown>)?.vat_confidence !== null && 
+                           (receipt as unknown as Record<string, unknown>)?.vat_confidence !== undefined && 
+                           ((receipt as unknown as Record<string, unknown>)?.vat_confidence as number) < 0.7 && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                MwSt-Satz unsicher erkannt ({Math.round((((receipt as unknown as Record<string, unknown>)?.vat_confidence as number) || 0) * 100)}% Konfidenz). Bitte überprüfen.
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
                       </LearnableField>
                     </div>
+
+                    {/* Special VAT Case Badge */}
+                    {(receipt as unknown as Record<string, unknown>)?.special_vat_case && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 flex-wrap">
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-300">
+                          {(receipt as unknown as Record<string, unknown>)?.special_vat_case === 'kleinunternehmer' && 'Kleinunternehmer-Rechnung (0% MwSt)'}
+                          {(receipt as unknown as Record<string, unknown>)?.special_vat_case === 'reverse_charge' && 'Reverse-Charge (Steuerschuldnerschaft)'}
+                          {(receipt as unknown as Record<string, unknown>)?.special_vat_case === 'ig_lieferung' && 'Innergemeinschaftliche Lieferung'}
+                          {(receipt as unknown as Record<string, unknown>)?.special_vat_case === 'export' && 'Steuerfreie Ausfuhr'}
+                        </Badge>
+                        {(receipt as unknown as Record<string, unknown>)?.vendor_country && (
+                          <span className="text-xs text-muted-foreground">
+                            Land: {(receipt as unknown as Record<string, unknown>)?.vendor_country as string}
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Mixed Tax Rate Details */}
                     {isMixedTaxRate && taxRateDetails && taxRateDetails.length > 0 && (

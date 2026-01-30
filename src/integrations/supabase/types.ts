@@ -980,6 +980,7 @@ export type Database = {
           payment_method: string | null
           receipt_date: string | null
           source: string | null
+          special_vat_case: string | null
           split_from_receipt_id: string | null
           split_suggestion: Json | null
           status: string | null
@@ -988,10 +989,13 @@ export type Database = {
           user_id: string
           user_modified_fields: string[] | null
           vat_amount: number | null
+          vat_confidence: number | null
+          vat_detection_method: string | null
           vat_rate: number | null
           vat_rate_source: string | null
           vendor: string | null
           vendor_brand: string | null
+          vendor_country: string | null
           vendor_id: string | null
         }
         Insert: {
@@ -1028,6 +1032,7 @@ export type Database = {
           payment_method?: string | null
           receipt_date?: string | null
           source?: string | null
+          special_vat_case?: string | null
           split_from_receipt_id?: string | null
           split_suggestion?: Json | null
           status?: string | null
@@ -1036,10 +1041,13 @@ export type Database = {
           user_id: string
           user_modified_fields?: string[] | null
           vat_amount?: number | null
+          vat_confidence?: number | null
+          vat_detection_method?: string | null
           vat_rate?: number | null
           vat_rate_source?: string | null
           vendor?: string | null
           vendor_brand?: string | null
+          vendor_country?: string | null
           vendor_id?: string | null
         }
         Update: {
@@ -1076,6 +1084,7 @@ export type Database = {
           payment_method?: string | null
           receipt_date?: string | null
           source?: string | null
+          special_vat_case?: string | null
           split_from_receipt_id?: string | null
           split_suggestion?: Json | null
           status?: string | null
@@ -1084,10 +1093,13 @@ export type Database = {
           user_id?: string
           user_modified_fields?: string[] | null
           vat_amount?: number | null
+          vat_confidence?: number | null
+          vat_detection_method?: string | null
           vat_rate?: number | null
           vat_rate_source?: string | null
           vendor?: string | null
           vendor_brand?: string | null
+          vendor_country?: string | null
           vendor_id?: string | null
         }
         Relationships: [
