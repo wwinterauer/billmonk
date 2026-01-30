@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Download,
   RefreshCw,
+  Tag,
 } from 'lucide-react';
 import { PdfViewer } from '@/components/receipts/PdfViewer';
 import { MultiInvoiceAlert } from '@/components/receipts/MultiInvoiceAlert';
@@ -61,6 +62,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { TagSelector } from '@/components/tags/TagSelector';
 
 const VAT_RATES = [
   { value: '20', label: '20% (AT normal)' },
@@ -1072,6 +1074,20 @@ const Review = () => {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+
+                    {/* Tags */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-4 w-4 text-muted-foreground" />
+                        <Label>Tags</Label>
+                      </div>
+                      {currentReceipt && (
+                        <TagSelector
+                          receiptId={currentReceipt.id}
+                          size="sm"
+                        />
+                      )}
                     </div>
 
                     {/* Low Confidence Warning */}
