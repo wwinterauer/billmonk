@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Check, Minus, MoreHorizontal, Settings } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useTags } from '@/hooks/useTags';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import type { Tag, TagWithAssignment } from '@/types/tags';
@@ -38,8 +39,6 @@ export function TagSelector({
   const {
     activeTags,
     loading,
-    getTagsForReceipt,
-    getTagsForReceipts,
     assignTag,
     removeTag,
     bulkAssignTag,
@@ -51,45 +50,81 @@ export function TagSelector({
   const [tagStates, setTagStates] = useState<TagState[]>([]);
   const [loadingTags, setLoadingTags] = useState(true);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  
+  // Track if we've done initial load to prevent unnecessary re-fetches
+  const loadedRef = useRef<string>('');
 
   const isBulkMode = !!receiptIds && receiptIds.length > 0;
   const targetReceiptIds = isBulkMode ? receiptIds : receiptId ? [receiptId] : [];
 
+  // Stable string key for effect dependency
+  const receiptIdsKey = [...targetReceiptIds].sort().join(',');
+  
+  // Stable key for activeTags to prevent infinite loops
+  const activeTagsKey = activeTags.map(t => t.id).join(',');
+  
+  // Combined key for caching
+  const cacheKey = `${activeTagsKey}|${receiptId || ''}|${receiptIdsKey}`;
+
   // Load tag assignment states
   useEffect(() => {
+    // Avoid re-fetching if nothing changed
+    if (loadedRef.current === cacheKey) {
+      return;
+    }
+    
     const loadTagStates = async () => {
       if (activeTags.length === 0 || targetReceiptIds.length === 0) {
         setTagStates([]);
         setLoadingTags(false);
+        loadedRef.current = cacheKey;
         return;
       }
 
       setLoadingTags(true);
 
       try {
-        if (isBulkMode) {
-          // Bulk mode: Get tags with assignment counts
-          const tagsWithAssignments = await getTagsForReceipts(targetReceiptIds);
-          const states: TagState[] = activeTags.map(tag => {
-            const found = tagsWithAssignments.find(t => t.id === tag.id);
-            return {
-              ...tag,
-              isAssigned: found ? found.assignmentCount === targetReceiptIds.length : false,
-              assignmentCount: found?.assignmentCount || 0,
-              totalCount: targetReceiptIds.length,
-            };
+        if (isBulkMode && targetReceiptIds.length > 0) {
+          // Bulk mode: Get tags with assignment counts directly from supabase
+          const { data, error } = await supabase
+            .from('receipt_tags')
+            .select('receipt_id, tag_id')
+            .in('receipt_id', targetReceiptIds);
+          
+          if (error) throw error;
+          
+          // Count how many receipts have each tag
+          const tagCounts = new Map<string, number>();
+          (data || []).forEach(item => {
+            const count = tagCounts.get(item.tag_id) || 0;
+            tagCounts.set(item.tag_id, count + 1);
           });
+
+          const states: TagState[] = activeTags.map(tag => ({
+            ...tag,
+            isAssigned: tagCounts.get(tag.id) === targetReceiptIds.length,
+            assignmentCount: tagCounts.get(tag.id) || 0,
+            totalCount: targetReceiptIds.length,
+          }));
           setTagStates(states);
         } else if (receiptId) {
-          // Single mode: Get assigned tags
-          const assignedTags = await getTagsForReceipt(receiptId);
-          const assignedIds = new Set(assignedTags.map(t => t.id));
+          // Single mode: Get assigned tags directly from supabase
+          const { data, error } = await supabase
+            .from('receipt_tags')
+            .select('tag_id')
+            .eq('receipt_id', receiptId);
+          
+          if (error) throw error;
+          
+          const assignedIds = new Set((data || []).map(item => item.tag_id));
           const states: TagState[] = activeTags.map(tag => ({
             ...tag,
             isAssigned: assignedIds.has(tag.id),
           }));
           setTagStates(states);
         }
+        
+        loadedRef.current = cacheKey;
       } catch (error) {
         console.error('Error loading tag states:', error);
       } finally {
@@ -98,7 +133,7 @@ export function TagSelector({
     };
 
     loadTagStates();
-  }, [activeTags, receiptId, receiptIds?.join(',')]);
+  }, [cacheKey, activeTags, isBulkMode, receiptId, targetReceiptIds]);
 
   // Handle tag click
   const handleTagClick = async (tag: TagState) => {

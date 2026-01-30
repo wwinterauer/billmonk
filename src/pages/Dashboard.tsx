@@ -11,7 +11,8 @@ import {
   ArrowRight,
   Calendar,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Tag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,7 +63,9 @@ const Dashboard = () => {
     loading, 
     error, 
     stats, 
-    categoryData, 
+    categoryData,
+    tagData,
+    untaggedTotal,
     recentReceipts, 
     percentageChange,
     refetch 
@@ -453,6 +456,68 @@ const Dashboard = () => {
                         />
                       </PieChart>
                     </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Tag Statistics */}
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Tag className="h-4 w-4" />
+                  Ausgaben nach Tags
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                    ))}
+                  </div>
+                ) : tagData.length === 0 && untaggedTotal === 0 ? (
+                  <div className="py-4 text-center">
+                    <p className="text-sm text-muted-foreground">Keine Tag-Daten</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {tagData.slice(0, 5).map((tag) => (
+                      <div
+                        key={tag.id}
+                        className="flex items-center justify-between py-1.5"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div 
+                            className="h-3 w-3 rounded-full flex-shrink-0" 
+                            style={{ backgroundColor: tag.color }}
+                          />
+                          <span className="text-sm text-foreground truncate">{tag.name}</span>
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            {tag.count}
+                          </Badge>
+                        </div>
+                        <span className="text-sm font-medium text-foreground ml-2">
+                          {formatCurrency(tag.total)}
+                        </span>
+                      </div>
+                    ))}
+                    {untaggedTotal > 0 && (
+                      <div className="flex items-center justify-between py-1.5 border-t pt-2 mt-2">
+                        <span className="text-sm text-muted-foreground">(ohne Tags)</span>
+                        <span className="text-sm text-muted-foreground">
+                          {formatCurrency(untaggedTotal)}
+                        </span>
+                      </div>
+                    )}
+                    {tagData.length > 5 && (
+                      <p className="text-xs text-muted-foreground pt-1">
+                        +{tagData.length - 5} weitere Tags
+                      </p>
+                    )}
                   </div>
                 )}
               </CardContent>

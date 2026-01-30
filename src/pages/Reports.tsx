@@ -17,6 +17,7 @@ import {
   TrendingDown,
   Activity,
   Info,
+  Tag,
 } from 'lucide-react';
 import {
   PieChart,
@@ -128,7 +129,7 @@ const Reports = () => {
     }
   }, [periodType, selectedMonth, selectedYear, selectedQuarter, dateFrom, dateTo]);
 
-  // Fetch receipts data for selected period
+  // Fetch receipts data for selected period (with tags)
   const { data: receipts, isLoading } = useQuery({
     queryKey: ['reports', dateRange.from?.toISOString(), dateRange.to?.toISOString(), user?.id],
     queryFn: async () => {
@@ -136,14 +137,24 @@ const Reports = () => {
       
       const { data, error } = await supabase
         .from('receipts')
-        .select('*')
+        .select(`
+          *,
+          receipt_tags(tag:tags(id, name, color))
+        `)
         .eq('user_id', user.id)
         .gte('receipt_date', format(dateRange.from, 'yyyy-MM-dd'))
         .lte('receipt_date', format(dateRange.to, 'yyyy-MM-dd'))
         .eq('status', 'approved');
       
       if (error) throw error;
-      return data || [];
+      
+      // Transform tags into flat array
+      return (data || []).map(r => ({
+        ...r,
+        tags: (r.receipt_tags || [])
+          .map((rt: { tag: { id: string; name: string; color: string } | null }) => rt.tag)
+          .filter(Boolean) as Array<{ id: string; name: string; color: string }>,
+      }));
     },
     enabled: !!user && !!dateRange.from && !!dateRange.to,
   });
@@ -423,6 +434,47 @@ const Reports = () => {
     return Object.values(grouped).sort((a, b) => b.rate - a.rate);
   }, [receipts]);
 
+  // Tag data grouped by tag
+  const tagData = useMemo(() => {
+    if (!receipts) return { byTag: [], untagged: { amount: 0, count: 0 } };
+
+    const tagMap = new Map<string, { id: string; name: string; color: string; amount: number; count: number; vat: number }>();
+    let untaggedAmount = 0;
+    let untaggedCount = 0;
+
+    receipts.forEach((receipt) => {
+      const tags = receipt.tags as Array<{ id: string; name: string; color: string }> | undefined;
+      
+      if (!tags || tags.length === 0) {
+        untaggedAmount += receipt.amount_gross || 0;
+        untaggedCount += 1;
+      } else {
+        tags.forEach((tag) => {
+          const existing = tagMap.get(tag.id);
+          if (existing) {
+            existing.amount += receipt.amount_gross || 0;
+            existing.count += 1;
+            existing.vat += receipt.vat_amount || 0;
+          } else {
+            tagMap.set(tag.id, {
+              id: tag.id,
+              name: tag.name,
+              color: tag.color,
+              amount: receipt.amount_gross || 0,
+              count: 1,
+              vat: receipt.vat_amount || 0,
+            });
+          }
+        });
+      }
+    });
+
+    return {
+      byTag: Array.from(tagMap.values()).sort((a, b) => b.amount - a.amount),
+      untagged: { amount: untaggedAmount, count: untaggedCount },
+    };
+  }, [receipts]);
+
   // Quick period selection
   const setQuickPeriod = (period: 'thisMonth' | 'lastMonth' | 'thisYear') => {
     const now = new Date();
@@ -547,6 +599,24 @@ const Reports = () => {
     const catSheet = XLSX.utils.json_to_sheet(catData);
     XLSX.utils.book_append_sheet(workbook, catSheet, 'Kategorien');
 
+    // Tags sheet
+    const tagsSheetData = tagData.byTag.map((t) => ({
+      Tag: t.name,
+      Anzahl: t.count,
+      Brutto: t.amount,
+      Vorsteuer: t.vat,
+    }));
+    if (tagData.untagged.count > 0) {
+      tagsSheetData.push({
+        Tag: '(ohne Tags)',
+        Anzahl: tagData.untagged.count,
+        Brutto: tagData.untagged.amount,
+        Vorsteuer: 0,
+      });
+    }
+    const tagsSheet = XLSX.utils.json_to_sheet(tagsSheetData);
+    XLSX.utils.book_append_sheet(workbook, tagsSheet, 'Tags');
+
     // Vendors sheet
     const vendorSheetData = vendorData.map((v) => ({
       Lieferant: v.name,
@@ -568,12 +638,13 @@ const Reports = () => {
     const vatSheet = XLSX.utils.json_to_sheet(vatSheetData);
     XLSX.utils.book_append_sheet(workbook, vatSheet, 'MwSt');
 
-    // All receipts sheet
+    // All receipts sheet with tags
     const receiptsData = receipts.map((r) => ({
       Datum: r.receipt_date,
       Lieferant: r.vendor_brand || r.vendor,
       Beschreibung: r.description,
       Kategorie: r.category,
+      Tags: (r.tags as Array<{ name: string }> || []).map(t => t.name).join(', '),
       Brutto: r.amount_gross,
       Netto: r.amount_net,
       'MwSt-Satz': r.vat_rate,
@@ -592,7 +663,7 @@ const Reports = () => {
     });
   };
 
-  // Export to CSV
+  // Export to CSV with tags
   const exportToCSV = () => {
     if (!receipts || !dateRange.from || !dateRange.to) return;
 
@@ -601,6 +672,7 @@ const Reports = () => {
       'Lieferant',
       'Beschreibung',
       'Kategorie',
+      'Tags',
       'Brutto',
       'Netto',
       'MwSt-Satz',
@@ -613,6 +685,7 @@ const Reports = () => {
       r.vendor_brand || r.vendor || '',
       r.description || '',
       r.category || '',
+      (r.tags as Array<{ name: string }> || []).map(t => t.name).join(', '),
       r.amount_gross?.toFixed(2) || '',
       r.amount_net?.toFixed(2) || '',
       r.vat_rate?.toString() || '',
@@ -1221,6 +1294,87 @@ const Reports = () => {
                     <TableCell className="text-right font-medium">100%</TableCell>
                   </TableRow>
                 </TableFooter>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Tag Overview Section */}
+        <Card className="border-border/50 mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Tag className="h-5 w-5" />
+              Ausgaben nach Tags
+            </CardTitle>
+            <CardDescription>Aufschlüsselung nach Projekten und Tags</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-2">
+                {[...Array(4)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : tagData.byTag.length === 0 && tagData.untagged.count === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                Keine Tags für den gewählten Zeitraum
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tag</TableHead>
+                    <TableHead className="text-right">Anzahl</TableHead>
+                    <TableHead className="text-right">Brutto</TableHead>
+                    <TableHead className="text-right">Vorsteuer</TableHead>
+                    <TableHead className="text-right">Anteil</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tagData.byTag.map((tag) => (
+                    <TableRow key={tag.id}>
+                      <TableCell className="flex items-center gap-2">
+                        <div
+                          className="h-3 w-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                        <span className="font-medium">{tag.name}</span>
+                      </TableCell>
+                      <TableCell className="text-right">{tag.count}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(tag.amount)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(tag.vat)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {stats?.totalGross
+                          ? ((tag.amount / stats.totalGross) * 100).toFixed(1)
+                          : 0}
+                        %
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {tagData.untagged.count > 0 && (
+                    <TableRow className="text-muted-foreground">
+                      <TableCell className="flex items-center gap-2">
+                        <div className="h-3 w-3 rounded-full flex-shrink-0 bg-muted" />
+                        <span className="italic">(ohne Tags)</span>
+                      </TableCell>
+                      <TableCell className="text-right">{tagData.untagged.count}</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(tagData.untagged.amount)}
+                      </TableCell>
+                      <TableCell className="text-right">–</TableCell>
+                      <TableCell className="text-right">
+                        {stats?.totalGross
+                          ? ((tagData.untagged.amount / stats.totalGross) * 100).toFixed(1)
+                          : 0}
+                        %
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
               </Table>
             )}
           </CardContent>
