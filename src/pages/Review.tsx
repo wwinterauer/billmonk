@@ -39,7 +39,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -64,15 +66,44 @@ import { CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { TagSelector } from '@/components/tags/TagSelector';
 
-const VAT_RATES = [
-  { value: '20', label: '20% (AT normal)' },
-  { value: '19', label: '19% (DE normal)' },
-  { value: '13', label: '13% (AT ermäßigt)' },
-  { value: '10', label: '10% (AT ermäßigt)' },
-  { value: '7', label: '7% (DE ermäßigt)' },
-  { value: '0', label: '0% (Steuerfrei)' },
-  { value: 'mixed', label: 'Gemischt (mehrere Sätze)' },
+// International VAT rates grouped by country
+const VAT_RATE_GROUPS = [
+  {
+    label: 'Österreich',
+    rates: [
+      { value: '20', label: '20% (Normal)' },
+      { value: '13', label: '13% (Ermäßigt)' },
+      { value: '10', label: '10% (Ermäßigt)' },
+    ],
+  },
+  {
+    label: 'Deutschland',
+    rates: [
+      { value: '19', label: '19% (Normal)' },
+      { value: '7', label: '7% (Ermäßigt)' },
+    ],
+  },
+  {
+    label: 'Schweiz',
+    rates: [
+      { value: '8.1', label: '8.1% (Normal)' },
+      { value: '3.8', label: '3.8% (Beherbergung)' },
+      { value: '2.6', label: '2.6% (Ermäßigt)' },
+    ],
+  },
+  {
+    label: 'EU / Sonstige',
+    rates: [
+      { value: '22', label: '22% (IT)' },
+      { value: '21', label: '21% (ES/NL)' },
+      { value: '0', label: '0% (Steuerfrei)' },
+      { value: 'mixed', label: 'Gemischt (mehrere)' },
+    ],
+  },
 ];
+
+// Flattened list for backward compatibility
+const VAT_RATES = VAT_RATE_GROUPS.flatMap(g => g.rates);
 
 const PAYMENT_METHODS = [
   { value: 'Überweisung', label: 'Überweisung' },
@@ -971,6 +1002,25 @@ const Review = () => {
                               {currentReceipt?.vat_rate ? 'Von KI erkannt' : 'Nicht erkannt'}
                             </TooltipContent>
                           </Tooltip>
+                          {/* Low VAT confidence warning */}
+                          {(currentReceipt as any)?.vat_confidence !== null && 
+                           (currentReceipt as any)?.vat_confidence !== undefined && 
+                           (currentReceipt as any)?.vat_confidence < 0.7 && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                MwSt-Satz unsicher erkannt ({Math.round(((currentReceipt as any)?.vat_confidence || 0) * 100)}% Konfidenz). Bitte überprüfen.
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                          {/* Learned VAT badge */}
+                          {(currentReceipt as any)?.vat_detection_method === 'learned' && (
+                            <Badge variant="secondary" className="text-xs py-0 px-1.5">
+                              Gelernt
+                            </Badge>
+                          )}
                         </div>
                         <Select
                           value={formData.is_mixed_tax_rate ? 'mixed' : formData.vat_rate}
@@ -986,15 +1036,37 @@ const Review = () => {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {VAT_RATES.map(rate => (
-                              <SelectItem key={rate.value} value={rate.value}>
-                                {rate.label}
-                              </SelectItem>
+                            {VAT_RATE_GROUPS.map(group => (
+                              <SelectGroup key={group.label}>
+                                <SelectLabel>{group.label}</SelectLabel>
+                                {group.rates.map(rate => (
+                                  <SelectItem key={rate.value} value={rate.value}>
+                                    {rate.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
+
+                    {/* Special VAT Case Badge */}
+                    {(currentReceipt as any)?.special_vat_case && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-300">
+                          {(currentReceipt as any)?.special_vat_case === 'kleinunternehmer' && 'Kleinunternehmer-Rechnung (0% MwSt)'}
+                          {(currentReceipt as any)?.special_vat_case === 'reverse_charge' && 'Reverse-Charge (Steuerschuldnerschaft)'}
+                          {(currentReceipt as any)?.special_vat_case === 'ig_lieferung' && 'Innergemeinschaftliche Lieferung'}
+                          {(currentReceipt as any)?.special_vat_case === 'export' && 'Steuerfreie Ausfuhr'}
+                        </Badge>
+                        {(currentReceipt as any)?.vendor_country && (
+                          <span className="text-xs text-muted-foreground">
+                            Land: {(currentReceipt as any)?.vendor_country}
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Mixed Tax Rate Details */}
                     {formData.is_mixed_tax_rate && formData.tax_rate_details && formData.tax_rate_details.length > 0 && (
