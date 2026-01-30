@@ -89,6 +89,11 @@ export function useExportPreview() {
       if (col.field === 'vendor') {
         value = (receipt.vendor_data as Record<string, unknown>)?.display_name || receipt.vendor_brand || receipt.vendor;
       }
+      if (col.field === 'tags') {
+        // Format tags as comma-separated list
+        const tags = receipt.tags as Array<{ name: string }> | undefined;
+        value = tags && tags.length > 0 ? tags.map(t => t.name).join(', ') : '';
+      }
 
       // Apply formatting
       if (col.type === 'date' && value) {
@@ -113,40 +118,53 @@ export function useExportPreview() {
     const groups: Record<string, Record<string, unknown>[]> = {};
     
     receipts.forEach(receipt => {
-      let key: string;
+      let keys: string[] = [];
 
       switch (groupField) {
         case 'category':
-          key = String((receipt.category as Record<string, unknown>)?.name || receipt.category || 'Ohne Kategorie');
+          keys = [String((receipt.category as Record<string, unknown>)?.name || receipt.category || 'Ohne Kategorie')];
           break;
+        case 'tags': {
+          // Handle tags - a receipt can have multiple tags
+          const tags = receipt.tags as Array<{ name: string }> | undefined;
+          if (tags && tags.length > 0) {
+            keys = tags.map(t => t.name);
+          } else {
+            keys = ['Ohne Tags'];
+          }
+          break;
+        }
         case 'vendor':
-          key = String((receipt.vendor_data as Record<string, unknown>)?.display_name || receipt.vendor_brand || receipt.vendor || 'Unbekannt');
+          keys = [String((receipt.vendor_data as Record<string, unknown>)?.display_name || receipt.vendor_brand || receipt.vendor || 'Unbekannt')];
           break;
         case 'month': {
           const d = new Date(String(receipt.receipt_date));
-          key = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+          keys = [`${MONTHS[d.getMonth()]} ${d.getFullYear()}`];
           break;
         }
         case 'quarter': {
           const qd = new Date(String(receipt.receipt_date));
-          key = `Q${Math.ceil((qd.getMonth() + 1) / 3)} ${qd.getFullYear()}`;
+          keys = [`Q${Math.ceil((qd.getMonth() + 1) / 3)} ${qd.getFullYear()}`];
           break;
         }
         case 'year':
-          key = String(new Date(String(receipt.receipt_date)).getFullYear());
+          keys = [String(new Date(String(receipt.receipt_date)).getFullYear())];
           break;
         case 'vat_rate':
-          key = `${receipt.vat_rate || 0}%`;
+          keys = [`${receipt.vat_rate || 0}%`];
           break;
         case 'payment_method':
-          key = String(receipt.payment_method || 'Unbekannt');
+          keys = [String(receipt.payment_method || 'Unbekannt')];
           break;
         default:
-          key = 'Alle';
+          keys = ['Alle'];
       }
 
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(receipt);
+      // Add receipt to each matching group (allows multi-group for tags)
+      keys.forEach(key => {
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(receipt);
+      });
     });
     
     return groups;
@@ -224,9 +242,15 @@ export function useExportPreview() {
 
     setLoading(true);
     try {
+      // Fetch with tags
       let query = supabase
         .from('receipts')
-        .select('*, category:categories(id, name), vendor_data:vendors(id, display_name)')
+        .select(`
+          *,
+          category:categories(id, name),
+          vendor_data:vendors(id, display_name),
+          receipt_tags(tag:tags(id, name, color))
+        `)
         .eq('user_id', user.id);
 
       // Apply sorting
@@ -241,7 +265,13 @@ export function useExportPreview() {
 
       if (error) throw error;
 
-      const receipts = (data || []) as Record<string, unknown>[];
+      // Transform tags into flat array
+      const receipts = ((data || []) as Record<string, unknown>[]).map(r => ({
+        ...r,
+        tags: ((r.receipt_tags as Array<{ tag: { id: string; name: string; color: string } }>) || [])
+          .map(rt => rt.tag)
+          .filter(Boolean),
+      }));
       setRawData(receipts);
 
       // Calculate totals

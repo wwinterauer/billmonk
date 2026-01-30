@@ -44,13 +44,14 @@ export const DEFAULT_COLUMNS: ExportColumn[] = [
   { id: '3', field: 'description', label: 'Beschreibung', type: 'text', format: null, visible: true, order: 2, align: 'left' },
   { id: '4', field: 'invoice_number', label: 'Rechnungsnr.', type: 'text', format: null, visible: true, order: 3, align: 'left' },
   { id: '5', field: 'category', label: 'Kategorie', type: 'text', format: null, visible: true, order: 4, align: 'left' },
-  { id: '6', field: 'amount_gross', label: 'Brutto', type: 'currency', format: '€ #.##0,00', visible: true, order: 5, align: 'right' },
-  { id: '7', field: 'amount_net', label: 'Netto', type: 'currency', format: '€ #.##0,00', visible: true, order: 6, align: 'right' },
-  { id: '8', field: 'vat_rate', label: 'MwSt-Satz', type: 'percent', format: '#0%', visible: true, order: 7, align: 'right' },
-  { id: '9', field: 'vat_amount', label: 'Vorsteuer', type: 'currency', format: '€ #.##0,00', visible: true, order: 8, align: 'right' },
-  { id: '10', field: 'payment_method', label: 'Zahlungsart', type: 'text', format: null, visible: false, order: 9, align: 'left' },
-  { id: '11', field: 'status', label: 'Status', type: 'text', format: null, visible: false, order: 10, align: 'left' },
-  { id: '12', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 11, align: 'left' },
+  { id: '13', field: 'tags', label: 'Tags', type: 'text', format: null, visible: false, order: 5, align: 'left' },
+  { id: '6', field: 'amount_gross', label: 'Brutto', type: 'currency', format: '€ #.##0,00', visible: true, order: 6, align: 'right' },
+  { id: '7', field: 'amount_net', label: 'Netto', type: 'currency', format: '€ #.##0,00', visible: true, order: 7, align: 'right' },
+  { id: '8', field: 'vat_rate', label: 'MwSt-Satz', type: 'percent', format: '#0%', visible: true, order: 8, align: 'right' },
+  { id: '9', field: 'vat_amount', label: 'Vorsteuer', type: 'currency', format: '€ #.##0,00', visible: true, order: 9, align: 'right' },
+  { id: '10', field: 'payment_method', label: 'Zahlungsart', type: 'text', format: null, visible: false, order: 10, align: 'left' },
+  { id: '11', field: 'status', label: 'Status', type: 'text', format: null, visible: false, order: 11, align: 'left' },
+  { id: '12', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 12, align: 'left' },
 ];
 
 // Format preview function
@@ -119,6 +120,7 @@ export const SORTABLE_FIELDS = [
 // Available fields for grouping with icons
 export const GROUPING_OPTIONS = [
   { value: 'category', label: 'Kategorie', icon: 'Tag' },
+  { value: 'tags', label: 'Tags', icon: 'Tags' },
   { value: 'vendor', label: 'Lieferant', icon: 'Building' },
   { value: 'month', label: 'Monat', icon: 'Calendar' },
   { value: 'quarter', label: 'Quartal', icon: 'CalendarDays' },
@@ -132,6 +134,8 @@ export const getGroupPreview = (groupBy: string | null): string[] => {
   switch (groupBy) {
     case 'category':
       return ['Büromaterial', 'Software & Lizenzen', 'Reisekosten', '...'];
+    case 'tags':
+      return ['Baustelle Müller', 'Q1-2026', 'Projekt Alpha', '...'];
     case 'vendor':
       return ['Amazon', 'MediaMarkt', 'IKEA', '...'];
     case 'month':

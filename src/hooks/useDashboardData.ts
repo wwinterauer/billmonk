@@ -19,6 +19,14 @@ interface CategoryData {
   color: string | null;
 }
 
+interface TagData {
+  id: string;
+  name: string;
+  color: string;
+  total: number;
+  count: number;
+}
+
 interface RecentReceipt {
   id: string;
   receipt_date: string | null;
@@ -43,6 +51,8 @@ export function useDashboardData(year: number, month: number) {
     unmatchedTransactions: 0,
   });
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [tagData, setTagData] = useState<TagData[]>([]);
+  const [untaggedTotal, setUntaggedTotal] = useState(0);
   const [recentReceipts, setRecentReceipts] = useState<RecentReceipt[]>([]);
 
   const fetchDashboardData = async () => {
@@ -107,6 +117,18 @@ export function useDashboardData(year: number, month: number) {
 
       if (catError) throw catError;
 
+      // Fetch receipt tags for the current month (with tag details and receipt amounts)
+      const { data: receiptTags, error: tagsError } = await supabase
+        .from('receipt_tags')
+        .select(`
+          tag:tags(id, name, color),
+          receipt:receipts(id, amount_gross, created_at, user_id)
+        `)
+        .gte('receipt.created_at', startOfMonth.toISOString())
+        .lte('receipt.created_at', endOfMonth.toISOString());
+
+      if (tagsError) throw tagsError;
+
       // Calculate stats
       const receipts = currentMonthReceipts || [];
       const totalExpenses = receipts.reduce((sum, r) => sum + (r.amount_gross || 0), 0);
@@ -143,6 +165,40 @@ export function useDashboardData(year: number, month: number) {
         }))
         .sort((a, b) => b.total - a.total);
 
+      // Calculate tag totals
+      const tagMap = new Map<string, { id: string; name: string; color: string; total: number; count: number }>();
+      const taggedReceiptIds = new Set<string>();
+
+      (receiptTags || []).forEach((rt: { tag: { id: string; name: string; color: string } | null; receipt: { id: string; amount_gross: number | null; user_id: string } | null }) => {
+        if (!rt.tag || !rt.receipt) return;
+        if (rt.receipt.user_id !== user.id) return;
+
+        const tag = rt.tag;
+        taggedReceiptIds.add(rt.receipt.id);
+
+        const existing = tagMap.get(tag.id);
+        if (existing) {
+          existing.total += rt.receipt.amount_gross || 0;
+          existing.count += 1;
+        } else {
+          tagMap.set(tag.id, {
+            id: tag.id,
+            name: tag.name,
+            color: tag.color,
+            total: rt.receipt.amount_gross || 0,
+            count: 1,
+          });
+        }
+      });
+
+      const tagDataArray: TagData[] = Array.from(tagMap.values())
+        .sort((a, b) => b.total - a.total);
+
+      // Calculate untagged receipts total
+      const untaggedAmount = receipts
+        .filter(r => !taggedReceiptIds.has(r.id))
+        .reduce((sum, r) => sum + (r.amount_gross || 0), 0);
+
       setStats({
         totalExpenses,
         previousMonthExpenses,
@@ -155,6 +211,8 @@ export function useDashboardData(year: number, month: number) {
       });
 
       setCategoryData(catData);
+      setTagData(tagDataArray);
+      setUntaggedTotal(untaggedAmount);
       setRecentReceipts((recent || []) as RecentReceipt[]);
 
     } catch (err) {
@@ -180,6 +238,8 @@ export function useDashboardData(year: number, month: number) {
     error,
     stats,
     categoryData,
+    tagData,
+    untaggedTotal,
     recentReceipts,
     percentageChange,
     refetch: fetchDashboardData,
