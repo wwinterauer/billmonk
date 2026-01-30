@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Copy,
   Settings,
+  Tag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,6 +89,7 @@ import { SaveWithLearningDialog, type FieldChange } from './SaveWithLearningDial
 import { ManualTrainingModal } from './ManualTrainingModal';
 import { SourceBadge, NoReceiptBadge } from './SourceBadge';
 import { ReanalyzeOptions } from './ReanalyzeOptions';
+import { TagSelector } from '@/components/tags/TagSelector';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
@@ -1419,6 +1421,23 @@ export function ReceiptDetailPanel({
                         placeholder="Optionale Anmerkungen..."
                         rows={2}
                       />
+                    </div>
+
+                    {/* Tags */}
+                    <div className="pt-2 border-t">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Tag className="h-4 w-4 text-muted-foreground" />
+                        <Label>Tags</Label>
+                      </div>
+                      {receipt && (
+                        <TagSelector
+                          receiptId={receipt.id}
+                          size="md"
+                        />
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        Tags werden sofort gespeichert
+                      </p>
                     </div>
 
                     {/* Export Filename - at the bottom of the form */}
