@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Search, 
@@ -31,6 +31,7 @@ import {
   GitCompare,
   Square,
   RefreshCw,
+  Tag,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, startOfQuarter, endOfQuarter } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -61,6 +62,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu';
 import {
   Table,
@@ -85,13 +87,15 @@ import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
 import { useCategories } from '@/hooks/useCategories';
+import { useTags } from '@/hooks/useTags';
 import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
 import { ReceiptPreviewDialog } from '@/components/receipts/ReceiptPreviewDialog';
 import { DuplicateComparisonModal } from '@/components/receipts/DuplicateComparisonModal';
 import { ExportDialog } from '@/components/exports/ExportDialog';
 import { ExportFormatDialog, type ExportFormat } from '@/components/exports/ExportFormatDialog';
 import { ExportTemplateEditor } from '@/components/exports/ExportTemplateEditor';
-import { motion } from 'framer-motion';
+import { TagSelector } from '@/components/tags/TagSelector';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Copy, Scissors, Layers } from 'lucide-react';
@@ -106,7 +110,7 @@ import { SourceBadge, NoReceiptBadge } from '@/components/receipts/SourceBadge';
 type SortField = 'receipt_date' | 'vendor' | 'invoice_number' | 'amount_gross';
 type SortDirection = 'asc' | 'desc';
 
-type ColumnKey = 'date' | 'vendor' | 'invoice_number' | 'description' | 'category' | 'amount' | 'ai' | 'status';
+type ColumnKey = 'date' | 'vendor' | 'invoice_number' | 'description' | 'category' | 'tags' | 'amount' | 'ai' | 'status';
 
 const COLUMN_CONFIG: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
   { key: 'date', label: 'Datum', defaultVisible: true },
@@ -114,6 +118,7 @@ const COLUMN_CONFIG: { key: ColumnKey; label: string; defaultVisible: boolean }[
   { key: 'invoice_number', label: 'Rechnungsnr.', defaultVisible: true },
   { key: 'description', label: 'Beschreibung', defaultVisible: true },
   { key: 'category', label: 'Kategorie', defaultVisible: true },
+  { key: 'tags', label: 'Tags', defaultVisible: true },
   { key: 'amount', label: 'Betrag', defaultVisible: true },
   { key: 'ai', label: 'KI', defaultVisible: true },
   { key: 'status', label: 'Status', defaultVisible: true },
@@ -181,10 +186,14 @@ const Expenses = () => {
   const { user } = useAuth();
   const { getReceipts, updateReceipt, rejectReceipt, deleteReceipt, processReceiptWithAI } = useReceipts();
   const { categories } = useCategories();
+  const { tags, activeTags, getTagsForReceipt, getTagsForReceipts } = useTags();
 
   // Data state
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Receipt tags cache for table display
+  const [receiptTagsCache, setReceiptTagsCache] = useState<Record<string, { id: string; name: string; color: string }[]>>({});
 
   // Date range filter state - persist to localStorage
   const STORAGE_KEY = 'expenses-date-filter';
@@ -256,6 +265,7 @@ const Expenses = () => {
   );
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [invoiceFilter, setInvoiceFilter] = useState<string>('all');
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Column visibility state
@@ -577,6 +587,32 @@ const Expenses = () => {
         dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
       });
       setReceipts(data);
+      
+      // Load tags for all receipts for display
+      if (data.length > 0) {
+        const tagsData = await getTagsForReceipts(data.map(r => r.id));
+        // Build cache: group by receipt
+        const cache: Record<string, { id: string; name: string; color: string }[]> = {};
+        
+        // For each receipt, get its tags from the receipt_tags table
+        const { data: receiptTagsData } = await supabase
+          .from('receipt_tags')
+          .select('receipt_id, tag_id, tags(id, name, color)')
+          .in('receipt_id', data.map(r => r.id));
+        
+        if (receiptTagsData) {
+          for (const rt of receiptTagsData) {
+            const tagInfo = rt.tags as unknown as { id: string; name: string; color: string };
+            if (!cache[rt.receipt_id]) {
+              cache[rt.receipt_id] = [];
+            }
+            if (tagInfo) {
+              cache[rt.receipt_id].push(tagInfo);
+            }
+          }
+        }
+        setReceiptTagsCache(cache);
+      }
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -666,6 +702,20 @@ const Expenses = () => {
       result = result.filter(r => !r.invoice_number || r.invoice_number.trim() === '');
     }
 
+    // Tag filter
+    if (tagFilter.length > 0) {
+      if (tagFilter.includes('__none__')) {
+        // Show receipts without any tags
+        result = result.filter(r => !receiptTagsCache[r.id] || receiptTagsCache[r.id].length === 0);
+      } else {
+        // Show receipts that have at least one of the selected tags (OR logic)
+        result = result.filter(r => {
+          const receiptTags = receiptTagsCache[r.id] || [];
+          return receiptTags.some(t => tagFilter.includes(t.id));
+        });
+      }
+    }
+
     // Search filter (extended to include invoice_number and vendor_brand)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -710,7 +760,7 @@ const Expenses = () => {
     });
 
     return result;
-  }, [receipts, statusFilter, categoryFilter, searchQuery, sortField, sortDirection]);
+  }, [receipts, statusFilter, categoryFilter, tagFilter, receiptTagsCache, searchQuery, sortField, sortDirection]);
 
   // Pagination
   const totalPages = Math.ceil(filteredReceipts.length / ITEMS_PER_PAGE);
@@ -722,7 +772,7 @@ const Expenses = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, categoryFilter, invoiceFilter, searchQuery]);
+  }, [statusFilter, categoryFilter, invoiceFilter, tagFilter, searchQuery]);
 
   // Save column visibility to localStorage
   useEffect(() => {
@@ -1459,6 +1509,77 @@ const Expenses = () => {
             </SelectContent>
           </Select>
 
+          {/* Tag Filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="outline" 
+                className={cn(
+                  "w-[150px] justify-start",
+                  tagFilter.length > 0 && "border-primary text-primary"
+                )}
+              >
+                <Tag className="h-4 w-4 mr-2" />
+                {tagFilter.length === 0 
+                  ? 'Tags' 
+                  : tagFilter.includes('__none__')
+                    ? 'Ohne Tags'
+                    : `${tagFilter.length} Tag${tagFilter.length > 1 ? 's' : ''}`
+                }
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel className="text-xs">Nach Tags filtern</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={tagFilter.includes('__none__')}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setTagFilter(['__none__']);
+                  } else {
+                    setTagFilter(prev => prev.filter(t => t !== '__none__'));
+                  }
+                }}
+              >
+                <span className="text-muted-foreground">Ohne Tags</span>
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              {tags.map(tag => (
+                <DropdownMenuCheckboxItem
+                  key={tag.id}
+                  checked={tagFilter.includes(tag.id)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setTagFilter(prev => [...prev.filter(t => t !== '__none__'), tag.id]);
+                    } else {
+                      setTagFilter(prev => prev.filter(t => t !== tag.id));
+                    }
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: tag.color }}
+                    />
+                    <span className={!tag.is_active ? 'text-muted-foreground' : ''}>
+                      {tag.name}
+                      {!tag.is_active && ' (inaktiv)'}
+                    </span>
+                  </div>
+                </DropdownMenuCheckboxItem>
+              ))}
+              {tagFilter.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setTagFilter([])}>
+                    <X className="h-4 w-4 mr-2" />
+                    Filter zurücksetzen
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -1652,6 +1773,34 @@ const Expenses = () => {
               )}
               Ablehnen
             </Button>
+            
+            {/* Bulk Tags */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  disabled={bulkActionLoading !== null}
+                  className="border-primary/50 text-primary hover:bg-primary/10"
+                >
+                  <Tag className="h-4 w-4 mr-1" />
+                  Tags bearbeiten
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-3" align="start">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium mb-2">Tags für {selectedIds.size} Belege</p>
+                  <TagSelector
+                    receiptIds={Array.from(selectedIds)}
+                    size="sm"
+                    onChange={() => {
+                      toast({ title: `Tags für ${selectedIds.size} Belege aktualisiert` });
+                      loadReceipts();
+                    }}
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
             
             {/* Re-run AI with modes */}
             <DropdownMenu>
@@ -1866,6 +2015,9 @@ const Expenses = () => {
                         {visibleColumns.has('category') && (
                           <TableHead>Kategorie</TableHead>
                         )}
+                        {visibleColumns.has('tags') && (
+                          <TableHead>Tags</TableHead>
+                        )}
                         {visibleColumns.has('amount') && (
                           <TableHead 
                             className="text-right cursor-pointer hover:text-foreground"
@@ -1960,6 +2112,50 @@ const Expenses = () => {
                                   {receipt.category}
                                 </Badge>
                               ) : '—'}
+                            </TableCell>
+                          )}
+                          {visibleColumns.has('tags') && (
+                            <TableCell>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button 
+                                    className="flex items-center gap-1 hover:opacity-80 cursor-pointer min-h-[24px]"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {receiptTagsCache[receipt.id]?.length > 0 ? (
+                                      <>
+                                        {receiptTagsCache[receipt.id].slice(0, 2).map(tag => (
+                                          <Badge 
+                                            key={tag.id}
+                                            variant="secondary"
+                                            className="text-xs py-0.5 px-1.5 text-white"
+                                            style={{ backgroundColor: tag.color }}
+                                          >
+                                            {tag.name}
+                                          </Badge>
+                                        ))}
+                                        {receiptTagsCache[receipt.id].length > 2 && (
+                                          <Badge variant="outline" className="text-xs py-0.5 px-1.5">
+                                            +{receiptTagsCache[receipt.id].length - 2}
+                                          </Badge>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground">—</span>
+                                    )}
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-3" align="start">
+                                  <div className="space-y-2">
+                                    <p className="text-sm font-medium mb-2">Tags zuweisen</p>
+                                    <TagSelector
+                                      receiptId={receipt.id}
+                                      size="sm"
+                                      onChange={loadReceipts}
+                                    />
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             </TableCell>
                           )}
                           {visibleColumns.has('amount') && (
