@@ -32,12 +32,12 @@ export function CameraButton() {
         const file = files[0];
         const base64 = await fileToBase64(file);
 
+        // Note: userId is now extracted from auth token server-side, not passed in body
         const { data, error } = await supabase.functions.invoke('convert-image-to-pdf', {
           body: {
             imageData: base64.split(',')[1],
             fileName: file.name,
             contentType: file.type,
-            userId: user.id,
           }
         });
 
