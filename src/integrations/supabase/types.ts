@@ -504,6 +504,7 @@ export type Database = {
           attachment_size: number | null
           created_at: string | null
           duplicate_of: string | null
+          email_account_id: string | null
           email_connection_id: string
           email_from: string | null
           email_import_id: string | null
@@ -526,6 +527,7 @@ export type Database = {
           attachment_size?: number | null
           created_at?: string | null
           duplicate_of?: string | null
+          email_account_id?: string | null
           email_connection_id: string
           email_from?: string | null
           email_import_id?: string | null
@@ -548,6 +550,7 @@ export type Database = {
           attachment_size?: number | null
           created_at?: string | null
           duplicate_of?: string | null
+          email_account_id?: string | null
           email_connection_id?: string
           email_from?: string | null
           email_import_id?: string | null
@@ -570,6 +573,13 @@ export type Database = {
             columns: ["duplicate_of"]
             isOneToOne: false
             referencedRelation: "email_attachments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_attachments_email_account_id_fkey"
+            columns: ["email_account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
             referencedColumns: ["id"]
           },
           {
