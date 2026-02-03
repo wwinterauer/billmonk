@@ -374,6 +374,7 @@ serve(async (req) => {
 
     const body = await req.json();
     accountId = body.accountId;
+    const resync = body.resync === true; // Auch gelesene E-Mails erneut prüfen
 
     if (!accountId) {
       throw new Error("accountId ist erforderlich");
@@ -423,7 +424,7 @@ serve(async (req) => {
     console.log(`Mailbox opened: ${mailbox.exists} messages`);
 
     // E-Mails verarbeiten
-    const result = await processEmails(client, supabase, account);
+    const result = await processEmails(client, supabase, account, resync);
 
     // Verbindung schließen
     await client.logout();
@@ -487,7 +488,8 @@ serve(async (req) => {
 async function processEmails(
   client: SimpleImapClient, 
   supabase: any, 
-  account: any
+  account: any,
+  resync: boolean = false
 ): Promise<SyncResult> {
   const result: SyncResult = {
     processed: 0,
@@ -498,23 +500,40 @@ async function processEmails(
   };
 
   try {
-    // Ungelesene E-Mails suchen
-    let searchCriteria = "UNSEEN";
+    // E-Mails suchen - bei Resync auch gelesene E-Mails prüfen
+    let searchCriteria: string;
     
-    // Wenn wir eine letzte UID haben, nur neuere holen
-    if (account.last_synced_uid) {
+    if (resync) {
+      // Resync: Alle E-Mails der letzten 7 Tage prüfen (auch gelesene)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const dateStr = sevenDaysAgo.toISOString().split('T')[0].replace(/-/g, '');
+      // Format: SINCE 01-Feb-2026
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const d = sevenDaysAgo;
+      const imapDate = `${d.getDate()}-${months[d.getMonth()]}-${d.getFullYear()}`;
+      searchCriteria = `SINCE ${imapDate}`;
+      console.log(`Resync mode: searching emails since ${imapDate}`);
+    } else if (account.last_synced_uid) {
+      // Normal: Nur ungelesene E-Mails mit UID > last_synced_uid
       searchCriteria = `UID ${parseInt(account.last_synced_uid) + 1}:* UNSEEN`;
+    } else {
+      // Erster Sync: Nur ungelesene
+      searchCriteria = "UNSEEN";
     }
 
     const messageNums = await client.search(searchCriteria);
-    console.log(`Found ${messageNums.length} unread messages`);
+    console.log(`Found ${messageNums.length} messages matching criteria`);
 
     if (messageNums.length === 0) {
       return result;
     }
 
-    // Maximal 20 E-Mails pro Sync verarbeiten
-    const toProcess = messageNums.slice(0, 20);
+    // Bei Resync mehr E-Mails verarbeiten, da wir nach fehlenden suchen
+    const maxToProcess = resync ? 50 : 20;
+    // Neueste zuerst (höchste Message-Nummer = neueste)
+    const sortedNums = [...messageNums].sort((a, b) => b - a);
+    const toProcess = sortedNums.slice(0, maxToProcess);
 
     for (const msgNum of toProcess) {
       result.processed++;

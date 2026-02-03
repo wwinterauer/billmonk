@@ -505,7 +505,7 @@ export type Database = {
           created_at: string | null
           duplicate_of: string | null
           email_account_id: string | null
-          email_connection_id: string
+          email_connection_id: string | null
           email_from: string | null
           email_import_id: string | null
           email_message_id: string | null
@@ -528,7 +528,7 @@ export type Database = {
           created_at?: string | null
           duplicate_of?: string | null
           email_account_id?: string | null
-          email_connection_id: string
+          email_connection_id?: string | null
           email_from?: string | null
           email_import_id?: string | null
           email_message_id?: string | null
@@ -551,7 +551,7 @@ export type Database = {
           created_at?: string | null
           duplicate_of?: string | null
           email_account_id?: string | null
-          email_connection_id?: string
+          email_connection_id?: string | null
           email_from?: string | null
           email_import_id?: string | null
           email_message_id?: string | null
