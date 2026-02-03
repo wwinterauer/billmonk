@@ -586,11 +586,11 @@ async function processEmails(
             continue;
           }
 
-          // Email-Attachment Record erstellen
+          // Email-Attachment Record erstellen (email_account_id statt email_connection_id für IMAP)
           const { data: emailAttachment, error: attachmentError } = await supabase
             .from("email_attachments")
             .insert({
-              email_connection_id: account.id,
+              email_account_id: account.id,
               user_id: account.user_id,
               email_message_id: message.uid,
               email_subject: parsed.subject.substring(0, 255),
