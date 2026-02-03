@@ -399,7 +399,7 @@ export const useEmailImport = () => {
   // Trigger manual sync for email account with optimistic UI updates
   // Automatically selects correct sync function based on oauth_provider
   const syncEmailAccountMutation = useMutation({
-    mutationFn: async (accountId: string) => {
+    mutationFn: async ({ accountId, resync = false }: { accountId: string; resync?: boolean }) => {
       // Find account to determine correct sync function
       const account = emailAccounts.find(a => a.id === accountId);
       
@@ -412,10 +412,10 @@ export const useEmailImport = () => {
         functionName = 'sync-microsoft'; // To be implemented
       }
       
-      console.log(`Syncing account ${accountId} with ${functionName}`);
+      console.log(`Syncing account ${accountId} with ${functionName}${resync ? ' (resync mode)' : ''}`);
       
       const { data, error } = await supabase.functions.invoke(functionName, {
-        body: { accountId },
+        body: { accountId, resync },
       });
 
       if (error) throw error;
@@ -427,7 +427,7 @@ export const useEmailImport = () => {
       
       return data;
     },
-    onMutate: async (accountId: string) => {
+    onMutate: async ({ accountId }) => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['email-accounts', user?.id] });
       
@@ -463,7 +463,7 @@ export const useEmailImport = () => {
         });
       }
     },
-    onError: (error: Error, accountId: string, context) => {
+    onError: (error: Error, { accountId }) => {
       console.error('Error syncing email account:', error);
       
       // Rollback to previous state but with error status

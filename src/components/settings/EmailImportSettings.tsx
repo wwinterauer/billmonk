@@ -667,7 +667,7 @@ export const EmailImportSettings: React.FC = () => {
                           if (account.is_active && 
                               account.last_sync_status !== 'running' && 
                               account.last_sync_status !== 'syncing') {
-                            syncEmailAccount(account.id);
+                            syncEmailAccount({ accountId: account.id });
                           }
                         });
                       }}
@@ -711,25 +711,39 @@ export const EmailImportSettings: React.FC = () => {
                               checked={account.is_active}
                               onCheckedChange={(checked) => updateEmailAccount({ id: account.id, is_active: checked })}
                             />
-                            {/* Sync-Button */}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => syncEmailAccount(account.id)}
-                              disabled={isSyncingThis || !account.is_active}
-                            >
-                              {isSyncingThis ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                  Sync läuft...
-                                </>
-                              ) : (
-                                <>
-                                  <RefreshCw className="h-4 w-4 mr-2" />
-                                  Sync
-                                </>
-                              )}
-                            </Button>
+                            {/* Sync-Buttons */}
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => syncEmailAccount({ accountId: account.id })}
+                                disabled={isSyncingThis || !account.is_active}
+                                title="Neue E-Mails abrufen"
+                              >
+                                {isSyncingThis ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    Sync läuft...
+                                  </>
+                                ) : (
+                                  <>
+                                    <RefreshCw className="h-4 w-4 mr-2" />
+                                    Sync
+                                  </>
+                                )}
+                              </Button>
+                              {/* Resync-Button für bereits gelesene E-Mails */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => syncEmailAccount({ accountId: account.id, resync: true })}
+                                disabled={isSyncingThis || !account.is_active}
+                                title="Auch bereits gelesene E-Mails der letzten 7 Tage erneut prüfen"
+                                className="px-2"
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                              </Button>
+                            </div>
                             {/* Löschen */}
                             <AlertDialog>
                               <AlertDialogTrigger asChild>

@@ -79,7 +79,7 @@ export function OAuthProviderButtons({ existingAccounts, onSwitchToImap }: OAuth
                   variant="outline"
                   size="sm"
                   className="flex-1"
-                  onClick={() => syncEmailAccount(gmailAccount.id)}
+                  onClick={() => syncEmailAccount({ accountId: gmailAccount.id })}
                   disabled={gmailAccount.last_sync_status === 'running'}
                 >
                   {gmailAccount.last_sync_status === 'running' ? (
