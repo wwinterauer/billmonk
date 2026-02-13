@@ -1,161 +1,93 @@
 
-# Plan: Checklisten-Funktion für XpenzAI
+# Google Drive Integration - Implementierungsplan
 
-## Zusammenfassung
-Implementierung einer Checklisten-Funktion mit der Möglichkeit, mehrere Checklisten anzulegen (z.B. pro Quartal), Positionen mit abhakbaren Items zu verwalten und Links/Notizen hinzuzufügen.
+## Uebersicht
 
-## Vorgehensweise
+Die Google Drive Integration ermoeglicht zwei Hauptfunktionen:
+1. **Verbindung herstellen** - OAuth-Flow mit Google Drive Scopes
+2. **Automatisches Backup** - Inkrementelles Backup von Belegen als ZIP-Archiv nach Google Drive
 
-### Schritt 1: Datenbank-Schema erstellen
+## Aktueller Stand
 
-Zwei neue Tabellen werden angelegt:
+- Die Datenbank-Tabelle `cloud_connections` existiert bereits mit allen noetigen Feldern (OAuth-Tokens, Backup-Konfiguration, Zeitplan etc.)
+- Google OAuth Credentials (Client ID, Secret, Redirect URI) sind als Secrets konfiguriert
+- Der bestehende OAuth-Flow (oauth-start/oauth-callback) behandelt nur E-Mail (Gmail/Microsoft), nicht Google Drive
+- Upload-Seite hat Platzhalter-Buttons mit "Coming Soon" Badge
+- Settings-Seite hat noch keinen Cloud-Storage-Tab
 
-**Tabelle `checklists`:**
-- id, user_id, name, description, color, icon, is_archived, created_at, updated_at
-- Row-Level Security für benutzerspezifischen Zugriff
+## Implementierungsschritte
 
-**Tabelle `checklist_items`:**
-- id, checklist_id, user_id, name, notes, links (JSONB), is_completed, completed_at, sort_order, created_at, updated_at
-- Row-Level Security für benutzerspezifischen Zugriff
+### 1. OAuth-Flow fuer Google Drive erweitern
 
-**Zusätzliche Datenbankfunktion:**
-- `reset_checklist(p_checklist_id UUID)` - Setzt alle Items einer Checkliste zurück (alle Haken entfernen)
+**Edge Function `oauth-start`**: Provider "google_drive" hinzufuegen mit Drive-spezifischen Scopes:
+- `https://www.googleapis.com/auth/drive.file` (Dateien erstellen/lesen die die App erstellt hat)
+- `https://www.googleapis.com/auth/userinfo.email`
 
-### Schritt 2: Neue Seite erstellen
+**Edge Function `oauth-callback`**: Handler fuer "google_drive" Provider hinzufuegen, der die Tokens in `cloud_connections` statt `email_accounts` speichert.
 
-**Datei: `src/pages/Checklists.tsx`**
+### 2. Neuer Settings-Tab "Cloud-Speicher"
 
-Funktionen:
-- Übersicht aller Checklisten mit Fortschrittsanzeige
-- Checklisten erstellen, bearbeiten, löschen
-- Checklisten-Positionen hinzufügen, bearbeiten, löschen, abhaken
-- Links und Notizen pro Position
-- Farbauswahl für visuelle Unterscheidung
-- Zurücksetzen einer kompletten Checkliste
+Ein neuer Tab in den Einstellungen (10. Tab mit Cloud-Icon) mit:
+- **Verbindungsstatus**: Google Drive verbunden/nicht verbunden, E-Mail-Adresse
+- **Verbinden/Trennen Button**: Startet OAuth-Flow oder loescht Verbindung
+- **Backup-Konfiguration** (nur sichtbar wenn verbunden):
+  - Backup aktivieren/deaktivieren (Switch)
+  - Zeitplan: woechentlich oder monatlich
+  - Wochentag (bei woechentlich) oder Tag im Monat
+  - Uhrzeit
+  - Datei-Praefix (Standard: "XpenzAI-Backup")
+  - Status-Filter (welche Belege gesichert werden)
+  - Dateien einschliessen (PDFs mitschicken)
+  - Letztes Backup: Datum, Anzahl Belege, ggf. Fehler
 
-UI-Komponenten:
-- Aufklappbare Checklisten-Karten mit Fortschrittsbalken
-- Checkbox-Items mit optionalen Notizen und Links
-- Dialoge für Erstellen/Bearbeiten von Listen und Positionen
-- Bestätigungsdialog für Zurücksetzen
+### 3. Settings-Komponente `CloudStorageSettings.tsx`
 
-### Schritt 3: Route hinzufügen
+Neue Komponente die:
+- Bestehende `cloud_connections` fuer den User laedt
+- OAuth-Flow ueber `oauth-start` Edge Function startet
+- Backup-Einstellungen in `cloud_connections` speichert
+- Naechstes geplantes Backup berechnet und anzeigt
 
-In `src/App.tsx`:
-- Import der neuen Checklists-Komponente
-- Neue geschützte Route `/checklists`
+### 4. Edge Function `backup-to-drive`
 
-### Schritt 4: Navigation erweitern
+Neue Edge Function die:
+- Belege findet wo `cloud_backup_at IS NULL` (noch nie gesichert)
+- PDFs aus dem Storage-Bucket laedt
+- Dateien umbenennt (nach Naming-Settings)
+- Zusammenfassung als CSV generiert
+- Alles in ein ZIP-Archiv packt
+- ZIP nach Google Drive hochlaedt (mit Token-Refresh falls noetig)
+- `cloud_backup_at` bei gesicherten Belegen aktualisiert
+- Backup-Status in `cloud_connections` aktualisiert
 
-In `src/components/dashboard/Sidebar.tsx`:
-- Neuer Menüpunkt "Checklisten" mit ClipboardList-Icon
-- Position im Menü: nach "Berichte", vor "Einstellungen"
+### 5. Upload-Seite aktualisieren
 
----
+- "Coming Soon" Badge bei Google Drive entfernen
+- Button funktional machen: Wenn Verbindung besteht, Ordner-Auswahl anzeigen; sonst zu Settings weiterleiten
 
 ## Technische Details
 
-### Datenbank-Migration SQL
+### Neue/geaenderte Dateien
 
-```sql
--- Tabelle: checklists
-CREATE TABLE IF NOT EXISTS public.checklists (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  color TEXT DEFAULT '#8B5CF6',
-  icon TEXT DEFAULT 'clipboard-list',
-  is_archived BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
+| Datei | Aktion |
+|-------|--------|
+| `supabase/functions/oauth-start/index.ts` | Erweitern um "google_drive" Provider |
+| `supabase/functions/oauth-callback/index.ts` | Erweitern um "google_drive" Handler |
+| `supabase/functions/backup-to-drive/index.ts` | Neu erstellen |
+| `src/components/settings/CloudStorageSettings.tsx` | Neu erstellen |
+| `src/pages/Settings.tsx` | Neuen Tab "Cloud" hinzufuegen |
+| `src/pages/Upload.tsx` | Google Drive Button aktivieren |
+| `supabase/config.toml` | Neue Edge Function registrieren |
 
--- Tabelle: checklist_items  
-CREATE TABLE IF NOT EXISTS public.checklist_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  checklist_id UUID REFERENCES public.checklists(id) ON DELETE CASCADE NOT NULL,
-  user_id UUID NOT NULL,
-  name TEXT NOT NULL,
-  notes TEXT,
-  links JSONB DEFAULT '[]',
-  is_completed BOOLEAN DEFAULT false,
-  completed_at TIMESTAMPTZ,
-  sort_order INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
+### Datenbank-Migration
 
--- Indizes
-CREATE INDEX idx_checklists_user ON public.checklists(user_id, is_archived);
-CREATE INDEX idx_checklist_items_checklist ON public.checklist_items(checklist_id, sort_order);
+- Spalte `cloud_backup_at` in `receipts` Tabelle hinzufuegen (falls nicht vorhanden)
+- Redirect-URI fuer den Google Drive OAuth-Callback muss ggf. als neuer Secret oder als bestehende GOOGLE_REDIRECT_URI verwendet werden (gleicher Callback, anderer Provider-Parameter)
 
--- RLS aktivieren
-ALTER TABLE public.checklists ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.checklist_items ENABLE ROW LEVEL SECURITY;
+### Google Drive API Scopes
 
--- RLS Policies
-CREATE POLICY "Users can view own checklists" ON public.checklists
-  FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own checklists" ON public.checklists
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own checklists" ON public.checklists
-  FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own checklists" ON public.checklists
-  FOR DELETE USING (auth.uid() = user_id);
+Der Drive-OAuth-Flow nutzt eingeschraenkte Scopes (`drive.file`), sodass die App nur auf selbst erstellte Dateien zugreifen kann - nicht auf das gesamte Drive des Users.
 
-CREATE POLICY "Users can view own checklist items" ON public.checklist_items
-  FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own checklist items" ON public.checklist_items
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own checklist items" ON public.checklist_items
-  FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own checklist items" ON public.checklist_items
-  FOR DELETE USING (auth.uid() = user_id);
+### Voraussetzung
 
--- Funktion zum Zurücksetzen einer Checkliste
-CREATE OR REPLACE FUNCTION public.reset_checklist(p_checklist_id UUID)
-RETURNS void AS $$
-BEGIN
-  UPDATE public.checklist_items
-  SET 
-    is_completed = false,
-    completed_at = NULL,
-    updated_at = now()
-  WHERE checklist_id = p_checklist_id
-  AND user_id = auth.uid();
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-```
-
-### Komponenten-Struktur
-
-```text
-src/pages/Checklists.tsx
-├── Checklisten-Übersicht mit Cards
-├── Fortschrittsbalken pro Checkliste
-├── Expandable Items mit Checkboxen
-├── Dialog: Neue/Bearbeiten Checkliste
-├── Dialog: Neue/Bearbeiten Position
-└── AlertDialog: Zurücksetzen bestätigen
-```
-
-### Sidebar Navigation Update
-
-Neuer Eintrag im `navigation` Array:
-```typescript
-{ name: 'Checklisten', href: '/checklists', icon: ClipboardList }
-```
-
-Position: Nach "Berichte" (index 6), vor "Einstellungen" (index 7)
-
----
-
-## Betroffene Dateien
-
-| Datei | Änderung |
-|-------|----------|
-| `supabase/migrations/[timestamp].sql` | Neue Migration für Tabellen |
-| `src/pages/Checklists.tsx` | Neue Seite (ca. 600 Zeilen) |
-| `src/App.tsx` | Route hinzufügen |
-| `src/components/dashboard/Sidebar.tsx` | Menüpunkt hinzufügen |
+Die Google Cloud Console muss die Google Drive API aktiviert haben und die Redirect-URI muss dort hinterlegt sein (laut Memory bereits erledigt fuer `oauth-cloud-callback`). Falls ein separater Callback-Pfad gewuenscht ist, muss eine weitere Redirect-URI eingetragen werden.
