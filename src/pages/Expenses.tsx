@@ -143,6 +143,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   error: { label: 'Fehler', color: 'bg-red-500/10 text-red-600 border-red-500/20' },
   needs_splitting: { label: 'Aufteilen', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
   split: { label: 'Aufgeteilt', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
+  completed: { label: 'Abgeschlossen', color: 'bg-slate-500/10 text-slate-600 border-slate-500/20' },
 };
 
 type DateRangePreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'thisYear' | 'lastYear' | 'all' | 'custom';
@@ -861,7 +862,7 @@ const Expenses = () => {
   };
 
   // Bulk action states
-  const [bulkActionLoading, setBulkActionLoading] = useState<'approve' | 'reject' | 'review' | 'ai' | 'duplicateCheck' | null>(null);
+  const [bulkActionLoading, setBulkActionLoading] = useState<'approve' | 'reject' | 'review' | 'ai' | 'duplicateCheck' | 'completed' | null>(null);
   const [aiProgress, setAiProgress] = useState<{ current: number; total: number } | null>(null);
   const [showBulkReanalyzeConfirm, setShowBulkReanalyzeConfirm] = useState(false);
 
@@ -1039,6 +1040,60 @@ const Expenses = () => {
         title: `${count} Belege abgelehnt`,
         description: 'Dateien können erneut hochgeladen werden'
       });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setBulkActionLoading(null);
+    }
+  };
+
+  const handleBulkComplete = async () => {
+    setBulkActionLoading('completed');
+    try {
+      if (statusFilter === 'completed') {
+        for (const id of selectedIds) {
+          await updateReceipt(id, { status: 'approved' });
+        }
+        setReceipts(prev => prev.map(r => 
+          selectedIds.has(r.id) ? { ...r, status: 'approved' as const } : r
+        ));
+        const count = selectedIds.size;
+        setSelectedIds(new Set());
+        toast({ title: `${count} Belege zurück zu Genehmigt` });
+      } else {
+        const selectedReceipts = receipts.filter(r => selectedIds.has(r.id));
+        const approvedReceipts = selectedReceipts.filter(r => r.status === 'approved');
+        const skippedCount = selectedReceipts.length - approvedReceipts.length;
+        
+        for (const r of approvedReceipts) {
+          await updateReceipt(r.id, { status: 'completed' } as unknown as Partial<Receipt>);
+        }
+        
+        setReceipts(prev => prev.map(r => 
+          approvedReceipts.some(ar => ar.id === r.id) ? { ...r, status: 'completed' } as unknown as Receipt : r
+        ));
+        
+        setSelectedIds(new Set());
+        
+        if (approvedReceipts.length > 0 && skippedCount > 0) {
+          toast({ 
+            title: `${approvedReceipts.length} von ${selectedReceipts.length} abgeschlossen`,
+            description: `${skippedCount} übersprungen (nicht freigegeben)`
+          });
+        } else if (approvedReceipts.length > 0) {
+          toast({ title: `${approvedReceipts.length} Belege abgeschlossen` });
+        } else {
+          toast({ 
+            title: 'Keine Belege abgeschlossen',
+            description: 'Nur freigegebene Belege können abgeschlossen werden',
+            variant: 'destructive'
+          });
+        }
+      }
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -1773,6 +1828,39 @@ const Expenses = () => {
               )}
               Ablehnen
             </Button>
+            
+            {/* Complete / Revert to Approved */}
+            {statusFilter === 'completed' ? (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={handleBulkComplete}
+                disabled={bulkActionLoading !== null}
+                className="border-green-500/50 text-green-600 hover:bg-green-50 hover:text-green-700"
+              >
+                {bulkActionLoading === 'completed' ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                )}
+                Zurück zu Genehmigt
+              </Button>
+            ) : (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={handleBulkComplete}
+                disabled={bulkActionLoading !== null}
+                className="border-slate-500/50 text-slate-600 hover:bg-slate-50 hover:text-slate-700"
+              >
+                {bulkActionLoading === 'completed' ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Archive className="h-4 w-4 mr-1" />
+                )}
+                Abschließen
+              </Button>
+            )}
             
             {/* Bulk Tags */}
             <Popover>

@@ -612,7 +612,7 @@ export function ReceiptDetailPanel({
   }, [originalReceipt, vendor, invoiceNumber, receiptDate, amountGross, vatRate, description, category]);
 
   // Handle save click - show dialog if there are changes and vendor assigned
-  const handleSaveClick = (newStatus?: 'approved' | 'rejected' | 'review') => {
+  const handleSaveClick = (newStatus?: 'approved' | 'rejected' | 'review' | 'completed') => {
     const changes = calculateFieldChanges();
     const hasChanges = Object.keys(changes).length > 0;
     
@@ -628,7 +628,7 @@ export function ReceiptDetailPanel({
 
   // Execute save after dialog confirmation
   const executeSaveWithLearning = () => {
-    const pendingStatus = (window as unknown as { pendingSaveStatus?: 'approved' | 'rejected' | 'review' }).pendingSaveStatus;
+    const pendingStatus = (window as unknown as { pendingSaveStatus?: 'approved' | 'rejected' | 'review' | 'completed' }).pendingSaveStatus;
     setShowSaveDialog(false);
     
     // If user chose not to remember, we still save but skip the learning
@@ -640,7 +640,7 @@ export function ReceiptDetailPanel({
     handleSave(pendingStatus);
   };
 
-  const handleSave = async (newStatus?: 'approved' | 'rejected' | 'review') => {
+  const handleSave = async (newStatus?: 'approved' | 'rejected' | 'review' | 'completed') => {
     if (!receipt || !originalReceipt) return;
 
     setSaving(true);
@@ -771,10 +771,11 @@ export function ReceiptDetailPanel({
       setHasUnsavedAiChanges(false);
       setChangedFields({});
 
-      const statusMessages = {
+      const statusMessages: Record<string, string> = {
         approved: 'Beleg freigegeben',
         rejected: 'Beleg abgelehnt',
         review: 'Beleg zur Überprüfung',
+        completed: 'Beleg abgeschlossen',
       };
 
       toast({
@@ -1632,6 +1633,28 @@ export function ReceiptDetailPanel({
                       {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                       Freigeben
                     </Button>
+                    {receipt.status === 'approved' && (
+                      <Button
+                        variant="outline"
+                        className="border-slate-500 text-slate-600 hover:bg-slate-50 hover:text-slate-700"
+                        onClick={() => handleSaveClick('completed')}
+                        disabled={saving}
+                      >
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Abschließen
+                      </Button>
+                    )}
+                    {(receipt.status as string) === 'completed' && (
+                      <Button
+                        variant="outline"
+                        className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700"
+                        onClick={() => handleSaveClick('approved')}
+                        disabled={saving}
+                      >
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Zurück zu Genehmigt
+                      </Button>
+                    )}
                     <Button
                       className="gradient-primary hover:opacity-90"
                       onClick={() => handleSaveClick()}
