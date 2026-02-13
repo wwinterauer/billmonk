@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.encrypt-password]
 verify_jwt = false
+
+[functions.backup-to-drive]
+verify_jwt = false

@@ -1105,15 +1105,12 @@ const Upload = () => {
                   <Button 
                     variant="outline" 
                     className="h-auto py-4 flex-col gap-2 relative overflow-hidden"
-                    onClick={() => handleCloudImport('Google Drive')}
+                    onClick={() => navigate('/settings?tab=cloud-storage')}
                   >
-                    <Badge className="absolute top-2 right-2 text-xs bg-muted text-muted-foreground">
-                      Coming Soon
-                    </Badge>
                     <div className="h-10 w-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
                       <Cloud className="h-5 w-5 text-yellow-500" />
                     </div>
-                    <span className="text-muted-foreground">Google Drive</span>
+                    <span className="text-foreground">Google Drive</span>
                   </Button>
                   <Button 
                     variant="outline" 

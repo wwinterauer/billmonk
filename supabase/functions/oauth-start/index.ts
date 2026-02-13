@@ -18,6 +18,11 @@ const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email",
 ];
 
+const GOOGLE_DRIVE_SCOPES = [
+  "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/userinfo.email",
+];
+
 const MICROSOFT_SCOPES = [
   "https://graph.microsoft.com/Mail.Read",
   "https://graph.microsoft.com/Mail.ReadWrite",
@@ -51,8 +56,8 @@ serve(async (req) => {
 
     const { provider } = await req.json();
 
-    if (!provider || !["gmail", "microsoft"].includes(provider)) {
-      throw new Error("Ungültiger Provider. Erlaubt: gmail, microsoft");
+    if (!provider || !["gmail", "microsoft", "google_drive"].includes(provider)) {
+      throw new Error("Ungültiger Provider. Erlaubt: gmail, microsoft, google_drive");
     }
 
     // State Token generieren (CSRF-Schutz)
@@ -91,6 +96,23 @@ serve(async (req) => {
 
       authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
     } 
+    else if (provider === "google_drive") {
+      if (!GOOGLE_CLIENT_ID || !GOOGLE_REDIRECT_URI) {
+        throw new Error("Google OAuth ist nicht konfiguriert. Bitte GOOGLE_CLIENT_ID und GOOGLE_REDIRECT_URI in den Edge Function Secrets setzen.");
+      }
+
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: GOOGLE_REDIRECT_URI,
+        response_type: "code",
+        scope: GOOGLE_DRIVE_SCOPES.join(" "),
+        access_type: "offline",
+        prompt: "consent",
+        state: stateToken,
+      });
+
+      authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+    }
     else if (provider === "microsoft") {
       if (!MICROSOFT_CLIENT_ID || !MICROSOFT_REDIRECT_URI) {
         throw new Error("Microsoft OAuth ist nicht konfiguriert. Bitte MICROSOFT_CLIENT_ID und MICROSOFT_REDIRECT_URI in den Edge Function Secrets setzen.");
