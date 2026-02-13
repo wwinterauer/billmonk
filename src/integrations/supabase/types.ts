@@ -384,12 +384,16 @@ export type Database = {
           backup_file_prefix: string | null
           backup_folder_id: string | null
           backup_folder_path: string | null
+          backup_folder_structure: string | null
+          backup_include_csv: boolean | null
+          backup_include_excel: boolean | null
           backup_include_files: boolean | null
           backup_schedule_type: string | null
           backup_status_filter: string[] | null
           backup_template_id: string | null
           backup_time: string | null
           backup_weekday: number | null
+          backup_zip_pattern: string | null
           created_at: string | null
           display_name: string | null
           folder_path: string | null
@@ -415,12 +419,16 @@ export type Database = {
           backup_file_prefix?: string | null
           backup_folder_id?: string | null
           backup_folder_path?: string | null
+          backup_folder_structure?: string | null
+          backup_include_csv?: boolean | null
+          backup_include_excel?: boolean | null
           backup_include_files?: boolean | null
           backup_schedule_type?: string | null
           backup_status_filter?: string[] | null
           backup_template_id?: string | null
           backup_time?: string | null
           backup_weekday?: number | null
+          backup_zip_pattern?: string | null
           created_at?: string | null
           display_name?: string | null
           folder_path?: string | null
@@ -446,12 +454,16 @@ export type Database = {
           backup_file_prefix?: string | null
           backup_folder_id?: string | null
           backup_folder_path?: string | null
+          backup_folder_structure?: string | null
+          backup_include_csv?: boolean | null
+          backup_include_excel?: boolean | null
           backup_include_files?: boolean | null
           backup_schedule_type?: string | null
           backup_status_filter?: string[] | null
           backup_template_id?: string | null
           backup_time?: string | null
           backup_weekday?: number | null
+          backup_zip_pattern?: string | null
           created_at?: string | null
           display_name?: string | null
           folder_path?: string | null

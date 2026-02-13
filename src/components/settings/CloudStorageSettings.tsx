@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Cloud, Check, X, Loader2, Calendar, FileText, Shield, AlertCircle } from 'lucide-react';
+import { Cloud, Check, X, Loader2, Calendar, FileText, Shield, AlertCircle, Info } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,9 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useExportTemplates } from '@/hooks/useExportTemplates';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -29,6 +31,11 @@ interface CloudConnection {
   backup_file_prefix: string;
   backup_include_files: boolean;
   backup_status_filter: string[];
+  backup_template_id: string | null;
+  backup_include_excel: boolean;
+  backup_include_csv: boolean;
+  backup_zip_pattern: string;
+  backup_folder_structure: string;
   last_backup_at: string | null;
   last_backup_count: number | null;
   last_backup_error: string | null;
@@ -47,9 +54,21 @@ const WEEKDAYS = [
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'review', label: 'Geprüft' },
-  { value: 'approved', label: 'Genehmigt' },
   { value: 'pending', label: 'Ausstehend' },
+  { value: 'processing', label: 'In Verarbeitung' },
+  { value: 'review', label: 'Zur Prüfung' },
+  { value: 'approved', label: 'Genehmigt' },
+  { value: 'rejected', label: 'Abgelehnt' },
+  { value: 'completed', label: 'Abgeschlossen' },
+];
+
+const ZIP_PLACEHOLDERS = [
+  { key: '{prefix}', desc: 'Datei-Präfix' },
+  { key: '{datum}', desc: 'Datum (YYYY-MM-DD)' },
+  { key: '{zeit}', desc: 'Uhrzeit (HHmm)' },
+  { key: '{anzahl}', desc: 'Anzahl Belege' },
+  { key: '{monat}', desc: 'Monat (MM)' },
+  { key: '{jahr}', desc: 'Jahr (YYYY)' },
 ];
 
 export const CloudStorageSettings = () => {
@@ -60,6 +79,7 @@ export const CloudStorageSettings = () => {
   const [connecting, setConnecting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [connection, setConnection] = useState<CloudConnection | null>(null);
+  const { templates, loading: templatesLoading } = useExportTemplates();
 
   // Check for OAuth callback results
   useEffect(() => {
@@ -109,6 +129,11 @@ export const CloudStorageSettings = () => {
           backup_file_prefix: data.backup_file_prefix || 'XpenzAI-Backup',
           backup_include_files: data.backup_include_files ?? true,
           backup_status_filter: data.backup_status_filter || ['review'],
+          backup_template_id: data.backup_template_id,
+          backup_include_excel: (data as any).backup_include_excel ?? true,
+          backup_include_csv: (data as any).backup_include_csv ?? true,
+          backup_zip_pattern: (data as any).backup_zip_pattern || '{prefix}_{datum}_{zeit}',
+          backup_folder_structure: (data as any).backup_folder_structure || 'flat',
           last_backup_at: data.last_backup_at,
           last_backup_count: data.last_backup_count,
           last_backup_error: data.last_backup_error,
@@ -196,7 +221,12 @@ export const CloudStorageSettings = () => {
           backup_file_prefix: connection.backup_file_prefix,
           backup_include_files: connection.backup_include_files,
           backup_status_filter: connection.backup_status_filter,
-        })
+          backup_template_id: connection.backup_template_id,
+          backup_include_excel: connection.backup_include_excel,
+          backup_include_csv: connection.backup_include_csv,
+          backup_zip_pattern: connection.backup_zip_pattern,
+          backup_folder_structure: connection.backup_folder_structure,
+        } as any)
         .eq('id', connection.id);
 
       if (error) throw error;
@@ -234,7 +264,6 @@ export const CloudStorageSettings = () => {
         description: response.data?.message || 'Das Backup wird im Hintergrund durchgeführt.',
       });
 
-      // Reload connection to get updated backup status
       setTimeout(loadConnection, 3000);
     } catch (error) {
       toast({
@@ -257,6 +286,20 @@ export const CloudStorageSettings = () => {
       ? current.filter(s => s !== status)
       : [...current, status];
     updateConnection({ backup_status_filter: updated });
+  };
+
+  // Generate ZIP name preview
+  const getZipPreview = () => {
+    if (!connection) return '';
+    const now = new Date();
+    return connection.backup_zip_pattern
+      .replace('{prefix}', connection.backup_file_prefix || 'XpenzAI-Backup')
+      .replace('{datum}', format(now, 'yyyy-MM-dd'))
+      .replace('{zeit}', format(now, 'HHmm'))
+      .replace('{anzahl}', '12')
+      .replace('{monat}', format(now, 'MM'))
+      .replace('{jahr}', format(now, 'yyyy'))
+      + '.zip';
   };
 
   if (loading) {
@@ -334,7 +377,7 @@ export const CloudStorageSettings = () => {
         </CardContent>
       </Card>
 
-      {/* Backup Configuration - only visible when connected */}
+      {/* Backup Configuration */}
       {connection && (
         <Card>
           <CardHeader>
@@ -440,19 +483,70 @@ export const CloudStorageSettings = () => {
                   </div>
                 </div>
 
-                {/* Options */}
+                {/* Content Options */}
                 <div className="space-y-3">
+                  <Label className="text-base font-medium">Backup-Inhalte</Label>
+                  
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>PDF-Dateien einschließen</Label>
-                      <p className="text-xs text-muted-foreground">Original-PDFs in das Backup-Archiv packen</p>
+                      <p className="text-xs text-muted-foreground">Original-Belege (umbenannt) in das Backup-Archiv packen</p>
                     </div>
                     <Switch
                       checked={connection.backup_include_files}
                       onCheckedChange={(checked) => updateConnection({ backup_include_files: checked })}
                     />
                   </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Excel-Export (.xlsx)</Label>
+                      <p className="text-xs text-muted-foreground">Zusammenfassung als Excel-Datei nach Vorlage</p>
+                    </div>
+                    <Switch
+                      checked={connection.backup_include_excel}
+                      onCheckedChange={(checked) => updateConnection({ backup_include_excel: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>CSV-Export (.csv)</Label>
+                      <p className="text-xs text-muted-foreground">Zusammenfassung als CSV-Datei nach Vorlage</p>
+                    </div>
+                    <Switch
+                      checked={connection.backup_include_csv}
+                      onCheckedChange={(checked) => updateConnection({ backup_include_csv: checked })}
+                    />
+                  </div>
                 </div>
+
+                {/* Export Template Selection */}
+                {(connection.backup_include_excel || connection.backup_include_csv) && (
+                  <div className="space-y-2">
+                    <Label>Export-Vorlage</Label>
+                    <Select
+                      value={connection.backup_template_id || '__default__'}
+                      onValueChange={(value) => updateConnection({ backup_template_id: value === '__default__' ? null : value === '__none__' ? null : value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Vorlage wählen..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">Standard (alle Felder)</SelectItem>
+                        <SelectItem value="__none__">Keine Zusammenfassung</SelectItem>
+                        {!templatesLoading && templates.map(t => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}{t.is_default ? ' ⭐' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Vorlagen können unter Einstellungen → Export verwaltet werden
+                    </p>
+                  </div>
+                )}
 
                 {/* Status Filter */}
                 <div className="space-y-2">
@@ -470,6 +564,62 @@ export const CloudStorageSettings = () => {
                       </Badge>
                     ))}
                   </div>
+                </div>
+
+                {/* Incremental Backup Info */}
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    <span className="font-medium">Inkrementelles Backup:</span> Nur Belege die noch nie per Cloud-Backup gesichert wurden, werden eingeschlossen. Manuelle Exports (Download) sind davon unabhängig.
+                  </AlertDescription>
+                </Alert>
+
+                {/* ZIP Naming */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label>ZIP-Dateiname</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="font-medium mb-1">Verfügbare Platzhalter:</p>
+                          <div className="space-y-0.5 text-xs">
+                            {ZIP_PLACEHOLDERS.map(p => (
+                              <div key={p.key}><code>{p.key}</code> — {p.desc}</div>
+                            ))}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <Input
+                    value={connection.backup_zip_pattern}
+                    onChange={(e) => updateConnection({ backup_zip_pattern: e.target.value })}
+                    placeholder="{prefix}_{datum}_{zeit}"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Vorschau: <code className="bg-muted px-1 py-0.5 rounded">{getZipPreview()}</code>
+                  </p>
+                </div>
+
+                {/* Folder Structure */}
+                <div className="space-y-2">
+                  <Label>Ordnerstruktur in Google Drive</Label>
+                  <Select
+                    value={connection.backup_folder_structure}
+                    onValueChange={(value) => updateConnection({ backup_folder_structure: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="flat">Flach (alles in einen Ordner)</SelectItem>
+                      <SelectItem value="monthly">Nach Monat (YYYY/MM/)</SelectItem>
+                      <SelectItem value="category">Nach Kategorie</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Save Button */}
