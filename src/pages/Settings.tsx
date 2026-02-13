@@ -13,7 +13,6 @@ import {
   Loader2,
   Receipt,
   CreditCard,
-  Settings2,
   Tags,
   Building,
   Table2,
@@ -21,6 +20,7 @@ import {
   Brain,
   Mail,
   Landmark,
+  Cloud,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,6 +54,7 @@ import { ProcessingRetry } from '@/components/settings/ProcessingRetry';
 import { EmailImportSettings } from '@/components/settings/EmailImportSettings';
 import { BankImportKeywords } from '@/components/settings/BankImportKeywords';
 import { TagManagement } from '@/components/settings/TagManagement';
+import { CloudStorageSettings } from '@/components/settings/CloudStorageSettings';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
@@ -179,7 +180,7 @@ const Settings = () => {
   // Handle tab from URL query parameter - must be before any early returns
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'vendors', 'export', 'ai-learning', 'email-import'];
+  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'naming';
   const [activeTab, setActiveTab] = useState(initialTab);
   
@@ -431,7 +432,7 @@ const Settings = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-9">
+          <TabsList className="grid w-full grid-cols-10">
             <TabsTrigger value="naming" className="gap-2">
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Umbenennung</span>
@@ -467,6 +468,10 @@ const Settings = () => {
             <TabsTrigger value="email-import" className="gap-2">
               <Mail className="h-4 w-4" />
               <span className="hidden sm:inline">E-Mail</span>
+            </TabsTrigger>
+            <TabsTrigger value="cloud-storage" className="gap-2">
+              <Cloud className="h-4 w-4" />
+              <span className="hidden sm:inline">Cloud</span>
             </TabsTrigger>
           </TabsList>
 
@@ -928,6 +933,16 @@ const Settings = () => {
               <TagManagement />
             </CardContent>
           </Card>
+        </motion.div>
+      </TabsContent>
+
+      {/* Cloud Storage Tab */}
+      <TabsContent value="cloud-storage">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <CloudStorageSettings />
         </motion.div>
       </TabsContent>
     </Tabs>

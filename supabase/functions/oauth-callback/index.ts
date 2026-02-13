@@ -19,16 +19,16 @@ serve(async (req) => {
   const errorDescription = url.searchParams.get("error_description");
 
   // Redirect Helper
-  const redirectWithError = (message: string) => {
-    const redirectUrl = `${FRONTEND_URL}/settings?tab=email-import&oauth_error=${encodeURIComponent(message)}`;
+  const redirectWithError = (message: string, tab = "email-import") => {
+    const redirectUrl = `${FRONTEND_URL}/settings?tab=${tab}&oauth_error=${encodeURIComponent(message)}`;
     return new Response(null, {
       status: 302,
       headers: { Location: redirectUrl },
     });
   };
 
-  const redirectWithSuccess = (provider: string) => {
-    const redirectUrl = `${FRONTEND_URL}/settings?tab=email-import&oauth_success=${provider}`;
+  const redirectWithSuccess = (provider: string, tab = "email-import") => {
+    const redirectUrl = `${FRONTEND_URL}/settings?tab=${tab}&oauth_success=${provider}`;
     return new Response(null, {
       status: 302,
       headers: { Location: redirectUrl },
@@ -160,7 +160,105 @@ serve(async (req) => {
       if (!userEmail) {
         throw new Error("Keine E-Mail-Adresse vom Microsoft-Konto erhalten");
       }
-    } 
+    }
+    // === GOOGLE DRIVE ===
+    else if (provider === "google_drive") {
+      if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI) {
+        throw new Error("Google OAuth nicht vollständig konfiguriert");
+      }
+
+      // Token Exchange
+      const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code,
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: GOOGLE_REDIRECT_URI,
+          grant_type: "authorization_code",
+        }),
+      });
+
+      tokens = await tokenResponse.json();
+
+      if (tokens.error) {
+        console.error("Google Drive token error:", tokens);
+        throw new Error(tokens.error_description || tokens.error);
+      }
+
+      // User-Info abrufen
+      const userInfoResponse = await fetch(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        { headers: { Authorization: `Bearer ${tokens.access_token}` } }
+      );
+      
+      if (!userInfoResponse.ok) {
+        throw new Error("Konnte Google-Benutzerdaten nicht abrufen");
+      }
+      
+      const userInfo = await userInfoResponse.json();
+      userEmail = userInfo.email;
+
+      if (!userEmail) {
+        throw new Error("Keine E-Mail-Adresse vom Google-Konto erhalten");
+      }
+
+      // Save to cloud_connections instead of email_accounts
+      const expiresAt = new Date(Date.now() + (tokens.expires_in || 3600) * 1000);
+
+      const { data: existingConnection } = await supabase
+        .from("cloud_connections")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("provider", "google_drive")
+        .maybeSingle();
+
+      if (existingConnection) {
+        const { error: updateError } = await supabase
+          .from("cloud_connections")
+          .update({
+            oauth_access_token: tokens.access_token,
+            oauth_refresh_token: tokens.refresh_token || null,
+            oauth_token_expires_at: expiresAt.toISOString(),
+            display_name: userEmail,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingConnection.id);
+
+        if (updateError) {
+          throw new Error(`Cloud-Verbindung Update fehlgeschlagen: ${updateError.message}`);
+        }
+        console.log(`Updated Google Drive connection: ${existingConnection.id}`);
+      } else {
+        const { error: insertError } = await supabase
+          .from("cloud_connections")
+          .insert({
+            user_id,
+            provider: "google_drive",
+            display_name: userEmail,
+            oauth_access_token: tokens.access_token,
+            oauth_refresh_token: tokens.refresh_token || null,
+            oauth_token_expires_at: expiresAt.toISOString(),
+            is_active: true,
+            backup_enabled: false,
+            backup_schedule_type: "weekly",
+            backup_weekday: 1,
+            backup_time: "02:00",
+            backup_file_prefix: "XpenzAI-Backup",
+            backup_include_files: true,
+            backup_status_filter: ["review"],
+          });
+
+        if (insertError) {
+          throw new Error(`Cloud-Verbindung Erstellung fehlgeschlagen: ${insertError.message}`);
+        }
+        console.log(`Created Google Drive connection for ${userEmail}`);
+      }
+
+      return redirectWithSuccess(provider, "cloud-storage");
+    }
     else {
       throw new Error(`Unbekannter Provider: ${provider}`);
     }
@@ -214,7 +312,7 @@ serve(async (req) => {
           email_address: userEmail,
           display_name: userEmail,
           imap_username: userEmail,
-          imap_password_encrypted: "", // Not used for OAuth
+          imap_password_encrypted: "",
           oauth_provider: provider,
           oauth_access_token: tokens.access_token,
           oauth_refresh_token: tokens.refresh_token || null,
