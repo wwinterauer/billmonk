@@ -358,7 +358,22 @@ const Review = () => {
       await updateReceipt(currentReceipt.id, updateData as Partial<Receipt>);
 
       // Track corrections for AI learning
-      if (currentReceipt.vendor_id) {
+      // Use existing vendor_id, or look up vendor by name if not linked
+      let trackingVendorId = currentReceipt.vendor_id;
+      if (!trackingVendorId && formData.vendor) {
+        const { data: matchedVendor } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
+          .or(`display_name.ilike.%${formData.vendor}%,legal_name.ilike.%${formData.vendor}%`)
+          .limit(1)
+          .maybeSingle();
+        if (matchedVendor) {
+          trackingVendorId = matchedVendor.id;
+        }
+      }
+
+      if (trackingVendorId) {
         const fieldsToTrack = [
           { fieldName: 'vat_rate', detected: currentReceipt.vat_rate, corrected: formData.is_mixed_tax_rate ? null : (parseFloat(formData.vat_rate) || null) },
           { fieldName: 'amount_gross', detected: currentReceipt.amount_gross, corrected: gross },
@@ -375,13 +390,14 @@ const Review = () => {
             detectedValue: f.detected,
             correctedValue: f.corrected,
             receiptId: currentReceipt.id,
-            vendorId: currentReceipt.vendor_id!,
+            vendorId: trackingVendorId!,
           }));
 
         if (corrections.length > 0) {
           trackCorrections(corrections);
+          console.log(`[AI Learning] Tracked ${corrections.length} corrections for vendor ${trackingVendorId}`);
         } else {
-          trackSuccessfulPrediction(currentReceipt.id, currentReceipt.vendor_id);
+          trackSuccessfulPrediction(currentReceipt.id, trackingVendorId);
         }
       }
 
