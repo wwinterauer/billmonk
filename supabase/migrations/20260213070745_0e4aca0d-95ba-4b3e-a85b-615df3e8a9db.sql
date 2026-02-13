@@ -1,0 +1,2 @@
+ALTER TABLE public.email_accounts DROP CONSTRAINT email_accounts_last_sync_status_check;
+ALTER TABLE public.email_accounts ADD CONSTRAINT email_accounts_last_sync_status_check CHECK (last_sync_status = ANY (ARRAY['pending', 'running', 'success', 'error', 'partial', 'idle']));
