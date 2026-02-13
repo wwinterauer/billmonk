@@ -219,6 +219,33 @@ export type Database = {
           },
         ]
       }
+      blocked_senders: {
+        Row: {
+          created_at: string | null
+          id: string
+          reason: string | null
+          sender_email: string
+          sender_name: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          reason?: string | null
+          sender_email: string
+          sender_name?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          reason?: string | null
+          sender_email?: string
+          sender_name?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           color: string | null
@@ -352,38 +379,105 @@ export type Database = {
       cloud_connections: {
         Row: {
           access_token: string | null
+          backup_day_of_month: number | null
+          backup_enabled: boolean | null
+          backup_file_prefix: string | null
+          backup_folder_id: string | null
+          backup_folder_path: string | null
+          backup_include_files: boolean | null
+          backup_schedule_type: string | null
+          backup_status_filter: string[] | null
+          backup_template_id: string | null
+          backup_time: string | null
+          backup_weekday: number | null
           created_at: string | null
+          display_name: string | null
           folder_path: string | null
           id: string
           is_active: boolean | null
+          last_backup_at: string | null
+          last_backup_count: number | null
+          last_backup_error: string | null
           last_sync: string | null
+          next_backup_at: string | null
+          oauth_access_token: string | null
+          oauth_refresh_token: string | null
+          oauth_token_expires_at: string | null
           provider: string | null
           refresh_token: string | null
+          updated_at: string | null
           user_id: string
         }
         Insert: {
           access_token?: string | null
+          backup_day_of_month?: number | null
+          backup_enabled?: boolean | null
+          backup_file_prefix?: string | null
+          backup_folder_id?: string | null
+          backup_folder_path?: string | null
+          backup_include_files?: boolean | null
+          backup_schedule_type?: string | null
+          backup_status_filter?: string[] | null
+          backup_template_id?: string | null
+          backup_time?: string | null
+          backup_weekday?: number | null
           created_at?: string | null
+          display_name?: string | null
           folder_path?: string | null
           id?: string
           is_active?: boolean | null
+          last_backup_at?: string | null
+          last_backup_count?: number | null
+          last_backup_error?: string | null
           last_sync?: string | null
+          next_backup_at?: string | null
+          oauth_access_token?: string | null
+          oauth_refresh_token?: string | null
+          oauth_token_expires_at?: string | null
           provider?: string | null
           refresh_token?: string | null
+          updated_at?: string | null
           user_id: string
         }
         Update: {
           access_token?: string | null
+          backup_day_of_month?: number | null
+          backup_enabled?: boolean | null
+          backup_file_prefix?: string | null
+          backup_folder_id?: string | null
+          backup_folder_path?: string | null
+          backup_include_files?: boolean | null
+          backup_schedule_type?: string | null
+          backup_status_filter?: string[] | null
+          backup_template_id?: string | null
+          backup_time?: string | null
+          backup_weekday?: number | null
           created_at?: string | null
+          display_name?: string | null
           folder_path?: string | null
           id?: string
           is_active?: boolean | null
+          last_backup_at?: string | null
+          last_backup_count?: number | null
+          last_backup_error?: string | null
           last_sync?: string | null
+          next_backup_at?: string | null
+          oauth_access_token?: string | null
+          oauth_refresh_token?: string | null
+          oauth_token_expires_at?: string | null
           provider?: string | null
           refresh_token?: string | null
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "cloud_connections_backup_template_id_fkey"
+            columns: ["backup_template_id"]
+            isOneToOne: false
+            referencedRelation: "export_templates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cloud_connections_user_id_fkey"
             columns: ["user_id"]
@@ -966,6 +1060,7 @@ export type Database = {
           bank_transaction_id: string | null
           bank_transaction_reference: string | null
           category: string | null
+          cloud_backup_at: string | null
           created_at: string | null
           currency: string | null
           custom_filename: string | null
@@ -1018,6 +1113,7 @@ export type Database = {
           bank_transaction_id?: string | null
           bank_transaction_reference?: string | null
           category?: string | null
+          cloud_backup_at?: string | null
           created_at?: string | null
           currency?: string | null
           custom_filename?: string | null
@@ -1070,6 +1166,7 @@ export type Database = {
           bank_transaction_id?: string | null
           bank_transaction_reference?: string | null
           category?: string | null
+          cloud_backup_at?: string | null
           created_at?: string | null
           currency?: string | null
           custom_filename?: string | null
