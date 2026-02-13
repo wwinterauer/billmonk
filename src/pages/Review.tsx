@@ -60,6 +60,7 @@ import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
 import { useCategories } from '@/hooks/useCategories';
+import { useCorrectionTracking } from '@/hooks/useCorrectionTracking';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarIcon } from 'lucide-react';
@@ -143,6 +144,7 @@ const Review = () => {
   const { toast } = useToast();
   const { getReceipts, updateReceipt, getReceiptFileUrl } = useReceipts();
   const { categories } = useCategories();
+  const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const queryClient = useQueryClient();
 
   // State
@@ -354,6 +356,34 @@ const Review = () => {
       }
 
       await updateReceipt(currentReceipt.id, updateData as Partial<Receipt>);
+
+      // Track corrections for AI learning
+      if (currentReceipt.vendor_id) {
+        const fieldsToTrack = [
+          { fieldName: 'vat_rate', detected: currentReceipt.vat_rate, corrected: formData.is_mixed_tax_rate ? null : (parseFloat(formData.vat_rate) || null) },
+          { fieldName: 'amount_gross', detected: currentReceipt.amount_gross, corrected: gross },
+          { fieldName: 'vendor', detected: currentReceipt.vendor, corrected: formData.vendor || null },
+          { fieldName: 'vendor_brand', detected: currentReceipt.vendor_brand, corrected: formData.vendor_brand || null },
+          { fieldName: 'invoice_number', detected: currentReceipt.invoice_number, corrected: formData.invoice_number || null },
+          { fieldName: 'category', detected: currentReceipt.category, corrected: formData.category || null },
+        ];
+
+        const corrections = fieldsToTrack
+          .filter(f => String(f.detected ?? '') !== String(f.corrected ?? ''))
+          .map(f => ({
+            fieldName: f.fieldName,
+            detectedValue: f.detected,
+            correctedValue: f.corrected,
+            receiptId: currentReceipt.id,
+            vendorId: currentReceipt.vendor_id!,
+          }));
+
+        if (corrections.length > 0) {
+          trackCorrections(corrections);
+        } else {
+          trackSuccessfulPrediction(currentReceipt.id, currentReceipt.vendor_id);
+        }
+      }
 
       if (newStatus) {
         // Remove from list and go to next
