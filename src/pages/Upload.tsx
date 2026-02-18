@@ -13,7 +13,8 @@ import {
   Sparkles,
   Clock,
   PenLine,
-  Copy
+  Copy,
+  Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,12 +48,13 @@ interface PendingReceiptFromDB {
   id: string;
   fileName: string;
   fileUrl: string | null;
-  status: 'pending' | 'processing' | 'review' | 'rejected' | 'not_a_receipt' | 'duplicate';
+  status: 'pending' | 'processing' | 'review' | 'approved' | 'rejected' | 'not_a_receipt' | 'duplicate';
   aiConfidence: number | null;
   createdAt: string;
   vendor: string | null;
   amountGross: number | null;
   notes: string | null;
+  autoApproved: boolean;
 }
 
 interface VendorDecisionQueueItem {
@@ -119,9 +121,9 @@ const Upload = () => {
 
         const { data, error } = await supabase
           .from('receipts')
-          .select('id, file_name, file_url, status, ai_confidence, created_at, vendor, amount_gross, notes')
+          .select('id, file_name, file_url, status, ai_confidence, created_at, vendor, amount_gross, notes, auto_approved')
           .eq('user_id', user.id)
-          .or(`status.in.(processing,pending,not_a_receipt,duplicate),and(status.in.(review,rejected),created_at.gte.${twoHoursAgo})`)
+          .or(`status.in.(processing,pending,not_a_receipt,duplicate),and(status.in.(review,rejected,approved),created_at.gte.${twoHoursAgo})`)
           .order('created_at', { ascending: false })
           .limit(200);
 
@@ -132,12 +134,13 @@ const Upload = () => {
             id: r.id,
             fileName: r.file_name || 'Unbekannte Datei',
             fileUrl: r.file_url,
-            status: r.status as 'pending' | 'processing' | 'review' | 'rejected' | 'not_a_receipt' | 'duplicate',
+            status: r.status as PendingReceiptFromDB['status'],
             aiConfidence: r.ai_confidence,
             createdAt: r.created_at,
             vendor: r.vendor,
             amountGross: r.amount_gross,
             notes: r.notes,
+            autoApproved: r.auto_approved ?? false,
           })));
         }
       } catch (err) {
@@ -1285,7 +1288,9 @@ const Upload = () => {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         className={`flex items-center gap-4 p-3 rounded-lg ${
-                          receipt.status === 'review' 
+                          receipt.status === 'approved'
+                            ? 'bg-success/10 border border-success/20'
+                            : receipt.status === 'review' 
                             ? 'bg-success/10 border border-success/20' 
                             : receipt.status === 'duplicate'
                             ? 'bg-warning/10 border border-warning/20'
@@ -1295,7 +1300,9 @@ const Upload = () => {
                         }`}
                       >
                         <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                          receipt.status === 'review' 
+                          receipt.status === 'approved'
+                            ? 'bg-success'
+                            : receipt.status === 'review' 
                             ? 'bg-success' 
                             : receipt.status === 'duplicate'
                             ? 'bg-warning'
@@ -1303,7 +1310,9 @@ const Upload = () => {
                             ? 'bg-destructive'
                             : 'bg-primary/10'
                         }`}>
-                          {receipt.status === 'review' ? (
+                          {receipt.status === 'approved' ? (
+                            <Zap className="h-4 w-4 text-success-foreground" />
+                          ) : receipt.status === 'review' ? (
                             <Check className="h-4 w-4 text-success-foreground" />
                           ) : receipt.status === 'duplicate' ? (
                             <Copy className="h-4 w-4 text-warning-foreground" />
@@ -1322,7 +1331,9 @@ const Upload = () => {
                             <Badge 
                               variant="secondary" 
                               className={`text-xs ${
-                                receipt.status === 'review'
+                                receipt.status === 'approved'
+                                  ? 'bg-success/20 text-success-foreground border-success/30'
+                                  : receipt.status === 'review'
                                   ? 'bg-success/20 text-success-foreground border-success/30'
                                   : receipt.status === 'duplicate'
                                   ? 'bg-warning/20 text-warning border-warning/30'
@@ -1333,7 +1344,11 @@ const Upload = () => {
                                   : 'bg-muted text-muted-foreground'
                               }`}
                             >
-                              {receipt.status === 'review' 
+                              {receipt.status === 'approved' && receipt.autoApproved
+                                ? 'Auto-freigegeben'
+                                : receipt.status === 'approved'
+                                ? 'Freigegeben'
+                                : receipt.status === 'review' 
                                 ? `Fertig${receipt.aiConfidence ? ` (${Math.round(receipt.aiConfidence * 100)}%)` : ''}`
                                 : receipt.status === 'duplicate'
                                 ? 'Duplikat'
@@ -1360,7 +1375,9 @@ const Upload = () => {
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          {receipt.status === 'review' ? (
+                          {receipt.status === 'approved' ? (
+                            <Zap className="h-4 w-4 text-success" />
+                          ) : receipt.status === 'review' ? (
                             <Check className="h-4 w-4 text-success" />
                           ) : receipt.status === 'duplicate' ? (
                             <Copy className="h-4 w-4 text-warning" />

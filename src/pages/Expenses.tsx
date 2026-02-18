@@ -98,7 +98,7 @@ import { TagSelector } from '@/components/tags/TagSelector';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { Copy, Scissors, Layers } from 'lucide-react';
+import { Copy, Scissors, Layers, Zap } from 'lucide-react';
 import { checkForDuplicates, type DuplicateCheckResult } from '@/services/duplicateDetectionService';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -2280,6 +2280,16 @@ const Expenses = () => {
                                   {receipt.status === 'needs_splitting' && <Scissors className="w-3 h-3 mr-1" />}
                                   {STATUS_CONFIG[receipt.status]?.label || receipt.status}
                                 </Badge>
+                                {/* Auto-approved badge */}
+                                {(receipt as any).auto_approved && (receipt.status === 'approved' || receipt.status === 'split') && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="bg-success/10 text-success border-success/30 text-xs"
+                                  >
+                                    <Zap className="w-3 h-3 mr-1" />
+                                    Automatisch freigegeben
+                                  </Badge>
+                                )}
                                 {/* Split-from indicator for child receipts */}
                                 {receipt.split_from_receipt_id && (
                                   <Badge 

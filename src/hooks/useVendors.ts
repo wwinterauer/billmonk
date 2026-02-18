@@ -19,6 +19,9 @@ export interface Vendor {
   learning_level: number;
   correction_count: number;
   prediction_accuracy: number | null;
+  // Auto-approve fields
+  auto_approve: boolean;
+  auto_approve_min_confidence: number;
   created_at: string;
   updated_at: string;
 }
@@ -85,6 +88,8 @@ export function useVendors() {
           learning_level: v.learning_level ?? 0,
           correction_count: v.correction_count ?? 0,
           prediction_accuracy: v.prediction_accuracy ?? null,
+          auto_approve: v.auto_approve ?? false,
+          auto_approve_min_confidence: v.auto_approve_min_confidence ?? 0.8,
         };
       }) as Vendor[];
 
@@ -152,6 +157,8 @@ export function useVendors() {
       learning_level: data.learning_level ?? 0,
       correction_count: data.correction_count ?? 0,
       prediction_accuracy: data.prediction_accuracy ?? null,
+      auto_approve: data.auto_approve ?? false,
+      auto_approve_min_confidence: data.auto_approve_min_confidence ?? 0.8,
     } as Vendor;
 
     setVendors(prev => [...prev, newVendor].sort((a, b) => 
@@ -162,7 +169,7 @@ export function useVendors() {
 
   const updateVendor = async (
     id: string,
-    updates: Partial<Pick<Vendor, 'display_name' | 'legal_name' | 'detected_names' | 'default_category_id' | 'default_vat_rate' | 'notes' | 'website'>>
+    updates: Partial<Pick<Vendor, 'display_name' | 'legal_name' | 'detected_names' | 'default_category_id' | 'default_vat_rate' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence'>>
   ): Promise<{ vendor: Vendor; syncedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
 
@@ -228,6 +235,8 @@ export function useVendors() {
       learning_level: data.learning_level ?? 0,
       correction_count: data.correction_count ?? 0,
       prediction_accuracy: data.prediction_accuracy ?? null,
+      auto_approve: data.auto_approve ?? false,
+      auto_approve_min_confidence: data.auto_approve_min_confidence ?? 0.8,
     } as Vendor;
 
     setVendors(prev => prev.map(v => v.id === id ? updated : v).sort((a, b) => 
