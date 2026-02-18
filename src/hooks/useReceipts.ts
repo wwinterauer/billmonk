@@ -56,6 +56,8 @@ export interface Receipt {
   is_no_receipt_entry: boolean | null;
   bank_import_keyword_id: string | null;
   bank_transaction_reference: string | null;
+  // Auto-approve
+  auto_approved: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -505,12 +507,35 @@ export function useReceipts() {
         }
       }
 
+      // Auto-approve logic: check if vendor has auto_approve enabled
+      if (updateData.vendor_id) {
+        const { data: vendorData } = await supabase
+          .from('vendors')
+          .select('auto_approve, auto_approve_min_confidence')
+          .eq('id', updateData.vendor_id)
+          .single();
+
+        if (vendorData?.auto_approve) {
+          const confidence = updateData.ai_confidence ?? 0;
+          const minConfidence = vendorData.auto_approve_min_confidence ?? 0.8;
+          const isDuplicate = updateData.is_duplicate === true;
+          const needsSplitting = updateData.status === 'needs_splitting' || 
+            (updateData.split_suggestion && typeof updateData.split_suggestion === 'object' && 
+             (updateData.split_suggestion as any)?.contains_multiple_invoices === true);
+
+          if (confidence >= minConfidence && !isDuplicate && !needsSplitting) {
+            updateData.status = 'approved';
+            (updateData as any).auto_approved = true;
+          }
+        }
+      }
+
       onProgress?.(90, 'Speichern...');
 
       // Update receipt with extracted data
       const updated = await updateReceipt(receiptId, updateData);
 
-      onProgress?.(100, 'Zur Überprüfung');
+      onProgress?.(100, updateData.status === 'approved' ? 'Auto-freigegeben' : 'Zur Überprüfung');
 
       return { 
         receipt: updated, 
@@ -615,6 +640,34 @@ export function useReceipts() {
           .update({ legal_name: extractedData.vendor })
           .eq('id', vendor.id)
           .is('legal_name', null);
+      }
+
+      // Auto-approve logic for manual vendor selection
+      const { data: vendorAutoData } = await supabase
+        .from('vendors')
+        .select('auto_approve, auto_approve_min_confidence')
+        .eq('id', vendor.id)
+        .single();
+
+      if (vendorAutoData?.auto_approve) {
+        // Load current receipt to check for duplicates/splitting
+        const { data: currentReceipt } = await supabase
+          .from('receipts')
+          .select('ai_confidence, is_duplicate, split_suggestion, status')
+          .eq('id', receiptId)
+          .single();
+
+        const confidence = currentReceipt?.ai_confidence ?? extractedData.ai_confidence ?? 0;
+        const minConfidence = vendorAutoData.auto_approve_min_confidence ?? 0.8;
+        const isDuplicate = currentReceipt?.is_duplicate === true;
+        const needsSplitting = currentReceipt?.status === 'needs_splitting' ||
+          (currentReceipt?.split_suggestion && typeof currentReceipt.split_suggestion === 'object' &&
+           (currentReceipt.split_suggestion as any)?.contains_multiple_invoices === true);
+
+        if (confidence >= minConfidence && !isDuplicate && !needsSplitting) {
+          updateData.status = 'approved';
+          (updateData as any).auto_approved = true;
+        }
       }
     }
 

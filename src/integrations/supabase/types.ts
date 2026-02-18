@@ -1068,6 +1068,7 @@ export type Database = {
           ai_raw_response: Json | null
           amount_gross: number | null
           amount_net: number | null
+          auto_approved: boolean
           bank_import_keyword_id: string | null
           bank_transaction_id: string | null
           bank_transaction_reference: string | null
@@ -1121,6 +1122,7 @@ export type Database = {
           ai_raw_response?: Json | null
           amount_gross?: number | null
           amount_net?: number | null
+          auto_approved?: boolean
           bank_import_keyword_id?: string | null
           bank_transaction_id?: string | null
           bank_transaction_reference?: string | null
@@ -1174,6 +1176,7 @@ export type Database = {
           ai_raw_response?: Json | null
           amount_gross?: number | null
           amount_net?: number | null
+          auto_approved?: boolean
           bank_import_keyword_id?: string | null
           bank_transaction_id?: string | null
           bank_transaction_reference?: string | null
@@ -1436,6 +1439,8 @@ export type Database = {
       }
       vendors: {
         Row: {
+          auto_approve: boolean
+          auto_approve_min_confidence: number
           correction_count: number | null
           created_at: string | null
           default_category_id: string | null
@@ -1455,6 +1460,8 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          auto_approve?: boolean
+          auto_approve_min_confidence?: number
           correction_count?: number | null
           created_at?: string | null
           default_category_id?: string | null
@@ -1474,6 +1481,8 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          auto_approve?: boolean
+          auto_approve_min_confidence?: number
           correction_count?: number | null
           created_at?: string | null
           default_category_id?: string | null

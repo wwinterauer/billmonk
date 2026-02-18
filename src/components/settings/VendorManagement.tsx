@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
-import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge, Download, Loader2, ArrowLeftRight, Users, ScanSearch, CheckCircle, Sparkles, AlertTriangle } from 'lucide-react';
+import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge, Download, Loader2, ArrowLeftRight, Users, ScanSearch, CheckCircle, Sparkles, AlertTriangle, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { importVendorsFromReceipts } from '@/services/vendorMatchingService';
@@ -134,6 +135,8 @@ export function VendorManagement() {
     default_vat_rate: '',
     website: '',
     notes: '',
+    auto_approve: false,
+    auto_approve_min_confidence: 0.8,
   });
   const [newVariant, setNewVariant] = useState('');
 
@@ -146,6 +149,8 @@ export function VendorManagement() {
       default_vat_rate: '',
       website: '',
       notes: '',
+      auto_approve: false,
+      auto_approve_min_confidence: 0.8,
     });
     setNewVariant('');
   };
@@ -160,6 +165,8 @@ export function VendorManagement() {
       default_vat_rate: vendor.default_vat_rate?.toString() || '',
       website: vendor.website || '',
       notes: vendor.notes || '',
+      auto_approve: vendor.auto_approve ?? false,
+      auto_approve_min_confidence: vendor.auto_approve_min_confidence ?? 0.8,
     });
     setNewVariant('');
   };
@@ -204,6 +211,8 @@ export function VendorManagement() {
           default_vat_rate: formData.default_vat_rate ? parseFloat(formData.default_vat_rate) : null,
           website: formData.website.trim() || null,
           notes: formData.notes.trim() || null,
+          auto_approve: formData.auto_approve,
+          auto_approve_min_confidence: formData.auto_approve_min_confidence,
         });
         if (result.syncedReceipts > 0) {
           toast.success(`Lieferant aktualisiert`, {
@@ -901,6 +910,12 @@ export function VendorManagement() {
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
                               {vendor.display_name}
+                              {vendor.auto_approve && (
+                                <Badge variant="outline" className="bg-success/10 text-success border-success/30 text-xs">
+                                  <Zap className="h-3 w-3 mr-0.5" />
+                                  Auto
+                                </Badge>
+                              )}
                               {vendor.website && (
                                 <a
                                   href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
@@ -1233,6 +1248,54 @@ export function VendorManagement() {
                 placeholder="Optionale Anmerkungen..."
                 rows={2}
               />
+            </div>
+
+            {/* Automatische Freigabe */}
+            <Separator />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="auto_approve" className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-success" />
+                    Automatische Freigabe
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Belege automatisch freigeben, wenn die KI-Erkennung sicher genug ist
+                  </p>
+                </div>
+                <Switch
+                  id="auto_approve"
+                  checked={formData.auto_approve}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, auto_approve: checked }))}
+                />
+              </div>
+
+              {formData.auto_approve && (
+                <div className="space-y-3 pl-6 border-l-2 border-success/30">
+                  <div className="space-y-2">
+                    <Label className="text-sm">
+                      Mindest-Konfidenz: {Math.round(formData.auto_approve_min_confidence * 100)}%
+                    </Label>
+                    <Slider
+                      value={[formData.auto_approve_min_confidence * 100]}
+                      onValueChange={([value]) => setFormData(prev => ({ ...prev, auto_approve_min_confidence: value / 100 }))}
+                      min={60}
+                      max={100}
+                      step={5}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Nur Belege mit mindestens dieser KI-Sicherheit werden automatisch freigegeben
+                    </p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <AlertTriangle className="h-3.5 w-3.5 text-warning flex-shrink-0" />
+                      Duplikate und PDFs mit mehreren Rechnungen werden nie automatisch freigegeben.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Statistik (nur bei Bearbeitung) */}
