@@ -1,51 +1,75 @@
 
-# "Abgeschlossen" Status in Ausgabenuebersicht sichtbar machen
 
-## Problem
+# "Automatisch freigegeben" Badge in der Ausgabenuebersicht
 
-Der Status `completed` (Abgeschlossen) existiert zwar in der Datenbank, ist aber in der Ausgabenuebersicht an mehreren Stellen nicht implementiert:
-- Kein Eintrag im Status-Filter-Dropdown
-- Keine Farbe/Badge-Darstellung in der Tabelle
-- Kein "Abschliessen"-Button in der Bulk-Aktionsleiste
-- Kein "Abschliessen"-Button im Einzelbeleg-Bearbeitungspanel
-- Nur fuer bereits freigegebene (`approved`) Belege verfuegbar
+## Zusammenfassung
+
+Automatisch freigegebene Belege erhalten in der Ausgabenuebersicht ein zusaetzliches Badge "Automatisch freigegeben", damit der Nutzer sofort erkennen kann, welche Belege ohne manuellen Review freigegeben wurden.
+
+## Voraussetzung
+
+Da die Auto-Approve-Funktion noch nicht implementiert ist, wird diese Aenderung zusammen mit der gesamten Auto-Approve-Implementierung umgesetzt. Ein neues Feld in der `receipts`-Tabelle speichert, ob ein Beleg automatisch freigegeben wurde.
 
 ## Aenderungen
 
-### 1. STATUS_CONFIG erweitern (`src/pages/Expenses.tsx`)
+### 1. Datenbank: Neues Feld in `receipts`
 
-Neuer Eintrag in der Status-Konfiguration (Zeile 135-146):
-- `completed`: Label "Abgeschlossen", Farbe Schiefergrau (Slate) - konsistent mit dem dokumentierten Workflow
+| Spalte | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `auto_approved` | boolean | false | Markiert ob der Beleg automatisch freigegeben wurde |
 
-### 2. Bulk-Aktion "Abschliessen" (`src/pages/Expenses.tsx`)
+Dieses Feld wird beim Auto-Approve-Vorgang auf `true` gesetzt und bleibt dauerhaft erhalten -- auch wenn der Status spaeter geaendert wird.
 
-- `bulkActionLoading`-Typ um `'completed'` erweitern
-- Neue Funktion `handleBulkComplete`: Setzt Status auf `completed`, aber **nur fuer Belege mit Status `approved`**. Belege mit anderem Status werden uebersprungen und der User wird informiert.
-- Neuer Button "Abschliessen" in der Bulk-Aktionsleiste (zwischen "Ablehnen" und "Tags bearbeiten"), mit Slate-Farbgebung und Archive-Icon
-- Umgekehrt: Wenn im Filter `completed` aktiv ist, wird ein Button "Zurueck zu Genehmigt" angezeigt, um den Status wieder auf `approved` zurueckzusetzen
+### 2. Datenbank: Neue Spalten in `vendors`
 
-### 3. Einzelbeleg-Panel (`src/components/receipts/ReceiptDetailPanel.tsx`)
+Wie im vorherigen Plan:
 
-- `handleSave`/`handleSaveClick`-Typ um `'completed'` erweitern
-- Neuer "Abschliessen"-Button neben "Freigeben" - nur sichtbar wenn der Beleg aktuell `approved` ist
-- Wenn Beleg `completed` ist: Button "Zurueck zu Genehmigt" anzeigen, um zurueckzusetzen
-- Status-Meldungen um `completed: 'Beleg abgeschlossen'` erweitern
+| Spalte | Typ | Default |
+|--------|-----|---------|
+| `auto_approve` | boolean | false |
+| `auto_approve_min_confidence` | numeric | 0.8 |
 
-### 4. Sidebar-Zaehler (optional, kein Muss)
+### 3. Kern-Logik (`src/hooks/useReceipts.ts`)
 
-Der Sidebar zaehlt aktuell nur `review`-Belege. Ein separater Zaehler fuer `completed` ist nicht noetig, da es sich um einen finalen Status handelt.
+Bei `processReceiptWithAI` und `finalizeReceiptWithVendor`:
+- Wenn alle Auto-Approve-Bedingungen erfuellt sind (Vendor aktiv, Konfidenz erreicht, kein Duplikat, kein Multi-Invoice):
+  - `status = 'approved'`
+  - `auto_approved = true`
 
-## Technische Details
+### 4. Badge in Ausgabenuebersicht (`src/pages/Expenses.tsx`)
 
-### Dateien
+In der Status-Spalte der Tabelle (Zeile ~2282), direkt nach dem Status-Badge:
+
+```text
+[Genehmigt] [Automatisch freigegeben]
+```
+
+- Gruen mit Zap-Icon (Blitz-Symbol fuer "automatisch")
+- Nur sichtbar wenn `receipt.auto_approved === true` UND Status `approved` oder `completed`
+- Wird neben dem normalen Status-Badge angezeigt, nicht als Ersatz
+
+### 5. Lieferanten-Verwaltung (`src/components/settings/VendorManagement.tsx`)
+
+- Switch "Automatische Freigabe" + Konfidenz-Slider im Dialog
+- Hinweis zu Ausschluessen (Duplikate, Multi-Rechnungen)
+- Badge in der Lieferanten-Tabelle
+
+### 6. Upload-Seite (`src/pages/Upload.tsx`)
+
+- "Auto-freigegeben" Badge bei automatisch freigegebenen Belegen
+
+### 7. Vendor-Hook (`src/hooks/useVendors.ts`)
+
+- Interface und CRUD um `auto_approve` und `auto_approve_min_confidence` erweitern
+
+## Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/pages/Expenses.tsx` | STATUS_CONFIG + Bulk-Aktion + Button |
-| `src/components/receipts/ReceiptDetailPanel.tsx` | Status-Typ erweitern + Button |
+| Migration (SQL) | `auto_approved` auf `receipts`, `auto_approve` + `auto_approve_min_confidence` auf `vendors` |
+| `src/hooks/useVendors.ts` | Interface + CRUD |
+| `src/hooks/useReceipts.ts` | Auto-Approve-Logik + `auto_approved`-Flag setzen |
+| `src/pages/Expenses.tsx` | Badge "Automatisch freigegeben" in Status-Spalte |
+| `src/components/settings/VendorManagement.tsx` | Switch + Slider + Hinweis |
+| `src/pages/Upload.tsx` | Badge bei Auto-Freigabe |
 
-### Logik "Abschliessen"
-
-- Nur Belege mit Status `approved` koennen abgeschlossen werden
-- Bei Bulk-Aktion: Nicht-freigegebene Belege werden uebersprungen, Toast zeigt "X von Y abgeschlossen, Z uebersprungen (nicht freigegeben)"
-- Abgeschlossene Belege koennen zurueck auf `approved` gesetzt werden
