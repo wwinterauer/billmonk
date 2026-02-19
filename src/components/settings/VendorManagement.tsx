@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge, Download, Loader2, ArrowLeftRight, Users, ScanSearch, CheckCircle, Sparkles, AlertTriangle, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +69,7 @@ type AdditionalFilter = 'all' | 'with_category' | 'without_category' | 'with_vat
 
 export function VendorManagement() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { vendors, loading, addVendor, updateVendor, deleteVendor, fetchVendors } = useVendors();
   const { categories } = useCategories();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -170,6 +172,21 @@ export function VendorManagement() {
     });
     setNewVariant('');
   };
+
+  // Deep-link: auto-open vendor edit dialog when vendorId is in URL
+  useEffect(() => {
+    const vendorId = searchParams.get('vendorId');
+    if (!vendorId || loading || vendors.length === 0) return;
+
+    const vendor = vendors.find(v => v.id === vendorId);
+    if (vendor) {
+      setSearchQuery(vendor.display_name);
+      openEditDialog(vendor);
+    }
+    // Remove vendorId from URL to prevent re-triggering
+    searchParams.delete('vendorId');
+    setSearchParams(searchParams, { replace: true });
+  }, [vendors, loading, searchParams]);
 
   const closeDialogs = () => {
     setIsAddDialogOpen(false);
