@@ -401,6 +401,11 @@ WICHTIG - DUPLIKAT-VERMEIDUNG:
 - Wenn der gleiche Betrag mehrfach in einer Zusammenfassung/Summenzeile wiederholt wird, erfasse nur die Einzelposition, NICHT die Summenzeile
 - Orientiere dich an den tatsächlichen Einzelposten/Detailzeilen, nicht an Zwischensummen oder Gesamtsummen die diese Positionen enthalten
 
+BETRAGS-REGELN:
+- Alle Betraege MUESSEN POSITIV sein - es gibt keine negativen Ausgaben
+- Wenn ein Betrag in Klammern steht z.B. (0,51) oder ein Minus hat z.B. -0,51, behandle ihn als POSITIVEN Kostenbetrag (also 0,51)
+- Ignoriere Gutschriften, Auszahlungen und Erstattungen komplett
+
 IGNORIERE alle anderen Zeilen/Positionen komplett (Einnahmen, Erlöse, Gutschriften, Auszahlungen, Umsätze).`;
           } else {
             expensesOnlyPrompt = `
@@ -412,7 +417,12 @@ Diese Rechnung stammt von einem Lieferanten mit gemischten Abrechnungen (z.B. Pl
 - amount_gross = Summe NUR der Kosten-Positionen
 - amount_net und vat_amount ebenfalls nur aus Kosten-Positionen berechnen
 - Beschreibung: nur Kosten-Positionen auflisten
-- Bei gemischten MwSt-Sätzen der Kosten: is_mixed_tax_rate = true mit Details`;
+- Bei gemischten MwSt-Sätzen der Kosten: is_mixed_tax_rate = true mit Details
+
+BETRAGS-REGELN:
+- Alle Betraege MUESSEN POSITIV sein - es gibt keine negativen Ausgaben
+- Wenn ein Betrag in Klammern steht z.B. (0,51) oder ein Minus hat z.B. -0,51, behandle ihn als POSITIVEN Kostenbetrag (also 0,51)
+- Ignoriere Gutschriften, Auszahlungen und Erstattungen komplett`;
           }
         }
       }
@@ -444,6 +454,11 @@ WICHTIG - DUPLIKAT-VERMEIDUNG:
 - Wenn der gleiche Betrag mehrfach in einer Zusammenfassung/Summenzeile wiederholt wird, erfasse nur die Einzelposition, NICHT die Summenzeile
 - Orientiere dich an den tatsächlichen Einzelposten/Detailzeilen, nicht an Zwischensummen oder Gesamtsummen die diese Positionen enthalten
 
+BETRAGS-REGELN:
+- Alle Betraege MUESSEN POSITIV sein - es gibt keine negativen Ausgaben
+- Wenn ein Betrag in Klammern steht z.B. (0,51) oder ein Minus hat z.B. -0,51, behandle ihn als POSITIVEN Kostenbetrag (also 0,51)
+- Ignoriere Gutschriften, Auszahlungen und Erstattungen komplett
+
 IGNORIERE alle anderen Zeilen/Positionen komplett (Einnahmen, Erlöse, Gutschriften, Auszahlungen, Umsätze).`;
       } else {
         expensesOnlyPrompt = `
@@ -455,7 +470,12 @@ Diese Rechnung stammt von einem Lieferanten mit gemischten Abrechnungen (z.B. Pl
 - amount_gross = Summe NUR der Kosten-Positionen
 - amount_net und vat_amount ebenfalls nur aus Kosten-Positionen berechnen
 - Beschreibung: nur Kosten-Positionen auflisten
-- Bei gemischten MwSt-Sätzen der Kosten: is_mixed_tax_rate = true mit Details`;
+- Bei gemischten MwSt-Sätzen der Kosten: is_mixed_tax_rate = true mit Details
+
+BETRAGS-REGELN:
+- Alle Betraege MUESSEN POSITIV sein - es gibt keine negativen Ausgaben
+- Wenn ein Betrag in Klammern steht z.B. (0,51) oder ein Minus hat z.B. -0,51, behandle ihn als POSITIVEN Kostenbetrag (also 0,51)
+- Ignoriere Gutschriften, Auszahlungen und Erstattungen komplett`;
       }
     }
 
@@ -847,7 +867,25 @@ Beispiel Kleinunternehmer:
 
     try {
       const extractedData: ExtractionResult = JSON.parse(cleanedContent);
-      
+
+      // Post-Processing: Ensure all amounts are positive (no negative expenses)
+      if (extractedData.amount_gross != null && extractedData.amount_gross < 0) {
+        console.log(`[Amount Fix] amount_gross ${extractedData.amount_gross} → ${Math.abs(extractedData.amount_gross)}`);
+        extractedData.amount_gross = Math.abs(extractedData.amount_gross);
+      }
+      if (extractedData.amount_net != null && extractedData.amount_net < 0) {
+        extractedData.amount_net = Math.abs(extractedData.amount_net);
+      }
+      if (extractedData.vat_amount != null && extractedData.vat_amount < 0) {
+        extractedData.vat_amount = Math.abs(extractedData.vat_amount);
+      }
+      if (extractedData.tax_rate_details && Array.isArray(extractedData.tax_rate_details)) {
+        extractedData.tax_rate_details = extractedData.tax_rate_details.map(detail => ({
+          ...detail,
+          net_amount: Math.abs(detail.net_amount),
+          tax_amount: Math.abs(detail.tax_amount),
+        }));
+      }
       // Check if document is NOT a receipt - save it with "Keine Rechnung" category
       // These can be supplementary documents (detail pages, attachments, etc.)
       if (extractedData.is_receipt === false) {
