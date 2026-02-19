@@ -1,57 +1,49 @@
 
 
-# Fix: Vendor-Daten fuer ReanalyzeOptions laden
+# Fix: Keine Minusbetraege bei Ausgaben-Extraktion
 
 ## Problem
 
-Die Schlagwoerter und der Extraktions-Hinweis werden in `Review.tsx` und `ReceiptDetailPanel.tsx` mit leeren Werten hardcoded uebergeben:
+Die KI liefert fuer Rechnung 166218 (Monta) `amount_gross: -5.65` mit negativen Werten. Das passiert, weil die Monta-Rechnung Gutschriften/Auszahlungen mit negativem Vorzeichen zeigt und die KI diese Werte uebernimmt, statt nur die Kosten-Positionen korrekt als positive Betraege zu erfassen.
+
+Korrekt waere: Transaktionsgebuehr 1,27 EUR (0% MwSt) + Betreiber-Abonnement 12,00 EUR (20% MwSt) = 13,27 EUR brutto, 11,27 EUR netto.
+
+## Loesung: Zwei Ebenen
+
+### 1. Prompt-Erweiterung (Edge Function)
+
+Im "Gezielte Positions-Extraktion"-Block zwei Regeln ergaenzen:
 
 ```text
-vendorExtractionKeywords={[]}   // immer leer
-vendorExtractionHint=""          // immer leer
-vendorExpensesOnly               // fehlt komplett
+BETRAGS-REGELN:
+- Alle Betraege MUESSEN POSITIV sein - es gibt keine negativen Ausgaben
+- Wenn ein Betrag in Klammern steht z.B. (0,51) oder ein Minus hat z.B. -0,51, 
+  behandle ihn als POSITIVEN Kostenbetrag (also 0,51)
+- Ignoriere Gutschriften, Auszahlungen und Erstattungen komplett
 ```
 
-Die tatsaechlichen Vendor-Daten (Keywords, Hint, Expenses-Only-Flag) werden nie aus der Datenbank geladen.
+Diese Regel wird in BEIDE expensesOnlyPrompt-Bloecke eingefuegt (mit Keywords und ohne Keywords).
 
-## Loesung
+### 2. Post-Processing Validierung (Edge Function)
 
-In beiden Dateien den Vendor per `vendor_id` aus der Datenbank laden und die echten Werte an `ReanalyzeOptions` weitergeben.
+Nach dem Parsen der KI-Antwort (Zeile 849) und vor dem DB-Update: Negative Betraege automatisch zu positiven konvertieren.
 
-### 1. Review.tsx
+```text
+Wenn amount_gross < 0: amount_gross = Math.abs(amount_gross)
+Wenn amount_net < 0: amount_net = Math.abs(amount_net)
+Wenn vat_amount < 0: vat_amount = Math.abs(vat_amount)
 
-- Neuen State `currentVendorData` einfuegen (oder per `useMemo` + kleinem Fetch)
-- Wenn sich `currentReceipt.vendor_id` aendert: Vendor-Daten aus Supabase laden (`extraction_keywords`, `extraction_hint`, `expenses_only_extraction`)
-- Die drei Props korrekt befuellen:
-  - `vendorExpensesOnly={currentVendorData?.expenses_only_extraction}`
-  - `vendorExtractionKeywords={currentVendorData?.extraction_keywords || []}`
-  - `vendorExtractionHint={currentVendorData?.extraction_hint || ''}`
-- Nach "merken" den lokalen State ebenfalls aktualisieren
+Falls tax_rate_details vorhanden:
+  Fuer jedes Detail: net_amount und tax_amount mit Math.abs() korrigieren
+```
 
-### 2. ReceiptDetailPanel.tsx
-
-- Gleiche Logik: Vendor-Daten per `vendor_id` (bzw. `selectedVendorId`) laden
-- Die drei Props korrekt befuellen statt leere Werte zu uebergeben
+Dies ist ein Sicherheitsnetz fuer den Fall, dass die KI trotz Prompt-Anweisung negative Werte liefert.
 
 ---
 
-## Technische Details
-
-Kleiner `useEffect` in beiden Dateien, der bei Aenderung der `vendor_id` feuert:
-
-```text
-useEffect:
-  wenn vendor_id vorhanden:
-    SELECT expenses_only_extraction, extraction_keywords, extraction_hint
-    FROM vendors WHERE id = vendor_id
-  sonst:
-    vendorData = null
-```
-
-## Betroffene Dateien
+## Betroffene Datei
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/pages/Review.tsx` | Vendor-Daten laden + Props korrekt setzen |
-| `src/components/receipts/ReceiptDetailPanel.tsx` | Vendor-Daten laden + Props korrekt setzen |
+| `supabase/functions/extract-receipt/index.ts` | Prompt: Positiv-Regel in beide expensesOnly-Bloecke. Post-Processing: Math.abs() nach JSON-Parse. |
 
