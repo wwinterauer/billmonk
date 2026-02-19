@@ -1,10 +1,12 @@
 
 
-# Extraction-Keywords fuer Lieferanten
+# Extraktions-Hinweise + Duplikat-Schutz
 
 ## Uebersicht
 
-Erweiterung des "Nur Ausgaben extrahieren"-Features um benutzerdefinierte **Schlagwoerter** pro Lieferant. Die Keywords steuern, welche Rechnungszeilen die KI extrahiert. Sie koennen sowohl in den Lieferanten-Einstellungen als auch direkt im "Nur Ausgaben extrahieren?"-Dialog der Review/Belegbearbeitung gepflegt werden. Beide Stellen zeigen und bearbeiten dieselben Daten.
+Zwei Erweiterungen:
+1. **Freitext-Hinweis pro Lieferant** ("Extraktions-Hinweis"): Der User kann der KI lieferantenspezifische Regeln mitgeben, z.B. "Betraege in Klammern sind Kosten" oder "Nur EUR-Betraege beruecksichtigen". Dieses Feld ist ein einfaches Textfeld neben den Keywords.
+2. **Duplikat-Schutz im Prompt**: Die KI wird angewiesen, identische Betraege auf der Rechnung nicht doppelt zu zaehlen, sondern die tatsaechliche Anzahl der Zeilen zu respektieren.
 
 ---
 
@@ -13,75 +15,80 @@ Erweiterung des "Nur Ausgaben extrahieren"-Features um benutzerdefinierte **Schl
 ### 1. Datenbank: Neue Spalte
 
 ```text
-ALTER TABLE vendors ADD COLUMN extraction_keywords text[] NOT NULL DEFAULT '{}';
+ALTER TABLE vendors ADD COLUMN extraction_hint text DEFAULT '';
 ```
+
+Ein Freitext-Feld fuer beliebige Extraktions-Anweisungen pro Lieferant.
 
 ### 2. Vendor-Hook (`src/hooks/useVendors.ts`)
 
-- `extraction_keywords: string[]` zum `Vendor`-Interface hinzufuegen
-- In `fetchVendors()` mitlesen (mit Default `[]`)
-- In `updateVendor()` mitschreiben
+- `extraction_hint: string` zum Interface hinzufuegen
+- In fetch/update mitlesen/-schreiben
 
-### 3. Lieferanten-Verwaltung (`src/components/settings/VendorManagement.tsx`)
+### 3. VendorManagement.tsx -- zwei Fixes + neues Feld
 
-Unterhalb des "Nur Ausgaben extrahieren"-Switches (Zeile ~1412), nur sichtbar wenn Switch aktiv:
+**Fix 1: JSX-Verschachtelung reparieren**
+Der "Nur Ausgaben extrahieren"-Block (ab Zeile 1401) ist aktuell innerhalb des `{formData.auto_approve && (...)}` Blocks eingeschlossen (durch falsche Einrueckung bei Zeile 1399). Die schliessenden Tags bei Zeilen 1493-1496 muessen korrigiert werden, damit der Expenses-Only-Block **unabhaengig** von der Auto-Approve-Einstellung sichtbar ist.
 
-- `extraction_keywords` ins `formData` aufnehmen (Default `[]`)
-- In `openEditDialog()` und `resetForm()` beruecksichtigen
-- In `handleSave()` mitspeichern
-- UI: Keyword-Chips mit X-Button zum Entfernen + Input mit "Hinzufuegen"-Button
-- Hinweistext: "Die KI extrahiert nur Zeilen die diese Begriffe enthalten. Ohne Schlagwoerter werden allgemein alle Kosten erfasst."
+**Fix 2: Neues Textarea-Feld** unterhalb der Keywords (nur wenn "Nur Ausgaben extrahieren" aktiv):
 
 ```text
 [x] Nur Ausgaben extrahieren
-    Schlagwoerter fuer Kosten-Positionen:
-    [Transaktionsgebuehr  x] [Betreiber-Abonnement  x]
+    Schlagwoerter: [Transaktionsgebuehr x] [Betreiber-Abo x]
     [____________________] [+ Hinzufuegen]
+
+    Extraktions-Hinweis fuer die KI (optional):
+    [Betraege in Klammern wie (0,51) sind Kosten.    ]
+    [Bitte als positive Werte behandeln.              ]
 ```
 
-### 4. ReanalyzeOptions (`src/components/receipts/ReanalyzeOptions.tsx`)
+Label: "Extraktions-Hinweis fuer die KI (optional)"
+Placeholder: "z.B. Betraege in Klammern sind Kosten und sollen als positive Werte behandelt werden"
+Max 500 Zeichen, 3 Zeilen Textarea.
 
-**Props erweitern:**
-- `vendorExtractionKeywords?: string[]` -- aktuelle Keywords vom Vendor
+### 4. ReanalyzeOptions.tsx
 
-**"Nur Ausgaben extrahieren?"-Dialog erweitern (Zeile ~599-640):**
-- Keyword-Verwaltung direkt im Dialog: gleiche Chip + Input UI wie in VendorManagement
-- Lokaler State fuer Keywords, initialisiert mit `vendorExtractionKeywords`
-- Nutzer kann Keywords hinzufuegen/entfernen bevor er "Nur Ausgaben analysieren" klickt
-- Bei "Fuer diesen Lieferanten merken": Keywords + Flag werden zusammen gespeichert
-- Keywords werden an die Edge Function als Body-Parameter `extractionKeywords: string[]` mitgeschickt
+- Neues Prop `vendorExtractionHint?: string`
+- Im "Nur Ausgaben extrahieren"-Dialog: Textarea fuer den Hinweis anzeigen (editierbar, initialisiert mit Vendor-Wert)
+- Bei "Fuer diesen Lieferanten merken": Hint zusammen mit Keywords speichern
+- Hint als `extractionHint: string` an die Edge Function mitschicken
 
-**Callback erweitern:**
-- `onExpensesOnlyReanalyze` aendern zu `onExpensesOnlyReanalyze?: (rememberForVendor: boolean, keywords?: string[]) => void`
+### 5. Edge Function (`extract-receipt/index.ts`)
 
-### 5. Edge Function (`supabase/functions/extract-receipt/index.ts`)
+**Neuer Body-Parameter:** `extractionHint: string`
 
-**Neuer Body-Parameter:** `extractionKeywords: string[]`
+**Vendor-Lookup erweitern:** `extraction_hint` zusaetzlich laden
 
-**Vendor-Lookup erweitern (Zeile ~370):**
-- Zusaetzlich `extraction_keywords` laden
+**Prompt-Logik erweitern:**
 
-**Prompt-Logik (Zeile ~376-401):**
-- Wenn Keywords vorhanden (aus Body ODER Vendor-DB): gezielten Prompt verwenden
-- Wenn keine Keywords: bisherigen allgemeinen "Nur Ausgaben"-Prompt beibehalten
+Wenn Keywords vorhanden, wird der Prompt um zwei Bloecke ergaenzt:
 
 ```text
-WENN Keywords vorhanden:
-  "Suche NUR nach Zeilen/Positionen die folgende Begriffe enthalten:
-   - Transaktionsgebuehr
-   - Betreiber-Abonnement
-   Erfasse Brutto, Netto, MwSt fuer jede gefundene Position.
-   amount_gross = Summe aller gefundenen Positionen.
-   Bei verschiedenen MwSt-Saetzen: is_mixed_tax_rate = true"
+GEZIELTE POSITIONS-EXTRAKTION:
+Suche NUR nach Zeilen die folgende Begriffe enthalten:
+- "Transaktionsgebuehr"
+- "Betreiber-Abonnement"
 
-WENN keine Keywords:
-  Bisheriger allgemeiner Prompt bleibt unveraendert
+WICHTIG - DUPLIKAT-VERMEIDUNG:
+- Zaehle jede Zeile auf der Rechnung genau EINMAL
+- Wenn der gleiche Betrag mehrfach in einer Zusammenfassung/Summenzeile 
+  wiederholt wird, erfasse nur die Einzelposition, NICHT die Summenzeile
+- Orientiere dich an den tatsaechlichen Einzelposten/Detailzeilen, 
+  nicht an Zwischensummen oder Gesamtsummen die diese Positionen enthalten
+
+LIEFERANTEN-SPEZIFISCHER HINWEIS:
+Betraege in Klammern wie (0,51) sind Kosten. 
+Bitte als positive Werte behandeln.
 ```
+
+Der "Lieferanten-spezifischer Hinweis"-Block wird nur angehaengt wenn `extractionHint` nicht leer ist (aus Body ODER Vendor-DB, Body hat Vorrang).
+
+Die Duplikat-Vermeidungsregel wird immer angehaengt wenn Keywords vorhanden sind.
 
 ### 6. Review.tsx + ReceiptDetailPanel.tsx
 
-- `vendorExtractionKeywords` aus dem Vendor-Objekt laden und an `ReanalyzeOptions` weiterreichen
-- `onExpensesOnlyReanalyze`-Handler erweitern: bei `rememberForVendor=true` auch die Keywords via `updateVendor()` speichern
+- `vendorExtractionHint` aus dem Vendor-Objekt laden und an ReanalyzeOptions weiterreichen
+- Handler erweitern: bei "merken" auch den Hint via updateVendor speichern
 
 ---
 
@@ -89,11 +96,10 @@ WENN keine Keywords:
 
 | Datei | Aenderung |
 |-------|-----------|
-| Datenbank (Migration) | `extraction_keywords text[]` auf `vendors` |
-| `src/hooks/useVendors.ts` | Interface + fetch/update |
-| `src/components/settings/VendorManagement.tsx` | Keyword-Chips UI unter expenses_only Switch |
-| `src/components/receipts/ReanalyzeOptions.tsx` | Keywords im Dialog + an Edge Function senden |
-| `supabase/functions/extract-receipt/index.ts` | Keywords laden, gezielten Prompt bauen |
-| `src/pages/Review.tsx` | Keywords an ReanalyzeOptions weiterreichen |
-| `src/components/receipts/ReceiptDetailPanel.tsx` | Keywords an ReanalyzeOptions weiterreichen |
-
+| Datenbank (Migration) | `extraction_hint text DEFAULT ''` auf `vendors` |
+| `src/hooks/useVendors.ts` | `extraction_hint` in Interface + fetch/update |
+| `src/components/settings/VendorManagement.tsx` | JSX-Fix + Textarea fuer Hint |
+| `src/components/receipts/ReanalyzeOptions.tsx` | Hint-Prop + Textarea im Dialog + an Edge Function senden |
+| `supabase/functions/extract-receipt/index.ts` | Hint laden, Duplikat-Regel + Hint-Block in Prompt einbauen |
+| `src/pages/Review.tsx` | Hint an ReanalyzeOptions weiterreichen + bei merken speichern |
+| `src/components/receipts/ReceiptDetailPanel.tsx` | Hint an ReanalyzeOptions weiterreichen + bei merken speichern |
