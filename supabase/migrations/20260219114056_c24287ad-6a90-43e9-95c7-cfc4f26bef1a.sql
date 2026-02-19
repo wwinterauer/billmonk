@@ -1,0 +1,1 @@
+ALTER TABLE public.vendors ADD COLUMN default_payment_method text;

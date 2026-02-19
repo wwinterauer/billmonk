@@ -138,6 +138,7 @@ export function VendorManagement() {
     default_category_id: '',
     default_tag_id: '',
     default_vat_rate: '',
+    default_payment_method: '',
     website: '',
     notes: '',
     auto_approve: false,
@@ -153,6 +154,7 @@ export function VendorManagement() {
       default_category_id: '',
       default_tag_id: '',
       default_vat_rate: '',
+      default_payment_method: '',
       website: '',
       notes: '',
       auto_approve: false,
@@ -170,6 +172,7 @@ export function VendorManagement() {
       default_category_id: vendor.default_category_id || '',
       default_tag_id: vendor.default_tag_id || '',
       default_vat_rate: vendor.default_vat_rate?.toString() || '',
+      default_payment_method: vendor.default_payment_method || '',
       website: vendor.website || '',
       notes: vendor.notes || '',
       auto_approve: vendor.auto_approve ?? false,
@@ -232,6 +235,7 @@ export function VendorManagement() {
           default_category_id: formData.default_category_id || null,
           default_tag_id: formData.default_tag_id || null,
           default_vat_rate: formData.default_vat_rate ? parseFloat(formData.default_vat_rate) : null,
+          default_payment_method: formData.default_payment_method || null,
           website: formData.website.trim() || null,
           notes: formData.notes.trim() || null,
           auto_approve: formData.auto_approve,
@@ -258,6 +262,7 @@ export function VendorManagement() {
           defaultCategoryId: formData.default_category_id || undefined,
           defaultTagId: formData.default_tag_id || undefined,
           defaultVatRate: formData.default_vat_rate ? parseFloat(formData.default_vat_rate) : undefined,
+          defaultPaymentMethod: formData.default_payment_method || undefined,
           website: formData.website.trim() || undefined,
           notes: formData.notes.trim() || undefined,
         });
@@ -1285,6 +1290,33 @@ export function VendorManagement() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Standard-Zahlungsart */}
+            <div className="space-y-2">
+              <Label htmlFor="default_payment_method">Standard-Zahlungsart</Label>
+              <Select
+                value={formData.default_payment_method}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, default_payment_method: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Keine Vorgabe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Überweisung">Überweisung</SelectItem>
+                  <SelectItem value="Kreditkarte">Kreditkarte</SelectItem>
+                  <SelectItem value="Debitkarte">Karte Debitzahlung</SelectItem>
+                  <SelectItem value="Bar">Barzahlung</SelectItem>
+                  <SelectItem value="PayPal">PayPal</SelectItem>
+                  <SelectItem value="Apple Pay">Apple Pay</SelectItem>
+                  <SelectItem value="Google Pay">Google Pay</SelectItem>
+                  <SelectItem value="Lastschrift">Lastschrift</SelectItem>
+                  <SelectItem value="Sonstige">Sonstige</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Zahlungsart wird automatisch bei Lieferantenauswahl zugewiesen
+              </p>
             </div>
 
             {/* Website */}

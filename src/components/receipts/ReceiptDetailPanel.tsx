@@ -468,6 +468,7 @@ export function ReceiptDetailPanel({
     default_category_id: string | null;
     default_tag_id?: string | null;
     default_vat_rate: number | null;
+    default_payment_method?: string | null;
     default_category: { id: string; name: string; color: string | null } | null;
   }) => {
     // Set legal name as the main vendor field (or display_name as fallback)
@@ -505,10 +506,16 @@ export function ReceiptDetailPanel({
       }
     }
 
+    // Apply default payment method if not already set
+    if (vendorData.default_payment_method && !paymentMethod) {
+      setPaymentMethod(vendorData.default_payment_method);
+      applied.push('Zahlungsart');
+    }
+
     toast({
       title: `${applied.join(', ')} vom Lieferanten übernommen`,
     });
-  }, [category, vatRate, toast, receiptId, currentReceiptTags, assignTag]);
+  }, [category, vatRate, paymentMethod, toast, receiptId, currentReceiptTags, assignTag]);
 
   // Download/Open handlers using signedUrl
   const handleDownload = () => {

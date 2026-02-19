@@ -11,6 +11,7 @@ export interface Vendor {
   default_category_id: string | null;
   default_tag_id: string | null;
   default_vat_rate: number | null;
+  default_payment_method: string | null;
   notes: string | null;
   website: string | null;
   receipt_count: number;
@@ -114,6 +115,7 @@ export function useVendors() {
       defaultCategoryId?: string;
       defaultTagId?: string;
       defaultVatRate?: number;
+      defaultPaymentMethod?: string;
       notes?: string;
       website?: string;
     }
@@ -138,6 +140,7 @@ export function useVendors() {
         default_category_id: options?.defaultCategoryId || null,
         default_tag_id: options?.defaultTagId || null,
         default_vat_rate: options?.defaultVatRate || null,
+        default_payment_method: options?.defaultPaymentMethod || null,
         notes: options?.notes || null,
         website: options?.website || null,
       })
@@ -172,7 +175,7 @@ export function useVendors() {
 
   const updateVendor = async (
     id: string,
-    updates: Partial<Pick<Vendor, 'display_name' | 'legal_name' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence'>>
+    updates: Partial<Pick<Vendor, 'display_name' | 'legal_name' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_payment_method' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence'>>
   ): Promise<{ vendor: Vendor; syncedReceipts: number; autoApprovedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
 
