@@ -898,6 +898,51 @@ Beispiel Kleinunternehmer:
           tax_amount: Math.abs(detail.tax_amount),
         }));
       }
+
+      // === POST-PROCESSING: MwSt-Konsistenzprüfung ===
+      if (extractedData.amount_gross != null) {
+        // Regel 0: Explizite 0% USt. im Dokument-Text respektieren
+        const zeroVatPattern = /0[,.]?0{0,2}\s*%\s*(USt|MwSt|Ust|mwst|umsatzsteuer)/i;
+        if (zeroVatPattern.test(content) && extractedData.vat_rate !== 0) {
+          console.log(`[VAT Consistency] Rule 0: Explicit 0% USt found in document text, correcting vat_rate from ${extractedData.vat_rate}% to 0%`);
+          extractedData.vat_rate = 0;
+          extractedData.vat_amount = 0;
+          extractedData.amount_net = extractedData.amount_gross;
+        }
+
+        // Regel 1: Brutto == Netto und kein MwSt-Betrag → Satz muss 0 sein
+        if (extractedData.amount_gross === extractedData.amount_net && (!extractedData.vat_amount || extractedData.vat_amount === 0)) {
+          if (extractedData.vat_rate && extractedData.vat_rate > 0) {
+            console.log(`[VAT Consistency] Rule 1: Gross=Net and no VAT amount, correcting vat_rate from ${extractedData.vat_rate}% to 0%`);
+          }
+          extractedData.vat_rate = 0;
+          extractedData.vat_amount = 0;
+        }
+
+        // Regel 2: Satz > 0 mit MwSt-Betrag, aber Netto fehlt oder gleich Brutto
+        if (extractedData.vat_rate != null && extractedData.vat_rate > 0 && extractedData.vat_amount != null && extractedData.vat_amount > 0
+            && (!extractedData.amount_net || extractedData.amount_net === extractedData.amount_gross)) {
+          extractedData.amount_net = Math.round((extractedData.amount_gross - extractedData.vat_amount) * 100) / 100;
+          console.log(`[VAT Consistency] Rule 2: Net calculated from Gross-VAT: ${extractedData.amount_net}`);
+        }
+
+        // Regel 3: Satz > 0, aber MwSt-Betrag fehlt und Netto fehlt/gleich Brutto
+        if (extractedData.vat_rate != null && extractedData.vat_rate > 0
+            && (!extractedData.vat_amount || extractedData.vat_amount === 0)
+            && (!extractedData.amount_net || extractedData.amount_net === extractedData.amount_gross)) {
+          extractedData.amount_net = Math.round((extractedData.amount_gross / (1 + extractedData.vat_rate / 100)) * 100) / 100;
+          extractedData.vat_amount = Math.round((extractedData.amount_gross - extractedData.amount_net) * 100) / 100;
+          console.log(`[VAT Consistency] Rule 3: Net=${extractedData.amount_net}, VAT=${extractedData.vat_amount} calculated from Gross+Rate`);
+        }
+
+        // Regel 4: Netto < Brutto, aber MwSt-Betrag fehlt
+        if (extractedData.amount_net != null && extractedData.amount_net < extractedData.amount_gross
+            && (!extractedData.vat_amount || extractedData.vat_amount === 0)) {
+          extractedData.vat_amount = Math.round((extractedData.amount_gross - extractedData.amount_net) * 100) / 100;
+          console.log(`[VAT Consistency] Rule 4: VAT amount=${extractedData.vat_amount} from Gross-Net difference`);
+        }
+      }
+
       // Check if document is NOT a receipt - save it with "Keine Rechnung" category
       // These can be supplementary documents (detail pages, attachments, etc.)
       if (extractedData.is_receipt === false) {
