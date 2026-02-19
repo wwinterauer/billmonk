@@ -790,7 +790,6 @@ const Review = () => {
                               const updatedReceipts = [...receipts];
                               updatedReceipts[currentIndex] = data as Receipt;
                               setReceipts(updatedReceipts);
-                              populateForm(data as Receipt);
                             }
                           }
                         }}
