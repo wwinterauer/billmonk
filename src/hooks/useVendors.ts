@@ -170,7 +170,7 @@ export function useVendors() {
   const updateVendor = async (
     id: string,
     updates: Partial<Pick<Vendor, 'display_name' | 'legal_name' | 'detected_names' | 'default_category_id' | 'default_vat_rate' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence'>>
-  ): Promise<{ vendor: Vendor; syncedReceipts: number }> => {
+  ): Promise<{ vendor: Vendor; syncedReceipts: number; autoApprovedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
 
     // Check for duplicate if display_name is being updated
@@ -203,9 +203,6 @@ export function useVendors() {
       const newLegalName = updates.legal_name !== undefined ? updates.legal_name : data.legal_name;
       const newBrandName = updates.display_name !== undefined ? updates.display_name : data.display_name;
       
-      // Determine what to set on receipts:
-      // - vendor = legal_name (or display_name as fallback)
-      // - vendor_brand = display_name (only if different from legal_name)
       const receiptVendor = newLegalName || newBrandName;
       const receiptBrand = (newLegalName && newBrandName !== newLegalName) ? newBrandName : null;
 
@@ -226,6 +223,47 @@ export function useVendors() {
       }
     }
 
+    // Retroactive auto-approval: approve review receipts if auto_approve is enabled
+    let autoApprovedReceipts = 0;
+    if (data.auto_approve) {
+      const minConfidence = data.auto_approve_min_confidence ?? 0.8;
+
+      // Fetch review receipts for this vendor
+      const { data: reviewReceipts, error: reviewError } = await supabase
+        .from('receipts')
+        .select('id, ai_confidence, is_duplicate, status')
+        .eq('vendor_id', id)
+        .eq('status', 'review')
+        .gte('ai_confidence', minConfidence);
+
+      if (reviewError) {
+        console.error('Error fetching review receipts for auto-approve:', reviewError);
+      } else if (reviewReceipts && reviewReceipts.length > 0) {
+        // Filter out duplicates
+        const eligibleIds = reviewReceipts
+          .filter(r => !r.is_duplicate)
+          .map(r => r.id);
+
+        if (eligibleIds.length > 0) {
+          const { data: approvedResult, error: approveError } = await supabase
+            .from('receipts')
+            .update({
+              status: 'approved',
+              auto_approved: true,
+              updated_at: new Date().toISOString(),
+            })
+            .in('id', eligibleIds)
+            .select('id');
+
+          if (approveError) {
+            console.error('Error auto-approving receipts:', approveError);
+          } else {
+            autoApprovedReceipts = approvedResult?.length || 0;
+          }
+        }
+      }
+    }
+
     const updated = {
       ...data,
       detected_names: data.detected_names || [],
@@ -242,7 +280,7 @@ export function useVendors() {
     setVendors(prev => prev.map(v => v.id === id ? updated : v).sort((a, b) => 
       a.display_name.localeCompare(b.display_name)
     ));
-    return { vendor: updated, syncedReceipts };
+    return { vendor: updated, syncedReceipts, autoApprovedReceipts };
   };
 
   const deleteVendor = async (id: string): Promise<void> => {

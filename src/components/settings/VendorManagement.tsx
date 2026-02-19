@@ -214,9 +214,16 @@ export function VendorManagement() {
           auto_approve: formData.auto_approve,
           auto_approve_min_confidence: formData.auto_approve_min_confidence,
         });
+        const messages: string[] = [];
         if (result.syncedReceipts > 0) {
+          messages.push(`${result.syncedReceipts} Beleg(e) synchronisiert`);
+        }
+        if (result.autoApprovedReceipts > 0) {
+          messages.push(`${result.autoApprovedReceipts} Beleg(e) automatisch freigegeben`);
+        }
+        if (messages.length > 0) {
           toast.success(`Lieferant aktualisiert`, {
-            description: `${result.syncedReceipts} verknüpfte Beleg(e) wurden synchronisiert`
+            description: messages.join(' · ')
           });
         } else {
           toast.success('Lieferant aktualisiert');
