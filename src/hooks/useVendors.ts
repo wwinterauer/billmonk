@@ -27,6 +27,7 @@ export interface Vendor {
   // Expenses-only extraction
   expenses_only_extraction: boolean;
   extraction_keywords: string[];
+  extraction_hint: string;
   created_at: string;
   updated_at: string;
 }
@@ -97,6 +98,7 @@ export function useVendors() {
           auto_approve_min_confidence: v.auto_approve_min_confidence ?? 0.8,
           expenses_only_extraction: v.expenses_only_extraction ?? false,
           extraction_keywords: v.extraction_keywords || [],
+          extraction_hint: v.extraction_hint ?? '',
         };
       }) as Vendor[];
 
@@ -172,6 +174,7 @@ export function useVendors() {
       auto_approve_min_confidence: data.auto_approve_min_confidence ?? 0.8,
       expenses_only_extraction: data.expenses_only_extraction ?? false,
       extraction_keywords: data.extraction_keywords || [],
+      extraction_hint: data.extraction_hint ?? '',
     } as Vendor;
 
     setVendors(prev => [...prev, newVendor].sort((a, b) => 
@@ -182,7 +185,7 @@ export function useVendors() {
 
   const updateVendor = async (
     id: string,
-    updates: Partial<Pick<Vendor, 'display_name' | 'legal_name' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_payment_method' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords'>>
+    updates: Partial<Pick<Vendor, 'display_name' | 'legal_name' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_payment_method' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
   ): Promise<{ vendor: Vendor; syncedReceipts: number; autoApprovedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
 
@@ -445,6 +448,7 @@ export function useVendors() {
       auto_approve_min_confidence: data.auto_approve_min_confidence ?? 0.8,
       expenses_only_extraction: data.expenses_only_extraction ?? false,
       extraction_keywords: data.extraction_keywords || [],
+      extraction_hint: data.extraction_hint ?? '',
     } as Vendor;
 
     setVendors(prev => prev.map(v => v.id === id ? updated : v).sort((a, b) => 

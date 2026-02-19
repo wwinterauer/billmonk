@@ -51,6 +51,7 @@ import { extractReceiptData, normalizeExtractionResult } from '@/services/aiServ
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 // Fields that can be selectively re-analyzed by AI
 // Fields that can be selectively re-analyzed by AI
@@ -97,7 +98,8 @@ interface ReanalyzeOptionsProps {
   vendorId?: string;
   vendorExpensesOnly?: boolean;
   vendorExtractionKeywords?: string[];
-  onExpensesOnlyReanalyze?: (rememberForVendor: boolean, keywords?: string[]) => void;
+  vendorExtractionHint?: string;
+  onExpensesOnlyReanalyze?: (rememberForVendor: boolean, keywords?: string[], extractionHint?: string) => void;
 }
 
 export function ReanalyzeOptions({
@@ -113,6 +115,7 @@ export function ReanalyzeOptions({
   vendorId,
   vendorExpensesOnly = false,
   vendorExtractionKeywords = [],
+  vendorExtractionHint = '',
   onExpensesOnlyReanalyze,
 }: ReanalyzeOptionsProps) {
   const { toast } = useToast();
@@ -125,6 +128,7 @@ export function ReanalyzeOptions({
   const [rememberExpensesOnly, setRememberExpensesOnly] = useState(false);
   const [dialogKeywords, setDialogKeywords] = useState<string[]>([]);
   const [newKeywordInput, setNewKeywordInput] = useState('');
+  const [dialogExtractionHint, setDialogExtractionHint] = useState('');
 
   // AI Re-run handler - supports selective field reanalysis
   const reanalyzeFields = async (fieldsToUpdate: string[]) => {
@@ -297,6 +301,7 @@ export function ReanalyzeOptions({
           expensesOnly: true, 
           skipMultiCheck: true,
           extractionKeywords: keywords.length > 0 ? keywords : undefined,
+          extractionHint: dialogExtractionHint.trim() || undefined,
         },
       });
 
@@ -309,7 +314,7 @@ export function ReanalyzeOptions({
         });
         onReanalyzeComplete?.();
         if (remember) {
-          onExpensesOnlyReanalyze?.(true, keywords);
+          onExpensesOnlyReanalyze?.(true, keywords, dialogExtractionHint.trim());
         }
       } else {
         throw new Error(data?.error || 'Analyse fehlgeschlagen');
@@ -615,6 +620,7 @@ export function ReanalyzeOptions({
         if (open) {
           setDialogKeywords([...vendorExtractionKeywords]);
           setNewKeywordInput('');
+          setDialogExtractionHint(vendorExtractionHint);
         }
       }}>
         <DialogContent className="sm:max-w-md">
@@ -686,6 +692,22 @@ export function ReanalyzeOptions({
               {dialogKeywords.length === 0
                 ? 'Ohne Schlagwörter werden allgemein alle Kosten erfasst.'
                 : 'Die KI extrahiert nur Zeilen die diese Begriffe enthalten.'}
+            </p>
+          </div>
+
+          {/* Extraction Hint */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Extraktions-Hinweis für die KI (optional)</Label>
+            <Textarea
+              value={dialogExtractionHint}
+              onChange={(e) => setDialogExtractionHint(e.target.value.slice(0, 500))}
+              placeholder="z.B. Beträge in Klammern sind Kosten und sollen als positive Werte behandelt werden"
+              rows={3}
+              maxLength={500}
+              className="text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              {dialogExtractionHint.length}/500 Zeichen
             </p>
           </div>
 
