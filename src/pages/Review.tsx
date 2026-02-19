@@ -138,6 +138,8 @@ interface FormData {
   is_mixed_tax_rate: boolean;
   tax_rate_details: TaxRateDetail[] | null;
   payment_method: string;
+  amount_net_override: string;
+  vat_amount_override: string;
 }
 
 const Review = () => {
@@ -171,6 +173,8 @@ const Review = () => {
     is_mixed_tax_rate: false,
     tax_rate_details: null,
     payment_method: '',
+    amount_net_override: '',
+    vat_amount_override: '',
   });
 
   // Load receipts with status='review' or 'needs_splitting'
@@ -234,6 +238,39 @@ const Review = () => {
   // Populate form with receipt data
   const populateForm = (receipt: Receipt) => {
     const receiptData = receipt as unknown as Record<string, unknown>;
+    
+    // Calculate expected net/vat to detect manual overrides from DB
+    const gross = receipt.amount_gross || 0;
+    const vatRateVal = receipt.vat_rate !== null && receipt.vat_rate !== undefined ? receipt.vat_rate : 20;
+    const isMixed = (receiptData.is_mixed_tax_rate as boolean) || false;
+    const taxDetails = (receiptData.tax_rate_details as TaxRateDetail[]) || null;
+    
+    let calculatedNet = 0;
+    let calculatedVat = 0;
+    if (isMixed && taxDetails && taxDetails.length > 0) {
+      calculatedNet = taxDetails.reduce((sum, d) => sum + (d.net_amount || 0), 0);
+      calculatedVat = taxDetails.reduce((sum, d) => sum + (d.tax_amount || 0), 0);
+    } else if (gross) {
+      calculatedNet = gross / (1 + vatRateVal / 100);
+      calculatedVat = gross - calculatedNet;
+    }
+    
+    // If DB values differ from calculated, treat as override
+    let amountNetOverride = '';
+    let vatAmountOverride = '';
+    if (receipt.amount_net !== null && receipt.amount_net !== undefined) {
+      const diff = Math.abs((receipt.amount_net || 0) - calculatedNet);
+      if (diff > 0.01) {
+        amountNetOverride = receipt.amount_net.toString();
+      }
+    }
+    if (receipt.vat_amount !== null && receipt.vat_amount !== undefined) {
+      const diff = Math.abs((receipt.vat_amount || 0) - calculatedVat);
+      if (diff > 0.01) {
+        vatAmountOverride = receipt.vat_amount.toString();
+      }
+    }
+    
     setFormData({
       vendor: receipt.vendor || '',
       vendor_brand: receipt.vendor_brand || '',
@@ -244,9 +281,11 @@ const Review = () => {
       amount_gross: receipt.amount_gross?.toString() || '',
       // IMPORTANT: 0% VAT is valid, so we need to check for null/undefined specifically
       vat_rate: receipt.vat_rate !== null && receipt.vat_rate !== undefined ? receipt.vat_rate.toString() : '20',
-      is_mixed_tax_rate: (receiptData.is_mixed_tax_rate as boolean) || false,
-      tax_rate_details: (receiptData.tax_rate_details as TaxRateDetail[]) || null,
+      is_mixed_tax_rate: isMixed,
+      tax_rate_details: taxDetails,
       payment_method: receipt.payment_method || '',
+      amount_net_override: amountNetOverride,
+      vat_amount_override: vatAmountOverride,
     });
     setAiConfidence(receipt.ai_confidence ?? null);
   };
@@ -328,12 +367,21 @@ const Review = () => {
       let net = null;
       let vatAmount = null;
       
-      if (formData.is_mixed_tax_rate && formData.tax_rate_details) {
+      // Use manual overrides if provided, otherwise calculate
+      if (formData.amount_net_override) {
+        net = parseFloat(formData.amount_net_override);
+      } else if (formData.is_mixed_tax_rate && formData.tax_rate_details) {
         net = formData.tax_rate_details.reduce((sum, d) => sum + (d.net_amount || 0), 0);
-        vatAmount = formData.tax_rate_details.reduce((sum, d) => sum + (d.tax_amount || 0), 0);
       } else if (gross && vatRate !== null) {
         net = gross / (1 + vatRate / 100);
-        vatAmount = gross - net;
+      }
+      
+      if (formData.vat_amount_override) {
+        vatAmount = parseFloat(formData.vat_amount_override);
+      } else if (formData.is_mixed_tax_rate && formData.tax_rate_details) {
+        vatAmount = formData.tax_rate_details.reduce((sum, d) => sum + (d.tax_amount || 0), 0);
+      } else if (gross && vatRate !== null) {
+        vatAmount = gross - (net ?? (gross / (1 + vatRate / 100)));
       }
 
       const updateData: Record<string, unknown> = {
@@ -1154,27 +1202,33 @@ const Review = () => {
                       </div>
                     )}
 
-                    {/* Calculated Fields (readonly) */}
-                    <div className="grid sm:grid-cols-2 gap-4">
+                    {/* Net & VAT Amount (editable with calculated placeholder) */}
+                    <div className="grid sm:grid-cols-2 gap-4 items-end">
                       <div className="space-y-2">
-                        <Label className="text-muted-foreground">Nettobetrag (berechnet)</Label>
+                        <Label className="text-muted-foreground">Nettobetrag</Label>
                         <Input
-                          value={calculations.net ? `€ ${calculations.net.toFixed(2)}` : '—'}
-                          readOnly
-                          className="bg-muted"
+                          type="number"
+                          step="0.01"
+                          value={formData.amount_net_override}
+                          onChange={(e) => setFormData(prev => ({ ...prev, amount_net_override: e.target.value }))}
+                          placeholder={calculations.net ? `${calculations.net.toFixed(2)} (berechnet)` : '—'}
+                          className={formData.amount_net_override ? '' : 'bg-muted'}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-muted-foreground flex items-center gap-1">
-                          MwSt-Betrag (berechnet)
+                          MwSt-Betrag
                           {formData.is_mixed_tax_rate && (
                             <span className="text-xs">(gemischt)</span>
                           )}
                         </Label>
                         <Input
-                          value={calculations.vat ? `€ ${calculations.vat.toFixed(2)}` : '—'}
-                          readOnly
-                          className="bg-muted"
+                          type="number"
+                          step="0.01"
+                          value={formData.vat_amount_override}
+                          onChange={(e) => setFormData(prev => ({ ...prev, vat_amount_override: e.target.value }))}
+                          placeholder={calculations.vat ? `${calculations.vat.toFixed(2)} (berechnet)` : '—'}
+                          className={formData.vat_amount_override ? '' : 'bg-muted'}
                         />
                       </div>
                     </div>
