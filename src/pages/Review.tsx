@@ -723,11 +723,15 @@ const Review = () => {
                           // Find vendor extraction_keywords from vendors if available
                           return [];
                         })()}
-                        onExpensesOnlyReanalyze={(remember, keywords) => {
+                        vendorExtractionHint=""
+                        onExpensesOnlyReanalyze={(remember, keywords, hint) => {
                           if (remember && currentReceipt.vendor_id) {
                             const updates: Record<string, unknown> = { expenses_only_extraction: true };
                             if (keywords && keywords.length > 0) {
                               updates.extraction_keywords = keywords;
+                            }
+                            if (hint !== undefined) {
+                              updates.extraction_hint = hint;
                             }
                             supabase
                               .from('vendors')

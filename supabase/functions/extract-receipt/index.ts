@@ -221,6 +221,7 @@ serve(async (req) => {
     const skipMultiCheck = body.skipMultiCheck === true;
     const expensesOnly = body.expensesOnly === true;
     const extractionKeywords: string[] = Array.isArray(body.extractionKeywords) ? body.extractionKeywords : [];
+    const extractionHint: string = typeof body.extractionHint === 'string' ? body.extractionHint.trim() : '';
 
     // Support both direct image upload and receiptId lookup
     if (body.receiptId) {
@@ -369,7 +370,7 @@ Antworte IMMER und AUSSCHLIESSLICH mit validem JSON ohne zusätzliche Erklärung
       if (receiptCheck?.vendor_id) {
         const { data: vendorCheck } = await supabase
           .from('vendors')
-          .select('expenses_only_extraction, extraction_keywords')
+          .select('expenses_only_extraction, extraction_keywords, extraction_hint')
           .eq('id', receiptCheck.vendor_id)
           .single();
         
@@ -388,11 +389,17 @@ ${keywordList}
 
 FÜR JEDE gefundene Position:
 - Erfasse den Bruttobetrag, Nettobetrag, MwSt-Satz und MwSt-Betrag
+- Ein Schlagwort kann MEHRFACH auf der Rechnung vorkommen - erfasse JEDE passende Zeile einzeln
 - amount_gross = Summe ALLER gefundenen Positionen (Brutto)
 - amount_net = Summe ALLER gefundenen Positionen (Netto)
 - vat_amount = Summe ALLER Steuerbeträge
 - Wenn verschiedene MwSt-Sätze bei den gefundenen Positionen: is_mixed_tax_rate = true und tax_rate_details ausfüllen
 - description: Gefundene Positionen mit Beträgen auflisten
+
+WICHTIG - DUPLIKAT-VERMEIDUNG:
+- Zähle jede Zeile auf der Rechnung genau EINMAL
+- Wenn der gleiche Betrag mehrfach in einer Zusammenfassung/Summenzeile wiederholt wird, erfasse nur die Einzelposition, NICHT die Summenzeile
+- Orientiere dich an den tatsächlichen Einzelposten/Detailzeilen, nicht an Zwischensummen oder Gesamtsummen die diese Positionen enthalten
 
 IGNORIERE alle anderen Zeilen/Positionen komplett (Einnahmen, Erlöse, Gutschriften, Auszahlungen, Umsätze).`;
           } else {
@@ -425,11 +432,17 @@ ${keywordList}
 
 FÜR JEDE gefundene Position:
 - Erfasse den Bruttobetrag, Nettobetrag, MwSt-Satz und MwSt-Betrag
+- Ein Schlagwort kann MEHRFACH auf der Rechnung vorkommen - erfasse JEDE passende Zeile einzeln
 - amount_gross = Summe ALLER gefundenen Positionen (Brutto)
 - amount_net = Summe ALLER gefundenen Positionen (Netto)
 - vat_amount = Summe ALLER Steuerbeträge
 - Wenn verschiedene MwSt-Sätze bei den gefundenen Positionen: is_mixed_tax_rate = true und tax_rate_details ausfüllen
 - description: Gefundene Positionen mit Beträgen auflisten
+
+WICHTIG - DUPLIKAT-VERMEIDUNG:
+- Zähle jede Zeile auf der Rechnung genau EINMAL
+- Wenn der gleiche Betrag mehrfach in einer Zusammenfassung/Summenzeile wiederholt wird, erfasse nur die Einzelposition, NICHT die Summenzeile
+- Orientiere dich an den tatsächlichen Einzelposten/Detailzeilen, nicht an Zwischensummen oder Gesamtsummen die diese Positionen enthalten
 
 IGNORIERE alle anderen Zeilen/Positionen komplett (Einnahmen, Erlöse, Gutschriften, Auszahlungen, Umsätze).`;
       } else {
@@ -446,7 +459,39 @@ Diese Rechnung stammt von einem Lieferanten mit gemischten Abrechnungen (z.B. Pl
       }
     }
 
-    console.log(`Expenses-only mode: ${expensesOnlyPrompt ? 'ACTIVE' : 'inactive'} (flag: ${expensesOnly}, keywords: ${extractionKeywords.length})`);
+    // Build extraction hint block
+    // Priority: body extractionHint > vendor extraction_hint from DB
+    let hintText = extractionHint;
+    if (!hintText && receiptId) {
+      // Try to load from vendor if not provided in body
+      const { data: receiptForHint } = await supabase
+        .from('receipts')
+        .select('vendor_id')
+        .eq('id', receiptId)
+        .single();
+      
+      if (receiptForHint?.vendor_id) {
+        const { data: vendorHint } = await supabase
+          .from('vendors')
+          .select('extraction_hint')
+          .eq('id', receiptForHint.vendor_id)
+          .single();
+        
+        if (vendorHint?.extraction_hint) {
+          hintText = vendorHint.extraction_hint;
+        }
+      }
+    }
+
+    let extractionHintPrompt = '';
+    if (hintText) {
+      extractionHintPrompt = `
+
+LIEFERANTEN-SPEZIFISCHER HINWEIS:
+${hintText}`;
+    }
+
+    console.log(`Expenses-only mode: ${expensesOnlyPrompt ? 'ACTIVE' : 'inactive'} (flag: ${expensesOnly}, keywords: ${extractionKeywords.length}, hint: ${hintText ? 'yes' : 'no'})`);
 
     const userPrompt = `Analysiere dieses Dokument in zwei Schritten:
 
@@ -743,7 +788,7 @@ Beispiel Kleinunternehmer:
               },
               {
                 type: "text",
-                text: userPrompt + expensesOnlyPrompt,
+                text: userPrompt + expensesOnlyPrompt + extractionHintPrompt,
               },
             ],
           },

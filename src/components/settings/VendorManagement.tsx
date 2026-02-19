@@ -145,6 +145,7 @@ export function VendorManagement() {
     auto_approve_min_confidence: 0.8,
     expenses_only_extraction: false,
     extraction_keywords: [] as string[],
+    extraction_hint: '',
   });
   const [newVariant, setNewVariant] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
@@ -164,6 +165,7 @@ export function VendorManagement() {
       auto_approve_min_confidence: 0.8,
       expenses_only_extraction: false,
       extraction_keywords: [],
+      extraction_hint: '',
     });
     setNewVariant('');
     setNewKeyword('');
@@ -185,6 +187,7 @@ export function VendorManagement() {
       auto_approve_min_confidence: vendor.auto_approve_min_confidence ?? 0.8,
       expenses_only_extraction: vendor.expenses_only_extraction ?? false,
       extraction_keywords: vendor.extraction_keywords || [],
+      extraction_hint: vendor.extraction_hint || '',
     });
     setNewVariant('');
     setNewKeyword('');
@@ -251,6 +254,7 @@ export function VendorManagement() {
           auto_approve_min_confidence: formData.auto_approve_min_confidence,
           expenses_only_extraction: formData.expenses_only_extraction,
           extraction_keywords: formData.extraction_keywords,
+          extraction_hint: formData.extraction_hint,
         });
         const messages: string[] = [];
         if (result.syncedReceipts > 0) {
@@ -1396,6 +1400,9 @@ export function VendorManagement() {
                       <AlertTriangle className="h-3.5 w-3.5 text-warning flex-shrink-0" />
                       Duplikate und PDFs mit mehreren Rechnungen werden nie automatisch freigegeben.
                     </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Nur Ausgaben extrahieren */}
@@ -1420,7 +1427,7 @@ export function VendorManagement() {
 
               {/* Extraction Keywords - only visible when expenses_only is active */}
               {formData.expenses_only_extraction && (
-                <div className="space-y-2 pl-6 border-l-2 border-primary/20 ml-2">
+                <div className="space-y-3 pl-6 border-l-2 border-primary/20 ml-2">
                   <Label className="text-sm">Schlagwörter für Kosten-Positionen</Label>
                   
                   {/* Keyword chips */}
@@ -1488,9 +1495,22 @@ export function VendorManagement() {
                       ? 'Ohne Schlagwörter werden allgemein alle Kosten erfasst.'
                       : 'Die KI extrahiert nur Zeilen die diese Begriffe enthalten.'}
                   </p>
-                </div>
-              )}
-            </div>
+
+                  {/* Extraction Hint Textarea */}
+                  <div className="space-y-1.5 pt-1">
+                    <Label className="text-sm">Extraktions-Hinweis für die KI (optional)</Label>
+                    <Textarea
+                      value={formData.extraction_hint}
+                      onChange={(e) => setFormData(prev => ({ ...prev, extraction_hint: e.target.value.slice(0, 500) }))}
+                      placeholder="z.B. Beträge in Klammern sind Kosten und sollen als positive Werte behandelt werden"
+                      rows={3}
+                      maxLength={500}
+                      className="text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {formData.extraction_hint.length}/500 Zeichen — Dieser Hinweis wird der KI bei jeder Analyse mitgegeben.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

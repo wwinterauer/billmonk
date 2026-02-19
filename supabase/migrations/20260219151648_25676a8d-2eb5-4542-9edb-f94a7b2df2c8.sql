@@ -1,0 +1,1 @@
+ALTER TABLE public.vendors ADD COLUMN extraction_hint text DEFAULT '';
