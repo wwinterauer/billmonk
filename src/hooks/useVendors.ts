@@ -317,7 +317,6 @@ export function useVendors() {
         }
       }
     }
-    }
 
     const updated = {
       ...data,
