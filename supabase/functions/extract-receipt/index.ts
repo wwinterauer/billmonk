@@ -384,8 +384,14 @@ Antworte IMMER und AUSSCHLIESSLICH mit validem JSON ohne zusätzliche Erklärung
 
 WICHTIGE REGEL - GEZIELTE POSITIONS-EXTRAKTION:
 Dieser Lieferant hat spezifische Kosten-Positionen.
-Suche NUR nach Zeilen/Positionen die folgende Begriffe enthalten:
+Suche NUR nach Zeilen/Positionen die eines der folgenden Schlagwoerter im Text enthalten:
 ${keywordList}
+
+STRENGE FILTERREGEL:
+- Eine Zeile wird NUR erfasst, wenn ihr Text eines der obigen Schlagwoerter woertlich enthaelt
+- Wenn eine Zeile KEINES dieser Schlagwoerter enthaelt, wird sie KOMPLETT IGNORIERT - auch wenn sie wie eine Ausgabe/Kosten aussieht
+- Beispiel: Wenn "Transaktionsgebuehr" ein Schlagwort ist, aber "Ladevorgaenge" NICHT, dann wird "Ladevorgaenge" ignoriert
+- Es zaehlen NUR exakte Treffer auf die Schlagwoerter - keine aehnlichen Begriffe, keine Synonyme
 
 FÜR JEDE gefundene Position:
 - Erfasse den Bruttobetrag, Nettobetrag, MwSt-Satz und MwSt-Betrag
@@ -437,8 +443,14 @@ BETRAGS-REGELN:
 
 WICHTIGE REGEL - GEZIELTE POSITIONS-EXTRAKTION:
 Dieser Lieferant hat spezifische Kosten-Positionen.
-Suche NUR nach Zeilen/Positionen die folgende Begriffe enthalten:
+Suche NUR nach Zeilen/Positionen die eines der folgenden Schlagwoerter im Text enthalten:
 ${keywordList}
+
+STRENGE FILTERREGEL:
+- Eine Zeile wird NUR erfasst, wenn ihr Text eines der obigen Schlagwoerter woertlich enthaelt
+- Wenn eine Zeile KEINES dieser Schlagwoerter enthaelt, wird sie KOMPLETT IGNORIERT - auch wenn sie wie eine Ausgabe/Kosten aussieht
+- Beispiel: Wenn "Transaktionsgebuehr" ein Schlagwort ist, aber "Ladevorgaenge" NICHT, dann wird "Ladevorgaenge" ignoriert
+- Es zaehlen NUR exakte Treffer auf die Schlagwoerter - keine aehnlichen Begriffe, keine Synonyme
 
 FÜR JEDE gefundene Position:
 - Erfasse den Bruttobetrag, Nettobetrag, MwSt-Satz und MwSt-Betrag
