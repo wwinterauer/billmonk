@@ -220,6 +220,7 @@ serve(async (req) => {
     const forceExtract = body.forceExtract === true;
     const skipMultiCheck = body.skipMultiCheck === true;
     const expensesOnly = body.expensesOnly === true;
+    const extractionKeywords: string[] = Array.isArray(body.extractionKeywords) ? body.extractionKeywords : [];
 
     // Support both direct image upload and receiptId lookup
     if (body.receiptId) {
@@ -357,7 +358,7 @@ Antworte IMMER und AUSSCHLIESSLICH mit validem JSON ohne zusätzliche Erklärung
     // Build expenses-only prompt addition if needed
     let expensesOnlyPrompt = '';
     
-    // Check if vendor has expenses_only_extraction flag
+    // Check if vendor has expenses_only_extraction flag and/or extraction_keywords
     if (receiptId && !expensesOnly) {
       const { data: receiptCheck } = await supabase
         .from('receipts')
@@ -368,12 +369,34 @@ Antworte IMMER und AUSSCHLIESSLICH mit validem JSON ohne zusätzliche Erklärung
       if (receiptCheck?.vendor_id) {
         const { data: vendorCheck } = await supabase
           .from('vendors')
-          .select('expenses_only_extraction')
+          .select('expenses_only_extraction, extraction_keywords')
           .eq('id', receiptCheck.vendor_id)
           .single();
         
         if (vendorCheck?.expenses_only_extraction) {
-          expensesOnlyPrompt = `
+          const vendorKeywords: string[] = vendorCheck.extraction_keywords || [];
+          const allKeywords = [...new Set([...extractionKeywords, ...vendorKeywords])];
+          
+          if (allKeywords.length > 0) {
+            const keywordList = allKeywords.map(k => `- "${k}"`).join('\n');
+            expensesOnlyPrompt = `
+
+WICHTIGE REGEL - GEZIELTE POSITIONS-EXTRAKTION:
+Dieser Lieferant hat spezifische Kosten-Positionen.
+Suche NUR nach Zeilen/Positionen die folgende Begriffe enthalten:
+${keywordList}
+
+FÜR JEDE gefundene Position:
+- Erfasse den Bruttobetrag, Nettobetrag, MwSt-Satz und MwSt-Betrag
+- amount_gross = Summe ALLER gefundenen Positionen (Brutto)
+- amount_net = Summe ALLER gefundenen Positionen (Netto)
+- vat_amount = Summe ALLER Steuerbeträge
+- Wenn verschiedene MwSt-Sätze bei den gefundenen Positionen: is_mixed_tax_rate = true und tax_rate_details ausfüllen
+- description: Gefundene Positionen mit Beträgen auflisten
+
+IGNORIERE alle anderen Zeilen/Positionen komplett (Einnahmen, Erlöse, Gutschriften, Auszahlungen, Umsätze).`;
+          } else {
+            expensesOnlyPrompt = `
 
 WICHTIGE REGEL - NUR AUSGABEN EXTRAHIEREN:
 Diese Rechnung stammt von einem Lieferanten mit gemischten Abrechnungen (z.B. Plattform-Abrechnung).
@@ -383,12 +406,34 @@ Diese Rechnung stammt von einem Lieferanten mit gemischten Abrechnungen (z.B. Pl
 - amount_net und vat_amount ebenfalls nur aus Kosten-Positionen berechnen
 - Beschreibung: nur Kosten-Positionen auflisten
 - Bei gemischten MwSt-Sätzen der Kosten: is_mixed_tax_rate = true mit Details`;
+          }
         }
       }
     }
     
     if (expensesOnly && !expensesOnlyPrompt) {
-      expensesOnlyPrompt = `
+      const allKeywords = [...new Set([...extractionKeywords])];
+      
+      if (allKeywords.length > 0) {
+        const keywordList = allKeywords.map(k => `- "${k}"`).join('\n');
+        expensesOnlyPrompt = `
+
+WICHTIGE REGEL - GEZIELTE POSITIONS-EXTRAKTION:
+Dieser Lieferant hat spezifische Kosten-Positionen.
+Suche NUR nach Zeilen/Positionen die folgende Begriffe enthalten:
+${keywordList}
+
+FÜR JEDE gefundene Position:
+- Erfasse den Bruttobetrag, Nettobetrag, MwSt-Satz und MwSt-Betrag
+- amount_gross = Summe ALLER gefundenen Positionen (Brutto)
+- amount_net = Summe ALLER gefundenen Positionen (Netto)
+- vat_amount = Summe ALLER Steuerbeträge
+- Wenn verschiedene MwSt-Sätze bei den gefundenen Positionen: is_mixed_tax_rate = true und tax_rate_details ausfüllen
+- description: Gefundene Positionen mit Beträgen auflisten
+
+IGNORIERE alle anderen Zeilen/Positionen komplett (Einnahmen, Erlöse, Gutschriften, Auszahlungen, Umsätze).`;
+      } else {
+        expensesOnlyPrompt = `
 
 WICHTIGE REGEL - NUR AUSGABEN EXTRAHIEREN:
 Diese Rechnung stammt von einem Lieferanten mit gemischten Abrechnungen (z.B. Plattform-Abrechnung).
@@ -398,7 +443,10 @@ Diese Rechnung stammt von einem Lieferanten mit gemischten Abrechnungen (z.B. Pl
 - amount_net und vat_amount ebenfalls nur aus Kosten-Positionen berechnen
 - Beschreibung: nur Kosten-Positionen auflisten
 - Bei gemischten MwSt-Sätzen der Kosten: is_mixed_tax_rate = true mit Details`;
+      }
     }
+
+    console.log(`Expenses-only mode: ${expensesOnlyPrompt ? 'ACTIVE' : 'inactive'} (flag: ${expensesOnly}, keywords: ${extractionKeywords.length})`);
 
     const userPrompt = `Analysiere dieses Dokument in zwei Schritten:
 

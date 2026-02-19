@@ -1,0 +1,1 @@
+ALTER TABLE vendors ADD COLUMN extraction_keywords text[] NOT NULL DEFAULT '{}';

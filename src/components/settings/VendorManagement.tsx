@@ -144,8 +144,10 @@ export function VendorManagement() {
     auto_approve: false,
     auto_approve_min_confidence: 0.8,
     expenses_only_extraction: false,
+    extraction_keywords: [] as string[],
   });
   const [newVariant, setNewVariant] = useState('');
+  const [newKeyword, setNewKeyword] = useState('');
 
   const resetForm = () => {
     setFormData({
@@ -161,8 +163,10 @@ export function VendorManagement() {
       auto_approve: false,
       auto_approve_min_confidence: 0.8,
       expenses_only_extraction: false,
+      extraction_keywords: [],
     });
     setNewVariant('');
+    setNewKeyword('');
   };
 
   const openEditDialog = (vendor: Vendor) => {
@@ -180,8 +184,10 @@ export function VendorManagement() {
       auto_approve: vendor.auto_approve ?? false,
       auto_approve_min_confidence: vendor.auto_approve_min_confidence ?? 0.8,
       expenses_only_extraction: vendor.expenses_only_extraction ?? false,
+      extraction_keywords: vendor.extraction_keywords || [],
     });
     setNewVariant('');
+    setNewKeyword('');
   };
 
   // Deep-link: auto-open vendor edit dialog when vendorId is in URL
@@ -244,6 +250,7 @@ export function VendorManagement() {
           auto_approve: formData.auto_approve,
           auto_approve_min_confidence: formData.auto_approve_min_confidence,
           expenses_only_extraction: formData.expenses_only_extraction,
+          extraction_keywords: formData.extraction_keywords,
         });
         const messages: string[] = [];
         if (result.syncedReceipts > 0) {
@@ -1410,6 +1417,79 @@ export function VendorManagement() {
                   onCheckedChange={(checked) => setFormData(prev => ({ ...prev, expenses_only_extraction: checked }))}
                 />
               </div>
+
+              {/* Extraction Keywords - only visible when expenses_only is active */}
+              {formData.expenses_only_extraction && (
+                <div className="space-y-2 pl-6 border-l-2 border-primary/20 ml-2">
+                  <Label className="text-sm">Schlagwörter für Kosten-Positionen</Label>
+                  
+                  {/* Keyword chips */}
+                  {formData.extraction_keywords.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {formData.extraction_keywords.map((keyword, index) => (
+                        <Badge key={index} variant="secondary" className="gap-1 pr-1">
+                          {keyword}
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({
+                              ...prev,
+                              extraction_keywords: prev.extraction_keywords.filter((_, i) => i !== index)
+                            }))}
+                            className="ml-0.5 rounded-full hover:bg-muted p-0.5"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Add keyword input */}
+                  <div className="flex gap-2">
+                    <Input
+                      value={newKeyword}
+                      onChange={(e) => setNewKeyword(e.target.value)}
+                      placeholder="z.B. Transaktionsgebühr"
+                      className="flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (newKeyword.trim() && !formData.extraction_keywords.includes(newKeyword.trim())) {
+                            setFormData(prev => ({
+                              ...prev,
+                              extraction_keywords: [...prev.extraction_keywords, newKeyword.trim()]
+                            }));
+                            setNewKeyword('');
+                          }
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (newKeyword.trim() && !formData.extraction_keywords.includes(newKeyword.trim())) {
+                          setFormData(prev => ({
+                            ...prev,
+                            extraction_keywords: [...prev.extraction_keywords, newKeyword.trim()]
+                          }));
+                          setNewKeyword('');
+                        }
+                      }}
+                      disabled={!newKeyword.trim()}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground">
+                    {formData.extraction_keywords.length === 0
+                      ? 'Ohne Schlagwörter werden allgemein alle Kosten erfasst.'
+                      : 'Die KI extrahiert nur Zeilen die diese Begriffe enthalten.'}
+                  </p>
+                </div>
+              )}
             </div>
                 </div>
               )}

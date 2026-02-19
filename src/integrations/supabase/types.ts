@@ -1450,6 +1450,7 @@ export type Database = {
           detected_names: string[] | null
           display_name: string
           expenses_only_extraction: boolean
+          extraction_keywords: string[]
           id: string
           learning_enabled: boolean | null
           learning_level: number | null
@@ -1474,6 +1475,7 @@ export type Database = {
           detected_names?: string[] | null
           display_name: string
           expenses_only_extraction?: boolean
+          extraction_keywords?: string[]
           id?: string
           learning_enabled?: boolean | null
           learning_level?: number | null
@@ -1498,6 +1500,7 @@ export type Database = {
           detected_names?: string[] | null
           display_name?: string
           expenses_only_extraction?: boolean
+          extraction_keywords?: string[]
           id?: string
           learning_enabled?: boolean | null
           learning_level?: number | null

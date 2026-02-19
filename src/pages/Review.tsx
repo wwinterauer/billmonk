@@ -719,11 +719,19 @@ const Review = () => {
                         onFieldsUpdated={handleReanalysisUpdate}
                         disabled={imageLoading}
                         vendorId={currentReceipt.vendor_id || undefined}
-                        onExpensesOnlyReanalyze={(remember) => {
+                        vendorExtractionKeywords={(() => {
+                          // Find vendor extraction_keywords from vendors if available
+                          return [];
+                        })()}
+                        onExpensesOnlyReanalyze={(remember, keywords) => {
                           if (remember && currentReceipt.vendor_id) {
+                            const updates: Record<string, unknown> = { expenses_only_extraction: true };
+                            if (keywords && keywords.length > 0) {
+                              updates.extraction_keywords = keywords;
+                            }
                             supabase
                               .from('vendors')
-                              .update({ expenses_only_extraction: true })
+                              .update(updates)
                               .eq('id', currentReceipt.vendor_id)
                               .then(() => {
                                 // will trigger reload via onReanalyzeComplete
