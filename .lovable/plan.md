@@ -1,103 +1,47 @@
 
+# Fix: Review-Seite springt nach Neuanalyse weiter + Daten werden nicht aktualisiert
 
-# Lieferanten-spezifische "Nur Ausgaben"-Regel
+## Problem
 
-## Uebersicht
+Drei zusammenhaengende Fehler:
 
-Statt einer globalen Prompt-Regel wird ein lieferantenspezifisches Flag eingefuehrt: **"Nur Ausgaben extrahieren"**. Damit werden bei Plattform-Abrechnungen (z.B. Monta) nur Kosten-Positionen erfasst und Einnahmen/Gutschriften ignoriert.
+1. **Navigation springt auf ersten Beleg**: Nach jeder Neuanalyse wird `onReanalyzeComplete` aufgerufen, was `loadReceipts()` ausfuehrt. Diese Funktion laedt alle Belege neu und zeigt immer den **ersten** Beleg an (Index 0) -- statt auf dem aktuellen Beleg zu bleiben.
 
-Der Nutzer kann diese Regel:
-1. Beim **Lieferanten fest hinterlegen** (Einstellungen > Lieferanten)
-2. In der **Review-Seite** oder **Einzelbeleg-Bearbeitung** direkt aktivieren und eine Neuanalyse anstoessen
+2. **"Alle Betraege" nutzt falschen Analyse-Pfad**: Die Schnellzugriff-Optionen (inkl. "Alle Betraege") verwenden die Client-seitige `extractReceiptData()` Funktion, die das Bild direkt an die KI sendet. Die Edge Function aktualisiert dabei **nicht** die Datenbank. Die Ergebnisse werden nur lokal im Formular angezeigt, gehen aber beim Neuladen verloren.
 
----
+3. **"Nur Ausgaben" aktualisiert DB, aber springt weg**: Die Expenses-Only-Analyse nutzt korrekt den `receiptId`-Pfad der Edge Function (DB wird aktualisiert), aber `onReanalyzeComplete` laesst die Seite wegspringen, bevor der Nutzer die neuen Daten sieht.
 
-## Aenderungen
+## Loesung
 
-### 1. Datenbank: Neues Feld auf `vendors`
+### 1. `onReanalyzeComplete` in Review.tsx aendern
 
-Neue Spalte `expenses_only_extraction` (boolean, default `false`) auf der `vendors`-Tabelle.
-
-```text
-ALTER TABLE vendors ADD COLUMN expenses_only_extraction boolean NOT NULL DEFAULT false;
-```
-
-### 2. Edge Function (`supabase/functions/extract-receipt/index.ts`)
-
-**Vendor-Lookup erweitern** (Zeile ~780-813):
-- Wenn ein Vendor gefunden wird, zusaetzlich `expenses_only_extraction` abfragen
-- Falls `true`: zusaetzliche Prompt-Regel an den `userPrompt` anhaengen
-
-**Zusaetzliche Prompt-Regel** (nur wenn Flag aktiv):
-```text
-WICHTIGE REGEL - NUR AUSGABEN EXTRAHIEREN:
-Diese Rechnung stammt von einem Lieferanten mit gemischten Abrechnungen.
-- Erfasse NUR AUSGABEN/KOSTEN (Gebuehren, Abos, Transaktionskosten)
-- IGNORIERE Einnahmen, Erloese, Gutschriften, Auszahlungen
-- amount_gross = Summe NUR der Kosten-Positionen
-- Beschreibung: nur Kosten-Positionen auflisten
-```
-
-**Body-Parameter**: Die Edge Function akzeptiert auch einen neuen optionalen Parameter `expensesOnly: boolean` fuer Ad-hoc-Aufrufe aus der UI (wenn der Nutzer die Regel fuer einen einzelnen Beleg anstoesst, ohne sie dauerhaft zu speichern).
-
-### 3. Lieferanten-Verwaltung (`src/components/settings/VendorManagement.tsx`)
-
-**Bearbeitungs-Dialog erweitern**:
-- Neuer Switch/Checkbox: "Nur Ausgaben extrahieren (Einnahmen ignorieren)"
-- Erklaerungstext: "Aktivieren fuer Plattform-Abrechnungen die Kosten und Einnahmen mischen (z.B. Monta, Marketplace-Anbieter)"
-- Wird ueber `updateVendor()` gespeichert
-
-### 4. Vendor-Hook (`src/hooks/useVendors.ts`)
-
-**Vendor-Interface erweitern**:
-- Neues Feld `expenses_only_extraction: boolean` im `Vendor` Interface
-- Feld in `fetchVendors()` laden und in `updateVendor()` speichern
-
-### 5. Review-Seite (`src/pages/Review.tsx`)
-
-**Neuer Hinweis-Banner** (nach dem Vendor-Feld):
-- Wenn der aktuelle Beleg einem Vendor mit `expenses_only_extraction = true` zugeordnet ist: Info-Badge "Nur Ausgaben" anzeigen
-- Button: "Nur Ausgaben neu analysieren" -- ruft `extract-receipt` mit `expensesOnly: true` auf
-
-**Neuer Quick-Action im KI-Analyse-Menue**:
-- Falls Vendor bekannt aber Flag nicht gesetzt: Option "Nur Ausgaben extrahieren (einmalig)" -- fuehrt Neuanalyse mit dem Flag durch
-- Falls gewuenscht: "Und fuer diesen Lieferanten merken" -- setzt zusaetzlich das Flag auf dem Vendor
-
-### 6. Beleg-Detail-Panel (`src/components/receipts/ReceiptDetailPanel.tsx`)
-
-**Gleiche Logik wie Review**:
-- Info-Badge wenn Vendor `expenses_only_extraction = true` hat
-- Option fuer einmalige Neuanalyse mit "Nur Ausgaben"
-- Option das Flag dauerhaft am Lieferanten zu speichern
-
-### 7. ReanalyzeOptions erweitern (`src/components/receipts/ReanalyzeOptions.tsx`)
-
-**Neuer Menuepunkt** im KI-Analyse-Dropdown:
-- Separator + neuer Abschnitt "Spezial-Analyse"
-- Menuepunkt: "Nur Ausgaben extrahieren" mit Euro-Icon und Erklaerungstext
-- Ruft die Edge Function mit `expensesOnly: true` auf
-- Optional: Sub-Option "Fuer Lieferant merken" (setzt `expenses_only_extraction` auf dem Vendor)
-
-**Props erweitern**:
-- `vendorId?: string` und `vendorExpensesOnly?: boolean` als neue Props
-- Callback `onVendorSettingChange?: (setting: string, value: boolean) => void`
-
----
-
-## Ablauf aus Nutzersicht
+Statt `loadReceipts()` (kompletter Reload) soll nur der **aktuelle Beleg** neu aus der DB geladen und das Formular aktualisiert werden:
 
 ```text
-Szenario A: Einmalig in der Review
-1. Nutzer sieht Monta-Rechnung mit falschen Betraegen
-2. Klickt auf "KI-Analyse" > "Nur Ausgaben extrahieren"
-3. KI analysiert neu und erfasst nur Gebuehren + Abo
-4. Optional: Checkbox "Fuer diesen Lieferanten merken" -> setzt Flag
-
-Szenario B: Dauerhaft beim Lieferanten
-1. Nutzer geht zu Einstellungen > Lieferanten > Monta
-2. Aktiviert "Nur Ausgaben extrahieren"
-3. Alle kuenftigen Monta-Belege werden automatisch nur mit Ausgaben analysiert
+onReanalyzeComplete wird zu:
+1. Aktuellen Beleg per getReceipt(currentReceipt.id) neu laden
+2. populateForm() mit den neuen Daten aufrufen
+3. currentIndex bleibt unveraendert
 ```
+
+### 2. Einzelbeleg-Reload-Funktion erstellen
+
+Neue Hilfsfunktion `reloadCurrentReceipt()` in Review.tsx:
+- Laedt den aktuellen Beleg per `supabase.from('receipts').select('*').eq('id', id).single()`
+- Aktualisiert `receipts[currentIndex]` im State
+- Ruft `populateForm()` mit den neuen Daten auf
+- Laedt das Bild nicht neu (ist bereits geladen)
+
+### 3. onReanalyzeComplete Callback anpassen
+
+```text
+Vorher:  onReanalyzeComplete={() => loadReceipts()}
+Nachher: onReanalyzeComplete={() => reloadCurrentReceipt()}
+```
+
+### 4. Gleiche Logik fuer ReceiptDetailPanel pruefen
+
+Falls `ReceiptDetailPanel.tsx` ein aehnliches Muster hat, dort ebenfalls den Einzelbeleg-Reload statt Komplett-Reload verwenden.
 
 ---
 
@@ -105,10 +49,5 @@ Szenario B: Dauerhaft beim Lieferanten
 
 | Datei | Aenderungen |
 |-------|------------|
-| Datenbank (Migration) | `expenses_only_extraction` Spalte auf `vendors` |
-| `supabase/functions/extract-receipt/index.ts` | Vendor-Flag laden, Prompt erweitern, `expensesOnly` Body-Parameter |
-| `src/hooks/useVendors.ts` | Interface + fetch/update erweitern |
-| `src/components/settings/VendorManagement.tsx` | Switch im Bearbeitungs-Dialog |
-| `src/components/receipts/ReanalyzeOptions.tsx` | Neuer "Nur Ausgaben" Menuepunkt + Vendor-Merken-Option |
-| `src/pages/Review.tsx` | Info-Badge, Vendor-Flag weiterreichen an ReanalyzeOptions |
-| `src/components/receipts/ReceiptDetailPanel.tsx` | Info-Badge, Vendor-Flag weiterreichen |
+| `src/pages/Review.tsx` | Neue `reloadCurrentReceipt()` Funktion, `onReanalyzeComplete` Callback anpassen |
+| `src/components/receipts/ReceiptDetailPanel.tsx` | Gleiche Anpassung falls betroffen |
