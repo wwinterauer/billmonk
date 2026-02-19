@@ -1444,6 +1444,7 @@ export type Database = {
           correction_count: number | null
           created_at: string | null
           default_category_id: string | null
+          default_tag_id: string | null
           default_vat_rate: number | null
           detected_names: string[] | null
           display_name: string
@@ -1465,6 +1466,7 @@ export type Database = {
           correction_count?: number | null
           created_at?: string | null
           default_category_id?: string | null
+          default_tag_id?: string | null
           default_vat_rate?: number | null
           detected_names?: string[] | null
           display_name: string
@@ -1486,6 +1488,7 @@ export type Database = {
           correction_count?: number | null
           created_at?: string | null
           default_category_id?: string | null
+          default_tag_id?: string | null
           default_vat_rate?: number | null
           detected_names?: string[] | null
           display_name?: string
@@ -1507,6 +1510,13 @@ export type Database = {
             columns: ["default_category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendors_default_tag_id_fkey"
+            columns: ["default_tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
             referencedColumns: ["id"]
           },
           {

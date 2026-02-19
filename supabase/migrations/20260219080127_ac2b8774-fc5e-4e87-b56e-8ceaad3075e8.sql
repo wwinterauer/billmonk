@@ -1,0 +1,1 @@
+ALTER TABLE public.vendors ADD COLUMN default_tag_id uuid REFERENCES public.tags(id) ON DELETE SET NULL;
