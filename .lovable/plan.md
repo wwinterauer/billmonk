@@ -1,48 +1,69 @@
 
 
-# Fix: KI ignoriert Schlagwort-Einschraenkung und extrahiert "Ladevorgang"
+# Fix: MwSt-Konsistenzpruefung und 0%-USt-Regel
 
 ## Problem
 
-Obwohl fuer Monta nur die Schlagwoerter "Transaktionsgebuehr" und "Betreiber-Abonnement" konfiguriert sind, extrahiert die KI zusaetzlich die Zeile "Ladevorgaenge". Die Prompt-Anweisung "Suche NUR nach Zeilen die folgende Begriffe enthalten" und "IGNORIERE alle anderen Zeilen" wird nicht strikt befolgt.
-
-Erwartet: 1,27 EUR Transaktionsgebuehr + 12,00 EUR Betreiber-Abonnement = 13,27 EUR brutto / 11,27 EUR netto.
-
-## Ursache
-
-Der Prompt ist zu implizit. Die KI sieht "Ladevorgaenge" als Kosten-Position und nimmt sie auf, obwohl sie nicht in der Schlagwort-Liste steht. Es fehlt eine explizite Negativregel.
+Bei Rechnung FR5245WLTAEUI erkennt die KI 20% MwSt, obwohl 0% auf der Rechnung steht, und setzt Brutto = Netto (widerspruechlich). Zwei Fehler:
+1. Explizit angegebene "0% USt." wird ignoriert
+2. Selbst bei falschem Satz fehlt die mathematische Konsistenz zwischen Brutto/Netto/MwSt
 
 ## Loesung
 
-Die Prompt-Formulierung in beiden "GEZIELTE POSITIONS-EXTRAKTION"-Bloecken (Zeilen 383-409 und 436-462) deutlich verstaerken:
+Eine Post-Processing-Validierung in `supabase/functions/extract-receipt/index.ts` einfuegen, die nach dem Math.abs()-Block (Zeile 900) und vor dem is_receipt-Check (Zeile 901) greift.
 
-### Aenderungen am Prompt
+### Validierungsregeln (in dieser Reihenfolge)
+
+**Regel 0 (NEU - Benutzer-Anforderung): Explizite 0% USt. respektieren**
+Wenn die KI-Rohantwort Hinweise auf "0% USt", "0,00% MwSt", "0.00% USt" o.ae. enthaelt (Suche im raw content), dann wird vat_rate = 0 erzwungen, unabhaengig davon was die KI als Satz geliefert hat.
+
+**Regel 1: Brutto = Netto und MwSt-Betrag = 0 oder fehlt**
+Wenn Brutto und Netto identisch sind und kein MwSt-Betrag vorhanden ist, wird vat_rate auf 0 gesetzt. Die KI hat einen falschen Satz geliefert.
+
+**Regel 2: MwSt-Satz > 0, aber Netto fehlt oder gleich Brutto**
+Wenn ein plausibler MwSt-Satz und MwSt-Betrag vorhanden sind, aber Netto fehlt oder gleich Brutto ist: Netto = Brutto - MwSt-Betrag berechnen.
+
+**Regel 3: MwSt-Satz > 0, aber MwSt-Betrag fehlt**
+MwSt-Betrag und Netto aus Brutto und Satz ableiten (Netto = Brutto / (1 + Satz/100)).
+
+**Regel 4: Netto < Brutto, aber MwSt-Betrag fehlt**
+MwSt-Betrag = Brutto - Netto.
+
+### Pseudo-Code
 
 ```text
-WICHTIGE REGEL - GEZIELTE POSITIONS-EXTRAKTION:
-Dieser Lieferant hat spezifische Kosten-Positionen.
-Suche NUR nach Zeilen/Positionen die eines der folgenden Schlagwoerter im Text enthalten:
-[Keyword-Liste]
+// Regel 0: Explizite 0% im Dokument-Text erkennen
+Pruefe cleanedContent (KI-Rohantwort) auf Muster wie:
+  "0% USt", "0,00% USt", "0.00% USt", "0% MwSt", "0,00% MwSt", "0.00% MwSt"
+Wenn gefunden UND vat_rate != 0:
+  -> vat_rate = 0, vat_amount = 0, amount_net = amount_gross
+  -> Log: "0% USt explizit im Dokument gefunden, Satz korrigiert"
 
-STRENGE FILTERREGEL:
-- Eine Zeile wird NUR erfasst, wenn ihr Text eines der obigen Schlagwoerter woertlich enthaelt
-- Wenn eine Zeile KEINES dieser Schlagwoerter enthaelt, wird sie KOMPLETT IGNORIERT - auch wenn sie wie eine Ausgabe/Kosten aussieht
-- Beispiel: Wenn "Transaktionsgebuehr" ein Schlagwort ist, aber "Ladevorgaenge" NICHT, dann wird "Ladevorgaenge" ignoriert
-- Es zaehlen NUR exakte Treffer auf die Schlagwoerter - keine aehnlichen Begriffe, keine Synonyme
+// Regel 1: Brutto == Netto und kein MwSt-Betrag
+Wenn amount_gross == amount_net UND (vat_amount == 0 ODER vat_amount == null):
+  -> vat_rate = 0, vat_amount = 0
+
+// Regel 2: Satz > 0 mit MwSt-Betrag, aber Netto fehlt/falsch
+Wenn vat_rate > 0 UND vat_amount > 0 UND (amount_net fehlt ODER amount_net == amount_gross):
+  -> amount_net = amount_gross - vat_amount
+
+// Regel 3: Satz > 0, aber MwSt-Betrag fehlt
+Wenn vat_rate > 0 UND (vat_amount fehlt ODER vat_amount == 0) UND (amount_net fehlt ODER amount_net == amount_gross):
+  -> amount_net = round(amount_gross / (1 + vat_rate/100), 2)
+  -> vat_amount = round(amount_gross - amount_net, 2)
+
+// Regel 4: Netto < Brutto, MwSt-Betrag fehlt
+Wenn amount_net < amount_gross UND (vat_amount fehlt ODER vat_amount == 0):
+  -> vat_amount = round(amount_gross - amount_net, 2)
 ```
-
-### Betroffene Stellen
-
-| Stelle | Zeilen | Kontext |
-|--------|--------|---------|
-| Block 1 | 383-409 | Vendor-DB-Pfad (wenn `expenses_only_extraction` in DB gesetzt) |
-| Block 2 | 436-462 | Ad-hoc-Pfad (wenn `expensesOnly` im Request und Keywords vorhanden) |
-
-Beide Bloecke erhalten die gleiche verstaerkte Formulierung.
 
 ## Betroffene Datei
 
 | Datei | Aenderung |
 |-------|-----------|
-| `supabase/functions/extract-receipt/index.ts` | Prompt-Text in beiden Keyword-Bloecken verschaerfen |
+| `supabase/functions/extract-receipt/index.ts` | Post-Processing: Konsistenzpruefung nach Zeile 900 einfuegen, inkl. 0%-USt-Erkennung aus Rohtext |
+
+## Erwartetes Ergebnis fuer FR5245WLTAEUI
+
+Die KI liefert 20% MwSt, aber "0% USt." steht im Dokument. Regel 0 erkennt das und korrigiert auf 0%. Brutto = Netto, MwSt = 0. Korrekt.
 
