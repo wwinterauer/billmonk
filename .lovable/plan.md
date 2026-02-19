@@ -1,55 +1,58 @@
 
 
-# Retroaktive automatische Belegfreigabe bei Aktivierung
+# Link zum Lieferanten aus Review und Einzelbelegerkennung
 
-## Problem
+## Uebersicht
 
-Die automatische Belegfreigabe wird aktuell nur beim Upload/Verarbeitung neuer Belege geprueft. Wenn ein Nutzer die Einstellung nachtraeglich fuer einen Lieferanten aktiviert, bleiben bestehende Belege im Status "review" liegen.
+In der Review-Seite und im Beleg-Detail-Panel (Einzelbelegerkennung) wird neben dem Lieferanten-Feld ein kleiner Button eingefuegt, der direkt zur Lieferanten-Verwaltung springt und den betreffenden Lieferanten vorselektiert/hervorhebt.
 
-## Loesung
+## Aenderungen
 
-Beim Speichern eines Lieferanten mit aktivierter Auto-Approve-Einstellung werden alle verknuepften Review-Belege retroaktiv freigegeben, sofern sie die Konfidenz-Schwelle erreichen.
+### 1. VendorManagement: Deep-Link-Unterstuetzung (`src/components/settings/VendorManagement.tsx`)
 
-## Technische Umsetzung
+- Beim Laden der Komponente wird ein URL-Parameter `vendorId` aus der URL gelesen (z.B. `/settings?tab=vendors&vendorId=abc-123`).
+- Falls vorhanden: Der Suchfilter wird automatisch auf den `display_name` dieses Lieferanten gesetzt und der Edit-Dialog wird geoeffnet.
+- Falls der Lieferant nicht in der Liste ist (z.B. durch Paginierung), wird er trotzdem gefunden und direkt bearbeitet.
 
-### Datei: `src/hooks/useVendors.ts` -- Funktion `updateVendor`
+### 2. Review-Seite: Link-Button (`src/pages/Review.tsx`)
 
-Nach dem erfolgreichen Update des Lieferanten wird geprueft, ob `auto_approve` auf `true` gesetzt wurde. Falls ja:
+- Neben dem "Lieferant (Markenname)"-Label wird ein kleiner Icon-Button (ExternalLink oder Settings-Icon) angezeigt, sofern der aktuelle Beleg eine `vendor_id` hat oder ein Lieferant per Name zugeordnet werden kann.
+- Klick oeffnet `/settings?tab=vendors&vendorId=XYZ` in einem neuen Tab.
+- Ist kein Lieferant verknuepft, wird der Button nicht angezeigt.
 
-1. Alle Belege mit `vendor_id = id` und `status = 'review'` laden
-2. Filtern: `ai_confidence >= auto_approve_min_confidence`
-3. Ausschliessen: Duplikate (`is_duplicate = true`) und Splitting-Belege (`status = 'needs_splitting'`)
-4. Batch-Update: `status = 'approved'`, `auto_approved = true`
-5. Rueckgabe der Anzahl retroaktiv freigegebener Belege
+### 3. Beleg-Detail-Panel: Bestehenden Link verbessern (`src/components/receipts/ReceiptDetailPanel.tsx`)
+
+- Der bereits vorhandene "Bearbeiten"-Button (Zeile 1179-1190) wird angepasst: Statt `/settings?tab=vendors` wird `/settings?tab=vendors&vendorId={selectedVendorId}` verwendet, damit direkt der richtige Lieferant geoeffnet wird.
+
+## Technische Details
+
+### URL-Schema
 
 ```text
-Pseudo-Code:
-if (updates.auto_approve === true || data.auto_approve === true) {
-  // Lade Review-Belege dieses Lieferanten
-  // Filtere nach Konfidenz >= Schwellenwert
-  // Schliesse Duplikate und Splitting aus
-  // Setze status = 'approved', auto_approved = true
-}
+/settings?tab=vendors&vendorId=<uuid>
 ```
 
-### Datei: `src/components/settings/VendorManagement.tsx` -- Funktion `handleSave`
+### VendorManagement Deep-Link-Logik
 
-Die bestehende Toast-Nachricht wird erweitert: Neben "X Belege synchronisiert" wird auch "Y Belege automatisch freigegeben" angezeigt, falls retroaktive Freigaben stattfanden.
+```text
+useEffect:
+  1. Lese vendorId aus URLSearchParams
+  2. Finde Lieferant in vendors-Liste (oder lade ihn per Supabase-Query)
+  3. Oeffne den Edit-Dialog mit openEditDialog(vendor)
+  4. Entferne vendorId aus URL (damit Reload nicht erneut triggert)
+```
 
-### Aenderung am Return-Typ von `updateVendor`
+### Review-Seite: Button neben Label
 
-Der Rueckgabetyp wird von `{ vendor, syncedReceipts }` auf `{ vendor, syncedReceipts, autoApprovedReceipts }` erweitert.
+Neben dem Label "Lieferant (Markenname)" wird ein kleiner Button eingefuegt:
+- Bedingung: `currentReceipt.vendor_id` ist vorhanden
+- Aktion: `window.open('/settings?tab=vendors&vendorId=' + currentReceipt.vendor_id, '_blank')`
 
-## Betroffene Dateien
+### Betroffene Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/hooks/useVendors.ts` | Retroaktive Freigabe-Logik in `updateVendor` |
-| `src/components/settings/VendorManagement.tsx` | Toast-Nachricht mit Anzahl freigegebener Belege |
+| `src/components/settings/VendorManagement.tsx` | Deep-Link per `vendorId`-Parameter: Lieferant automatisch oeffnen |
+| `src/pages/Review.tsx` | Link-Button neben Lieferant-Feld einfuegen |
+| `src/components/receipts/ReceiptDetailPanel.tsx` | Bestehenden "Bearbeiten"-Link um `vendorId` erweitern |
 
-## Sicherheits-Checks
-
-- Duplikate werden nicht freigegeben
-- Belege mit `needs_splitting` werden nicht freigegeben
-- Nur Belege mit ausreichender KI-Konfidenz werden freigegeben
-- RLS-Policies stellen sicher, dass nur eigene Belege betroffen sind
