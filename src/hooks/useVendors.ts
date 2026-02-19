@@ -229,6 +229,107 @@ export function useVendors() {
       }
     }
 
+    // Sync default values (category, vat_rate, payment_method, tag) to review receipts
+    const hasDefaultUpdates =
+      updates.default_category_id !== undefined ||
+      updates.default_vat_rate !== undefined ||
+      updates.default_payment_method !== undefined ||
+      updates.default_tag_id !== undefined;
+
+    if (hasDefaultUpdates) {
+      // Fetch review receipts for this vendor
+      const { data: reviewReceipts, error: reviewError } = await supabase
+        .from('receipts')
+        .select('id')
+        .eq('vendor_id', id)
+        .eq('status', 'review');
+
+      if (reviewError) {
+        console.error('Error fetching review receipts for default sync:', reviewError);
+      } else if (reviewReceipts && reviewReceipts.length > 0) {
+        const reviewIds = reviewReceipts.map(r => r.id);
+
+        // Build update object for receipts
+        const receiptUpdate: Record<string, unknown> = {
+          updated_at: new Date().toISOString(),
+        };
+
+        // Category: resolve name from categories table
+        if (updates.default_category_id !== undefined) {
+          if (updates.default_category_id) {
+            const { data: catData } = await supabase
+              .from('categories')
+              .select('name')
+              .eq('id', updates.default_category_id)
+              .single();
+            if (catData) {
+              receiptUpdate.category = catData.name;
+            }
+          } else {
+            // Category was cleared
+            receiptUpdate.category = null;
+          }
+        }
+
+        if (updates.default_vat_rate !== undefined) {
+          receiptUpdate.vat_rate = updates.default_vat_rate;
+        }
+
+        if (updates.default_payment_method !== undefined) {
+          receiptUpdate.payment_method = updates.default_payment_method;
+        }
+
+        // Apply batch update if there are fields to update
+        if (Object.keys(receiptUpdate).length > 1) {
+          const { data: defaultSyncResult, error: defaultSyncError } = await supabase
+            .from('receipts')
+            .update(receiptUpdate)
+            .in('id', reviewIds)
+            .select('id');
+
+          if (defaultSyncError) {
+            console.error('Error syncing defaults to review receipts:', defaultSyncError);
+          } else {
+            syncedReceipts += defaultSyncResult?.length || 0;
+          }
+        }
+
+        // Tag: assign default_tag_id to review receipts that don't have it yet
+        if (updates.default_tag_id !== undefined && updates.default_tag_id) {
+          const tagId = updates.default_tag_id;
+
+          // Find which review receipts already have this tag
+          const { data: existingTags, error: existingTagsError } = await supabase
+            .from('receipt_tags')
+            .select('receipt_id')
+            .eq('tag_id', tagId)
+            .in('receipt_id', reviewIds);
+
+          if (existingTagsError) {
+            console.error('Error checking existing tags:', existingTagsError);
+          } else {
+            const existingSet = new Set((existingTags || []).map(t => t.receipt_id));
+            const missingIds = reviewIds.filter(rid => !existingSet.has(rid));
+
+            if (missingIds.length > 0) {
+              const inserts = missingIds.map(receiptId => ({
+                receipt_id: receiptId,
+                tag_id: tagId,
+              }));
+
+              const { error: tagInsertError } = await supabase
+                .from('receipt_tags')
+                .insert(inserts);
+
+              if (tagInsertError) {
+                console.error('Error assigning tags to review receipts:', tagInsertError);
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Retroactive auto-approval: approve review receipts if auto_approve is enabled
     let autoApprovedReceipts = 0;
     if (data.auto_approve) {
