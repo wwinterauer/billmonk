@@ -219,7 +219,8 @@ export function ReceiptDetailPanel({
   const [taxRateDetails, setTaxRateDetails] = useState<TaxRateDetail[] | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [notes, setNotes] = useState('');
-
+  const [amountNetOverride, setAmountNetOverride] = useState('');
+  const [vatAmountOverride, setVatAmountOverride] = useState('');
   // Field changes tracking for learning dialog
   const [fieldChanges, setFieldChanges] = useState<Record<string, FieldChange>>({});
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -396,11 +397,37 @@ export function ReceiptDetailPanel({
           setVatRate(data.vat_rate?.toString() || '20');
           // Handle mixed tax rate fields (may not be in types yet)
           const receiptData = data as unknown as Record<string, unknown>;
-          setIsMixedTaxRate((receiptData.is_mixed_tax_rate as boolean) || false);
-          setTaxRateDetails((receiptData.tax_rate_details as TaxRateDetail[]) || null);
+          const isMixed = (receiptData.is_mixed_tax_rate as boolean) || false;
+          const taxDetails = (receiptData.tax_rate_details as TaxRateDetail[]) || null;
+          setIsMixedTaxRate(isMixed);
+          setTaxRateDetails(taxDetails);
           setPaymentMethod(data.payment_method || '');
           setNotes(data.notes || '');
           setSelectedVendorId(data.vendor_id || null);
+          
+          // Detect manual overrides by comparing DB values to calculated
+          const gross = data.amount_gross || 0;
+          const rateVal = data.vat_rate !== null && data.vat_rate !== undefined ? data.vat_rate : 20;
+          let calcNet = 0;
+          let calcVat = 0;
+          if (isMixed && taxDetails && taxDetails.length > 0) {
+            calcNet = taxDetails.reduce((sum, d) => sum + (d.net_amount || 0), 0);
+            calcVat = taxDetails.reduce((sum, d) => sum + (d.tax_amount || 0), 0);
+          } else if (gross) {
+            calcNet = gross / (1 + rateVal / 100);
+            calcVat = gross - calcNet;
+          }
+          
+          if (data.amount_net !== null && data.amount_net !== undefined && Math.abs((data.amount_net || 0) - calcNet) > 0.01) {
+            setAmountNetOverride(data.amount_net.toString());
+          } else {
+            setAmountNetOverride('');
+          }
+          if (data.vat_amount !== null && data.vat_amount !== undefined && Math.abs((data.vat_amount || 0) - calcVat) > 0.01) {
+            setVatAmountOverride(data.vat_amount.toString());
+          } else {
+            setVatAmountOverride('');
+          }
         }
       } catch (error) {
         toast({
@@ -701,9 +728,9 @@ export function ReceiptDetailPanel({
         invoice_number: invoiceNumber || null,
         receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null,
         amount_gross: parseFloat(amountGross) || null,
-        amount_net: calculatedValues.net || null,
+        amount_net: amountNetOverride ? parseFloat(amountNetOverride) : (calculatedValues.net || null),
         vat_rate: parseFloat(vatRate) || null,
-        vat_amount: calculatedValues.vat || null,
+        vat_amount: vatAmountOverride ? parseFloat(vatAmountOverride) : (calculatedValues.vat || null),
         description: processedDescription,
         category: category || null,
       };
@@ -733,8 +760,8 @@ export function ReceiptDetailPanel({
         invoice_number: invoiceNumber || null,
         category: category || null,
         amount_gross: parseFloat(amountGross) || null,
-        amount_net: calculatedValues.net || null,
-        vat_amount: calculatedValues.vat || null,
+        amount_net: amountNetOverride ? parseFloat(amountNetOverride) : (calculatedValues.net || null),
+        vat_amount: vatAmountOverride ? parseFloat(vatAmountOverride) : (calculatedValues.vat || null),
         vat_rate: isMixedTaxRate ? null : (parseFloat(vatRate) || null),
         is_mixed_tax_rate: isMixedTaxRate,
         tax_rate_details: isMixedTaxRate ? taxRateDetails : null,
@@ -1460,14 +1487,17 @@ export function ReceiptDetailPanel({
                       </div>
                     )}
 
-                    {/* Net & VAT Amount (calculated) */}
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* Net & VAT Amount (editable with calculated placeholder) */}
+                    <div className="grid grid-cols-2 gap-4 items-end">
                       <div>
                         <Label>Nettobetrag</Label>
                         <Input
-                          value={formatCurrency(calculatedValues.net)}
-                          readOnly
-                          className="bg-muted text-muted-foreground"
+                          type="number"
+                          step="0.01"
+                          value={amountNetOverride}
+                          onChange={(e) => setAmountNetOverride(e.target.value)}
+                          placeholder={calculatedValues.net ? `${calculatedValues.net.toFixed(2)} (berechnet)` : '—'}
+                          className={amountNetOverride ? '' : 'bg-muted text-muted-foreground'}
                         />
                       </div>
                       <div>
@@ -1478,9 +1508,12 @@ export function ReceiptDetailPanel({
                           )}
                         </Label>
                         <Input
-                          value={formatCurrency(calculatedValues.vat)}
-                          readOnly
-                          className="bg-muted text-muted-foreground"
+                          type="number"
+                          step="0.01"
+                          value={vatAmountOverride}
+                          onChange={(e) => setVatAmountOverride(e.target.value)}
+                          placeholder={calculatedValues.vat ? `${calculatedValues.vat.toFixed(2)} (berechnet)` : '—'}
+                          className={vatAmountOverride ? '' : 'bg-muted text-muted-foreground'}
                         />
                       </div>
                     </div>
