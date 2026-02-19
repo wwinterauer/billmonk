@@ -98,6 +98,8 @@ import { TagSelector } from '@/components/tags/TagSelector';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
+import { Folder } from 'lucide-react';
 import { Copy, Scissors, Layers, Zap } from 'lucide-react';
 import { checkForDuplicates, type DuplicateCheckResult } from '@/services/duplicateDetectionService';
 import { Progress } from '@/components/ui/progress';
@@ -792,12 +794,13 @@ const Expenses = () => {
     });
   };
 
-  // Statistics
+  // Statistics (exclude "Keine Rechnung" from monetary calculations)
   const stats = useMemo(() => {
-    const total = filteredReceipts.reduce((sum, r) => sum + (r.amount_gross || 0), 0);
-    const vatSum = filteredReceipts.reduce((sum, r) => sum + (r.vat_amount || 0), 0);
+    const billableReceipts = filteredReceipts.filter(r => r.category !== NO_RECEIPT_CATEGORY);
+    const total = billableReceipts.reduce((sum, r) => sum + (r.amount_gross || 0), 0);
+    const vatSum = billableReceipts.reduce((sum, r) => sum + (r.vat_amount || 0), 0);
     const count = filteredReceipts.length;
-    const average = count > 0 ? total / count : 0;
+    const average = billableReceipts.length > 0 ? total / billableReceipts.length : 0;
 
     return { total, vatSum, count, average };
   }, [filteredReceipts]);
@@ -1886,6 +1889,55 @@ const Expenses = () => {
                       loadReceipts();
                     }}
                   />
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Bulk Category */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  disabled={bulkActionLoading !== null}
+                  className="border-primary/50 text-primary hover:bg-primary/10"
+                >
+                  <Folder className="h-4 w-4 mr-1" />
+                  Kategorie
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-3" align="start">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium mb-2">Kategorie für {selectedIds.size} Belege</p>
+                  <Select onValueChange={async (categoryName) => {
+                    try {
+                      const ids = Array.from(selectedIds);
+                      for (const id of ids) {
+                        await supabase
+                          .from('receipts')
+                          .update({ category: categoryName })
+                          .eq('id', id);
+                      }
+                      toast({ title: `Kategorie für ${ids.length} Belege geändert` });
+                      setSelectedIds(new Set());
+                      loadReceipts();
+                    } catch (error) {
+                      toast({
+                        variant: 'destructive',
+                        title: 'Fehler',
+                        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+                      });
+                    }
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Kategorie wählen..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map(c => (
+                        <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </PopoverContent>
             </Popover>

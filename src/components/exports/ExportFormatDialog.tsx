@@ -103,6 +103,7 @@ export function ExportFormatDialog({
   // Export options
   const [includeHeader, setIncludeHeader] = useState(true);
   const [includeTotals, setIncludeTotals] = useState(true);
+  const [excludeNoReceipt, setExcludeNoReceipt] = useState(true);
 
   // ZIP options
   const [zipStructure, setZipStructure] = useState<'flat' | 'month' | 'category' | 'vendor'>('month');
@@ -542,6 +543,11 @@ export function ExportFormatDialog({
   const prepareExportData = () => {
     const columns = visibleColumns;
     let sortedReceipts = [...receipts];
+
+    // Filter out "Keine Rechnung" if option is enabled (not for ZIP)
+    if (excludeNoReceipt && exportFormat !== 'zip') {
+      sortedReceipts = sortedReceipts.filter(r => r.category !== 'Keine Rechnung');
+    }
 
     // Apply sorting from template
     if (selectedTemplate?.sort_by) {
@@ -1231,6 +1237,18 @@ export function ExportFormatDialog({
                       />
                     </div>
                   </>
+                )}
+
+                {/* Exclude "Keine Rechnung" option (not for ZIP) */}
+                {exportFormat !== 'zip' && (
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="excludeNoReceipt">„Keine Rechnung" ausschließen</Label>
+                    <Switch
+                      id="excludeNoReceipt"
+                      checked={excludeNoReceipt}
+                      onCheckedChange={setExcludeNoReceipt}
+                    />
+                  </div>
                 )}
 
                 {exportFormat === 'zip' && (

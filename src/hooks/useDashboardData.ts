@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
 
 interface DashboardStats {
   totalExpenses: number;
@@ -84,7 +85,7 @@ export function useDashboardData(year: number, month: number) {
       // Fetch previous month receipts for comparison
       const { data: prevMonthReceipts, error: prevError } = await supabase
         .from('receipts')
-        .select('amount_gross')
+        .select('amount_gross, category')
         .eq('user_id', user.id)
         .gte('created_at', startOfPrevMonth.toISOString())
         .lte('created_at', endOfPrevMonth.toISOString());
@@ -129,10 +130,11 @@ export function useDashboardData(year: number, month: number) {
 
       if (tagsError) throw tagsError;
 
-      // Calculate stats
+      // Calculate stats (exclude "Keine Rechnung" from monetary calculations)
       const receipts = currentMonthReceipts || [];
-      const totalExpenses = receipts.reduce((sum, r) => sum + (r.amount_gross || 0), 0);
-      const totalVat = receipts.reduce((sum, r) => sum + (r.vat_amount || 0), 0);
+      const billableReceipts = receipts.filter(r => r.category !== NO_RECEIPT_CATEGORY);
+      const totalExpenses = billableReceipts.reduce((sum, r) => sum + (r.amount_gross || 0), 0);
+      const totalVat = billableReceipts.reduce((sum, r) => sum + (r.vat_amount || 0), 0);
       const receiptCount = receipts.length;
       const openReceiptCount = receipts.filter(r => r.status === 'pending' || r.status === 'processing').length;
       const reviewReceiptCount = receipts.filter(r => r.status === 'review').length;
@@ -145,11 +147,12 @@ export function useDashboardData(year: number, month: number) {
         : null;
 
       const previousMonthExpenses = (prevMonthReceipts || [])
+        .filter(r => (r as any).category !== NO_RECEIPT_CATEGORY)
         .reduce((sum, r) => sum + (r.amount_gross || 0), 0);
 
-      // Calculate category totals
+      // Calculate category totals (exclude "Keine Rechnung")
       const categoryMap = new Map<string, number>();
-      receipts.forEach(r => {
+      billableReceipts.forEach(r => {
         if (r.category) {
           const current = categoryMap.get(r.category) || 0;
           categoryMap.set(r.category, current + (r.amount_gross || 0));

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
@@ -210,15 +211,17 @@ const Reports = () => {
   const stats = useMemo(() => {
     if (!receipts) return null;
 
-    const totalGross = receipts.reduce((sum, r) => sum + (r.amount_gross || 0), 0);
-    const totalNet = receipts.reduce((sum, r) => sum + (r.amount_net || 0), 0);
-    const totalVat = receipts.reduce((sum, r) => sum + (r.vat_amount || 0), 0);
-    const count = receipts.length;
+    // Exclude "Keine Rechnung" from monetary calculations
+    const billableReceipts = receipts.filter(r => r.category !== NO_RECEIPT_CATEGORY);
+    const totalGross = billableReceipts.reduce((sum, r) => sum + (r.amount_gross || 0), 0);
+    const totalNet = billableReceipts.reduce((sum, r) => sum + (r.amount_net || 0), 0);
+    const totalVat = billableReceipts.reduce((sum, r) => sum + (r.vat_amount || 0), 0);
+    const count = billableReceipts.length;
     const avgAmount = count > 0 ? totalGross / count : 0;
 
-    // Previous period stats for comparison
-    const prevTotalGross = previousReceipts?.reduce((sum, r) => sum + (r.amount_gross || 0), 0) || 0;
-    const prevCount = previousReceipts?.length || 0;
+    // Previous period stats for comparison (exclude "Keine Rechnung")
+    const prevTotalGross = previousReceipts?.filter(r => r.category !== NO_RECEIPT_CATEGORY).reduce((sum, r) => sum + (r.amount_gross || 0), 0) || 0;
+    const prevCount = previousReceipts?.filter(r => r.category !== NO_RECEIPT_CATEGORY).length || 0;
 
     // Calculate percentage change
     const grossChange = prevTotalGross > 0 
@@ -243,13 +246,16 @@ const Reports = () => {
   const categoryData = useMemo(() => {
     if (!receipts) return [];
 
+    // Exclude "Keine Rechnung" from category analysis
+    const billableReceipts = receipts.filter(r => r.category !== NO_RECEIPT_CATEGORY);
+
     // Create a map for category colors
     const categoryColorMap = new Map<string, string>();
     categories?.forEach((cat) => {
       categoryColorMap.set(cat.name, cat.color || '#94A3B8');
     });
 
-    const grouped = receipts.reduce((acc: Record<string, { name: string; color: string; amount: number; count: number; vat: number }>, receipt) => {
+    const grouped = billableReceipts.reduce((acc: Record<string, { name: string; color: string; amount: number; count: number; vat: number }>, receipt) => {
       const catName = receipt.category || 'Ohne Kategorie';
       const catColor = categoryColorMap.get(catName) || '#94A3B8';
 
