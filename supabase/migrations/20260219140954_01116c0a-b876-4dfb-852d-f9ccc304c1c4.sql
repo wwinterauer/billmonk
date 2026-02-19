@@ -1,0 +1,1 @@
+ALTER TABLE public.vendors ADD COLUMN expenses_only_extraction boolean NOT NULL DEFAULT false;

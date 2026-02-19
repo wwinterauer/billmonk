@@ -1054,6 +1054,34 @@ export function ReceiptDetailPanel({
                         amount_gross: amountGross,
                         vat_rate: vatRate,
                       }}
+                      vendorId={selectedVendorId || undefined}
+                      onExpensesOnlyReanalyze={(remember) => {
+                        if (remember && selectedVendorId) {
+                          supabase
+                            .from('vendors')
+                            .update({ expenses_only_extraction: true })
+                            .eq('id', selectedVendorId)
+                            .then(() => {
+                              // reload receipt data
+                            });
+                        }
+                      }}
+                      onReanalyzeComplete={() => {
+                        // Reload receipt data
+                        if (receiptId) {
+                          supabase
+                            .from('receipts')
+                            .select('*')
+                            .eq('id', receiptId)
+                            .single()
+                            .then(({ data }) => {
+                              if (data) {
+                                setReceipt(data as Receipt);
+                                onUpdate();
+                              }
+                            });
+                        }
+                      }}
                       onFieldsUpdated={(updates) => {
                         const changes: Record<string, { old: string; new: string }> = {};
                         

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, AlertCircle, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge, Download, Loader2, ArrowLeftRight, Users, ScanSearch, CheckCircle, Sparkles, AlertTriangle, Zap } from 'lucide-react';
+import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge, Download, Loader2, ArrowLeftRight, Users, ScanSearch, CheckCircle, Sparkles, AlertTriangle, Zap, Euro } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -143,6 +143,7 @@ export function VendorManagement() {
     notes: '',
     auto_approve: false,
     auto_approve_min_confidence: 0.8,
+    expenses_only_extraction: false,
   });
   const [newVariant, setNewVariant] = useState('');
 
@@ -159,6 +160,7 @@ export function VendorManagement() {
       notes: '',
       auto_approve: false,
       auto_approve_min_confidence: 0.8,
+      expenses_only_extraction: false,
     });
     setNewVariant('');
   };
@@ -177,6 +179,7 @@ export function VendorManagement() {
       notes: vendor.notes || '',
       auto_approve: vendor.auto_approve ?? false,
       auto_approve_min_confidence: vendor.auto_approve_min_confidence ?? 0.8,
+      expenses_only_extraction: vendor.expenses_only_extraction ?? false,
     });
     setNewVariant('');
   };
@@ -240,6 +243,7 @@ export function VendorManagement() {
           notes: formData.notes.trim() || null,
           auto_approve: formData.auto_approve,
           auto_approve_min_confidence: formData.auto_approve_min_confidence,
+          expenses_only_extraction: formData.expenses_only_extraction,
         });
         const messages: string[] = [];
         if (result.syncedReceipts > 0) {
@@ -1385,7 +1389,28 @@ export function VendorManagement() {
                       <AlertTriangle className="h-3.5 w-3.5 text-warning flex-shrink-0" />
                       Duplikate und PDFs mit mehreren Rechnungen werden nie automatisch freigegeben.
                     </p>
-                  </div>
+            </div>
+
+            {/* Nur Ausgaben extrahieren */}
+            <Separator />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="expenses_only" className="flex items-center gap-2">
+                    <Euro className="h-4 w-4 text-primary" />
+                    Nur Ausgaben extrahieren
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Einnahmen/Gutschriften ignorieren (z.B. Monta, Marketplace-Anbieter)
+                  </p>
+                </div>
+                <Switch
+                  id="expenses_only"
+                  checked={formData.expenses_only_extraction}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, expenses_only_extraction: checked }))}
+                />
+              </div>
+            </div>
                 </div>
               )}
             </div>

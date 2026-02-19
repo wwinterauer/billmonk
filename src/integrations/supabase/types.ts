@@ -1449,6 +1449,7 @@ export type Database = {
           default_vat_rate: number | null
           detected_names: string[] | null
           display_name: string
+          expenses_only_extraction: boolean
           id: string
           learning_enabled: boolean | null
           learning_level: number | null
@@ -1472,6 +1473,7 @@ export type Database = {
           default_vat_rate?: number | null
           detected_names?: string[] | null
           display_name: string
+          expenses_only_extraction?: boolean
           id?: string
           learning_enabled?: boolean | null
           learning_level?: number | null
@@ -1495,6 +1497,7 @@ export type Database = {
           default_vat_rate?: number | null
           detected_names?: string[] | null
           display_name?: string
+          expenses_only_extraction?: boolean
           id?: string
           learning_enabled?: boolean | null
           learning_level?: number | null
