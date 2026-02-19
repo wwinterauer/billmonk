@@ -730,7 +730,22 @@ const Review = () => {
                               });
                           }
                         }}
-                        onReanalyzeComplete={() => loadReceipts()}
+                        onReanalyzeComplete={async () => {
+                          // Reload only the current receipt instead of all receipts
+                          if (currentReceipt) {
+                            const { data } = await supabase
+                              .from('receipts')
+                              .select('*')
+                              .eq('id', currentReceipt.id)
+                              .maybeSingle();
+                            if (data) {
+                              const updatedReceipts = [...receipts];
+                              updatedReceipts[currentIndex] = data as Receipt;
+                              setReceipts(updatedReceipts);
+                              populateForm(data as Receipt);
+                            }
+                          }
+                        }}
                       />
                     )}
                   </div>

@@ -1066,20 +1066,35 @@ export function ReceiptDetailPanel({
                             });
                         }
                       }}
-                      onReanalyzeComplete={() => {
-                        // Reload receipt data
+                      onReanalyzeComplete={async () => {
+                        // Reload receipt data and re-populate form
                         if (receiptId) {
-                          supabase
+                          const { data } = await supabase
                             .from('receipts')
                             .select('*')
                             .eq('id', receiptId)
-                            .single()
-                            .then(({ data }) => {
-                              if (data) {
-                                setReceipt(data as Receipt);
-                                onUpdate();
-                              }
-                            });
+                            .maybeSingle();
+                          if (data) {
+                            const r = data as Receipt;
+                            setReceipt(r);
+                            // Re-populate form fields
+                            setVendor(r.vendor || '');
+                            setVendorBrand(r.vendor_brand || '');
+                            setDescription(r.description || '');
+                            setReceiptDate(r.receipt_date ? new Date(r.receipt_date) : undefined);
+                            setInvoiceNumber(r.invoice_number || '');
+                            setCategory(r.category || '');
+                            setAmountGross(r.amount_gross?.toString() || '');
+                            setVatRate(r.vat_rate !== null && r.vat_rate !== undefined ? r.vat_rate.toString() : '20');
+                            const receiptData = r as unknown as Record<string, unknown>;
+                            setIsMixedTaxRate((receiptData.is_mixed_tax_rate as boolean) || false);
+                            setTaxRateDetails((receiptData.tax_rate_details as TaxRateDetail[]) || null);
+                            setPaymentMethod(r.payment_method || '');
+                            setNotes(r.notes || '');
+                            setSelectedVendorId(r.vendor_id || null);
+                            setCurrentAiConfidence(r.ai_confidence ?? null);
+                            onUpdate();
+                          }
                         }
                       }}
                       onFieldsUpdated={(updates) => {
