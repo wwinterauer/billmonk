@@ -228,40 +228,95 @@ export function useVendors() {
     if (data.auto_approve) {
       const minConfidence = data.auto_approve_min_confidence ?? 0.8;
 
-      // Fetch review receipts for this vendor
-      const { data: reviewReceipts, error: reviewError } = await supabase
+      // Build list of all name variants to match unlinked receipts
+      const nameVariants = new Set<string>();
+      if (data.display_name) nameVariants.add(data.display_name.toLowerCase());
+      if (data.legal_name) nameVariants.add(data.legal_name.toLowerCase());
+      if (data.detected_names) {
+        for (const n of data.detected_names) {
+          if (n) nameVariants.add(n.toLowerCase());
+        }
+      }
+
+      // 1) Fetch review receipts already linked by vendor_id
+      const { data: linkedReceipts, error: linkedError } = await supabase
         .from('receipts')
-        .select('id, ai_confidence, is_duplicate, status')
+        .select('id, ai_confidence, is_duplicate')
         .eq('vendor_id', id)
         .eq('status', 'review')
         .gte('ai_confidence', minConfidence);
 
-      if (reviewError) {
-        console.error('Error fetching review receipts for auto-approve:', reviewError);
-      } else if (reviewReceipts && reviewReceipts.length > 0) {
-        // Filter out duplicates
-        const eligibleIds = reviewReceipts
-          .filter(r => !r.is_duplicate)
-          .map(r => r.id);
+      if (linkedError) {
+        console.error('Error fetching linked review receipts:', linkedError);
+      }
 
-        if (eligibleIds.length > 0) {
-          const { data: approvedResult, error: approveError } = await supabase
-            .from('receipts')
-            .update({
-              status: 'approved',
-              auto_approved: true,
-              updated_at: new Date().toISOString(),
-            })
-            .in('id', eligibleIds)
-            .select('id');
+      // 2) Fetch unlinked review receipts that match by vendor name/brand
+      let unmatchedReceipts: { id: string; ai_confidence: number | null; is_duplicate: boolean | null; vendor: string | null; vendor_brand: string | null }[] = [];
+      if (nameVariants.size > 0) {
+        // Build OR filter for vendor and vendor_brand columns
+        const nameArray = Array.from(nameVariants);
+        const orFilters = nameArray
+          .flatMap(n => [`vendor.ilike.${n}`, `vendor_brand.ilike.${n}`])
+          .join(',');
 
-          if (approveError) {
-            console.error('Error auto-approving receipts:', approveError);
-          } else {
-            autoApprovedReceipts = approvedResult?.length || 0;
-          }
+        const { data: unlinkedData, error: unlinkedError } = await supabase
+          .from('receipts')
+          .select('id, ai_confidence, is_duplicate, vendor, vendor_brand')
+          .is('vendor_id', null)
+          .eq('status', 'review')
+          .gte('ai_confidence', minConfidence)
+          .or(orFilters);
+
+        if (unlinkedError) {
+          console.error('Error fetching unlinked review receipts:', unlinkedError);
+        } else {
+          unmatchedReceipts = unlinkedData || [];
         }
       }
+
+      // Combine eligible IDs (exclude duplicates)
+      const eligibleIds: string[] = [];
+      if (linkedReceipts) {
+        for (const r of linkedReceipts) {
+          if (!r.is_duplicate) eligibleIds.push(r.id);
+        }
+      }
+      // Unlinked receipts: also link them to this vendor
+      const unlinkIds: string[] = [];
+      for (const r of unmatchedReceipts) {
+        if (!r.is_duplicate) {
+          eligibleIds.push(r.id);
+          unlinkIds.push(r.id);
+        }
+      }
+
+      if (eligibleIds.length > 0) {
+        // First, link unlinked receipts to this vendor
+        if (unlinkIds.length > 0) {
+          await supabase
+            .from('receipts')
+            .update({ vendor_id: id })
+            .in('id', unlinkIds);
+        }
+
+        // Then approve all eligible
+        const { data: approvedResult, error: approveError } = await supabase
+          .from('receipts')
+          .update({
+            status: 'approved',
+            auto_approved: true,
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', eligibleIds)
+          .select('id');
+
+        if (approveError) {
+          console.error('Error auto-approving receipts:', approveError);
+        } else {
+          autoApprovedReceipts = approvedResult?.length || 0;
+        }
+      }
+    }
     }
 
     const updated = {
