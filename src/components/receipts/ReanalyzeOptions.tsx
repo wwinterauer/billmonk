@@ -506,6 +506,10 @@ export function ReanalyzeOptions({
           <DropdownMenuItem
             onClick={() => {
               if (vendorId && onExpensesOnlyReanalyze) {
+                // Initialize dialog state before opening
+                setDialogKeywords([...vendorExtractionKeywords]);
+                setNewKeywordInput('');
+                setDialogExtractionHint(vendorExtractionHint);
                 setShowExpensesOnlyConfirm(true);
               } else {
                 handleExpensesOnlyReanalyze(false, vendorExtractionKeywords);
@@ -617,11 +621,6 @@ export function ReanalyzeOptions({
       {/* Expenses-Only Confirmation with Keywords + "Remember" option */}
       <Dialog open={showExpensesOnlyConfirm} onOpenChange={(open) => {
         setShowExpensesOnlyConfirm(open);
-        if (open) {
-          setDialogKeywords([...vendorExtractionKeywords]);
-          setNewKeywordInput('');
-          setDialogExtractionHint(vendorExtractionHint);
-        }
       }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
