@@ -1444,6 +1444,7 @@ export type Database = {
           correction_count: number | null
           created_at: string | null
           default_category_id: string | null
+          default_payment_method: string | null
           default_tag_id: string | null
           default_vat_rate: number | null
           detected_names: string[] | null
@@ -1466,6 +1467,7 @@ export type Database = {
           correction_count?: number | null
           created_at?: string | null
           default_category_id?: string | null
+          default_payment_method?: string | null
           default_tag_id?: string | null
           default_vat_rate?: number | null
           detected_names?: string[] | null
@@ -1488,6 +1490,7 @@ export type Database = {
           correction_count?: number | null
           created_at?: string | null
           default_category_id?: string | null
+          default_payment_method?: string | null
           default_tag_id?: string | null
           default_vat_rate?: number | null
           detected_names?: string[] | null

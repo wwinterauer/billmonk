@@ -15,6 +15,7 @@ interface VendorWithCategory {
   default_category_id: string | null;
   default_tag_id: string | null;
   default_vat_rate: number | null;
+  default_payment_method: string | null;
   receipt_count: number | null;
   default_category: {
     id: string;
@@ -78,6 +79,7 @@ export function VendorAutocomplete({
           default_category_id,
           default_tag_id,
           default_vat_rate,
+          default_payment_method,
           default_category:categories(id, name, color)
         `)
         .eq('user_id', user.id);
