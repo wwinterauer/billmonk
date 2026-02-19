@@ -1,62 +1,49 @@
 
 
-# Standard-Zahlungsart fuer Lieferanten
+# Lieferanten-Standardwerte auf Review-Belege uebertragen
 
 ## Uebersicht
 
-Lieferanten erhalten ein neues Feld "Standard-Zahlungsart", das -- analog zu Standard-Kategorie, Standard-Tag und Standard-MwSt-Satz -- automatisch bei der Lieferantenauswahl auf neue Belege angewandt wird.
+Wenn ein Lieferant gespeichert wird und sich Standardwerte (Kategorie, MwSt-Satz, Zahlungsart, Tag) geaendert haben, werden diese automatisch auf alle Belege im Status "review" uebertragen, die diesem Lieferanten zugeordnet sind.
 
 ## Aenderungen
 
-### 1. Datenbank: Neue Spalte `default_payment_method` auf `vendors`
+### 1. `src/hooks/useVendors.ts` - `updateVendor` erweitern
 
-- Migration: `ALTER TABLE public.vendors ADD COLUMN default_payment_method text;`
-- Kein Pflichtfeld, Standard ist NULL.
-- Kein Foreign Key noetig, da Zahlungsarten als feste Liste (nicht als eigene Tabelle) definiert sind.
+Nach dem bestehenden Namens-Sync-Block (Zeile 206-230) wird ein neuer Block eingefuegt, der die Standardwerte auf Review-Belege uebertraegt:
 
-### 2. Hook: `useVendors.ts`
+- **Kategorie**: Wenn `default_category_id` gesetzt ist, wird `category` auf allen Review-Belegen des Lieferanten auf den Kategorienamen gesetzt. Dazu wird der Kategoriename per Supabase-Query aus der `categories`-Tabelle geholt.
+- **MwSt-Satz**: Wenn `default_vat_rate` gesetzt ist, wird `vat_rate` auf allen Review-Belegen aktualisiert.
+- **Zahlungsart**: Wenn `default_payment_method` gesetzt ist, wird `payment_method` auf allen Review-Belegen aktualisiert.
+- **Tag**: Wenn `default_tag_id` gesetzt ist, wird fuer jeden Review-Beleg geprueft, ob der Tag bereits zugewiesen ist. Falls nicht, wird ein Eintrag in `receipt_tags` eingefuegt.
 
-- `Vendor`-Interface erhaelt `default_payment_method: string | null`.
-- `addVendor` Options erhalten `defaultPaymentMethod?: string`.
-- `updateVendor` Partial-Pick wird um `default_payment_method` erweitert.
-- Mapping in `fetchVendors` wird um das neue Feld ergaenzt.
+Der Rueckgabewert `syncedReceipts` wird um die Anzahl der aktualisierten Review-Belege erweitert (bzw. in die bestehende Zaehlung integriert).
 
-### 3. VendorManagement: Formular erweitern (`src/components/settings/VendorManagement.tsx`)
+### 2. `src/components/settings/VendorManagement.tsx` - Toast erweitern
 
-- `formData` erhaelt `default_payment_method: string`.
-- Im Edit-/Create-Dialog wird unter "Standard MwSt-Satz" ein neues Select-Feld "Standard-Zahlungsart" eingefuegt mit den bestehenden Zahlungsarten (Ueberweisung, Kreditkarte, Debitkarte, Bar, PayPal, Apple Pay, Google Pay, Lastschrift, Sonstige).
-- Speichern/Anlegen uebergibt `default_payment_method` an den Hook.
-- MergePreview erhaelt ebenfalls `default_payment_method`.
-
-### 4. Einzelbelegerkennung: Zahlungsart automatisch zuweisen (`src/components/receipts/ReceiptDetailPanel.tsx`)
-
-- Wenn ein Lieferant mit Standard-Zahlungsart ausgewaehlt wird und die aktuelle Zahlungsart des Belegs leer ist, wird `payment_method` automatisch gesetzt und "Zahlungsart" in die Toast-Liste aufgenommen.
-
-### 5. VendorAutocomplete: Query erweitern (`src/components/receipts/VendorAutocomplete.tsx`)
-
-- Das Supabase-Select wird um `default_payment_method` erweitert.
-- Das `VendorWithCategory`-Interface erhaelt `default_payment_method: string | null`.
+Die bestehende Toast-Nachricht nach `updateVendor` zeigt bereits `syncedReceipts` an. Die neue Logik wird in die gleiche Zaehlung integriert, sodass der Benutzer sieht, wie viele Belege mit den neuen Standardwerten aktualisiert wurden.
 
 ## Technische Details
 
-### Migration SQL
+### Sync-Logik in `updateVendor` (nach dem Namens-Sync, vor dem Auto-Approve)
 
 ```text
-ALTER TABLE public.vendors
-  ADD COLUMN default_payment_method text;
+// Pseudocode:
+1. Pruefen ob default_category_id, default_vat_rate, default_payment_method oder default_tag_id im Update enthalten sind
+2. Falls ja: Review-Belege dieses Lieferanten laden (receipts mit vendor_id = id UND status = 'review')
+3. Update-Objekt bauen:
+   - category: Kategoriename aus categories-Tabelle (wenn default_category_id gesetzt)
+   - vat_rate: default_vat_rate (wenn gesetzt)
+   - payment_method: default_payment_method (wenn gesetzt)
+4. Batch-Update auf alle Review-Belege ausfuehren
+5. Tag-Zuweisung: Fuer default_tag_id bestehende receipt_tags pruefen und fehlende einfuegen
+6. syncedReceipts-Zaehler erhoehen
 ```
-
-### Zahlungsarten-Liste (bereits vorhanden, wird wiederverwendet)
-
-Ueberweisung, Kreditkarte, Debitkarte (Karte Debitzahlung), Barzahlung, PayPal, Apple Pay, Google Pay, Lastschrift, Sonstige
 
 ### Betroffene Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| Migration (SQL) | Neue Spalte `default_payment_method` |
-| `src/hooks/useVendors.ts` | Interface + addVendor/updateVendor erweitern |
-| `src/components/settings/VendorManagement.tsx` | Zahlungsart-Select im Dialog, formData, Merge |
-| `src/components/receipts/VendorAutocomplete.tsx` | Query + Interface um `default_payment_method` |
-| `src/components/receipts/ReceiptDetailPanel.tsx` | Zahlungsart zuweisen bei Lieferantenauswahl |
+| `src/hooks/useVendors.ts` | Sync-Logik fuer Standardwerte auf Review-Belege in `updateVendor` |
+| `src/components/settings/VendorManagement.tsx` | Toast-Nachricht ggf. anpassen (zeigt bereits syncedReceipts) |
 
