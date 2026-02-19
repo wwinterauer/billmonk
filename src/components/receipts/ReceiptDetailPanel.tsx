@@ -232,6 +232,36 @@ export function ReceiptDetailPanel({
   // Vendor learning data
   const { vendorLearning } = useVendorLearning(selectedVendorId);
 
+  // Vendor extraction data for ReanalyzeOptions
+  const [vendorExtractionData, setVendorExtractionData] = useState<{
+    expenses_only_extraction: boolean;
+    extraction_keywords: string[];
+    extraction_hint: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!selectedVendorId) {
+      setVendorExtractionData(null);
+      return;
+    }
+    supabase
+      .from('vendors')
+      .select('expenses_only_extraction, extraction_keywords, extraction_hint')
+      .eq('id', selectedVendorId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setVendorExtractionData({
+            expenses_only_extraction: data.expenses_only_extraction,
+            extraction_keywords: data.extraction_keywords || [],
+            extraction_hint: data.extraction_hint || '',
+          });
+        } else {
+          setVendorExtractionData(null);
+        }
+      });
+  }, [selectedVendorId]);
+
   // Calculated values
   const calculatedValues = useMemo(() => {
     const gross = parseFloat(amountGross) || 0;
@@ -1055,7 +1085,9 @@ export function ReceiptDetailPanel({
                         vat_rate: vatRate,
                       }}
                       vendorId={selectedVendorId || undefined}
-                      vendorExtractionHint=""
+                      vendorExpensesOnly={vendorExtractionData?.expenses_only_extraction}
+                      vendorExtractionKeywords={vendorExtractionData?.extraction_keywords || []}
+                      vendorExtractionHint={vendorExtractionData?.extraction_hint || ''}
                       onExpensesOnlyReanalyze={(remember, keywords, hint) => {
                         if (remember && selectedVendorId) {
                           const updates: Record<string, unknown> = { expenses_only_extraction: true };
@@ -1070,7 +1102,12 @@ export function ReceiptDetailPanel({
                             .update(updates)
                             .eq('id', selectedVendorId)
                             .then(() => {
-                              // reload receipt data
+                              // Refresh local vendor data
+                              setVendorExtractionData(prev => ({
+                                expenses_only_extraction: true,
+                                extraction_keywords: (keywords && keywords.length > 0) ? keywords : (prev?.extraction_keywords || []),
+                                extraction_hint: hint !== undefined ? hint : (prev?.extraction_hint || ''),
+                              }));
                             });
                         }
                       }}
