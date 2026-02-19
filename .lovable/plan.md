@@ -1,75 +1,89 @@
 
 
-# "Automatisch freigegeben" Badge in der Ausgabenuebersicht
+# Bulk-Kategorie-Aenderung, "Keine Rechnung"-Ausschluss und Kategorie-Schutz
 
 ## Zusammenfassung
 
-Automatisch freigegebene Belege erhalten in der Ausgabenuebersicht ein zusaetzliches Badge "Automatisch freigegeben", damit der Nutzer sofort erkennen kann, welche Belege ohne manuellen Review freigegeben wurden.
+Drei zusammenhaengende Aenderungen:
+1. Neue Bulk-Aktion "Kategorie aendern" in der Ausgabenuebersicht
+2. Belege mit Kategorie "Keine Rechnung" werden bei allen Geldberechnungen ausgeschlossen
+3. Die Kategorie "Keine Rechnung" wird als geschuetzte System-Kategorie markiert (nicht editier-/loeschbar)
 
-## Voraussetzung
+---
 
-Da die Auto-Approve-Funktion noch nicht implementiert ist, wird diese Aenderung zusammen mit der gesamten Auto-Approve-Implementierung umgesetzt. Ein neues Feld in der `receipts`-Tabelle speichert, ob ein Beleg automatisch freigegeben wurde.
+## 1. Bulk-Aktion: Kategorie aendern
 
-## Aenderungen
+In der bestehenden Bulk-Aktionsleiste (unterhalb der Tags-Aktion) wird ein neuer Button "Kategorie" mit einem Popover eingefuegt. Der Nutzer waehlt eine Kategorie aus einem Select-Dropdown, und alle markierten Belege werden auf diese Kategorie umgestellt.
 
-### 1. Datenbank: Neues Feld in `receipts`
+**Ablauf:**
+- Button mit Folder-Icon in der Bulk-Leiste
+- Popover oeffnet sich mit einem Select aller sichtbaren Kategorien
+- Bei Auswahl: Batch-Update aller `selectedIds` in der Datenbank (`receipts.category = neuer Wert`)
+- Toast-Bestaetigung
+- Liste wird neu geladen
 
-| Spalte | Typ | Default | Beschreibung |
-|--------|-----|---------|--------------|
-| `auto_approved` | boolean | false | Markiert ob der Beleg automatisch freigegeben wurde |
+**Datei:** `src/pages/Expenses.tsx`
+- Neuer Handler `handleBulkCategoryChange(categoryName: string)`
+- Neuer Button + Popover in der Bulk-Aktionsleiste (nach dem Tags-Bereich)
 
-Dieses Feld wird beim Auto-Approve-Vorgang auf `true` gesetzt und bleibt dauerhaft erhalten -- auch wenn der Status spaeter geaendert wird.
+---
 
-### 2. Datenbank: Neue Spalten in `vendors`
+## 2. "Keine Rechnung" bei Berechnungen ausschliessen
 
-Wie im vorherigen Plan:
+Ueberall wo Geldsummen berechnet werden, muessen Belege mit `category === 'Keine Rechnung'` herausgefiltert werden.
 
-| Spalte | Typ | Default |
-|--------|-----|---------|
-| `auto_approve` | boolean | false |
-| `auto_approve_min_confidence` | numeric | 0.8 |
+### Betroffene Stellen:
 
-### 3. Kern-Logik (`src/hooks/useReceipts.ts`)
+| Datei | Stelle | Aenderung |
+|-------|--------|-----------|
+| `src/pages/Expenses.tsx` | `stats` useMemo (Zeile ~796) | Filter auf `category !== 'Keine Rechnung'` vor der Summenberechnung |
+| `src/hooks/useDashboardData.ts` | `totalExpenses`, `totalVat`, `categoryMap` (Zeile ~134) | Belege mit `category = 'Keine Rechnung'` bei Summenberechnung ausschliessen |
+| `src/pages/Reports.tsx` | `stats` useMemo (Zeile ~210) und `categoryData` | Belege mit dieser Kategorie bei KPIs und Analysen ausschliessen |
+| `src/components/exports/ExportFormatDialog.tsx` | Export-Optionen UI + `prepareExportData` | Neue Checkbox "Keine Rechnung ausschliessen" (Standard: an), filtert Belege vor dem Export |
 
-Bei `processReceiptWithAI` und `finalizeReceiptWithVendor`:
-- Wenn alle Auto-Approve-Bedingungen erfuellt sind (Vendor aktiv, Konfidenz erreicht, kein Duplikat, kein Multi-Invoice):
-  - `status = 'approved'`
-  - `auto_approved = true`
+### Export-Checkbox Details:
+- Neue State-Variable `excludeNoReceipt` (default: `true`)
+- Switch im Options-Bereich: "Belege ohne Rechnung ausschliessen"
+- Wenn aktiv: `receipts.filter(r => r.category !== 'Keine Rechnung')` vor dem Export
+- Gilt fuer CSV, Excel und PDF (nicht ZIP, da dort Dateien exportiert werden)
 
-### 4. Badge in Ausgabenuebersicht (`src/pages/Expenses.tsx`)
+---
 
-In der Status-Spalte der Tabelle (Zeile ~2282), direkt nach dem Status-Badge:
+## 3. "Keine Rechnung" als geschuetzte Kategorie
+
+### Datenbank-Migration:
+Die bestehende Kategorie "Keine Rechnung" wird auf `is_system = true` gesetzt. Da sie aktuell `is_system = false` ist, muss sie migriert werden.
 
 ```text
-[Genehmigt] [Automatisch freigegeben]
+UPDATE categories SET is_system = true WHERE name = 'Keine Rechnung';
 ```
 
-- Gruen mit Zap-Icon (Blitz-Symbol fuer "automatisch")
-- Nur sichtbar wenn `receipt.auto_approved === true` UND Status `approved` oder `completed`
-- Wird neben dem normalen Status-Badge angezeigt, nicht als Ersatz
+Zusaetzlich muss die RLS-Policy fuer Updates angepasst werden, damit `is_system = true`-Kategorien nicht geaendert werden koennen (bestehende Policy erlaubt nur Updates wenn `is_system = false`). Die bestehende Policy schuetzt bereits vor Loeschung und Updates von System-Kategorien -- das passt also bereits.
 
-### 5. Lieferanten-Verwaltung (`src/components/settings/VendorManagement.tsx`)
+### UI-Schutz in CategoryManagement:
+- **Bearbeiten-Button**: Deaktiviert fuer "Keine Rechnung"
+- **Loeschen-Button**: Deaktiviert fuer "Keine Rechnung"
+- **Sichtbarkeits-Toggle**: Deaktiviert fuer "Keine Rechnung"
+- Zusaetzliches Badge "Geschuetzt" oder Tooltip-Hinweis
 
-- Switch "Automatische Freigabe" + Konfidenz-Slider im Dialog
-- Hinweis zu Ausschluessen (Duplikate, Multi-Rechnungen)
-- Badge in der Lieferanten-Tabelle
+**Datei:** `src/components/settings/CategoryManagement.tsx`
+- Pruefung `category.name === 'Keine Rechnung'` oder `category.is_system && category.name === 'Keine Rechnung'` fuer die Button-Deaktivierung
 
-### 6. Upload-Seite (`src/pages/Upload.tsx`)
+---
 
-- "Auto-freigegeben" Badge bei automatisch freigegebenen Belegen
+## Technische Details
 
-### 7. Vendor-Hook (`src/hooks/useVendors.ts`)
+### Konstante fuer den Kategorienamen
+Eine zentrale Konstante `NO_RECEIPT_CATEGORY = 'Keine Rechnung'` wird definiert und ueberall verwendet, um Tippfehler zu vermeiden.
 
-- Interface und CRUD um `auto_approve` und `auto_approve_min_confidence` erweitern
-
-## Dateien
+### Dateien und Aenderungen
 
 | Datei | Aenderung |
 |-------|-----------|
-| Migration (SQL) | `auto_approved` auf `receipts`, `auto_approve` + `auto_approve_min_confidence` auf `vendors` |
-| `src/hooks/useVendors.ts` | Interface + CRUD |
-| `src/hooks/useReceipts.ts` | Auto-Approve-Logik + `auto_approved`-Flag setzen |
-| `src/pages/Expenses.tsx` | Badge "Automatisch freigegeben" in Status-Spalte |
-| `src/components/settings/VendorManagement.tsx` | Switch + Slider + Hinweis |
-| `src/pages/Upload.tsx` | Badge bei Auto-Freigabe |
+| Migration (SQL) | `UPDATE categories SET is_system = true WHERE name = 'Keine Rechnung'` |
+| `src/pages/Expenses.tsx` | Bulk-Kategorie-Button + Handler; Stats-Berechnung filtert "Keine Rechnung" |
+| `src/hooks/useDashboardData.ts` | Summen-Berechnung filtert "Keine Rechnung" |
+| `src/pages/Reports.tsx` | KPI- und Analyse-Berechnung filtert "Keine Rechnung" |
+| `src/components/exports/ExportFormatDialog.tsx` | Neue Checkbox + Filter-Logik |
+| `src/components/settings/CategoryManagement.tsx` | Buttons deaktiviert fuer geschuetzte Kategorie |
 
