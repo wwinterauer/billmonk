@@ -219,6 +219,7 @@ serve(async (req) => {
     let receiptId: string | null = null;
     const forceExtract = body.forceExtract === true;
     const skipMultiCheck = body.skipMultiCheck === true;
+    const expensesOnly = body.expensesOnly === true;
 
     // Support both direct image upload and receiptId lookup
     if (body.receiptId) {
@@ -352,6 +353,52 @@ serve(async (req) => {
     const systemPrompt = `Du bist ein Experte für die Analyse von Dokumenten und Rechnungen. 
 Analysiere das Dokument und entscheide zuerst, ob es sich um einen Finanzbeleg handelt.
 Antworte IMMER und AUSSCHLIESSLICH mit validem JSON ohne zusätzliche Erklärungen oder Markdown.`;
+
+    // Build expenses-only prompt addition if needed
+    let expensesOnlyPrompt = '';
+    
+    // Check if vendor has expenses_only_extraction flag
+    if (receiptId && !expensesOnly) {
+      const { data: receiptCheck } = await supabase
+        .from('receipts')
+        .select('vendor_id, user_id')
+        .eq('id', receiptId)
+        .single();
+      
+      if (receiptCheck?.vendor_id) {
+        const { data: vendorCheck } = await supabase
+          .from('vendors')
+          .select('expenses_only_extraction')
+          .eq('id', receiptCheck.vendor_id)
+          .single();
+        
+        if (vendorCheck?.expenses_only_extraction) {
+          expensesOnlyPrompt = `
+
+WICHTIGE REGEL - NUR AUSGABEN EXTRAHIEREN:
+Diese Rechnung stammt von einem Lieferanten mit gemischten Abrechnungen (z.B. Plattform-Abrechnung).
+- Erfasse NUR AUSGABEN/KOSTEN (Gebühren, Abos, Transaktionskosten, Servicegebühren)
+- IGNORIERE Einnahmen, Erlöse, Gutschriften, Auszahlungen, Umsätze
+- amount_gross = Summe NUR der Kosten-Positionen
+- amount_net und vat_amount ebenfalls nur aus Kosten-Positionen berechnen
+- Beschreibung: nur Kosten-Positionen auflisten
+- Bei gemischten MwSt-Sätzen der Kosten: is_mixed_tax_rate = true mit Details`;
+        }
+      }
+    }
+    
+    if (expensesOnly && !expensesOnlyPrompt) {
+      expensesOnlyPrompt = `
+
+WICHTIGE REGEL - NUR AUSGABEN EXTRAHIEREN:
+Diese Rechnung stammt von einem Lieferanten mit gemischten Abrechnungen (z.B. Plattform-Abrechnung).
+- Erfasse NUR AUSGABEN/KOSTEN (Gebühren, Abos, Transaktionskosten, Servicegebühren)
+- IGNORIERE Einnahmen, Erlöse, Gutschriften, Auszahlungen, Umsätze
+- amount_gross = Summe NUR der Kosten-Positionen
+- amount_net und vat_amount ebenfalls nur aus Kosten-Positionen berechnen
+- Beschreibung: nur Kosten-Positionen auflisten
+- Bei gemischten MwSt-Sätzen der Kosten: is_mixed_tax_rate = true mit Details`;
+    }
 
     const userPrompt = `Analysiere dieses Dokument in zwei Schritten:
 
@@ -648,7 +695,7 @@ Beispiel Kleinunternehmer:
               },
               {
                 type: "text",
-                text: userPrompt,
+                text: userPrompt + expensesOnlyPrompt,
               },
             ],
           },
@@ -781,12 +828,13 @@ Beispiel Kleinunternehmer:
           // Try to find vendor by name for VAT learning
           const { data: vendorMatch } = await supabase
             .from('vendors')
-            .select('id')
+            .select('id, expenses_only_extraction')
             .eq('user_id', receiptInfo.user_id)
             .or(`display_name.ilike.${extractedData.vendor},legal_name.ilike.${extractedData.vendor}`)
             .maybeSingle();
 
           const vendorId = receiptInfo.vendor_id || vendorMatch?.id;
+          const vendorExpensesOnly = vendorMatch?.expenses_only_extraction === true;
 
           if (vendorId) {
             // Check for learned VAT rate

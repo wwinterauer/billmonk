@@ -24,6 +24,8 @@ export interface Vendor {
   // Auto-approve fields
   auto_approve: boolean;
   auto_approve_min_confidence: number;
+  // Expenses-only extraction
+  expenses_only_extraction: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -92,6 +94,7 @@ export function useVendors() {
           prediction_accuracy: v.prediction_accuracy ?? null,
           auto_approve: v.auto_approve ?? false,
           auto_approve_min_confidence: v.auto_approve_min_confidence ?? 0.8,
+          expenses_only_extraction: v.expenses_only_extraction ?? false,
         };
       }) as Vendor[];
 
@@ -165,6 +168,7 @@ export function useVendors() {
       prediction_accuracy: data.prediction_accuracy ?? null,
       auto_approve: data.auto_approve ?? false,
       auto_approve_min_confidence: data.auto_approve_min_confidence ?? 0.8,
+      expenses_only_extraction: data.expenses_only_extraction ?? false,
     } as Vendor;
 
     setVendors(prev => [...prev, newVendor].sort((a, b) => 
@@ -175,7 +179,7 @@ export function useVendors() {
 
   const updateVendor = async (
     id: string,
-    updates: Partial<Pick<Vendor, 'display_name' | 'legal_name' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_payment_method' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence'>>
+    updates: Partial<Pick<Vendor, 'display_name' | 'legal_name' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_payment_method' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction'>>
   ): Promise<{ vendor: Vendor; syncedReceipts: number; autoApprovedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
 
@@ -436,6 +440,7 @@ export function useVendors() {
       prediction_accuracy: data.prediction_accuracy ?? null,
       auto_approve: data.auto_approve ?? false,
       auto_approve_min_confidence: data.auto_approve_min_confidence ?? 0.8,
+      expenses_only_extraction: data.expenses_only_extraction ?? false,
     } as Vendor;
 
     setVendors(prev => prev.map(v => v.id === id ? updated : v).sort((a, b) => 

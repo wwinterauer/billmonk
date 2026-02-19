@@ -718,6 +718,19 @@ const Review = () => {
                         }}
                         onFieldsUpdated={handleReanalysisUpdate}
                         disabled={imageLoading}
+                        vendorId={currentReceipt.vendor_id || undefined}
+                        onExpensesOnlyReanalyze={(remember) => {
+                          if (remember && currentReceipt.vendor_id) {
+                            supabase
+                              .from('vendors')
+                              .update({ expenses_only_extraction: true })
+                              .eq('id', currentReceipt.vendor_id)
+                              .then(() => {
+                                // will trigger reload via onReanalyzeComplete
+                              });
+                          }
+                        }}
+                        onReanalyzeComplete={() => loadReceipts()}
                       />
                     )}
                   </div>

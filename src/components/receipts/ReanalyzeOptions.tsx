@@ -90,6 +90,9 @@ interface ReanalyzeOptionsProps {
   }) => void;
   onReanalyzeComplete?: () => void;
   disabled?: boolean;
+  vendorId?: string;
+  vendorExpensesOnly?: boolean;
+  onExpensesOnlyReanalyze?: (rememberForVendor: boolean) => void;
 }
 
 export function ReanalyzeOptions({
@@ -102,6 +105,9 @@ export function ReanalyzeOptions({
   onFieldsUpdated,
   onReanalyzeComplete,
   disabled = false,
+  vendorId,
+  vendorExpensesOnly = false,
+  onExpensesOnlyReanalyze,
 }: ReanalyzeOptionsProps) {
   const { toast } = useToast();
 
@@ -109,6 +115,8 @@ export function ReanalyzeOptions({
   const [showFieldSelectDialog, setShowFieldSelectDialog] = useState(false);
   const [showFullReanalyzeConfirm, setShowFullReanalyzeConfirm] = useState(false);
   const [selectedReanalysisFields, setSelectedReanalysisFields] = useState<string[]>([]);
+  const [showExpensesOnlyConfirm, setShowExpensesOnlyConfirm] = useState(false);
+  const [rememberExpensesOnly, setRememberExpensesOnly] = useState(false);
 
   // AI Re-run handler - supports selective field reanalysis
   const reanalyzeFields = async (fieldsToUpdate: string[]) => {
@@ -266,6 +274,43 @@ export function ReanalyzeOptions({
     }
     setShowFieldSelectDialog(false);
     reanalyzeFields(selectedReanalysisFields);
+  };
+
+  // Expenses-only reanalysis via edge function
+  const handleExpensesOnlyReanalyze = async (remember: boolean) => {
+    if (!receiptId || isRerunning) return;
+    setIsRerunning(true);
+    setShowExpensesOnlyConfirm(false);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('extract-receipt', {
+        body: { receiptId, expensesOnly: true, skipMultiCheck: true },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast({
+          title: 'Nur-Ausgaben-Analyse abgeschlossen',
+          description: 'Beleg wurde nur mit Kosten-Positionen neu analysiert.',
+        });
+        onReanalyzeComplete?.();
+        if (remember) {
+          onExpensesOnlyReanalyze?.(true);
+        }
+      } else {
+        throw new Error(data?.error || 'Analyse fehlgeschlagen');
+      }
+    } catch (error) {
+      console.error('Expenses-only reanalyze error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler bei Nur-Ausgaben-Analyse',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setIsRerunning(false);
+    }
   };
 
   const unmodifiedFieldCount = REANALYZABLE_FIELDS.length - userModifiedFields.length;
@@ -433,6 +478,31 @@ export function ReanalyzeOptions({
               </div>
             </DropdownMenuItem>
           </div>
+
+          {/* Expenses-Only Section */}
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+            Spezial-Analyse
+          </DropdownMenuLabel>
+
+          <DropdownMenuItem
+            onClick={() => {
+              if (vendorId && onExpensesOnlyReanalyze) {
+                setShowExpensesOnlyConfirm(true);
+              } else {
+                handleExpensesOnlyReanalyze(false);
+              }
+            }}
+          >
+            <Euro className="w-4 h-4 mr-2 text-primary" />
+            <div className="flex-1">
+              <p>Nur Ausgaben extrahieren</p>
+              <p className="text-xs text-muted-foreground">Einnahmen/Gutschriften ignorieren</p>
+            </div>
+            {vendorExpensesOnly && (
+              <Badge variant="outline" className="text-xs ml-2">aktiv</Badge>
+            )}
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -521,6 +591,49 @@ export function ReanalyzeOptions({
               className="bg-orange-600 hover:bg-orange-700"
             >
               Ja, alle überschreiben
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Expenses-Only Confirmation with "Remember" option */}
+      <AlertDialog open={showExpensesOnlyConfirm} onOpenChange={setShowExpensesOnlyConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Euro className="h-5 w-5 text-primary" />
+              Nur Ausgaben extrahieren?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Die KI wird nur Kosten-Positionen (Gebühren, Abos, etc.) erfassen und
+              Einnahmen/Gutschriften ignorieren.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {vendorId && onExpensesOnlyReanalyze && (
+            <div
+              className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 cursor-pointer"
+              onClick={() => setRememberExpensesOnly(prev => !prev)}
+            >
+              <Checkbox
+                checked={rememberExpensesOnly}
+                onCheckedChange={(checked) => setRememberExpensesOnly(!!checked)}
+              />
+              <div>
+                <p className="text-sm font-medium">Für diesen Lieferanten merken</p>
+                <p className="text-xs text-muted-foreground">
+                  Zukünftige Belege werden automatisch nur mit Ausgaben analysiert
+                </p>
+              </div>
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => handleExpensesOnlyReanalyze(rememberExpensesOnly)}
+            >
+              Nur Ausgaben analysieren
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
