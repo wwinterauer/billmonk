@@ -705,16 +705,16 @@ const Review = () => {
                     </div>
                   </div>
                 )}
-                <div className="grid lg:grid-cols-2 gap-8">
+                <div className="grid lg:grid-cols-2 gap-8 items-stretch">
                   {/* Left Side - Image Preview */}
                   <div className="lg:col-span-1">
-                    <div className="sticky top-6">
+                    <div className="sticky top-6 h-full flex flex-col">
                       <div 
                         className={cn(
                           "relative bg-muted rounded-lg overflow-hidden",
                           currentReceipt?.file_type?.toLowerCase() === 'pdf' || 
                           currentReceipt?.file_name?.toLowerCase().endsWith('.pdf')
-                            ? "min-h-[500px] h-[60vh]" // Taller for PDFs
+                            ? "flex-1 min-h-[400px]"
                             : "aspect-[3/4] cursor-pointer group"
                         )}
                         onClick={() => {
