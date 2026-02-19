@@ -210,6 +210,37 @@ const Review = () => {
 
   const currentReceipt = receipts[currentIndex] || null;
 
+  // Vendor extraction data for ReanalyzeOptions
+  const [currentVendorData, setCurrentVendorData] = useState<{
+    expenses_only_extraction: boolean;
+    extraction_keywords: string[];
+    extraction_hint: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const vendorId = currentReceipt?.vendor_id;
+    if (!vendorId) {
+      setCurrentVendorData(null);
+      return;
+    }
+    supabase
+      .from('vendors')
+      .select('expenses_only_extraction, extraction_keywords, extraction_hint')
+      .eq('id', vendorId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setCurrentVendorData({
+            expenses_only_extraction: data.expenses_only_extraction,
+            extraction_keywords: data.extraction_keywords || [],
+            extraction_hint: data.extraction_hint || '',
+          });
+        } else {
+          setCurrentVendorData(null);
+        }
+      });
+  }, [currentReceipt?.vendor_id]);
+
   // Load image for current receipt
   const loadImage = async (receipt: Receipt) => {
     setImageLoading(true);
@@ -719,11 +750,9 @@ const Review = () => {
                         onFieldsUpdated={handleReanalysisUpdate}
                         disabled={imageLoading}
                         vendorId={currentReceipt.vendor_id || undefined}
-                        vendorExtractionKeywords={(() => {
-                          // Find vendor extraction_keywords from vendors if available
-                          return [];
-                        })()}
-                        vendorExtractionHint=""
+                        vendorExpensesOnly={currentVendorData?.expenses_only_extraction}
+                        vendorExtractionKeywords={currentVendorData?.extraction_keywords || []}
+                        vendorExtractionHint={currentVendorData?.extraction_hint || ''}
                         onExpensesOnlyReanalyze={(remember, keywords, hint) => {
                           if (remember && currentReceipt.vendor_id) {
                             const updates: Record<string, unknown> = { expenses_only_extraction: true };
@@ -737,8 +766,15 @@ const Review = () => {
                               .from('vendors')
                               .update(updates)
                               .eq('id', currentReceipt.vendor_id)
-                              .then(() => {
-                                // will trigger reload via onReanalyzeComplete
+                              .then(({ data }) => {
+                                // Refresh local vendor data
+                                if (data) {
+                                  setCurrentVendorData({
+                                    expenses_only_extraction: true,
+                                    extraction_keywords: (keywords && keywords.length > 0) ? keywords : (currentVendorData?.extraction_keywords || []),
+                                    extraction_hint: hint !== undefined ? hint : (currentVendorData?.extraction_hint || ''),
+                                  });
+                                }
                               });
                           }
                         }}
