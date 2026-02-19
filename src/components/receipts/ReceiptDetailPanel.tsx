@@ -1182,7 +1182,7 @@ export function ReceiptDetailPanel({
                             size="sm"
                             className="shrink-0 text-xs"
                             onClick={() => {
-                              window.open('/settings?tab=vendors', '_blank');
+                              window.open(`/settings?tab=vendors&vendorId=${selectedVendorId}`, '_blank');
                             }}
                           >
                             <Settings className="w-3 h-3 mr-1" />
