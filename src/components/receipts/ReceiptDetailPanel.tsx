@@ -1055,11 +1055,15 @@ export function ReceiptDetailPanel({
                         vat_rate: vatRate,
                       }}
                       vendorId={selectedVendorId || undefined}
-                      onExpensesOnlyReanalyze={(remember) => {
+                      onExpensesOnlyReanalyze={(remember, keywords) => {
                         if (remember && selectedVendorId) {
+                          const updates: Record<string, unknown> = { expenses_only_extraction: true };
+                          if (keywords && keywords.length > 0) {
+                            updates.extraction_keywords = keywords;
+                          }
                           supabase
                             .from('vendors')
-                            .update({ expenses_only_extraction: true })
+                            .update(updates)
                             .eq('id', selectedVendorId)
                             .then(() => {
                               // reload receipt data

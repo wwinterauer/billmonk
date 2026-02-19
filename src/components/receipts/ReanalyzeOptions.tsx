@@ -43,10 +43,14 @@ import {
   MousePointer,
   Square,
   AlertTriangle,
+  X,
+  Plus,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
 import { supabase } from '@/integrations/supabase/client';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 // Fields that can be selectively re-analyzed by AI
 // Fields that can be selectively re-analyzed by AI
@@ -92,7 +96,8 @@ interface ReanalyzeOptionsProps {
   disabled?: boolean;
   vendorId?: string;
   vendorExpensesOnly?: boolean;
-  onExpensesOnlyReanalyze?: (rememberForVendor: boolean) => void;
+  vendorExtractionKeywords?: string[];
+  onExpensesOnlyReanalyze?: (rememberForVendor: boolean, keywords?: string[]) => void;
 }
 
 export function ReanalyzeOptions({
@@ -107,6 +112,7 @@ export function ReanalyzeOptions({
   disabled = false,
   vendorId,
   vendorExpensesOnly = false,
+  vendorExtractionKeywords = [],
   onExpensesOnlyReanalyze,
 }: ReanalyzeOptionsProps) {
   const { toast } = useToast();
@@ -117,6 +123,8 @@ export function ReanalyzeOptions({
   const [selectedReanalysisFields, setSelectedReanalysisFields] = useState<string[]>([]);
   const [showExpensesOnlyConfirm, setShowExpensesOnlyConfirm] = useState(false);
   const [rememberExpensesOnly, setRememberExpensesOnly] = useState(false);
+  const [dialogKeywords, setDialogKeywords] = useState<string[]>([]);
+  const [newKeywordInput, setNewKeywordInput] = useState('');
 
   // AI Re-run handler - supports selective field reanalysis
   const reanalyzeFields = async (fieldsToUpdate: string[]) => {
@@ -277,14 +285,19 @@ export function ReanalyzeOptions({
   };
 
   // Expenses-only reanalysis via edge function
-  const handleExpensesOnlyReanalyze = async (remember: boolean) => {
+  const handleExpensesOnlyReanalyze = async (remember: boolean, keywords: string[]) => {
     if (!receiptId || isRerunning) return;
     setIsRerunning(true);
     setShowExpensesOnlyConfirm(false);
 
     try {
       const { data, error } = await supabase.functions.invoke('extract-receipt', {
-        body: { receiptId, expensesOnly: true, skipMultiCheck: true },
+        body: { 
+          receiptId, 
+          expensesOnly: true, 
+          skipMultiCheck: true,
+          extractionKeywords: keywords.length > 0 ? keywords : undefined,
+        },
       });
 
       if (error) throw error;
@@ -296,7 +309,7 @@ export function ReanalyzeOptions({
         });
         onReanalyzeComplete?.();
         if (remember) {
-          onExpensesOnlyReanalyze?.(true);
+          onExpensesOnlyReanalyze?.(true, keywords);
         }
       } else {
         throw new Error(data?.error || 'Analyse fehlgeschlagen');
@@ -490,7 +503,7 @@ export function ReanalyzeOptions({
               if (vendorId && onExpensesOnlyReanalyze) {
                 setShowExpensesOnlyConfirm(true);
               } else {
-                handleExpensesOnlyReanalyze(false);
+                handleExpensesOnlyReanalyze(false, vendorExtractionKeywords);
               }
             }}
           >
@@ -596,19 +609,85 @@ export function ReanalyzeOptions({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Expenses-Only Confirmation with "Remember" option */}
-      <AlertDialog open={showExpensesOnlyConfirm} onOpenChange={setShowExpensesOnlyConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
+      {/* Expenses-Only Confirmation with Keywords + "Remember" option */}
+      <Dialog open={showExpensesOnlyConfirm} onOpenChange={(open) => {
+        setShowExpensesOnlyConfirm(open);
+        if (open) {
+          setDialogKeywords([...vendorExtractionKeywords]);
+          setNewKeywordInput('');
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
               <Euro className="h-5 w-5 text-primary" />
               Nur Ausgaben extrahieren?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
+            </DialogTitle>
+            <DialogDescription>
               Die KI wird nur Kosten-Positionen (Gebühren, Abos, etc.) erfassen und
               Einnahmen/Gutschriften ignorieren.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Keyword management */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Schlagwörter für Kosten-Positionen</Label>
+            
+            {dialogKeywords.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {dialogKeywords.map((keyword, index) => (
+                  <Badge key={index} variant="secondary" className="gap-1 pr-1">
+                    {keyword}
+                    <button
+                      type="button"
+                      onClick={() => setDialogKeywords(prev => prev.filter((_, i) => i !== index))}
+                      className="ml-0.5 rounded-full hover:bg-muted p-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            
+            <div className="flex gap-2">
+              <Input
+                value={newKeywordInput}
+                onChange={(e) => setNewKeywordInput(e.target.value)}
+                placeholder="z.B. Transaktionsgebühr"
+                className="flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (newKeywordInput.trim() && !dialogKeywords.includes(newKeywordInput.trim())) {
+                      setDialogKeywords(prev => [...prev, newKeywordInput.trim()]);
+                      setNewKeywordInput('');
+                    }
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (newKeywordInput.trim() && !dialogKeywords.includes(newKeywordInput.trim())) {
+                    setDialogKeywords(prev => [...prev, newKeywordInput.trim()]);
+                    setNewKeywordInput('');
+                  }
+                }}
+                disabled={!newKeywordInput.trim()}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <p className="text-xs text-muted-foreground">
+              {dialogKeywords.length === 0
+                ? 'Ohne Schlagwörter werden allgemein alle Kosten erfasst.'
+                : 'Die KI extrahiert nur Zeilen die diese Begriffe enthalten.'}
+            </p>
+          </div>
 
           {vendorId && onExpensesOnlyReanalyze && (
             <div
@@ -622,22 +701,22 @@ export function ReanalyzeOptions({
               <div>
                 <p className="text-sm font-medium">Für diesen Lieferanten merken</p>
                 <p className="text-xs text-muted-foreground">
-                  Zukünftige Belege werden automatisch nur mit Ausgaben analysiert
+                  Schlagwörter und Einstellung werden beim Lieferanten gespeichert
                 </p>
               </div>
             </div>
           )}
 
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => handleExpensesOnlyReanalyze(rememberExpensesOnly)}
-            >
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExpensesOnlyConfirm(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={() => handleExpensesOnlyReanalyze(rememberExpensesOnly, dialogKeywords)}>
               Nur Ausgaben analysieren
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
