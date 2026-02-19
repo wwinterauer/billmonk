@@ -92,6 +92,7 @@ import { ManualTrainingModal } from './ManualTrainingModal';
 import { SourceBadge, NoReceiptBadge } from './SourceBadge';
 import { ReanalyzeOptions } from './ReanalyzeOptions';
 import { TagSelector } from '@/components/tags/TagSelector';
+import { useTags } from '@/hooks/useTags';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
@@ -455,12 +456,17 @@ export function ReceiptDetailPanel({
   }, [isEditingFilename, displayFilename]);
 
 
+  // Tags hook for auto-assignment
+  const { assignTag, useReceiptTags } = useTags();
+  const { data: currentReceiptTags } = useReceiptTags(receiptId);
+
   // Handle vendor selection from autocomplete
   const handleVendorSelect = useCallback((vendorData: {
     id: string;
     display_name: string;
     legal_name: string | null;
     default_category_id: string | null;
+    default_tag_id?: string | null;
     default_vat_rate: number | null;
     default_category: { id: string; name: string; color: string | null } | null;
   }) => {
@@ -490,10 +496,19 @@ export function ReceiptDetailPanel({
       applied.push('MwSt-Satz');
     }
 
+    // Apply default tag if not already assigned
+    if (vendorData.default_tag_id && receiptId) {
+      const alreadyAssigned = currentReceiptTags?.some(t => t.id === vendorData.default_tag_id);
+      if (!alreadyAssigned) {
+        assignTag(receiptId, vendorData.default_tag_id);
+        applied.push('Tag');
+      }
+    }
+
     toast({
       title: `${applied.join(', ')} vom Lieferanten übernommen`,
     });
-  }, [category, vatRate, toast]);
+  }, [category, vatRate, toast, receiptId, currentReceiptTags, assignTag]);
 
   // Download/Open handlers using signedUrl
   const handleDownload = () => {

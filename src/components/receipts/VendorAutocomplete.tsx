@@ -13,6 +13,7 @@ interface VendorWithCategory {
   legal_name: string | null;
   detected_names: string[] | null;
   default_category_id: string | null;
+  default_tag_id: string | null;
   default_vat_rate: number | null;
   receipt_count: number | null;
   default_category: {
@@ -75,6 +76,7 @@ export function VendorAutocomplete({
           legal_name,
           detected_names,
           default_category_id,
+          default_tag_id,
           default_vat_rate,
           default_category:categories(id, name, color)
         `)

@@ -51,6 +51,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useVendors, Vendor } from '@/hooks/useVendors';
 import { useCategories, Category } from '@/hooks/useCategories';
+import { useTags } from '@/hooks/useTags';
 import { toast } from 'sonner';
 
 const VAT_RATES = [
@@ -72,6 +73,7 @@ export function VendorManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { vendors, loading, addVendor, updateVendor, deleteVendor, fetchVendors } = useVendors();
   const { categories } = useCategories();
+  const { activeTags } = useTags();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [deleteConfirmVendor, setDeleteConfirmVendor] = useState<Vendor | null>(null);
@@ -134,6 +136,7 @@ export function VendorManagement() {
     legal_name: '',
     detected_names: [] as string[],
     default_category_id: '',
+    default_tag_id: '',
     default_vat_rate: '',
     website: '',
     notes: '',
@@ -148,6 +151,7 @@ export function VendorManagement() {
       legal_name: '',
       detected_names: [],
       default_category_id: '',
+      default_tag_id: '',
       default_vat_rate: '',
       website: '',
       notes: '',
@@ -164,6 +168,7 @@ export function VendorManagement() {
       legal_name: vendor.legal_name || '',
       detected_names: vendor.detected_names || [],
       default_category_id: vendor.default_category_id || '',
+      default_tag_id: vendor.default_tag_id || '',
       default_vat_rate: vendor.default_vat_rate?.toString() || '',
       website: vendor.website || '',
       notes: vendor.notes || '',
@@ -225,6 +230,7 @@ export function VendorManagement() {
           legal_name: formData.legal_name.trim() || null,
           detected_names: formData.detected_names,
           default_category_id: formData.default_category_id || null,
+          default_tag_id: formData.default_tag_id || null,
           default_vat_rate: formData.default_vat_rate ? parseFloat(formData.default_vat_rate) : null,
           website: formData.website.trim() || null,
           notes: formData.notes.trim() || null,
@@ -250,6 +256,7 @@ export function VendorManagement() {
           legalName: formData.legal_name.trim() || undefined,
           detectedNames: formData.detected_names,
           defaultCategoryId: formData.default_category_id || undefined,
+          defaultTagId: formData.default_tag_id || undefined,
           defaultVatRate: formData.default_vat_rate ? parseFloat(formData.default_vat_rate) : undefined,
           website: formData.website.trim() || undefined,
           notes: formData.notes.trim() || undefined,
@@ -1228,6 +1235,35 @@ export function VendorManagement() {
               </Select>
               <p className="text-xs text-muted-foreground">
                 Wird automatisch bei neuen Belegen gesetzt
+              </p>
+            </div>
+
+            {/* Standard-Tag */}
+            <div className="space-y-2">
+              <Label htmlFor="default_tag">Standard-Tag</Label>
+              <Select
+                value={formData.default_tag_id}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, default_tag_id: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Kein Standard-Tag" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeTags.map((tag) => (
+                    <SelectItem key={tag.id} value={tag.id}>
+                      <span className="flex items-center">
+                        <span
+                          className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                        {tag.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Tag wird automatisch bei Lieferantenauswahl zugewiesen
               </p>
             </div>
 
