@@ -1,34 +1,80 @@
 
-# PDF-Vorschau auf volle Hoehe der rechten Spalte erweitern
+# Nettobetrag/MwSt-Betrag: Alignment-Fix und manuelle Ueberschreibung
 
 ## Uebersicht
 
-Die linke Spalte (Dokumentvorschau) im Review-Layout wird so angepasst, dass sie die gesamte Hoehe der rechten Spalte (bis einschliesslich "Ueberspringen"-Button) ausfuellt, anstatt auf `h-[60vh]` begrenzt zu sein.
+Zwei Probleme werden behoben:
+1. **Alignment**: Nettobetrag und MwSt-Betrag sind nicht auf gleicher Hoehe (fehlendes `items-end` im Grid)
+2. **Manuelle Ueberschreibung**: Beide Felder sind aktuell `readOnly` und rein berechnet -- sie muessen editierbar werden, mit der berechneten Variante als Placeholder
 
-## Aenderung
+Beide Fixes betreffen `src/pages/Review.tsx` und `src/components/receipts/ReceiptDetailPanel.tsx`.
 
-### Datei: `src/pages/Review.tsx`
+---
 
-1. **Grid-Container (Zeile 708)**: Das `grid`-Layout erhaelt `items-stretch`, damit beide Spalten gleich hoch werden.
+## Aenderungen
 
-2. **Linke Spalte / sticky-Wrapper (Zeile 711)**: Der `sticky top-6`-Wrapper wird so angepasst, dass er die volle verfuegbare Hoehe nutzt (`h-full flex flex-col`).
+### 1. Review-Seite (`src/pages/Review.tsx`)
 
-3. **Preview-Container (Zeile 713-719)**: Die feste Hoehe `min-h-[500px] h-[60vh]` wird durch `flex-1 min-h-0` ersetzt, sodass der Vorschaubereich den gesamten verbleibenden Platz einnimmt (abzueglich Dateiname und Buttons darunter).
+**FormData erweitern** (Zeile ~128-141):
+- Neue Felder `amount_net_override: string` und `vat_amount_override: string` hinzufuegen (Standard: leer)
+- Beim Laden eines Belegs: Falls `amount_net` oder `vat_amount` in der DB gesetzt sind und vom berechneten Wert abweichen, als Override vorbelegen
 
-4. **Fuer Bilder** bleibt `aspect-[3/4]` erhalten, da Bilder eine feste Proportion benoetigen. Nur der PDF-Fall wird auf `flex-1` umgestellt.
+**Netto/MwSt-Grid (Zeile 1157-1180)**:
+- `items-end` zum Grid hinzufuegen fuer korrekte Ausrichtung
+- `readOnly` entfernen, Felder zu editierbaren `Input type="number"` machen
+- Berechneten Wert als `placeholder` anzeigen (z.B. `10.00 (berechnet)`)
+- `onChange` schreibt in `amount_net_override` / `vat_amount_override`
+- Styling: Wenn Override leer (= berechnet), bleibt `bg-muted`; bei manuellem Wert normaler Input-Style
+
+**Save-Logik (Zeile 320-337)**:
+- Falls Override vorhanden: diesen Wert als `amount_net` / `vat_amount` speichern
+- Falls leer: weiterhin berechneten Wert verwenden
+
+### 2. Beleg-Detail-Panel (`src/components/receipts/ReceiptDetailPanel.tsx`)
+
+**State erweitern** (bei den vorhandenen State-Variablen):
+- Neue States `amountNetOverride` und `vatAmountOverride` (String, default leer)
+- Beim Laden: Falls DB-Werte von Berechnung abweichen, als Override setzen
+
+**Netto/MwSt-Grid (Zeile 1463-1486)**:
+- `items-end` zum Grid hinzufuegen
+- Felder editierbar machen mit berechnetem Wert als Placeholder
+- Gleiche Override-Logik wie in Review
+
+**Save-Logik (Zeilen 700-738)**:
+- Override-Werte bevorzugt als `amount_net` / `vat_amount` speichern
+
+---
 
 ## Technische Details
 
-### Konkrete CSS-Aenderungen
+### Alignment-Fix
 
-| Zeile | Vorher | Nachher |
-|-------|--------|---------|
-| 708 | `grid lg:grid-cols-2 gap-8` | `grid lg:grid-cols-2 gap-8 items-stretch` |
-| 711 | `sticky top-6` | `sticky top-6 h-full flex flex-col` |
-| 718 (PDF) | `min-h-[500px] h-[60vh]` | `flex-1 min-h-[400px]` |
+| Datei | Zeile | Vorher | Nachher |
+|-------|-------|--------|---------|
+| Review.tsx | 1158 | `grid sm:grid-cols-2 gap-4` | `grid sm:grid-cols-2 gap-4 items-end` |
+| ReceiptDetailPanel.tsx | 1464 | `grid grid-cols-2 gap-4` | `grid grid-cols-2 gap-4 items-end` |
 
-### Betroffene Datei
+### Override-Felder (Review.tsx Beispiel)
 
-| Datei | Aenderung |
-|-------|-----------|
-| `src/pages/Review.tsx` | Grid `items-stretch`, sticky-Wrapper `h-full flex flex-col`, PDF-Container `flex-1` |
+```text
+Vorher:
+  <Input value={calculations.net ? ... : '—'} readOnly className="bg-muted" />
+
+Nachher:
+  <Input
+    type="number"
+    step="0.01"
+    value={formData.amount_net_override}
+    onChange={...}
+    placeholder={calculations.net ? `${calculations.net.toFixed(2)} (berechnet)` : '—'}
+    className={formData.amount_net_override ? '' : 'bg-muted'}
+  />
+```
+
+### Betroffene Dateien
+
+| Datei | Aenderungen |
+|-------|------------|
+| `src/pages/Review.tsx` | FormData + Override-State, Grid alignment, editierbare Felder, Save-Logik |
+| `src/components/receipts/ReceiptDetailPanel.tsx` | Override-State, Grid alignment, editierbare Felder, Save-Logik |
