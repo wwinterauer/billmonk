@@ -1,58 +1,58 @@
 
 
-# Link zum Lieferanten aus Review und Einzelbelegerkennung
+# Standard-Tag fuer Lieferanten
 
 ## Uebersicht
 
-In der Review-Seite und im Beleg-Detail-Panel (Einzelbelegerkennung) wird neben dem Lieferanten-Feld ein kleiner Button eingefuegt, der direkt zur Lieferanten-Verwaltung springt und den betreffenden Lieferanten vorselektiert/hervorhebt.
+Lieferanten koennen kuenftig einen Standard-Tag erhalten, der -- analog zur Standard-Kategorie -- automatisch bei der Lieferantenauswahl auf neue Belege angewandt wird.
 
 ## Aenderungen
 
-### 1. VendorManagement: Deep-Link-Unterstuetzung (`src/components/settings/VendorManagement.tsx`)
+### 1. Datenbank: Neue Spalte `default_tag_id` auf `vendors`
 
-- Beim Laden der Komponente wird ein URL-Parameter `vendorId` aus der URL gelesen (z.B. `/settings?tab=vendors&vendorId=abc-123`).
-- Falls vorhanden: Der Suchfilter wird automatisch auf den `display_name` dieses Lieferanten gesetzt und der Edit-Dialog wird geoeffnet.
-- Falls der Lieferant nicht in der Liste ist (z.B. durch Paginierung), wird er trotzdem gefunden und direkt bearbeitet.
+- Migration: `ALTER TABLE public.vendors ADD COLUMN default_tag_id uuid REFERENCES public.tags(id) ON DELETE SET NULL;`
+- Kein Pflichtfeld, Standard ist NULL.
 
-### 2. Review-Seite: Link-Button (`src/pages/Review.tsx`)
+### 2. Hook: `useVendors.ts`
 
-- Neben dem "Lieferant (Markenname)"-Label wird ein kleiner Icon-Button (ExternalLink oder Settings-Icon) angezeigt, sofern der aktuelle Beleg eine `vendor_id` hat oder ein Lieferant per Name zugeordnet werden kann.
-- Klick oeffnet `/settings?tab=vendors&vendorId=XYZ` in einem neuen Tab.
-- Ist kein Lieferant verknuepft, wird der Button nicht angezeigt.
+- `Vendor`-Interface erhaelt `default_tag_id: string | null`.
+- `addVendor` Options erhalten `defaultTagId?: string`.
+- `updateVendor` Partial-Pick wird um `default_tag_id` erweitert.
 
-### 3. Beleg-Detail-Panel: Bestehenden Link verbessern (`src/components/receipts/ReceiptDetailPanel.tsx`)
+### 3. VendorManagement: Formular erweitern (`src/components/settings/VendorManagement.tsx`)
 
-- Der bereits vorhandene "Bearbeiten"-Button (Zeile 1179-1190) wird angepasst: Statt `/settings?tab=vendors` wird `/settings?tab=vendors&vendorId={selectedVendorId}` verwendet, damit direkt der richtige Lieferant geoeffnet wird.
+- `formData` erhaelt `default_tag_id: string`.
+- Im Edit-Dialog wird unter "Standard-Kategorie" ein neues Select-Feld "Standard-Tag" eingefuegt, das die aktiven Tags (aus `useTags()`) als Auswahl anbietet -- mit farbigem Punkt analog zur Kategorie-Auswahl.
+- Speichern/Anlegen uebergibt `default_tag_id` an den Hook.
+- MergePreview erhaelt ebenfalls `default_tag_id`.
+
+### 4. Einzelbelegerkennung: Tag automatisch zuweisen (`src/components/receipts/ReceiptDetailPanel.tsx`)
+
+- `VendorAutocomplete` und `handleVendorSelect` erhalten `default_tag_id` im Vendor-Datenobjekt.
+- Wenn ein Lieferant mit Standard-Tag ausgewaehlt wird und der Beleg diesen Tag noch nicht hat, wird `assignTag(receiptId, default_tag_id)` aufgerufen und "Tag" in die Toast-Liste aufgenommen.
+- Dafuer wird `useTags()` (bzw. `assignTag`) im Panel importiert.
+
+### 5. VendorAutocomplete: Query erweitern (`src/components/receipts/VendorAutocomplete.tsx`)
+
+- Das Supabase-Select wird um `default_tag_id` erweitert.
+- Das `VendorWithCategory`-Interface erhaelt `default_tag_id: string | null`.
 
 ## Technische Details
 
-### URL-Schema
+### Migration SQL
 
 ```text
-/settings?tab=vendors&vendorId=<uuid>
+ALTER TABLE public.vendors
+  ADD COLUMN default_tag_id uuid REFERENCES public.tags(id) ON DELETE SET NULL;
 ```
-
-### VendorManagement Deep-Link-Logik
-
-```text
-useEffect:
-  1. Lese vendorId aus URLSearchParams
-  2. Finde Lieferant in vendors-Liste (oder lade ihn per Supabase-Query)
-  3. Oeffne den Edit-Dialog mit openEditDialog(vendor)
-  4. Entferne vendorId aus URL (damit Reload nicht erneut triggert)
-```
-
-### Review-Seite: Button neben Label
-
-Neben dem Label "Lieferant (Markenname)" wird ein kleiner Button eingefuegt:
-- Bedingung: `currentReceipt.vendor_id` ist vorhanden
-- Aktion: `window.open('/settings?tab=vendors&vendorId=' + currentReceipt.vendor_id, '_blank')`
 
 ### Betroffene Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/components/settings/VendorManagement.tsx` | Deep-Link per `vendorId`-Parameter: Lieferant automatisch oeffnen |
-| `src/pages/Review.tsx` | Link-Button neben Lieferant-Feld einfuegen |
-| `src/components/receipts/ReceiptDetailPanel.tsx` | Bestehenden "Bearbeiten"-Link um `vendorId` erweitern |
+| Migration (SQL) | Neue Spalte `default_tag_id` |
+| `src/hooks/useVendors.ts` | Interface + addVendor/updateVendor erweitern |
+| `src/components/settings/VendorManagement.tsx` | Tag-Select im Dialog, formData, Merge |
+| `src/components/receipts/VendorAutocomplete.tsx` | Query + Interface um `default_tag_id` |
+| `src/components/receipts/ReceiptDetailPanel.tsx` | Tag zuweisen bei Lieferantenauswahl |
 
