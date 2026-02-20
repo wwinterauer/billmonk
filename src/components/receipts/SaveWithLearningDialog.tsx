@@ -52,7 +52,7 @@ export function SaveWithLearningDialog({
   
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-xl">
+      <AlertDialogContent className="max-w-2xl">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <Brain className="w-5 h-5 text-violet-600" />
