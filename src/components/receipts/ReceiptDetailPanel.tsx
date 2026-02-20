@@ -82,7 +82,7 @@ import {
   DEFAULT_NAMING_SETTINGS,
   type NamingSettings 
 } from '@/lib/filenameUtils';
-import { AlertTriangle, GraduationCap } from 'lucide-react';
+import { AlertTriangle, GraduationCap, Trash2 } from 'lucide-react';
 import { useCorrectionTracking, type CorrectionData } from '@/hooks/useCorrectionTracking';
 import { LEARNABLE_FIELDS } from '@/types/learning';
 import { useVendorLearning } from '@/hooks/useVendorLearning';
@@ -1747,6 +1747,7 @@ export function ReceiptDetailPanel({
                     onClick={() => setDeleteDialogOpen(true)}
                     disabled={saving}
                   >
+                    <Trash2 className="h-4 w-4 mr-2" />
                     Löschen
                   </Button>
                   <div className="flex gap-2">

@@ -1444,20 +1444,15 @@ const Review = () => {
                         <SkipForward className="h-4 w-4 mr-2" />
                         Überspringen
                       </Button>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="ml-auto text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => setDeleteDialogOpen(true)}
-                            disabled={saving}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Beleg löschen</TooltipContent>
-                      </Tooltip>
+                      <Button
+                        variant="ghost"
+                        className="ml-auto text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeleteDialogOpen(true)}
+                        disabled={saving}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Löschen
+                      </Button>
                     </div>
                   </div>
                 </div>
