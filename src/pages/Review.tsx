@@ -819,20 +819,10 @@ const Review = () => {
                               });
                           }
                         }}
-                        onReanalyzeComplete={async () => {
-                          // Reload only the current receipt instead of all receipts
-                          if (currentReceipt) {
-                            const { data } = await supabase
-                              .from('receipts')
-                              .select('*')
-                              .eq('id', currentReceipt.id)
-                              .maybeSingle();
-                            if (data) {
-                              const updatedReceipts = [...receipts];
-                              updatedReceipts[currentIndex] = data as Receipt;
-                              setReceipts(updatedReceipts);
-                            }
-                          }
+                        onReanalyzeComplete={() => {
+                          // handleReanalysisUpdate (onFieldsUpdated) has already set all fields in-memory.
+                          // Reloading from DB here would overwrite AI values with stale data.
+                          queryClient.invalidateQueries({ queryKey: ['receipts'] });
                         }}
                       />
                     )}

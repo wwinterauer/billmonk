@@ -1111,36 +1111,10 @@ export function ReceiptDetailPanel({
                             });
                         }
                       }}
-                      onReanalyzeComplete={async () => {
-                        // Reload receipt data and re-populate form
-                        if (receiptId) {
-                          const { data } = await supabase
-                            .from('receipts')
-                            .select('*')
-                            .eq('id', receiptId)
-                            .maybeSingle();
-                          if (data) {
-                            const r = data as Receipt;
-                            setReceipt(r);
-                            // Re-populate form fields
-                            setVendor(r.vendor || '');
-                            setVendorBrand(r.vendor_brand || '');
-                            setDescription(r.description || '');
-                            setReceiptDate(r.receipt_date ? new Date(r.receipt_date) : undefined);
-                            setInvoiceNumber(r.invoice_number || '');
-                            setCategory(r.category || '');
-                            setAmountGross(r.amount_gross?.toString() || '');
-                            setVatRate(r.vat_rate !== null && r.vat_rate !== undefined ? r.vat_rate.toString() : '20');
-                            const receiptData = r as unknown as Record<string, unknown>;
-                            setIsMixedTaxRate((receiptData.is_mixed_tax_rate as boolean) || false);
-                            setTaxRateDetails((receiptData.tax_rate_details as TaxRateDetail[]) || null);
-                            setPaymentMethod(r.payment_method || '');
-                            setNotes(r.notes || '');
-                            setSelectedVendorId(r.vendor_id || null);
-                            setCurrentAiConfidence(r.ai_confidence ?? null);
-                            onUpdate();
-                          }
-                        }
+                      onReanalyzeComplete={() => {
+                        // onFieldsUpdated has already set all AI-extracted fields in-memory.
+                        // A DB reload here would overwrite those values with stale data (not yet saved).
+                        onUpdate();
                       }}
                       onFieldsUpdated={(updates) => {
                         const changes: Record<string, { old: string; new: string }> = {};
