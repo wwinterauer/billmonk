@@ -20,7 +20,18 @@ import {
   RefreshCw,
   Tag,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { PdfViewer } from '@/components/receipts/PdfViewer';
 import { MultiInvoiceAlert } from '@/components/receipts/MultiInvoiceAlert';
 import { ReanalyzeOptions } from '@/components/receipts/ReanalyzeOptions';
@@ -145,7 +156,7 @@ interface FormData {
 const Review = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { getReceipts, updateReceipt, getReceiptFileUrl } = useReceipts();
+  const { getReceipts, updateReceipt, getReceiptFileUrl, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const queryClient = useQueryClient();
@@ -161,6 +172,7 @@ const Review = () => {
   const [imageError, setImageError] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [aiConfidence, setAiConfidence] = useState<number | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     vendor: '',
     vendor_brand: '',
@@ -520,6 +532,35 @@ const Review = () => {
       goToReceipt(currentIndex + 1);
     } else if (currentIndex > 0) {
       goToReceipt(currentIndex - 1);
+    }
+  };
+
+  // Delete current receipt
+  const handleDelete = async () => {
+    if (!currentReceipt) return;
+    setSaving(true);
+    try {
+      await deleteReceipt(currentReceipt.id);
+      const newReceipts = receipts.filter((_, i) => i !== currentIndex);
+      setReceipts(newReceipts);
+      if (newReceipts.length > 0) {
+        const nextIndex = Math.min(currentIndex, newReceipts.length - 1);
+        setCurrentIndex(nextIndex);
+        populateForm(newReceipts[nextIndex]);
+        loadImage(newReceipts[nextIndex]);
+      }
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      window.dispatchEvent(new CustomEvent('refresh-review-count'));
+      toast({ title: 'Beleg gelöscht' });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler beim Löschen',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setSaving(false);
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -1403,6 +1444,20 @@ const Review = () => {
                         <SkipForward className="h-4 w-4 mr-2" />
                         Überspringen
                       </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="ml-auto text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setDeleteDialogOpen(true)}
+                            disabled={saving}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Beleg löschen</TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
                 </div>
@@ -1474,6 +1529,29 @@ const Review = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Beleg wirklich löschen?</AlertDialogTitle>
+              <AlertDialogDescription>
+                <strong>{currentReceipt?.file_name}</strong> wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={saving}>Abbrechen</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                disabled={saving}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Löschen
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );
