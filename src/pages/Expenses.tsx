@@ -2039,18 +2039,22 @@ const Expenses = () => {
               )}
             </Button>
             
-            <div className="h-4 w-px bg-border" />
-            {/* Delete */}
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={() => setBulkDeleteOpen(true)}
-              disabled={bulkActionLoading !== null}
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Löschen
-            </Button>
+            {/* Delete - nur anzeigen wenn NICHT im Duplikat-Filter (dort gibt es "Duplikate löschen") */}
+            {statusFilter !== 'duplicate' && (
+              <>
+                <div className="h-4 w-px bg-border" />
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => setBulkDeleteOpen(true)}
+                  disabled={bulkActionLoading !== null}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Löschen
+                </Button>
+              </>
+            )}
 
             {/* Duplicate-specific bulk actions */}
             {statusFilter === 'duplicate' && (
