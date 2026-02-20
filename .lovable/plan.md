@@ -1,37 +1,70 @@
 
-# Fix: MwSt-Satz wird nach Neuanalyse auf 20% zurueckgesetzt
+# Fix: Multi-Invoice-Erkennung beim Upload funktioniert nicht
 
-## Problem
+## Ursache (Root Cause)
 
-Nach einer "Komplett neu"-Analyse wird der korrekt erkannte MwSt-Satz (0%) kurz gesetzt, dann aber sofort wieder auf 20% zurueckgesetzt. Der Benutzer sieht im Dropdown "20% (Normal)" statt "0% (Steuerfrei)".
+Der Upload-Prozess nutzt zwei verschiedene Wege zur KI-Analyse:
 
-## Ursache
+- **Weg A (Upload)**: `processReceiptWithAI` → `aiService.extractReceiptData(file)` → sendet `imageBase64 + mimeType` an die Edge Function (KEIN `receiptId`)
+- **Weg B (Re-Analyse)**: Sendet `receiptId` direkt an die Edge Function
 
-In `src/pages/Review.tsx` (Zeile 781-794) laufen zwei Aktionen direkt nacheinander:
+Der Multi-Invoice Check in der Edge Function befindet sich **ausschliesslich im Weg B** (Zeile 297). Sobald die Funktion `imageBase64 + mimeType` empfaengt (Weg A), springt sie direkt zur Extraktion – kein Seitencount, kein Multi-Check.
 
-1. `handleReanalysisUpdate` setzt `formData.vat_rate = "0"` (korrekt)
-2. `onReanalyzeComplete` laedt den Beleg aus der Datenbank neu und ruft `populateForm()` auf
-3. Da die Neuanalyse ueber `ReanalyzeOptions` die Datenbank NICHT aktualisiert (kein `receiptId` wird mitgesendet), steht in der DB noch `vat_rate = NULL`
-4. `populateForm` setzt bei `NULL` den Standardwert `'20'` (Zeile 314)
+Das erklaert auch warum `page_count = NULL` in der Datenbank steht: Der Seitencount wird ebenfalls nur im Weg B gespeichert.
 
-Das Ergebnis: Die korrekte KI-Erkennung wird sofort von den veralteten DB-Werten ueberschrieben.
+Beweis aus der Datenbank:
+- "TEST RECHNUNG MIT 2 Rechnungen.pdf" → `page_count: NULL`, `split_suggestion: NULL`, `status: review`
 
 ## Loesung
 
-Den `onReanalyzeComplete`-Callback so aendern, dass er die Formular-Daten NICHT ueberschreibt. Stattdessen wird nur das Receipt-Objekt im `receipts`-Array aktualisiert (fuer die Sidebar/Navigation), aber `populateForm` wird NICHT aufgerufen, da die aktuellen Formular-Werte (aus `handleReanalysisUpdate`) bereits korrekt sind.
+Der Upload-Prozess muss auf Weg B umgestellt werden: `processReceiptWithAI` soll die `receiptId` an die Edge Function uebergeben statt die Datei als base64 zu senden. Die Datei liegt dann bereits in Storage – die Edge Function kann sie selbst herunterladen.
 
-### Aenderung
+### Technische Aenderungen
+
+**1. `src/services/aiService.ts`** – Neue Funktion hinzufuegen
+
+Eine neue exportierte Funktion `extractReceiptDataById(receiptId)` die die Edge Function mit `{ receiptId }` aufruft statt mit `imageBase64`. Diese Funktion prueft ob die Antwort `needs_splitting: true` enthaelt und gibt das entsprechend zurueck.
 
 ```text
-Vorher (Zeile 781-796):
-  onReanalyzeComplete -> DB laden -> populateForm(data)
-
-Nachher:
-  onReanalyzeComplete -> DB laden -> nur receipts-Array aktualisieren, KEIN populateForm()
+export async function extractReceiptDataById(receiptId: string): Promise<{
+  result?: ExtractionResult;
+  needs_splitting?: boolean;
+  invoice_count?: number;
+}>
 ```
 
-## Betroffene Datei
+**2. `src/hooks/useReceipts.ts`** – `processReceiptWithAI` umstellen
+
+Statt `extractReceiptData(file)` wird `extractReceiptDataById(receiptId)` aufgerufen. Das receipt ist bereits in Storage vorhanden, wenn diese Funktion aufgerufen wird.
+
+Wenn die Antwort `needs_splitting: true` zurueckgibt:
+- Kein weiteres Processing (DB wird bereits von der Edge Function auf `needs_splitting` gesetzt)
+- Das Receipt-Objekt aus der DB neu laden und zurueckgeben
+- `aiSuccess: false` da keine Extraktion stattfand
+
+**Ablauf nach dem Fix:**
+
+```text
+Upload -> Datei in Storage -> receiptId in DB (status: processing)
+       -> Edge Function mit receiptId
+            -> Datei aus Storage laden
+            -> Seitencount berechnen + in DB speichern
+            -> pageCount > 1? -> Multi-Invoice Check
+                 -> Mehrere erkannt? -> status: needs_splitting, split_suggestion gesetzt -> fertig
+                 -> Einzeln? -> KI-Extraktion -> status: review
+```
+
+## Betroffene Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/pages/Review.tsx` | `onReanalyzeComplete`-Callback: `populateForm(data)` entfernen (Zeile 793) |
+| `src/services/aiService.ts` | Neue Funktion `extractReceiptDataById(receiptId)` |
+| `src/hooks/useReceipts.ts` | `processReceiptWithAI` nutzt `extractReceiptDataById` statt `extractReceiptData(file)` |
+
+## Erwartetes Ergebnis
+
+Beim naechsten Upload einer PDF mit mehreren Rechnungen:
+1. Seitencount wird korrekt ermittelt und gespeichert
+2. Multi-Invoice Check wird ausgefuehrt
+3. Status wechselt zu `needs_splitting` mit `split_suggestion`
+4. In der Review-Ansicht erscheint die Multi-Invoice-Warnung und der "PDF aufteilen"-Dialog
