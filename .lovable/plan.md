@@ -1,85 +1,81 @@
 
-# Konsistente "Geändert"-Anzeige für alle Felder
+# Bug-Fix: 0% MwSt wird nach Speichern als 20% angezeigt
 
-## Problem
+## Ursache (Root Cause)
 
-Aktuell sind nur 3 von ~10 editierbaren Feldern in die `LearnableField`-Komponente eingebettet:
-- Rechnungsnummer
-- Bruttobetrag  
-- MwSt-Satz
+Das Problem liegt am JavaScript-Ausdruck `parseFloat("0") || null`:
 
-Alle anderen Felder haben kein "Geändert"-Badge, obwohl sie denselben `originalReceipt`-State für Vergleiche verwenden könnten. Das wirkt inkonsistent.
+- `parseFloat("0")` ergibt numerisch `0`
+- `0` ist in JavaScript **falsy**, daher ergibt `0 || null` den Wert `null`
+- `null` wird in die Datenbank gespeichert statt `0`
 
-## Felder die fehlen
+Beim erneuten Laden: `data.vat_rate?.toString() || '20'` — da `null?.toString()` = `undefined` (falsy), greift der Fallback `'20'`.
 
-| Feld | DB-Spalte | Aktuell | Ziel |
-|------|-----------|---------|------|
-| Lieferant (Markenname) | `vendor_brand` | plain `div` | `LearnableField` |
-| Rechtlicher Firmenname | `vendor` | plain `div` | `LearnableField` |
-| Beschreibung | `description` | plain `div` | `LearnableField` |
-| Belegdatum | `receipt_date` | plain `div` | `LearnableField` |
-| Kategorie | `category` | plain `div` | `LearnableField` |
-| Nettobetrag (Override) | `amount_net` | plain `div` | `LearnableField` |
-| MwSt-Betrag (Override) | `vat_amount` | plain `div` | `LearnableField` |
-| Zahlungsart | `payment_method` | plain `div` | `LearnableField` |
-| Notizen | `notes` | plain `div` | `LearnableField` |
+**Der Benutzer sieht 0%, speichert 0%, aber in der DB landet `null` → nächstes Öffnen zeigt 20%.**
 
-## Technische Details
+## Betroffene Stellen
 
-### Wie `LearnableField` funktioniert
+### Datei 1: `src/components/receipts/ReceiptDetailPanel.tsx`
 
-Die Komponente bekommt `value` (aktueller Wert) und `originalValue` (aus `originalReceipt` beim Laden) und vergleicht sie:
-
+**Zeile 795** (Speichern im Detail-Panel):
 ```typescript
-const hasChanged = String(normalizedValue || '') !== String(normalizedOriginal || '') && normalizedOriginal !== null;
+// FALSCH:
+vat_rate: isMixedTaxRate ? null : (parseFloat(vatRate) || null),
+
+// RICHTIG:
+vat_rate: isMixedTaxRate ? null : (vatRate !== '' && vatRate !== undefined ? parseFloat(vatRate) : null),
 ```
 
-Wenn sie verschieden sind, wird das "Geändert"-Badge mit orangem Stift-Symbol angezeigt, darunter der ursprüngliche Wert (mit Zurücksetzen-Button).
+**Zeile 762** (in `currentValues` für Change-Tracking):
+```typescript
+// FALSCH:
+vat_rate: parseFloat(vatRate) || null,
 
-### Besonderheiten je Feld
+// RICHTIG:
+vat_rate: vatRate !== '' ? parseFloat(vatRate) : null,
+```
 
-**Vendor/Brand**: Nur "Geändert" zeigen wenn kein `selectedVendorId` (wenn verknüpft, ist das Feld read-only). Für den rechtlichen Namen wird der Wert aus `originalReceipt?.vendor` verglichen.
+**Zeile 667** (in `calculateFieldChanges`):
+```typescript
+// FALSCH:
+vat_rate: parseFloat(vatRate) || null,
 
-**Belegdatum**: Das Datum wird als `Date`-Objekt gespeichert, original als ISO-String. Vergleich erfolgt über formatierten String (z.B. `'2024-01-15'`).
+// RICHTIG:
+vat_rate: vatRate !== '' ? parseFloat(vatRate) : null,
+```
 
-**Kategorie**: `originalReceipt?.category` vs. aktueller `category`-State. Kein `onReset` nötig (kein Lernfeld), nur das "Geändert"-Badge.
+### Datei 2: `src/pages/Review.tsx`
 
-**Nettobetrag / MwSt-Betrag**: Diese sind Override-Felder – "Geändert" wird gezeigt wenn `amountNetOverride` gesetzt und vom ursprünglichen DB-Wert abweicht. `originalValue = originalReceipt?.amount_net`.
+**Zeile 409** (Speichern in der Review-Seite):
+```typescript
+// FALSCH:
+const vatRate = formData.is_mixed_tax_rate ? null : (parseFloat(formData.vat_rate) || null);
 
-**Zahlungsart**: `originalReceipt?.payment_method` vs. `paymentMethod`.
+// RICHTIG:
+const vatRate = formData.is_mixed_tax_rate ? null : (formData.vat_rate !== '' && formData.vat_rate !== undefined ? parseFloat(formData.vat_rate) : null);
+```
 
-**Notizen**: `originalReceipt?.notes` vs. `notes`.
+### Datei 3: `src/components/receipts/ReceiptDetailPanel.tsx` — Laden
 
-**Beschreibung**: `originalReceipt?.description` vs. `description`.
+**Zeile 427** (Fallback beim Laden ist ebenfalls problematisch):
+```typescript
+// AKTUELL (auch ein Problem: vat_rate = 0 wird als '20' geladen)
+setVatRate(data.vat_rate?.toString() || '20');
 
-### `LearnableField`-Anpassung für reine "Geändert"-Anzeige
+// RICHTIG:
+setVatRate(data.vat_rate !== null && data.vat_rate !== undefined ? data.vat_rate.toString() : '20');
+```
 
-Für Felder ohne Lern-Funktion (kein `vendorLearning` relevant) werden einfach keine `vendorLearning`-Props übergeben. Das Badge erscheint trotzdem, sobald `value !== originalValue`.
+Der Unterschied: `(0).toString()` = `"0"` (truthy → kein Fallback auf '20'). Aber `0 || '20'` würde ebenfalls '20' liefern. Mit der expliziten null-Prüfung funktioniert es korrekt — allerdings wird dieser Ladefall gar nicht mehr erreicht sobald das Speichern korrekt ist, da dann `0` statt `null` in der DB steht.
 
-Das "KI erkannt: ..." mit Zurücksetzen-Zeile unter dem Feld soll nur erscheinen wenn `onReset` übergeben wird (bereits so implementiert).
+## Zusammenfassung der Änderungen
 
-### Änderung in `src/components/receipts/ReceiptDetailPanel.tsx`
+| Datei | Zeile | Problem | Fix |
+|-------|-------|---------|-----|
+| `ReceiptDetailPanel.tsx` | 427 | `0?.toString() \|\| '20'` → `'20'` | Explizite null-Prüfung |
+| `ReceiptDetailPanel.tsx` | 667 | `parseFloat("0") \|\| null` → `null` | `vatRate !== '' ? parseFloat(vatRate) : null` |
+| `ReceiptDetailPanel.tsx` | 762 | `parseFloat("0") \|\| null` → `null` | `vatRate !== '' ? parseFloat(vatRate) : null` |
+| `ReceiptDetailPanel.tsx` | 795 | `parseFloat("0") \|\| null` → `null` | `vatRate !== '' ? parseFloat(vatRate) : null` |
+| `Review.tsx` | 409 | `parseFloat("0") \|\| null` → `null` | Explizite Leer-String-Prüfung |
 
-Die folgenden Blöcke werden von `<div>` auf `<LearnableField ...>` umgestellt:
-
-1. **Vendor Brand** (Zeile ~1279-1318): Wrapper um `div.space-y-2`, mit `value={vendorBrand}`, `originalValue={originalReceipt?.vendor_brand}`, `onReset={() => setVendorBrand(originalReceipt?.vendor_brand || '')}` — aber nur wenn kein `selectedVendorId` (read-only-Modus braucht kein Badge)
-
-2. **Vendor Legal Name** (Zeile ~1321-1337): Wrapper um `VendorAutocomplete`, mit `value={vendor}`, `originalValue={originalReceipt?.vendor}`, `onReset={() => { setVendor(originalReceipt?.vendor || ''); setSelectedVendorId(null); }}`
-
-3. **Beschreibung** (Zeile ~1340-1370): Wrapper, mit `value={description}`, `originalValue={originalReceipt?.description}`, `onReset={() => setDescription(originalReceipt?.description || '')}`. Das Zeichen-Counter im Label bleibt via `labelExtra`-Prop.
-
-4. **Belegdatum** (Zeile ~1372-1401): Wrapper, mit `value={receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null}`, `originalValue={originalReceipt?.receipt_date ? originalReceipt.receipt_date.substring(0,10) : null}`, `onReset={() => setReceiptDate(originalReceipt?.receipt_date ? new Date(originalReceipt.receipt_date) : undefined)}`
-
-5. **Kategorie** (Zeile ~1421-1435): Wrapper, mit `value={category}`, `originalValue={originalReceipt?.category}`, `onReset={() => setCategory(originalReceipt?.category || '')}`
-
-6. **Nettobetrag** (Zeile ~1560-1570): Wrapper, mit `value={amountNetOverride ? parseFloat(amountNetOverride) : null}`, `originalValue={originalReceipt?.amount_net}`, kein `onReset` (da calculated field)
-
-7. **MwSt-Betrag** (Zeile ~1572-1586): Wrapper, mit `value={vatAmountOverride ? parseFloat(vatAmountOverride) : null}`, `originalValue={originalReceipt?.vat_amount}`, kein `onReset`
-
-8. **Zahlungsart** (Zeile ~1590-1604): Wrapper, mit `value={paymentMethod}`, `originalValue={originalReceipt?.payment_method}`, `onReset={() => setPaymentMethod(originalReceipt?.payment_method || '')}`
-
-9. **Notizen** (Zeile ~1606-1616): Wrapper, mit `value={notes}`, `originalValue={originalReceipt?.notes}`, `onReset={() => setNotes(originalReceipt?.notes || '')}`
-
-### Ergebnis
-
-Nach der Änderung zeigen **alle Felder** konsistent das orange "Geändert"-Badge mit Stift-Symbol sobald der aktuelle Wert vom ursprünglichen DB-Wert abweicht. Der Nutzer sieht sofort, was er oder die KI geändert hat, und kann jeden Wert einzeln zurücksetzen.
+Außerdem den gleichen Fix für `amount_gross` prüfen (Zeile 408/666 etc.), damit auch 0€-Beträge korrekt gespeichert werden können (obwohl das in der Praxis selten vorkommt).
