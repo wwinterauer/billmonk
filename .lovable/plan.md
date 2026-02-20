@@ -1,90 +1,85 @@
 
-# Bug-Fix: Nettobetrag bleibt nach KI-Neu-Analyse falsch (Override nicht zurückgesetzt)
+# Konsistente "Geändert"-Anzeige für alle Felder
 
-## Ursache
+## Problem
 
-Beim **Laden** des Belegs aus der Datenbank erkennt der Code, dass der gespeicherte Nettobetrag (6,71 €) von der Standardberechnung (79,42 € / 1,20 = 66,18 €) abweicht und setzt deshalb einen manuellen Override:
+Aktuell sind nur 3 von ~10 editierbaren Feldern in die `LearnableField`-Komponente eingebettet:
+- Rechnungsnummer
+- Bruttobetrag  
+- MwSt-Satz
 
-```typescript
-// Zeilen 451-455 in ReceiptDetailPanel.tsx
-if (data.amount_net !== null && Math.abs((data.amount_net || 0) - calcNet) > 0.01) {
-  setAmountNetOverride(data.amount_net.toString()); // → "6.71"
-} else {
-  setAmountNetOverride('');
-}
-```
+Alle anderen Felder haben kein "Geändert"-Badge, obwohl sie denselben `originalReceipt`-State für Vergleiche verwenden könnten. Das wirkt inkonsistent.
 
-Nach der **KI-Neu-Analyse** setzt `onFieldsUpdated`:
-- `setVatRate("0")` → korrekt
-- `setAmountGross("79.42")` → korrekt
+## Felder die fehlen
 
-**Aber `amountNetOverride` bleibt bei `"6.71"`!**
+| Feld | DB-Spalte | Aktuell | Ziel |
+|------|-----------|---------|------|
+| Lieferant (Markenname) | `vendor_brand` | plain `div` | `LearnableField` |
+| Rechtlicher Firmenname | `vendor` | plain `div` | `LearnableField` |
+| Beschreibung | `description` | plain `div` | `LearnableField` |
+| Belegdatum | `receipt_date` | plain `div` | `LearnableField` |
+| Kategorie | `category` | plain `div` | `LearnableField` |
+| Nettobetrag (Override) | `amount_net` | plain `div` | `LearnableField` |
+| MwSt-Betrag (Override) | `vat_amount` | plain `div` | `LearnableField` |
+| Zahlungsart | `payment_method` | plain `div` | `LearnableField` |
+| Notizen | `notes` | plain `div` | `LearnableField` |
 
-Die `calculatedValues` würde danach korrekt `net = 79.42 / (1 + 0/100) = 79.42` berechnen. Doch weil der Override noch gesetzt ist, gewinnt er (Zeile 793/761):
+## Technische Details
 
-```typescript
-amount_net: amountNetOverride ? parseFloat(amountNetOverride) : calculatedValues.net,
-// → parseFloat("6.71") = 6.71  ← Falsch!
-```
+### Wie `LearnableField` funktioniert
 
-Das gleiche Problem gilt für `vatAmountOverride` (bleibt z.B. bei einem alten Wert, obwohl jetzt 0% MwSt aktiv ist).
-
-## Lösung
-
-Im `onFieldsUpdated`-Callback in `ReceiptDetailPanel.tsx` müssen beim Update von `vat_rate` oder `amount_gross` die manuellen Override-Felder zurückgesetzt werden – weil neue KI-Werte die alten DB-basierten Overrides ungültig machen.
-
-### Änderung: `src/components/receipts/ReceiptDetailPanel.tsx`
-
-**Aktueller Code (Zeilen 1154-1165):**
+Die Komponente bekommt `value` (aktueller Wert) und `originalValue` (aus `originalReceipt` beim Laden) und vergleicht sie:
 
 ```typescript
-if (updates.amount_gross !== undefined) {
-  if (amountGross !== updates.amount_gross) {
-    changes['Bruttobetrag'] = { old: amountGross || '-', new: updates.amount_gross };
-  }
-  setAmountGross(updates.amount_gross);
-}
-if (updates.vat_rate !== undefined) {
-  if (vatRate !== updates.vat_rate) {
-    changes['MwSt-Satz'] = { old: vatRate || '-', new: updates.vat_rate + '%' };
-  }
-  setVatRate(updates.vat_rate);
-}
+const hasChanged = String(normalizedValue || '') !== String(normalizedOriginal || '') && normalizedOriginal !== null;
 ```
 
-**Geänderter Code:**
+Wenn sie verschieden sind, wird das "Geändert"-Badge mit orangem Stift-Symbol angezeigt, darunter der ursprüngliche Wert (mit Zurücksetzen-Button).
 
-```typescript
-if (updates.amount_gross !== undefined) {
-  if (amountGross !== updates.amount_gross) {
-    changes['Bruttobetrag'] = { old: amountGross || '-', new: updates.amount_gross };
-  }
-  setAmountGross(updates.amount_gross);
-  // KI hat Bruttobetrag geändert → manuelle Net/VAT-Overrides zurücksetzen
-  setAmountNetOverride('');
-  setVatAmountOverride('');
-}
-if (updates.vat_rate !== undefined) {
-  if (vatRate !== updates.vat_rate) {
-    changes['MwSt-Satz'] = { old: vatRate || '-', new: updates.vat_rate + '%' };
-  }
-  setVatRate(updates.vat_rate);
-  // KI hat MwSt-Satz geändert → manuelle Net/VAT-Overrides zurücksetzen
-  setAmountNetOverride('');
-  setVatAmountOverride('');
-}
-```
+### Besonderheiten je Feld
 
-## Warum das sicher ist
+**Vendor/Brand**: Nur "Geändert" zeigen wenn kein `selectedVendorId` (wenn verknüpft, ist das Feld read-only). Für den rechtlichen Namen wird der Wert aus `originalReceipt?.vendor` verglichen.
 
-- Die manuellen Override-Felder wurden beim Laden aus der DB gesetzt, weil die DB-Werte von der Standardberechnung abwichen
-- Sobald die KI neue Brutto- oder MwSt-Werte liefert, sind die alten DB-basierten Overrides **inhaltlich falsch** (basieren auf anderen Ursprungswerten)
-- Nach dem Reset berechnet `calculatedValues` automatisch korrekte Netto/MwSt-Werte aus den neuen KI-Daten
-- Falls der Nutzer danach manuell eingreift, kann er die Override-Felder wie gewohnt befüllen
-- Bei 0% MwSt: `net = 79.42 / (1 + 0/100) = 79.42` → korrekt angezeigt und gespeichert
+**Belegdatum**: Das Datum wird als `Date`-Objekt gespeichert, original als ISO-String. Vergleich erfolgt über formatierten String (z.B. `'2024-01-15'`).
 
-## Betroffene Datei
+**Kategorie**: `originalReceipt?.category` vs. aktueller `category`-State. Kein `onReset` nötig (kein Lernfeld), nur das "Geändert"-Badge.
 
-| Datei | Änderung |
-|-------|----------|
-| `src/components/receipts/ReceiptDetailPanel.tsx` | Im `onFieldsUpdated`-Callback: nach `setAmountGross()` und nach `setVatRate()` je `setAmountNetOverride('')` und `setVatAmountOverride('')` hinzufügen |
+**Nettobetrag / MwSt-Betrag**: Diese sind Override-Felder – "Geändert" wird gezeigt wenn `amountNetOverride` gesetzt und vom ursprünglichen DB-Wert abweicht. `originalValue = originalReceipt?.amount_net`.
+
+**Zahlungsart**: `originalReceipt?.payment_method` vs. `paymentMethod`.
+
+**Notizen**: `originalReceipt?.notes` vs. `notes`.
+
+**Beschreibung**: `originalReceipt?.description` vs. `description`.
+
+### `LearnableField`-Anpassung für reine "Geändert"-Anzeige
+
+Für Felder ohne Lern-Funktion (kein `vendorLearning` relevant) werden einfach keine `vendorLearning`-Props übergeben. Das Badge erscheint trotzdem, sobald `value !== originalValue`.
+
+Das "KI erkannt: ..." mit Zurücksetzen-Zeile unter dem Feld soll nur erscheinen wenn `onReset` übergeben wird (bereits so implementiert).
+
+### Änderung in `src/components/receipts/ReceiptDetailPanel.tsx`
+
+Die folgenden Blöcke werden von `<div>` auf `<LearnableField ...>` umgestellt:
+
+1. **Vendor Brand** (Zeile ~1279-1318): Wrapper um `div.space-y-2`, mit `value={vendorBrand}`, `originalValue={originalReceipt?.vendor_brand}`, `onReset={() => setVendorBrand(originalReceipt?.vendor_brand || '')}` — aber nur wenn kein `selectedVendorId` (read-only-Modus braucht kein Badge)
+
+2. **Vendor Legal Name** (Zeile ~1321-1337): Wrapper um `VendorAutocomplete`, mit `value={vendor}`, `originalValue={originalReceipt?.vendor}`, `onReset={() => { setVendor(originalReceipt?.vendor || ''); setSelectedVendorId(null); }}`
+
+3. **Beschreibung** (Zeile ~1340-1370): Wrapper, mit `value={description}`, `originalValue={originalReceipt?.description}`, `onReset={() => setDescription(originalReceipt?.description || '')}`. Das Zeichen-Counter im Label bleibt via `labelExtra`-Prop.
+
+4. **Belegdatum** (Zeile ~1372-1401): Wrapper, mit `value={receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null}`, `originalValue={originalReceipt?.receipt_date ? originalReceipt.receipt_date.substring(0,10) : null}`, `onReset={() => setReceiptDate(originalReceipt?.receipt_date ? new Date(originalReceipt.receipt_date) : undefined)}`
+
+5. **Kategorie** (Zeile ~1421-1435): Wrapper, mit `value={category}`, `originalValue={originalReceipt?.category}`, `onReset={() => setCategory(originalReceipt?.category || '')}`
+
+6. **Nettobetrag** (Zeile ~1560-1570): Wrapper, mit `value={amountNetOverride ? parseFloat(amountNetOverride) : null}`, `originalValue={originalReceipt?.amount_net}`, kein `onReset` (da calculated field)
+
+7. **MwSt-Betrag** (Zeile ~1572-1586): Wrapper, mit `value={vatAmountOverride ? parseFloat(vatAmountOverride) : null}`, `originalValue={originalReceipt?.vat_amount}`, kein `onReset`
+
+8. **Zahlungsart** (Zeile ~1590-1604): Wrapper, mit `value={paymentMethod}`, `originalValue={originalReceipt?.payment_method}`, `onReset={() => setPaymentMethod(originalReceipt?.payment_method || '')}`
+
+9. **Notizen** (Zeile ~1606-1616): Wrapper, mit `value={notes}`, `originalValue={originalReceipt?.notes}`, `onReset={() => setNotes(originalReceipt?.notes || '')}`
+
+### Ergebnis
+
+Nach der Änderung zeigen **alle Felder** konsistent das orange "Geändert"-Badge mit Stift-Symbol sobald der aktuelle Wert vom ursprünglichen DB-Wert abweicht. Der Nutzer sieht sofort, was er oder die KI geändert hat, und kann jeden Wert einzeln zurücksetzen.
