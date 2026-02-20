@@ -52,7 +52,7 @@ export function SaveWithLearningDialog({
   
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-2xl">
+      <AlertDialogContent className="w-full max-w-2xl sm:max-w-2xl">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <Brain className="w-5 h-5 text-violet-600" />
@@ -73,18 +73,20 @@ export function SaveWithLearningDialog({
               return (
                 <div 
                   key={fieldName} 
-                  className="flex items-center gap-2 text-sm p-2 bg-muted/50 rounded-lg"
+                  className="flex flex-col gap-1 text-sm p-2 bg-muted/50 rounded-lg"
                 >
-                  <span className="font-medium text-foreground min-w-[100px] shrink-0">
+                  <span className="font-medium text-foreground">
                     {field.label}:
                   </span>
-                  <span className="text-muted-foreground line-through truncate">
-                    {formatDisplayValue(change.original)}
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="text-green-600 font-medium truncate">
-                    {formatDisplayValue(change.current)}
-                  </span>
+                  <div className="flex items-start gap-2 flex-wrap">
+                    <span className="text-muted-foreground line-through break-all">
+                      {formatDisplayValue(change.original)}
+                    </span>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <span className="text-green-600 font-medium break-all">
+                      {formatDisplayValue(change.current)}
+                    </span>
+                  </div>
                 </div>
               );
             })}
