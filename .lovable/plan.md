@@ -1,81 +1,61 @@
 
-# Bug-Fix: 0% MwSt wird nach Speichern als 20% angezeigt
+# Bug-Fix: Doppelter Lösch-Button in der Duplikate-Ansicht
 
-## Ursache (Root Cause)
+## Problem
 
-Das Problem liegt am JavaScript-Ausdruck `parseFloat("0") || null`:
+In der Bulk-Aktionsleiste werden bei aktivem Duplikat-Filter zwei Lösch-Buttons gleichzeitig angezeigt:
 
-- `parseFloat("0")` ergibt numerisch `0`
-- `0` ist in JavaScript **falsy**, daher ergibt `0 || null` den Wert `null`
-- `null` wird in die Datenbank gespeichert statt `0`
+1. **"Löschen"** (grauer Outline-Button) → öffnet `bulkDeleteOpen` Dialog
+2. **"Duplikate löschen"** (roter Destructive-Button) → ruft `bulkDeleteDuplicates()` direkt auf
 
-Beim erneuten Laden: `data.vat_rate?.toString() || '20'` — da `null?.toString()` = `undefined` (falsy), greift der Fallback `'20'`.
+Beide löschen letztendlich die markierten Belege. Das ist redundant und verwirrend.
 
-**Der Benutzer sieht 0%, speichert 0%, aber in der DB landet `null` → nächstes Öffnen zeigt 20%.**
+## Lösung
 
-## Betroffene Stellen
+Der normale **"Löschen"**-Button soll im Duplikat-Filter (`statusFilter === 'duplicate'`) **ausgeblendet** werden, da der spezialisierte **"Duplikate löschen"**-Button diese Funktion bereits übernimmt.
 
-### Datei 1: `src/components/receipts/ReceiptDetailPanel.tsx`
+Alternativ könnten beide zusammengeführt werden – aber da der "Duplikate löschen"-Button einen eigenen direkten Flow hat (ohne Bestätigungsdialog über `bulkDeleteOpen`) und semantisch klarer für den Kontext ist, ist das Ausblenden des redundanten Buttons die sauberste Lösung.
 
-**Zeile 795** (Speichern im Detail-Panel):
-```typescript
-// FALSCH:
-vat_rate: isMixedTaxRate ? null : (parseFloat(vatRate) || null),
+### Änderung in `src/pages/Expenses.tsx`
 
-// RICHTIG:
-vat_rate: isMixedTaxRate ? null : (vatRate !== '' && vatRate !== undefined ? parseFloat(vatRate) : null),
+**Aktuelle Logik (Zeile 2043-2053):**
+```tsx
+<div className="h-4 w-px bg-border" />
+{/* Delete */}
+<Button 
+  size="sm" 
+  variant="outline" 
+  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+  onClick={() => setBulkDeleteOpen(true)}
+  disabled={bulkActionLoading !== null}
+>
+  <Trash2 className="h-4 w-4 mr-1" />
+  Löschen
+</Button>
 ```
 
-**Zeile 762** (in `currentValues` für Change-Tracking):
-```typescript
-// FALSCH:
-vat_rate: parseFloat(vatRate) || null,
-
-// RICHTIG:
-vat_rate: vatRate !== '' ? parseFloat(vatRate) : null,
+**Neue Logik:**
+```tsx
+<div className="h-4 w-px bg-border" />
+{/* Delete - nur anzeigen wenn NICHT im Duplikat-Filter (dort gibt es "Duplikate löschen") */}
+{statusFilter !== 'duplicate' && (
+  <Button 
+    size="sm" 
+    variant="outline" 
+    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+    onClick={() => setBulkDeleteOpen(true)}
+    disabled={bulkActionLoading !== null}
+  >
+    <Trash2 className="h-4 w-4 mr-1" />
+    Löschen
+  </Button>
+)}
 ```
 
-**Zeile 667** (in `calculateFieldChanges`):
-```typescript
-// FALSCH:
-vat_rate: parseFloat(vatRate) || null,
+Außerdem soll der Trenner (`<div className="h-4 w-px bg-border" />`) vor dem Löschen-Button ebenfalls nur erscheinen wenn der Button sichtbar ist (da er sonst einen leeren Separator zeigt).
 
-// RICHTIG:
-vat_rate: vatRate !== '' ? parseFloat(vatRate) : null,
-```
+## Betroffene Datei
 
-### Datei 2: `src/pages/Review.tsx`
-
-**Zeile 409** (Speichern in der Review-Seite):
-```typescript
-// FALSCH:
-const vatRate = formData.is_mixed_tax_rate ? null : (parseFloat(formData.vat_rate) || null);
-
-// RICHTIG:
-const vatRate = formData.is_mixed_tax_rate ? null : (formData.vat_rate !== '' && formData.vat_rate !== undefined ? parseFloat(formData.vat_rate) : null);
-```
-
-### Datei 3: `src/components/receipts/ReceiptDetailPanel.tsx` — Laden
-
-**Zeile 427** (Fallback beim Laden ist ebenfalls problematisch):
-```typescript
-// AKTUELL (auch ein Problem: vat_rate = 0 wird als '20' geladen)
-setVatRate(data.vat_rate?.toString() || '20');
-
-// RICHTIG:
-setVatRate(data.vat_rate !== null && data.vat_rate !== undefined ? data.vat_rate.toString() : '20');
-```
-
-Der Unterschied: `(0).toString()` = `"0"` (truthy → kein Fallback auf '20'). Aber `0 || '20'` würde ebenfalls '20' liefern. Mit der expliziten null-Prüfung funktioniert es korrekt — allerdings wird dieser Ladefall gar nicht mehr erreicht sobald das Speichern korrekt ist, da dann `0` statt `null` in der DB steht.
-
-## Zusammenfassung der Änderungen
-
-| Datei | Zeile | Problem | Fix |
-|-------|-------|---------|-----|
-| `ReceiptDetailPanel.tsx` | 427 | `0?.toString() \|\| '20'` → `'20'` | Explizite null-Prüfung |
-| `ReceiptDetailPanel.tsx` | 667 | `parseFloat("0") \|\| null` → `null` | `vatRate !== '' ? parseFloat(vatRate) : null` |
-| `ReceiptDetailPanel.tsx` | 762 | `parseFloat("0") \|\| null` → `null` | `vatRate !== '' ? parseFloat(vatRate) : null` |
-| `ReceiptDetailPanel.tsx` | 795 | `parseFloat("0") \|\| null` → `null` | `vatRate !== '' ? parseFloat(vatRate) : null` |
-| `Review.tsx` | 409 | `parseFloat("0") \|\| null` → `null` | Explizite Leer-String-Prüfung |
-
-Außerdem den gleichen Fix für `amount_gross` prüfen (Zeile 408/666 etc.), damit auch 0€-Beträge korrekt gespeichert werden können (obwohl das in der Praxis selten vorkommt).
+| Datei | Zeilen | Änderung |
+|-------|--------|----------|
+| `src/pages/Expenses.tsx` | 2042-2053 | Normalen "Löschen"-Button mit `statusFilter !== 'duplicate'` bedingen; Trenner mitbedingen |
