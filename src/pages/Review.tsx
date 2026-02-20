@@ -405,8 +405,8 @@ const Review = () => {
     
     setSaving(true);
     try {
-      const gross = parseFloat(formData.amount_gross) || null;
-      const vatRate = formData.is_mixed_tax_rate ? null : (parseFloat(formData.vat_rate) || null);
+      const gross = formData.amount_gross !== '' ? parseFloat(formData.amount_gross) : null;
+      const vatRate = formData.is_mixed_tax_rate ? null : (formData.vat_rate !== '' && formData.vat_rate !== undefined ? parseFloat(formData.vat_rate) : null);
       let net = null;
       let vatAmount = null;
       

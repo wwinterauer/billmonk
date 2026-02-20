@@ -424,7 +424,7 @@ export function ReceiptDetailPanel({
           setInvoiceNumber(data.invoice_number || '');
           setCategory(data.category || '');
           setAmountGross(data.amount_gross?.toString() || '');
-          setVatRate(data.vat_rate?.toString() || '20');
+          setVatRate(data.vat_rate !== null && data.vat_rate !== undefined ? data.vat_rate.toString() : '20');
           // Handle mixed tax rate fields (may not be in types yet)
           const receiptData = data as unknown as Record<string, unknown>;
           const isMixed = (receiptData.is_mixed_tax_rate as boolean) || false;
@@ -663,8 +663,8 @@ export function ReceiptDetailPanel({
       vendor: vendor || null,
       invoice_number: invoiceNumber || null,
       receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null,
-      amount_gross: parseFloat(amountGross) || null,
-      vat_rate: parseFloat(vatRate) || null,
+      amount_gross: amountGross !== '' ? parseFloat(amountGross) : null,
+      vat_rate: vatRate !== '' ? parseFloat(vatRate) : null,
       description: description || null,
       category: category || null,
     };
@@ -757,9 +757,9 @@ export function ReceiptDetailPanel({
         vendor: vendor || null,
         invoice_number: invoiceNumber || null,
         receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null,
-        amount_gross: parseFloat(amountGross) || null,
+        amount_gross: amountGross !== '' ? parseFloat(amountGross) : null,
         amount_net: amountNetOverride ? parseFloat(amountNetOverride) : (calculatedValues.net || null),
-        vat_rate: parseFloat(vatRate) || null,
+        vat_rate: vatRate !== '' ? parseFloat(vatRate) : null,
         vat_amount: vatAmountOverride ? parseFloat(vatAmountOverride) : (calculatedValues.vat || null),
         description: processedDescription,
         category: category || null,
@@ -789,10 +789,10 @@ export function ReceiptDetailPanel({
         receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null,
         invoice_number: invoiceNumber || null,
         category: category || null,
-        amount_gross: parseFloat(amountGross) || null,
+        amount_gross: amountGross !== '' ? parseFloat(amountGross) : null,
         amount_net: amountNetOverride ? parseFloat(amountNetOverride) : (calculatedValues.net || null),
         vat_amount: vatAmountOverride ? parseFloat(vatAmountOverride) : (calculatedValues.vat || null),
-        vat_rate: isMixedTaxRate ? null : (parseFloat(vatRate) || null),
+        vat_rate: isMixedTaxRate ? null : (vatRate !== '' && vatRate !== undefined ? parseFloat(vatRate) : null),
         is_mixed_tax_rate: isMixedTaxRate,
         tax_rate_details: isMixedTaxRate ? taxRateDetails : null,
         payment_method: paymentMethod || null,
