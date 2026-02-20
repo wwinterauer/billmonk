@@ -1,70 +1,92 @@
 
-# Fix: Multi-Invoice-Erkennung beim Upload funktioniert nicht
+# Direkte Löschmöglichkeit in der Review-Ansicht
 
-## Ursache (Root Cause)
+## Was wird hinzugefügt
 
-Der Upload-Prozess nutzt zwei verschiedene Wege zur KI-Analyse:
+Ein Löschen-Button mit Bestätigungsdialog direkt in der Review-Seite – identisch zum Verhalten in der Einzelbelegbearbeitung (`ReceiptDetailPanel`).
 
-- **Weg A (Upload)**: `processReceiptWithAI` → `aiService.extractReceiptData(file)` → sendet `imageBase64 + mimeType` an die Edge Function (KEIN `receiptId`)
-- **Weg B (Re-Analyse)**: Sendet `receiptId` direkt an die Edge Function
+## Technische Umsetzung
 
-Der Multi-Invoice Check in der Edge Function befindet sich **ausschliesslich im Weg B** (Zeile 297). Sobald die Funktion `imageBase64 + mimeType` empfaengt (Weg A), springt sie direkt zur Extraktion – kein Seitencount, kein Multi-Check.
+### Datei: `src/pages/Review.tsx`
 
-Das erklaert auch warum `page_count = NULL` in der Datenbank steht: Der Seitencount wird ebenfalls nur im Weg B gespeichert.
+**1. Imports ergänzen**
 
-Beweis aus der Datenbank:
-- "TEST RECHNUNG MIT 2 Rechnungen.pdf" → `page_count: NULL`, `split_suggestion: NULL`, `status: review`
+- `deleteReceipt` aus `useReceipts` destructuren (bereits im Hook verfügbar und exportiert)
+- `AlertDialog`, `AlertDialogAction`, `AlertDialogCancel`, `AlertDialogContent`, `AlertDialogDescription`, `AlertDialogFooter`, `AlertDialogHeader`, `AlertDialogTitle` aus `@/components/ui/alert-dialog` importieren
+- `Trash2` Icon aus `lucide-react` importieren
 
-## Loesung
-
-Der Upload-Prozess muss auf Weg B umgestellt werden: `processReceiptWithAI` soll die `receiptId` an die Edge Function uebergeben statt die Datei als base64 zu senden. Die Datei liegt dann bereits in Storage – die Edge Function kann sie selbst herunterladen.
-
-### Technische Aenderungen
-
-**1. `src/services/aiService.ts`** – Neue Funktion hinzufuegen
-
-Eine neue exportierte Funktion `extractReceiptDataById(receiptId)` die die Edge Function mit `{ receiptId }` aufruft statt mit `imageBase64`. Diese Funktion prueft ob die Antwort `needs_splitting: true` enthaelt und gibt das entsprechend zurueck.
+**2. State hinzufügen**
 
 ```text
-export async function extractReceiptDataById(receiptId: string): Promise<{
-  result?: ExtractionResult;
-  needs_splitting?: boolean;
-  invoice_count?: number;
-}>
+const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 ```
 
-**2. `src/hooks/useReceipts.ts`** – `processReceiptWithAI` umstellen
-
-Statt `extractReceiptData(file)` wird `extractReceiptDataById(receiptId)` aufgerufen. Das receipt ist bereits in Storage vorhanden, wenn diese Funktion aufgerufen wird.
-
-Wenn die Antwort `needs_splitting: true` zurueckgibt:
-- Kein weiteres Processing (DB wird bereits von der Edge Function auf `needs_splitting` gesetzt)
-- Das Receipt-Objekt aus der DB neu laden und zurueckgeben
-- `aiSuccess: false` da keine Extraktion stattfand
-
-**Ablauf nach dem Fix:**
+**3. Handler-Funktion hinzufügen**
 
 ```text
-Upload -> Datei in Storage -> receiptId in DB (status: processing)
-       -> Edge Function mit receiptId
-            -> Datei aus Storage laden
-            -> Seitencount berechnen + in DB speichern
-            -> pageCount > 1? -> Multi-Invoice Check
-                 -> Mehrere erkannt? -> status: needs_splitting, split_suggestion gesetzt -> fertig
-                 -> Einzeln? -> KI-Extraktion -> status: review
+const handleDelete = async () => {
+  if (!currentReceipt) return;
+  setSaving(true);
+  try {
+    await deleteReceipt(currentReceipt.id);
+    
+    // Sofort aus lokaler Liste entfernen (identisch zu saveReceipt mit Status)
+    const newReceipts = receipts.filter((_, i) => i !== currentIndex);
+    setReceipts(newReceipts);
+    if (newReceipts.length > 0) {
+      const nextIndex = Math.min(currentIndex, newReceipts.length - 1);
+      setCurrentIndex(nextIndex);
+      populateForm(newReceipts[nextIndex]);
+      loadImage(newReceipts[nextIndex]);
+    }
+    
+    queryClient.invalidateQueries({ queryKey: ['receipts'] });
+    window.dispatchEvent(new CustomEvent('refresh-review-count'));
+    
+    toast({ title: 'Beleg gelöscht' });
+  } catch (error) {
+    toast({
+      variant: 'destructive',
+      title: 'Fehler beim Löschen',
+      description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+    });
+  } finally {
+    setSaving(false);
+    setDeleteDialogOpen(false);
+  }
+};
 ```
 
-## Betroffene Dateien
+**4. Löschen-Button in der Action-Button-Leiste** (ca. Zeile 1369, neben "Ablehnen")
 
-| Datei | Aenderung |
+Der Button wird als kleiner, dezenter Icon-Button am rechten Ende der Aktionsleiste platziert – ähnlich wie in der Einzelansicht, aber optisch klar getrennt (z.B. mit `ml-auto`) damit er nicht versehentlich geklickt wird:
+
+```text
+[Bestätigen & Weiter] [Speichern] [Ablehnen] [Überspringen]     [🗑 Löschen]
+```
+
+**5. AlertDialog für Bestätigung**
+
+Identisch zum ReceiptDetailPanel – zeigt Dateiname und warnt vor dauerhafter Löschung:
+
+```text
+"Beleg wirklich löschen?"
+"[Dateiname] wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+[Abbrechen] [Löschen]
+```
+
+## Betroffene Datei
+
+| Datei | Änderung |
 |-------|-----------|
-| `src/services/aiService.ts` | Neue Funktion `extractReceiptDataById(receiptId)` |
-| `src/hooks/useReceipts.ts` | `processReceiptWithAI` nutzt `extractReceiptDataById` statt `extractReceiptData(file)` |
+| `src/pages/Review.tsx` | Import `deleteReceipt` + `Trash2` + `AlertDialog`-Komponenten; neuer State `deleteDialogOpen`; neue Funktion `handleDelete`; Löschen-Button in der Aktionsleiste; AlertDialog-Bestätigungsdialog |
 
-## Erwartetes Ergebnis
+## Verhalten nach dem Fix
 
-Beim naechsten Upload einer PDF mit mehreren Rechnungen:
-1. Seitencount wird korrekt ermittelt und gespeichert
-2. Multi-Invoice Check wird ausgefuehrt
-3. Status wechselt zu `needs_splitting` mit `split_suggestion`
-4. In der Review-Ansicht erscheint die Multi-Invoice-Warnung und der "PDF aufteilen"-Dialog
+1. Nutzer sieht in der Review einen dezenten "Löschen"-Button am rechten Ende der Aktionsleiste
+2. Klick öffnet Bestätigungsdialog mit Dateiname
+3. Nach Bestätigung: Beleg wird aus Storage + Datenbank entfernt
+4. Ansicht springt sofort zum nächsten Beleg (oder zeigt "Alle überprüft")
+5. Sidebar-Badge und Cache werden aktualisiert
+
+**Hinweis:** Dieser Plan enthält auch die bereits zuvor beschlossene Verbesserung (sofortige UI-Aktualisierung nach Split + Dubletten-Prüfung beim Split). Alle drei Fixes werden gemeinsam implementiert.
