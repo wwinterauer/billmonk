@@ -1156,12 +1156,18 @@ export function ReceiptDetailPanel({
                             changes['Bruttobetrag'] = { old: amountGross || '-', new: updates.amount_gross };
                           }
                           setAmountGross(updates.amount_gross);
+                          // KI hat Bruttobetrag geändert → manuelle Net/VAT-Overrides zurücksetzen
+                          setAmountNetOverride('');
+                          setVatAmountOverride('');
                         }
                         if (updates.vat_rate !== undefined) {
                           if (vatRate !== updates.vat_rate) {
                             changes['MwSt-Satz'] = { old: vatRate || '-', new: updates.vat_rate + '%' };
                           }
                           setVatRate(updates.vat_rate);
+                          // KI hat MwSt-Satz geändert → manuelle Net/VAT-Overrides zurücksetzen
+                          setAmountNetOverride('');
+                          setVatAmountOverride('');
                         }
                         if (updates.confidence !== undefined) {
                           setCurrentAiConfidence(updates.confidence);
