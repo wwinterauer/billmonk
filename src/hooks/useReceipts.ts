@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
-import { extractReceiptData, normalizeExtractionResult, fetchDescriptionSettings, extractReceiptDataWithLearning, findVendorIdByName } from '@/services/aiService';
+import { extractReceiptData, extractReceiptDataById, normalizeExtractionResult, fetchDescriptionSettings, extractReceiptDataWithLearning, findVendorIdByName } from '@/services/aiService';
 import { matchOrCreateVendor, findOrCreateVendor, addVendorVariant, type MatchedVendor, type VendorSuggestion, type FindOrCreateVendorResult } from '@/services/vendorMatchingService';
 import { 
   generateFileHash, 
@@ -374,8 +374,24 @@ export function useReceipts() {
     try {
       onProgress?.(60, 'KI analysiert...');
       
-      // Call AI extraction
-      const baseExtracted = await extractReceiptData(file);
+      // Use ID-based extraction so the Edge Function can:
+      // 1. Load the file from storage
+      // 2. Count pages and store page_count in DB
+      // 3. Run multi-invoice detection for multi-page PDFs
+      const extractionResponse = await extractReceiptDataById(receiptId);
+
+      // Multi-invoice detected – DB is already updated to needs_splitting by the Edge Function
+      if (extractionResponse.needs_splitting) {
+        onProgress?.(100, 'Mehrere Rechnungen erkannt');
+        const { data: freshReceipt } = await supabase
+          .from('receipts')
+          .select('*')
+          .eq('id', receiptId)
+          .single();
+        return { receipt: freshReceipt as Receipt, aiSuccess: false };
+      }
+
+      const baseExtracted = extractionResponse.result!;
       
       // Try to find vendor ID by name for learning pattern application
       const vendorName = baseExtracted.vendor_brand || baseExtracted.vendor;

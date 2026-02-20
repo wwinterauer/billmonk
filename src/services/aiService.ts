@@ -120,6 +120,50 @@ export async function extractReceiptData(file: File): Promise<ExtractionResult> 
 export { extractReceiptDataWithLearning, findVendorIdByName } from './learningPatternService';
 
 /**
+ * Extracts receipt data by receiptId (file already in storage).
+ * This path triggers page count calculation and multi-invoice detection in the Edge Function.
+ */
+export async function extractReceiptDataById(receiptId: string): Promise<{
+  result?: ExtractionResult;
+  needs_splitting?: boolean;
+  invoice_count?: number;
+}> {
+  const { data, error } = await supabase.functions.invoke<ExtractionResponse & { needs_splitting?: boolean; invoice_count?: number }>(
+    'extract-receipt',
+    { body: { receiptId } }
+  );
+
+  if (error) {
+    console.error('Edge function error (by ID):', error);
+    throw new Error(error.message || 'Fehler bei der KI-Verarbeitung');
+  }
+
+  if (!data) {
+    throw new Error('Keine Antwort vom KI-Service');
+  }
+
+  // Multi-invoice detected – Edge Function already updated DB status to needs_splitting
+  if (data.needs_splitting) {
+    return { needs_splitting: true, invoice_count: data.invoice_count };
+  }
+
+  if (!data.success) {
+    throw new Error(data.error || 'KI-Extraktion fehlgeschlagen');
+  }
+
+  if (!data.data) {
+    throw new Error('Keine Daten in der KI-Antwort');
+  }
+
+  return {
+    result: {
+      ...data.data,
+      raw_response: data.raw,
+    },
+  };
+}
+
+/**
  * Creates default extraction result for manual entry
  */
 export function createEmptyExtractionResult(): ExtractionResult {
