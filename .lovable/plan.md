@@ -1,130 +1,90 @@
 
-# Bug-Fix: KI-Neu-Analyse überschreibt Felder sofort wieder
+# Bug-Fix: Nettobetrag bleibt nach KI-Neu-Analyse falsch (Override nicht zurückgesetzt)
 
 ## Ursache
 
-Die Neu-Analyse in der Einzelbelegbearbeitung (`ReceiptDetailPanel`) leidet unter einem Race Condition / Overwrite-Problem mit **zwei unabhängigen Fehlerquellen**.
+Beim **Laden** des Belegs aus der Datenbank erkennt der Code, dass der gespeicherte Nettobetrag (6,71 €) von der Standardberechnung (79,42 € / 1,20 = 66,18 €) abweicht und setzt deshalb einen manuellen Override:
 
-### Fehlerquelle 1: `onReanalyzeComplete` überschreibt die gerade gesetzten Werte
-
-Der Ablauf in `ReanalyzeOptions.tsx` ist:
-
-1. `onFieldsUpdated(updates)` wird aufgerufen → setzt React-State in-memory (z.B. vendor = "Shen Zhen...", vat_rate = "0")
-2. Danach sofort: `onReanalyzeComplete?.()` wird aufgerufen
-
-In `ReceiptDetailPanel.tsx` ist `onReanalyzeComplete` (Zeile 1114-1144) so implementiert:
 ```typescript
-onReanalyzeComplete={async () => {
-  // Reload receipt data and re-populate form
-  if (receiptId) {
-    // Fetches OLD data from DB (AI hasn't saved to DB yet!)
-    const { data: r } = await supabase.from('receipts').select(...)...
-    // Overwrites everything with DB values!
-    setVendor(r.vendor || '');
-    setVatRate(r.vat_rate !== null ? r.vat_rate.toString() : '20');
-    // ...etc
-  }
-}}
+// Zeilen 451-455 in ReceiptDetailPanel.tsx
+if (data.amount_net !== null && Math.abs((data.amount_net || 0) - calcNet) > 0.01) {
+  setAmountNetOverride(data.amount_net.toString()); // → "6.71"
+} else {
+  setAmountNetOverride('');
+}
 ```
 
-Das Problem: `reanalyzeFields` in `ReanalyzeOptions.tsx` schreibt die extrahierten Werte **nie in die Datenbank** — es ruft nur `onFieldsUpdated` (in-memory) auf. Der anschließende DB-Fetch in `onReanalyzeComplete` liest daher die alten Werte und überschreibt die soeben gesetzten.
+Nach der **KI-Neu-Analyse** setzt `onFieldsUpdated`:
+- `setVatRate("0")` → korrekt
+- `setAmountGross("79.42")` → korrekt
 
-### Fehlerquelle 2: Vendor-Feld bei `null` wird nicht überschrieben (sekundär)
+**Aber `amountNetOverride` bleibt bei `"6.71"`!**
 
-In `ReanalyzeOptions.tsx` Zeile 165:
+Die `calculatedValues` würde danach korrekt `net = 79.42 / (1 + 0/100) = 79.42` berechnen. Doch weil der Override noch gesetzt ist, gewinnt er (Zeile 793/761):
+
 ```typescript
-if (shouldUpdate('vendor') && normalized.vendor) {
+amount_net: amountNetOverride ? parseFloat(amountNetOverride) : calculatedValues.net,
+// → parseFloat("6.71") = 6.71  ← Falsch!
 ```
-Der `&& normalized.vendor`-Check verhindert, dass ein leerer/null-Vendor (der in `onFieldsUpdated` via `??` den alten Wert beibehält) gesetzt wird — das ist eigentlich gewollt, aber bei `vat_rate = 0` gibt es ein ähnliches Muster.
 
-### Fehlerquelle 3: VAT-Rate 0% (Null-Check korrekt, aber Folgeberechnung falsch)
-
-In `Review.tsx` Zeile 382-383:
-```typescript
-const vatRate = parseFloat(formData.vat_rate) || 0;
-const net = gross / (1 + vatRate / 100);
-```
-`parseFloat("0") || 0` ergibt korrekt `0`, aber dann ist `net = gross / 1 = gross` und `vat = 0`. Das stimmt — aber in `populateForm` Zeile 287:
-```typescript
-const vatRateVal = receipt.vat_rate !== null && receipt.vat_rate !== undefined ? receipt.vat_rate : 20;
-```
-Das ist korrekt für 0%. Das Problem liegt woanders.
+Das gleiche Problem gilt für `vatAmountOverride` (bleibt z.B. bei einem alten Wert, obwohl jetzt 0% MwSt aktiv ist).
 
 ## Lösung
 
-### Strategie
+Im `onFieldsUpdated`-Callback in `ReceiptDetailPanel.tsx` müssen beim Update von `vat_rate` oder `amount_gross` die manuellen Override-Felder zurückgesetzt werden – weil neue KI-Werte die alten DB-basierten Overrides ungültig machen.
 
-Die `onReanalyzeComplete`-Callback in `ReceiptDetailPanel.tsx` soll **keinen vollständigen Form-Reload** mehr durchführen. Stattdessen genügt es, `onUpdate()` zu rufen (damit die übergeordnete Liste den aktualisierten Status sieht) und den Receipt-State partiell zu aktualisieren — aber **ohne** die Felder, die gerade vom AI-Update gesetzt wurden, zu überschreiben.
+### Änderung: `src/components/receipts/ReceiptDetailPanel.tsx`
 
-Die einfachste und sicherste Lösung: Den vollständigen Re-Populate in `onReanalyzeComplete` entfernen. Das `onFieldsUpdated` setzt bereits alle relevanten Felder. `onReanalyzeComplete` muss nur `onUpdate()` rufen, um das Parent über die Änderung zu informieren.
-
-### Änderung 1: `src/components/receipts/ReceiptDetailPanel.tsx`
-
-**Zeile 1114-1144** – `onReanalyzeComplete` Callback vereinfachen:
+**Aktueller Code (Zeilen 1154-1165):**
 
 ```typescript
-// VORHER: lud alle Felder aus DB neu und überschrieb onFieldsUpdated-Werte
-onReanalyzeComplete={async () => {
-  if (receiptId) {
-    const { data: r } = await supabase.from('receipts')...
-    setVendor(r.vendor || '');       // ← überschreibt onFieldsUpdated!
-    setVatRate(r.vat_rate...);       // ← überschreibt 0% mit altem Wert!
-    // ... alle anderen Felder ...
-    onUpdate();
+if (updates.amount_gross !== undefined) {
+  if (amountGross !== updates.amount_gross) {
+    changes['Bruttobetrag'] = { old: amountGross || '-', new: updates.amount_gross };
   }
-}}
-
-// NACHHER: nur onUpdate für Parent-Benachrichtigung, kein Overwrite
-onReanalyzeComplete={() => {
-  onUpdate();
-}}
-```
-
-**Warum das sicher ist:** `onFieldsUpdated` (direkt davor aufgerufen) setzt bereits alle Felder, die die KI aktualisiert hat. Ein erneutes Laden aus der DB ist zu diesem Zeitpunkt nicht nötig — die KI-Extraktion schreibt die Werte in `reanalyzeFields` ohnehin nicht in die DB (das passiert erst beim expliziten Speichern durch den Nutzer). Der `onUpdate()`-Aufruf genügt, um die übergeordnete Komponente (z.B. Expenses-Liste) zu informieren.
-
-### Änderung 2: `src/pages/Review.tsx`
-
-Der `onReanalyzeComplete` in Review.tsx (Zeile 822-836) lädt ebenfalls die Receipt-Daten aus der DB neu:
-```typescript
-onReanalyzeComplete={async () => {
-  if (currentReceipt) {
-    const { data } = await supabase.from('receipts').select('*').eq('id', currentReceipt.id).maybeSingle();
-    if (data) {
-      const updatedReceipts = [...receipts];
-      updatedReceipts[currentIndex] = data as Receipt; // überschreibt lokalen State!
-      setReceipts(updatedReceipts);
-    }
+  setAmountGross(updates.amount_gross);
+}
+if (updates.vat_rate !== undefined) {
+  if (vatRate !== updates.vat_rate) {
+    changes['MwSt-Satz'] = { old: vatRate || '-', new: updates.vat_rate + '%' };
   }
-}}
+  setVatRate(updates.vat_rate);
+}
 ```
 
-Diese DB-Reload-Logik muss ebenfalls entfernt werden, da die in-memory Updates durch `handleReanalysisUpdate` (den `onFieldsUpdated`-Callback) bereits korrekt gesetzt wurden.
+**Geänderter Code:**
 
 ```typescript
-// NACHHER: leer lassen oder Query-Cache invalidieren (ohne setReceipts)
-onReanalyzeComplete={() => {
-  // Kein DB-Reload nötig – handleReanalysisUpdate hat bereits alle Felder aktualisiert
-  queryClient.invalidateQueries({ queryKey: ['receipts'] });
-}}
+if (updates.amount_gross !== undefined) {
+  if (amountGross !== updates.amount_gross) {
+    changes['Bruttobetrag'] = { old: amountGross || '-', new: updates.amount_gross };
+  }
+  setAmountGross(updates.amount_gross);
+  // KI hat Bruttobetrag geändert → manuelle Net/VAT-Overrides zurücksetzen
+  setAmountNetOverride('');
+  setVatAmountOverride('');
+}
+if (updates.vat_rate !== undefined) {
+  if (vatRate !== updates.vat_rate) {
+    changes['MwSt-Satz'] = { old: vatRate || '-', new: updates.vat_rate + '%' };
+  }
+  setVatRate(updates.vat_rate);
+  // KI hat MwSt-Satz geändert → manuelle Net/VAT-Overrides zurücksetzen
+  setAmountNetOverride('');
+  setVatAmountOverride('');
+}
 ```
 
-### Zusammenfassung der Änderungen
+## Warum das sicher ist
 
-| Datei | Zeile | Änderung |
-|-------|-------|----------|
-| `src/components/receipts/ReceiptDetailPanel.tsx` | 1114-1144 | `onReanalyzeComplete`: vollständigen DB-Reload und Form-Re-Populate entfernen, nur `onUpdate()` behalten |
-| `src/pages/Review.tsx` | 822-836 | `onReanalyzeComplete`: DB-Reload und `setReceipts` entfernen, nur Cache-Invalidierung behalten |
+- Die manuellen Override-Felder wurden beim Laden aus der DB gesetzt, weil die DB-Werte von der Standardberechnung abwichen
+- Sobald die KI neue Brutto- oder MwSt-Werte liefert, sind die alten DB-basierten Overrides **inhaltlich falsch** (basieren auf anderen Ursprungswerten)
+- Nach dem Reset berechnet `calculatedValues` automatisch korrekte Netto/MwSt-Werte aus den neuen KI-Daten
+- Falls der Nutzer danach manuell eingreift, kann er die Override-Felder wie gewohnt befüllen
+- Bei 0% MwSt: `net = 79.42 / (1 + 0/100) = 79.42` → korrekt angezeigt und gespeichert
 
-## Erwartetes Verhalten nach dem Fix
+## Betroffene Datei
 
-**Szenario "Komplett neu" / "Intelligent" Analyse:**
-1. KI analysiert den Beleg
-2. `onFieldsUpdated` setzt alle extrahierten Felder in-memory (vendor = "Shen Zhen...", vat_rate = "0")
-3. `onReanalyzeComplete` ruft nur `onUpdate()`/Cache-Invalidierung – **kein Overwrite mehr**
-4. Alle Felder zeigen korrekt die KI-Werte
-5. Nutzer kann prüfen und manuell speichern
-
-**Szenario MwSt 0%:**
-- `normalized.vat_rate = 0` → `"0" !== null` → wird in `updates.vat_rate` geschrieben → `"0"` ist nicht `undefined` → `handleReanalysisUpdate` setzt `vat_rate: "0"` korrekt
-- Kein Overwrite mehr durch `onReanalyzeComplete`
-- Das Feld zeigt "0%" korrekt
+| Datei | Änderung |
+|-------|----------|
+| `src/components/receipts/ReceiptDetailPanel.tsx` | Im `onFieldsUpdated`-Callback: nach `setAmountGross()` und nach `setVatRate()` je `setAmountNetOverride('')` und `setVatAmountOverride('')` hinzufügen |
