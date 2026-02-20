@@ -1276,15 +1276,12 @@ export function ReceiptDetailPanel({
                     )}
 
                     {/* Vendor Brand/Marke */}
-                    <div>
-                      <Label htmlFor="vendorBrand" className="flex items-center gap-2">
-                        Lieferant (Markenname)
-                        {selectedVendorId && (
+                    {selectedVendorId ? (
+                      <div>
+                        <Label htmlFor="vendorBrand" className="flex items-center gap-2">
+                          Lieferant (Markenname)
                           <span className="text-xs font-normal text-muted-foreground">(aus Lieferantenstamm)</span>
-                        )}
-                      </Label>
-                      {selectedVendorId ? (
-                        // Read-only when linked to a vendor
+                        </Label>
                         <div className="flex items-center gap-2">
                           <Input
                             id="vendorBrand"
@@ -1306,22 +1303,35 @@ export function ReceiptDetailPanel({
                             Bearbeiten
                           </Button>
                         </div>
-                      ) : (
-                        // Editable when no vendor linked (new vendor)
+                      </div>
+                    ) : (
+                      <LearnableField
+                        fieldName="vendor_brand"
+                        label="Lieferant (Markenname)"
+                        value={vendorBrand}
+                        originalValue={originalReceipt?.vendor_brand}
+                        onReset={() => setVendorBrand(originalReceipt?.vendor_brand || '')}
+                      >
                         <Input
                           id="vendorBrand"
                           value={vendorBrand}
                           onChange={(e) => setVendorBrand(e.target.value)}
                           placeholder="z.B. timr, Amazon, A1"
                         />
-                      )}
-                    </div>
+                      </LearnableField>
+                    )}
 
                     {/* Vendor Legal Name */}
-                    <div className="space-y-2">
-                      <Label htmlFor="vendorLegal" className="text-sm text-muted-foreground">
-                        Rechtlicher Firmenname
-                      </Label>
+                    <LearnableField
+                      fieldName="vendor"
+                      label="Rechtlicher Firmenname"
+                      value={vendor}
+                      originalValue={originalReceipt?.vendor}
+                      onReset={() => {
+                        setVendor(originalReceipt?.vendor || '');
+                        setSelectedVendorId(null);
+                      }}
+                    >
                       <VendorAutocomplete
                         value={vendor}
                         vendorId={selectedVendorId}
@@ -1334,12 +1344,16 @@ export function ReceiptDetailPanel({
                         hideLabel
                         placeholder="z.B. troii Software GmbH"
                       />
-                    </div>
+                    </LearnableField>
 
                     {/* Description with character counter */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="description">Beschreibung</Label>
+                    <LearnableField
+                      fieldName="description"
+                      label="Beschreibung"
+                      value={description}
+                      originalValue={originalReceipt?.description}
+                      onReset={() => setDescription(originalReceipt?.description || '')}
+                      labelExtra={
                         <span className={cn(
                           "text-xs",
                           description.length > descriptionSettings.max_length 
@@ -1348,7 +1362,8 @@ export function ReceiptDetailPanel({
                         )}>
                           {description.length} / {descriptionSettings.max_length} Zeichen
                         </span>
-                      </div>
+                      }
+                    >
                       <Textarea
                         id="description"
                         value={description}
@@ -1367,11 +1382,16 @@ export function ReceiptDetailPanel({
                           Wird beim Speichern auf {descriptionSettings.max_length} Zeichen gekürzt
                         </p>
                       )}
-                    </div>
+                    </LearnableField>
 
                     {/* Date */}
-                    <div>
-                      <Label>Belegdatum</Label>
+                    <LearnableField
+                      fieldName="receipt_date"
+                      label="Belegdatum"
+                      value={receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null}
+                      originalValue={originalReceipt?.receipt_date ? originalReceipt.receipt_date.substring(0, 10) : null}
+                      onReset={() => setReceiptDate(originalReceipt?.receipt_date ? new Date(originalReceipt.receipt_date) : undefined)}
+                    >
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
@@ -1398,7 +1418,7 @@ export function ReceiptDetailPanel({
                           />
                         </PopoverContent>
                       </Popover>
-                    </div>
+                    </LearnableField>
 
                     {/* Invoice Number */}
                     <LearnableField
@@ -1418,8 +1438,13 @@ export function ReceiptDetailPanel({
                     </LearnableField>
 
                     {/* Category */}
-                    <div>
-                      <Label>Kategorie</Label>
+                    <LearnableField
+                      fieldName="category"
+                      label="Kategorie"
+                      value={category}
+                      originalValue={originalReceipt?.category}
+                      onReset={() => setCategory(originalReceipt?.category || '')}
+                    >
                       <Select value={category} onValueChange={setCategory}>
                         <SelectTrigger>
                           <SelectValue placeholder="Kategorie wählen" />
@@ -1432,7 +1457,7 @@ export function ReceiptDetailPanel({
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
+                    </LearnableField>
 
                     {/* Amount & VAT */}
                     <div className="grid grid-cols-2 gap-4">
@@ -1557,8 +1582,12 @@ export function ReceiptDetailPanel({
 
                     {/* Net & VAT Amount (editable with calculated placeholder) */}
                     <div className="grid grid-cols-2 gap-4 items-end">
-                      <div>
-                        <Label>Nettobetrag</Label>
+                      <LearnableField
+                        fieldName="amount_net"
+                        label="Nettobetrag"
+                        value={amountNetOverride ? parseFloat(amountNetOverride) : null}
+                        originalValue={originalReceipt?.amount_net}
+                      >
                         <Input
                           type="number"
                           step="0.01"
@@ -1567,14 +1596,14 @@ export function ReceiptDetailPanel({
                           placeholder={calculatedValues.net ? `${calculatedValues.net.toFixed(2)} (berechnet)` : '—'}
                           className={amountNetOverride ? '' : 'bg-muted text-muted-foreground'}
                         />
-                      </div>
-                      <div>
-                        <Label className="flex items-center gap-1">
-                          MwSt-Betrag
-                          {isMixedTaxRate && (
-                            <span className="text-xs text-muted-foreground">(gemischt)</span>
-                          )}
-                        </Label>
+                      </LearnableField>
+                      <LearnableField
+                        fieldName="vat_amount"
+                        label="MwSt-Betrag"
+                        labelExtra={isMixedTaxRate ? <span className="text-xs text-muted-foreground">(gemischt)</span> : undefined}
+                        value={vatAmountOverride ? parseFloat(vatAmountOverride) : null}
+                        originalValue={originalReceipt?.vat_amount}
+                      >
                         <Input
                           type="number"
                           step="0.01"
@@ -1583,12 +1612,17 @@ export function ReceiptDetailPanel({
                           placeholder={calculatedValues.vat ? `${calculatedValues.vat.toFixed(2)} (berechnet)` : '—'}
                           className={vatAmountOverride ? '' : 'bg-muted text-muted-foreground'}
                         />
-                      </div>
+                      </LearnableField>
                     </div>
 
                     {/* Payment Method */}
-                    <div>
-                      <Label>Zahlungsart</Label>
+                    <LearnableField
+                      fieldName="payment_method"
+                      label="Zahlungsart"
+                      value={paymentMethod}
+                      originalValue={originalReceipt?.payment_method}
+                      onReset={() => setPaymentMethod(originalReceipt?.payment_method || '')}
+                    >
                       <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                         <SelectTrigger>
                           <SelectValue placeholder="Zahlungsart wählen" />
@@ -1601,11 +1635,16 @@ export function ReceiptDetailPanel({
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
+                    </LearnableField>
 
                     {/* Notes */}
-                    <div>
-                      <Label htmlFor="notes">Notizen</Label>
+                    <LearnableField
+                      fieldName="notes"
+                      label="Notizen"
+                      value={notes}
+                      originalValue={originalReceipt?.notes}
+                      onReset={() => setNotes(originalReceipt?.notes || '')}
+                    >
                       <Textarea
                         id="notes"
                         value={notes}
@@ -1613,7 +1652,7 @@ export function ReceiptDetailPanel({
                         placeholder="Optionale Anmerkungen..."
                         rows={2}
                       />
-                    </div>
+                    </LearnableField>
 
                     {/* Tags */}
                     <div className="pt-2 border-t">

@@ -12,7 +12,7 @@ import type { VendorLearning, FieldPattern } from '@/types/learning';
 
 interface LearnableFieldProps {
   fieldName: string;
-  label: string;
+  label: ReactNode;
   value: unknown;
   originalValue: unknown;
   vendorLearning?: VendorLearning | null;
