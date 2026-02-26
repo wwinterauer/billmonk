@@ -247,8 +247,10 @@ export function useCorrectionTracking() {
       
       // 3b. Special handling for VAT rate corrections
       if (fieldName === 'vat_rate') {
-        const vatRate = parseFloat(String(correctedValue).replace(',', '.')) || 0;
-        const originalVatRate = parseFloat(String(detectedValue).replace(',', '.')) || null;
+        const correctedStr = String(correctedValue ?? '').replace(',', '.');
+        const vatRate = correctedStr !== '' ? parseFloat(correctedStr) : 0;
+        const detectedStr = String(detectedValue ?? '').replace(',', '.');
+        const originalVatRate = detectedStr !== '' ? parseFloat(detectedStr) : null;
         await recordVatRateCorrection(vendorId, user.id, vatRate, originalVatRate);
         console.log(`[VAT Learning] Recorded correction: ${originalVatRate}% → ${vatRate}%`);
       }

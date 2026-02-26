@@ -243,7 +243,7 @@ const Register = () => {
                       </FormControl>
                       <FormLabel className="text-sm font-normal cursor-pointer leading-tight">
                         Ich akzeptiere die{' '}
-                        <Link to="/agb" className="text-primary hover:underline">AGB</Link>
+                        <Link to="/datenschutz" className="text-primary hover:underline">AGB</Link>
                         {' '}und{' '}
                         <Link to="/datenschutz" className="text-primary hover:underline">Datenschutzerklärung</Link>
                       </FormLabel>

@@ -148,9 +148,9 @@ const Login = () => {
                       </FormItem>
                     )}
                   />
-                  <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                  <span className="text-sm text-muted-foreground cursor-not-allowed">
                     Passwort vergessen?
-                  </Link>
+                  </span>
                 </div>
 
                 <Button 

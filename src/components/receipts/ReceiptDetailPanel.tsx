@@ -291,7 +291,7 @@ export function ReceiptDetailPanel({
       vendor,
       vendor_brand: vendorBrand,
       receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null,
-      amount_gross: parseFloat(amountGross) || null,
+      amount_gross: amountGross !== '' ? parseFloat(amountGross) : null,
       category,
       invoice_number: invoiceNumber,
       payment_method: paymentMethod,
@@ -1464,7 +1464,7 @@ export function ReceiptDetailPanel({
                       <LearnableField
                         fieldName="amount_gross"
                         label="Bruttobetrag"
-                        value={parseFloat(amountGross) || null}
+                        value={amountGross !== '' ? parseFloat(amountGross) : null}
                         originalValue={originalReceipt?.amount_gross}
                         vendorLearning={vendorLearning}
                         onReset={() => setAmountGross(originalReceipt?.amount_gross?.toString() || '')}
@@ -1485,7 +1485,7 @@ export function ReceiptDetailPanel({
                       <LearnableField
                         fieldName="vat_rate"
                         label="MwSt-Satz"
-                        value={isMixedTaxRate ? null : (parseFloat(vatRate) || null)}
+                        value={isMixedTaxRate ? null : (vatRate !== '' ? parseFloat(vatRate) : null)}
                         originalValue={originalReceipt?.vat_rate}
                         vendorLearning={vendorLearning}
                         onReset={() => {
