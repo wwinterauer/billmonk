@@ -467,7 +467,7 @@ const Review = () => {
 
       if (trackingVendorId) {
         const fieldsToTrack = [
-          { fieldName: 'vat_rate', detected: currentReceipt.vat_rate, corrected: formData.is_mixed_tax_rate ? null : (parseFloat(formData.vat_rate) || null) },
+          { fieldName: 'vat_rate', detected: currentReceipt.vat_rate, corrected: formData.is_mixed_tax_rate ? null : (formData.vat_rate !== '' ? parseFloat(formData.vat_rate) : null) },
           { fieldName: 'amount_gross', detected: currentReceipt.amount_gross, corrected: gross },
           { fieldName: 'vendor', detected: currentReceipt.vendor, corrected: formData.vendor || null },
           { fieldName: 'vendor_brand', detected: currentReceipt.vendor_brand, corrected: formData.vendor_brand || null },
