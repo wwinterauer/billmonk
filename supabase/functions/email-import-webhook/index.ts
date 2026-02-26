@@ -9,7 +9,7 @@ const corsHeaders = {
 // Rate limiting: Track requests per token
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const RATE_LIMIT_MAX_REQUESTS = 50; // Max 50 emails per hour per token
+const RATE_LIMIT_MAX_REQUESTS = 20; // Max 20 emails per hour per token
 
 // Maximum file size per attachment (10MB)
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
@@ -66,6 +66,39 @@ function isValidContentType(contentType: string | undefined, filename: string): 
   const ext = filename.toLowerCase().match(/\.[^.]+$/)?.[0] || "";
   
   return validMimeTypes.includes(contentType?.toLowerCase() || "") || validExtensions.includes(ext);
+}
+
+// Verify file content matches declared type via magic bytes
+function verifyMagicBytes(content: Uint8Array, declaredType: string): boolean {
+  if (content.length < 4) return false;
+  
+  const pdfMagic = [0x25, 0x50, 0x44, 0x46]; // %PDF
+  const jpegMagic = [0xFF, 0xD8, 0xFF];
+  const pngMagic = [0x89, 0x50, 0x4E, 0x47]; // .PNG
+  const gifMagic87 = [0x47, 0x49, 0x46, 0x38, 0x37]; // GIF87
+  const gifMagic89 = [0x47, 0x49, 0x46, 0x38, 0x39]; // GIF89
+  const webpMagic = [0x52, 0x49, 0x46, 0x46]; // RIFF (WebP starts with RIFF)
+  
+  const type = declaredType.toLowerCase();
+  
+  if (type.includes("pdf")) {
+    return content.slice(0, 4).every((b, i) => b === pdfMagic[i]);
+  }
+  if (type.includes("jpeg") || type.includes("jpg")) {
+    return content.slice(0, 3).every((b, i) => b === jpegMagic[i]);
+  }
+  if (type.includes("png")) {
+    return content.slice(0, 4).every((b, i) => b === pngMagic[i]);
+  }
+  if (type.includes("gif")) {
+    return content.slice(0, 5).every((b, i) => b === gifMagic87[i]) ||
+           content.slice(0, 5).every((b, i) => b === gifMagic89[i]);
+  }
+  if (type.includes("webp")) {
+    return content.slice(0, 4).every((b, i) => b === webpMagic[i]);
+  }
+  
+  return false; // Unknown type, reject
 }
 
 // Sanitize filename to prevent path traversal
@@ -255,6 +288,13 @@ serve(async (req: Request) => {
         // Decode base64 content
         const binaryContent = Uint8Array.from(atob(attachment.content), (c) => c.charCodeAt(0));
         
+        // Verify magic bytes match declared content type
+        if (!verifyMagicBytes(binaryContent, attachment.contentType || attachment.filename)) {
+          console.warn(`Magic byte mismatch for ${sanitizeFilename(attachment.filename)}, skipping`);
+          errors.push(`Invalid file content for ${sanitizeFilename(attachment.filename)}`);
+          continue;
+        }
+        
         // Generate file hash for duplicate detection
         const hashBuffer = await crypto.subtle.digest('SHA-256', binaryContent);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -289,7 +329,7 @@ serve(async (req: Request) => {
 
         if (attachmentError) {
           console.error("Error creating email attachment:", attachmentError);
-          errors.push(`Attachment record failed for ${attachment.filename}: ${attachmentError.message}`);
+          errors.push(`Attachment record failed for ${sanitizeFilename(attachment.filename)}`);
           continue;
         }
 
@@ -327,9 +367,9 @@ serve(async (req: Request) => {
           console.error("Upload error:", uploadError);
           await supabase
             .from("email_attachments")
-            .update({ status: 'error', error_message: uploadError.message })
+            .update({ status: 'error', error_message: 'File upload failed' })
             .eq("id", emailAttachment.id);
-          errors.push(`Upload failed for ${attachment.filename}: ${uploadError.message}`);
+          errors.push(`Upload failed for ${sanitizeFilename(attachment.filename)}`);
           continue;
         }
 
@@ -354,9 +394,9 @@ serve(async (req: Request) => {
           console.error("Error creating receipt:", receiptError);
           await supabase
             .from("email_attachments")
-            .update({ status: 'error', error_message: receiptError.message })
+            .update({ status: 'error', error_message: 'Receipt creation failed' })
             .eq("id", emailAttachment.id);
-          errors.push(`Receipt creation failed for ${attachment.filename}: ${receiptError.message}`);
+          errors.push(`Receipt creation failed for ${sanitizeFilename(attachment.filename)}`);
           continue;
         }
 
@@ -395,7 +435,7 @@ serve(async (req: Request) => {
         processedCount++;
       } catch (attError) {
         console.error("Error processing attachment:", attError);
-        errors.push(`Processing failed for ${attachment.filename}: ${String(attError)}`);
+        errors.push(`Processing failed for ${sanitizeFilename(attachment.filename)}`);
       }
     }
 
@@ -433,7 +473,7 @@ serve(async (req: Request) => {
     );
   } catch (error) {
     console.error("Email import webhook error:", error);
-    return new Response(JSON.stringify({ error: String(error) }), {
+    return new Response(JSON.stringify({ error: "An internal error occurred. Please try again." }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

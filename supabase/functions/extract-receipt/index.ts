@@ -238,7 +238,7 @@ serve(async (req) => {
       if (receiptError || !receipt) {
         console.error("Receipt not found:", receiptError);
         return new Response(
-          JSON.stringify({ success: false, error: "Receipt not found" }),
+          JSON.stringify({ success: false, error: "The requested receipt could not be found." }),
           { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -251,7 +251,7 @@ serve(async (req) => {
       if (downloadError || !fileData) {
         console.error("Failed to download file:", downloadError);
         return new Response(
-          JSON.stringify({ success: false, error: "Failed to download file" }),
+          JSON.stringify({ success: false, error: "File could not be retrieved. Please try again." }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

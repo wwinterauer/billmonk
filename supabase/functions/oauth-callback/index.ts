@@ -39,7 +39,7 @@ serve(async (req) => {
     // OAuth Fehler vom Provider
     if (error) {
       console.error("OAuth error from provider:", error, errorDescription);
-      return redirectWithError(errorDescription || error);
+      return redirectWithError("Authentifizierung fehlgeschlagen. Bitte erneut versuchen.");
     }
 
     if (!code || !state) {
@@ -336,6 +336,6 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error("OAuth Callback Error:", error);
-    return redirectWithError(error.message || "Unbekannter Fehler");
+    return redirectWithError("Verbindung fehlgeschlagen. Bitte erneut versuchen.");
   }
 });
