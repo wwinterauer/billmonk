@@ -1,61 +1,133 @@
 
-# Bug-Fix: Doppelter Lösch-Button in der Duplikate-Ansicht
 
-## Problem
+# Umfassende Projekt-Pruefung: XpenzAi
 
-In der Bulk-Aktionsleiste werden bei aktivem Duplikat-Filter zwei Lösch-Buttons gleichzeitig angezeigt:
+## Status: Kuerzlich behobene Bugs
 
-1. **"Löschen"** (grauer Outline-Button) → öffnet `bulkDeleteOpen` Dialog
-2. **"Duplikate löschen"** (roter Destructive-Button) → ruft `bulkDeleteDuplicates()` direkt auf
+Die folgenden Fixes sind korrekt implementiert:
+- 0% MwSt-Bug (Speichern/Laden in ReceiptDetailPanel + Review): Korrekt
+- Doppelter Loesch-Button im Duplikat-Filter: Korrekt
 
-Beide löschen letztendlich die markierten Belege. Das ist redundant und verwirrend.
+---
 
-## Lösung
+## Verbleibende Probleme
 
-Der normale **"Löschen"**-Button soll im Duplikat-Filter (`statusFilter === 'duplicate'`) **ausgeblendet** werden, da der spezialisierte **"Duplikate löschen"**-Button diese Funktion bereits übernimmt.
+### 1. HOCH: `parseFloat(...) || null` Bug an 4 weiteren Stellen
 
-Alternativ könnten beide zusammengeführt werden – aber da der "Duplikate löschen"-Button einen eigenen direkten Flow hat (ohne Bestätigungsdialog über `bulkDeleteOpen`) und semantisch klarer für den Kontext ist, ist das Ausblenden des redundanten Buttons die sauberste Lösung.
+Der gleiche 0-Wert-Bug existiert noch an diesen Stellen:
 
-### Änderung in `src/pages/Expenses.tsx`
+| Datei | Zeile | Code | Auswirkung |
+|-------|-------|------|------------|
+| `ReceiptDetailPanel.tsx` | 294 | `amount_gross: parseFloat(amountGross) \|\| null` | Dateinamen-Vorschau zeigt keinen Betrag bei 0 EUR |
+| `ReceiptDetailPanel.tsx` | 1467 | `value={parseFloat(amountGross) \|\| null}` | LearnableField erkennt 0 EUR Aenderung nicht |
+| `ReceiptDetailPanel.tsx` | 1488 | `value={isMixedTaxRate ? null : (parseFloat(vatRate) \|\| null)}` | LearnableField erkennt 0% MwSt Aenderung nicht |
+| `Review.tsx` | 470 | `corrected: ... (parseFloat(formData.vat_rate) \|\| null)` | 0% MwSt wird im KI-Learning als null gespeichert |
 
-**Aktuelle Logik (Zeile 2043-2053):**
-```tsx
-<div className="h-4 w-px bg-border" />
-{/* Delete */}
-<Button 
-  size="sm" 
-  variant="outline" 
-  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-  onClick={() => setBulkDeleteOpen(true)}
-  disabled={bulkActionLoading !== null}
->
-  <Trash2 className="h-4 w-4 mr-1" />
-  Löschen
-</Button>
+**Fix:** Ueberall `parseFloat(x) \|\| null` ersetzen durch `x !== '' ? parseFloat(x) : null`
+
+### 2. HOCH: `parseFloat(...) || 0` und `|| null` in useCorrectionTracking.ts
+
+| Datei | Zeile | Code | Problem |
+|-------|-------|------|---------|
+| `useCorrectionTracking.ts` | 250 | `parseFloat(...) \|\| 0` | 0% MwSt-Korrektur: `parseFloat("0") \|\| 0` = korrekt (zufaellig), aber semantisch verwirrend |
+| `useCorrectionTracking.ts` | 251 | `parseFloat(...) \|\| null` | Original 0% wird als `null` geloggt statt `0` |
+
+**Fix Zeile 251:** `const originalVatRate = val !== '' && val !== 'null' ? parseFloat(val) : null;`
+
+### 3. MITTEL: Tote Links - Fehlende Seiten
+
+| Link | Verwendet in | Problem |
+|------|-------------|---------|
+| `/forgot-password` | `Login.tsx` Zeile 151 | Keine Route definiert - fuehrt zu 404 |
+| `/agb` | `Register.tsx` Zeile 246 | Keine Route definiert - fuehrt zu 404 |
+
+**Fix:** Entweder Seiten erstellen oder Links entfernen/deaktivieren.
+
+### 4. MITTEL: Badge-Komponente ohne forwardRef
+
+`src/components/ui/badge.tsx` ist eine einfache Funktion ohne `React.forwardRef`. Wenn Badge innerhalb von Tooltip verwendet wird (z.B. auf Dashboard, in LearnableField), entsteht eine React-Console-Warnung.
+
+**Fix:** Badge mit `React.forwardRef` wrappen und `displayName` setzen.
+
+### 5. NIEDRIG: `amount_gross` Laden mit `?.toString() || ''`
+
+`ReceiptDetailPanel.tsx` Zeile 426 und `Review.tsx` Zeile 324: `amount_gross?.toString() || ''` -- Bei `amount_gross = 0` wird `"0"` (truthy), also kein Problem. Aber `amount_gross?.toString() || ''` ist inkonsistent mit dem expliziten null-Check beim `vat_rate`. Zur Klarheit angleichen.
+
+### 6. NIEDRIG: `onReset` in LearnableField mit altem Muster
+
+`ReceiptDetailPanel.tsx` Zeile 1492: `setVatRate(originalReceipt?.vat_rate?.toString() || '20')` -- Wenn originalReceipt.vat_rate = 0, ergibt `(0).toString()` = `"0"` (truthy), also funktioniert es zufaellig. Trotzdem inkonsistent.
+
+### 7. INFO: Sicherheit
+
+Die Datenbank-Linter-Pruefung zeigt nur eine Warnung:
+- **Leaked Password Protection deaktiviert** -- empfohlen zu aktivieren fuer Produktivbetrieb, verhindert die Nutzung bekannter kompromittierter Passwoerter.
+
+---
+
+## Zusammenfassung der notwendigen Aenderungen
+
+| Prioritaet | Problem | Dateien | Aufwand |
+|------------|---------|---------|--------|
+| HOCH | 4x `parseFloat \|\| null` Bug | `ReceiptDetailPanel.tsx`, `Review.tsx` | 4 Zeilen |
+| HOCH | CorrectionTracking originalVatRate | `useCorrectionTracking.ts` | 1 Zeile |
+| MITTEL | Tote Links `/forgot-password`, `/agb` | `Login.tsx`, `Register.tsx` oder neue Pages | 2-50 Zeilen |
+| MITTEL | Badge ohne forwardRef | `badge.tsx` | 5 Zeilen |
+| NIEDRIG | Inkonsistente null-Checks | `ReceiptDetailPanel.tsx` | Optional |
+
+### Technische Details der Fixes
+
+**ReceiptDetailPanel.tsx Zeile 294:**
+```typescript
+// Vorher:
+amount_gross: parseFloat(amountGross) || null,
+// Nachher:
+amount_gross: amountGross !== '' ? parseFloat(amountGross) : null,
 ```
 
-**Neue Logik:**
-```tsx
-<div className="h-4 w-px bg-border" />
-{/* Delete - nur anzeigen wenn NICHT im Duplikat-Filter (dort gibt es "Duplikate löschen") */}
-{statusFilter !== 'duplicate' && (
-  <Button 
-    size="sm" 
-    variant="outline" 
-    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-    onClick={() => setBulkDeleteOpen(true)}
-    disabled={bulkActionLoading !== null}
-  >
-    <Trash2 className="h-4 w-4 mr-1" />
-    Löschen
-  </Button>
-)}
+**ReceiptDetailPanel.tsx Zeile 1467:**
+```typescript
+// Vorher:
+value={parseFloat(amountGross) || null}
+// Nachher:
+value={amountGross !== '' ? parseFloat(amountGross) : null}
 ```
 
-Außerdem soll der Trenner (`<div className="h-4 w-px bg-border" />`) vor dem Löschen-Button ebenfalls nur erscheinen wenn der Button sichtbar ist (da er sonst einen leeren Separator zeigt).
+**ReceiptDetailPanel.tsx Zeile 1488:**
+```typescript
+// Vorher:
+value={isMixedTaxRate ? null : (parseFloat(vatRate) || null)}
+// Nachher:
+value={isMixedTaxRate ? null : (vatRate !== '' ? parseFloat(vatRate) : null)}
+```
 
-## Betroffene Datei
+**Review.tsx Zeile 470:**
+```typescript
+// Vorher:
+corrected: formData.is_mixed_tax_rate ? null : (parseFloat(formData.vat_rate) || null)
+// Nachher:
+corrected: formData.is_mixed_tax_rate ? null : (formData.vat_rate !== '' ? parseFloat(formData.vat_rate) : null)
+```
 
-| Datei | Zeilen | Änderung |
-|-------|--------|----------|
-| `src/pages/Expenses.tsx` | 2042-2053 | Normalen "Löschen"-Button mit `statusFilter !== 'duplicate'` bedingen; Trenner mitbedingen |
+**useCorrectionTracking.ts Zeile 251:**
+```typescript
+// Vorher:
+const originalVatRate = parseFloat(String(detectedValue).replace(',', '.')) || null;
+// Nachher:
+const detectedStr = String(detectedValue ?? '').replace(',', '.');
+const originalVatRate = detectedStr !== '' ? parseFloat(detectedStr) : null;
+```
+
+**badge.tsx:**
+```typescript
+const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
+  ({ className, variant, ...props }, ref) => {
+    return <div ref={ref} className={cn(badgeVariants({ variant }), className)} {...props} />;
+  }
+);
+Badge.displayName = "Badge";
+```
+
+**Tote Links:**
+- `/forgot-password` in Login.tsx vorerst entfernen oder auskommentieren
+- `/agb` in Register.tsx auf `/datenschutz` umleiten oder Seite erstellen
+
