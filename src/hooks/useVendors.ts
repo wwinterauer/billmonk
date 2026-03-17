@@ -216,8 +216,9 @@ export function useVendors() {
 
     // Sync linked receipts with new vendor names
     let syncedReceipts = 0;
-    if (updates.display_name !== undefined || updates.legal_name !== undefined) {
-      const newLegalName = updates.legal_name !== undefined ? updates.legal_name : data.legal_name;
+    if (updates.display_name !== undefined || updates.legal_names !== undefined) {
+      const newLegalNames = updates.legal_names !== undefined ? updates.legal_names : (data.legal_names || []);
+      const primaryLegalName = newLegalNames.length > 0 ? newLegalNames[0] : null;
       const newBrandName = updates.display_name !== undefined ? updates.display_name : data.display_name;
       
       const receiptVendor = newLegalName || newBrandName;
