@@ -73,15 +73,9 @@ serve(async (req) => {
     });
 
     if (subscriptions.data.length === 0) {
-      logStep("No active subscription");
-      await supabaseAdmin.from("profiles").update({
-        plan: "free",
-        stripe_product_id: null,
-        subscription_status: "inactive",
-        subscription_end_date: null,
-      }).eq("id", user.id);
-
-      return new Response(JSON.stringify({ subscribed: false, plan: "free" }), {
+      logStep("No active subscription, keeping current plan");
+      // Don't reset plan - user might have a manually assigned plan
+      return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
