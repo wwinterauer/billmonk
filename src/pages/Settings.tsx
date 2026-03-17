@@ -441,48 +441,14 @@ const Settings = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-10">
-            <TabsTrigger value="naming" className="gap-2">
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Umbenennung</span>
-            </TabsTrigger>
-            <TabsTrigger value="recognition" className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              <span className="hidden sm:inline">Erkennung</span>
-            </TabsTrigger>
-            <TabsTrigger value="categories" className="gap-2">
-              <Tags className="h-4 w-4" />
-              <span className="hidden sm:inline">Kategorien</span>
-            </TabsTrigger>
-            <TabsTrigger value="tags" className="gap-2">
-              <Hash className="h-4 w-4" />
-              <span className="hidden sm:inline">Tags</span>
-            </TabsTrigger>
-            <TabsTrigger value="bank-keywords" className="gap-2">
-              <Landmark className="h-4 w-4" />
-              <span className="hidden sm:inline">Bank</span>
-            </TabsTrigger>
-            <TabsTrigger value="vendors" className="gap-2">
-              <Building className="h-4 w-4" />
-              <span className="hidden sm:inline">Lieferanten</span>
-            </TabsTrigger>
-            <TabsTrigger value="export" className="gap-2">
-              <Table2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Export</span>
-            </TabsTrigger>
-            <TabsTrigger value="ai-learning" className="gap-2">
-              <Brain className="h-4 w-4" />
-              <span className="hidden sm:inline">KI-Training</span>
-            </TabsTrigger>
-            <TabsTrigger value="email-import" className="gap-2">
-              <Mail className="h-4 w-4" />
-              <span className="hidden sm:inline">E-Mail</span>
-            </TabsTrigger>
-            <TabsTrigger value="cloud-storage" className="gap-2">
-              <Cloud className="h-4 w-4" />
-              <span className="hidden sm:inline">Cloud</span>
-            </TabsTrigger>
+        <Tabs value={visibleTabs.some(t => t.value === activeTab) ? activeTab : visibleTabs[0]?.value || 'naming'} onValueChange={handleTabChange} className="space-y-6">
+          <TabsList className="flex flex-wrap w-full h-auto gap-1 p-1">
+            {visibleTabs.map(tab => (
+              <TabsTrigger key={tab.value} value={tab.value} className="gap-2 flex-shrink-0">
+                <tab.icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{tab.label}</span>
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           {/* File Naming Tab */}
