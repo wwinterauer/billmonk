@@ -1783,8 +1783,8 @@ export function VendorManagement() {
                             </Badge>
                           </div>
                           <p className="font-medium">{item.matchingVendor.display_name}</p>
-                          {item.matchingVendor.legal_name && (
-                            <p className="text-sm text-muted-foreground">{item.matchingVendor.legal_name}</p>
+                          {item.matchingVendor.legal_names?.length > 0 && (
+                            <p className="text-sm text-muted-foreground">{item.matchingVendor.legal_names.join(', ')}</p>
                           )}
                           <p className="text-xs text-muted-foreground mt-1">
                             {item.matchingVendor.receipt_count} Belege • {formatCurrency(item.matchingVendor.total_amount || 0)}
