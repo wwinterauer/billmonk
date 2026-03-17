@@ -89,9 +89,21 @@ const Account = () => {
   const [avatarUploading, setAvatarUploading] = useState(false);
 
   // Password change
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  const PASSWORD_RULES = [
+    { key: 'length', label: 'Mindestens 8 Zeichen', test: (p: string) => p.length >= 8 },
+    { key: 'upper', label: 'Ein Großbuchstabe', test: (p: string) => /[A-Z]/.test(p) },
+    { key: 'number', label: 'Eine Zahl', test: (p: string) => /[0-9]/.test(p) },
+  ];
+
+  const allPasswordRulesPass = PASSWORD_RULES.every(r => r.test(newPassword));
+  const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
 
   useEffect(() => {
     if (!user) return;
