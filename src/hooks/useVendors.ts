@@ -142,7 +142,7 @@ export function useVendors() {
       .insert({
         user_id: user.id,
         display_name: displayName,
-        legal_name: options?.legalName || null,
+        legal_names: options?.legalName ? [options.legalName] : [],
         detected_names: options?.detectedNames || [],
         default_category_id: options?.defaultCategoryId || null,
         default_tag_id: options?.defaultTagId || null,
