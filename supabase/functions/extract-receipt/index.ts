@@ -1038,8 +1038,8 @@ Beispiel Kleinunternehmer:
             }
           }
 
-          const vendorId = receiptInfo.vendor_id || vendorMatch?.id;
-          const vendorExpensesOnly = vendorMatch?.expenses_only_extraction === true;
+          const vendorId = receiptInfo.vendor_id || finalVendorMatch?.id;
+          const _vendorExpensesOnly = finalVendorMatch?.expenses_only_extraction === true;
 
           if (vendorId) {
             // Check for learned VAT rate
