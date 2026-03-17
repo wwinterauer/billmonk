@@ -980,7 +980,7 @@ export function VendorManagement() {
                             </div>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
-                            {vendor.legal_name || '–'}
+                            {vendor.legal_names?.length ? vendor.legal_names.join(', ') : '–'}
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1 max-w-[200px]">
