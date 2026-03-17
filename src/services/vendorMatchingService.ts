@@ -5,7 +5,7 @@ export interface MatchedVendor {
   id: string;
   user_id: string;
   display_name: string;
-  legal_name: string | null;
+  legal_names: string[];
   detected_names: string[];
   default_category_id: string | null;
   default_vat_rate: number | null;
