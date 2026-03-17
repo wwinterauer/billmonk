@@ -1169,17 +1169,63 @@ export function VendorManagement() {
               </p>
             </div>
 
-            {/* Rechtlicher Name */}
+            {/* Rechtliche Firmennamen */}
             <div className="space-y-2">
-              <Label htmlFor="legal_name">Rechtlicher Firmenname</Label>
-              <Input
-                id="legal_name"
-                value={formData.legal_name}
-                onChange={(e) => setFormData(prev => ({ ...prev, legal_name: e.target.value }))}
-                placeholder="z.B. Amazon EU S.à r.l., Mass Response Service GmbH"
-              />
+              <Label>Rechtliche Firmennamen</Label>
+              <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg min-h-[40px]">
+                {formData.legal_names.map((name, i) => (
+                  <Badge key={i} variant="secondary" className="flex items-center gap-1 pr-1">
+                    {name}
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({
+                        ...prev,
+                        legal_names: prev.legal_names.filter((_, idx) => idx !== i)
+                      }))}
+                      className="ml-1 rounded-full hover:bg-destructive/20 p-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+                {formData.legal_names.length === 0 && (
+                  <span className="text-muted-foreground text-sm">Noch keine Firmennamen hinterlegt</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  id="new_legal_name"
+                  placeholder="z.B. Amazon EU S.à r.l."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const input = e.currentTarget;
+                      const val = input.value.trim();
+                      if (val && !formData.legal_names.includes(val)) {
+                        setFormData(prev => ({ ...prev, legal_names: [...prev.legal_names, val] }));
+                        input.value = '';
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const input = document.getElementById('new_legal_name') as HTMLInputElement;
+                    const val = input?.value.trim();
+                    if (val && !formData.legal_names.includes(val)) {
+                      setFormData(prev => ({ ...prev, legal_names: [...prev.legal_names, val] }));
+                      input.value = '';
+                    }
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">
-                Offizieller Firmenname für Buchhaltung und Belege (falls abweichend)
+                Mehrere rechtliche Firmennamen möglich – z.B. für Marktplätze wie Amazon mit verschiedenen Händlern
               </p>
             </div>
 
