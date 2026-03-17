@@ -6,7 +6,7 @@ export interface Vendor {
   id: string;
   user_id: string;
   display_name: string;
-  legal_name: string | null;
+  legal_names: string[];
   detected_names: string[];
   default_category_id: string | null;
   default_tag_id: string | null;
