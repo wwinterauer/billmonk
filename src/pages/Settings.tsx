@@ -937,11 +937,36 @@ const Settings = () => {
 
       {/* Cloud Storage Tab */}
       <TabsContent value="cloud-storage">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <CloudStorageSettings />
+        </motion.div>
+      </TabsContent>
+
+      {/* Customer Management Tab */}
+      <TabsContent value="customers">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <CustomerManagement />
+        </motion.div>
+      </TabsContent>
+
+      {/* Invoice Items Tab */}
+      <TabsContent value="invoice-items">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <InvoiceItemManagement />
+        </motion.div>
+      </TabsContent>
+
+      {/* Invoice Templates Tab */}
+      <TabsContent value="invoice-templates">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <InvoiceTemplateSettings />
+        </motion.div>
+      </TabsContent>
+
+      {/* Invoice Module Settings Tab */}
+      <TabsContent value="invoice-settings">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <InvoiceModuleSettings />
         </motion.div>
       </TabsContent>
     </Tabs>
