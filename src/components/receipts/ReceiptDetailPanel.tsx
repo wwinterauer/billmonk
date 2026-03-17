@@ -521,22 +521,23 @@ export function ReceiptDetailPanel({
   const handleVendorSelect = useCallback((vendorData: {
     id: string;
     display_name: string;
-    legal_name: string | null;
+    legal_names: string[] | null;
     default_category_id: string | null;
     default_tag_id?: string | null;
     default_vat_rate: number | null;
     default_payment_method?: string | null;
     default_category: { id: string; name: string; color: string | null } | null;
   }) => {
-    // Set legal name as the main vendor field (or display_name as fallback)
-    const legalName = vendorData.legal_name || vendorData.display_name;
+    // Set primary legal name as the main vendor field (or display_name as fallback)
+    const primaryLegalName = vendorData.legal_names?.length ? vendorData.legal_names[0] : null;
+    const legalName = primaryLegalName || vendorData.display_name;
     setVendor(legalName);
     setSelectedVendorId(vendorData.id);
 
     const applied: string[] = ['Lieferant'];
 
     // Set brand name only if different from legal name
-    if (vendorData.legal_name && vendorData.display_name !== vendorData.legal_name) {
+    if (primaryLegalName && vendorData.display_name !== primaryLegalName) {
       setVendorBrand(vendorData.display_name);
       applied.push('Markenname');
     }

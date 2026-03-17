@@ -1883,8 +1883,8 @@ export function VendorManagement() {
                 </CardHeader>
                 <CardContent className="text-sm space-y-1">
                   <p className="font-medium">{mergeTarget?.display_name}</p>
-                  {mergeTarget?.legal_name && (
-                    <p className="text-muted-foreground">{mergeTarget.legal_name}</p>
+                  {mergeTarget?.legal_names?.length > 0 && (
+                    <p className="text-muted-foreground">{mergeTarget.legal_names.join(', ')}</p>
                   )}
                   <p className="text-muted-foreground">
                     {mergeTarget?.receipt_count} Belege
