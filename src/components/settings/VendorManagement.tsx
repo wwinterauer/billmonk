@@ -467,7 +467,7 @@ export function VendorManagement() {
         .from('vendors')
         .update({
           display_name: mergePreview.display_name,
-          legal_name: mergePreview.legal_name || null,
+          legal_names: mergePreview.legal_names,
           detected_names: mergePreview.detected_names,
           default_category_id: mergePreview.default_category_id,
           default_vat_rate: mergePreview.default_vat_rate,
