@@ -584,7 +584,7 @@ export function useReceipts() {
         user_id: user.id,
         display_name: name.trim(),
         detected_names: [name.trim()],
-        legal_name: options?.legalName?.trim() || null
+        legal_names: options?.legalName?.trim() ? [options.legalName.trim()] : []
       })
       .select(`
         *,
