@@ -22,6 +22,7 @@ import Settings from "./pages/Settings";
 import ShareReceive from "./pages/ShareReceive";
 import Checklists from "./pages/Checklists";
 import Datenschutz from "./pages/Datenschutz";
+import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -106,6 +107,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Checklists />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/onboarding" 
+              element={
+                <ProtectedRoute skipOnboardingCheck>
+                  <Onboarding />
                 </ProtectedRoute>
               } 
             />

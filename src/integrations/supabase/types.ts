@@ -985,7 +985,11 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_type: string | null
+          admin_view_plan: string | null
+          city: string | null
           company_name: string | null
+          country: string | null
           created_at: string | null
           description_settings: Json | null
           email: string
@@ -994,11 +998,25 @@ export type Database = {
           last_name: string | null
           monthly_receipt_count: number | null
           naming_settings: Json | null
+          newsletter_opt_in: boolean | null
+          onboarding_completed: boolean | null
+          phone: string | null
           plan: string | null
+          receipt_credit: number | null
+          street: string | null
+          stripe_customer_id: string | null
+          subscription_end_date: string | null
+          subscription_status: string | null
+          uid_number: string | null
           updated_at: string | null
+          zip: string | null
         }
         Insert: {
+          account_type?: string | null
+          admin_view_plan?: string | null
+          city?: string | null
           company_name?: string | null
+          country?: string | null
           created_at?: string | null
           description_settings?: Json | null
           email: string
@@ -1007,11 +1025,25 @@ export type Database = {
           last_name?: string | null
           monthly_receipt_count?: number | null
           naming_settings?: Json | null
+          newsletter_opt_in?: boolean | null
+          onboarding_completed?: boolean | null
+          phone?: string | null
           plan?: string | null
+          receipt_credit?: number | null
+          street?: string | null
+          stripe_customer_id?: string | null
+          subscription_end_date?: string | null
+          subscription_status?: string | null
+          uid_number?: string | null
           updated_at?: string | null
+          zip?: string | null
         }
         Update: {
+          account_type?: string | null
+          admin_view_plan?: string | null
+          city?: string | null
           company_name?: string | null
+          country?: string | null
           created_at?: string | null
           description_settings?: Json | null
           email?: string
@@ -1020,8 +1052,18 @@ export type Database = {
           last_name?: string | null
           monthly_receipt_count?: number | null
           naming_settings?: Json | null
+          newsletter_opt_in?: boolean | null
+          onboarding_completed?: boolean | null
+          phone?: string | null
           plan?: string | null
+          receipt_credit?: number | null
+          street?: string | null
+          stripe_customer_id?: string | null
+          subscription_end_date?: string | null
+          subscription_status?: string | null
+          uid_number?: string | null
           updated_at?: string | null
+          zip?: string | null
         }
         Relationships: []
       }
@@ -1317,6 +1359,24 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       vendor_learning: {
         Row: {
           confidence_boost: number | null
@@ -1545,10 +1605,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       reset_checklist: { Args: { p_checklist_id: string }; Returns: undefined }
+      reset_monthly_credits: { Args: never; Returns: undefined }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1675,6 +1743,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
