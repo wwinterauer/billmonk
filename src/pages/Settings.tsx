@@ -445,7 +445,7 @@ const Settings = () => {
   ];
 
   const visibleTabs = allTabs.filter(t => 
-    !t.requiredFeature || (features as Record<string, boolean>)[t.requiredFeature]
+    !t.requiredFeature || (features as unknown as Record<string, boolean>)[t.requiredFeature]
   );
 
   // Update URL when tab changes
