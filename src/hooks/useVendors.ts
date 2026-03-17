@@ -443,6 +443,7 @@ export function useVendors() {
 
     const updated = {
       ...data,
+      legal_names: data.legal_names || [],
       detected_names: data.detected_names || [],
       receipt_count: data.receipt_count || 0,
       total_amount: Number(data.total_amount) || 0,
