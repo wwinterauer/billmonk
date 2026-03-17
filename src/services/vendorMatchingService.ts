@@ -217,10 +217,12 @@ export async function findOrCreateVendor(
         if (sim > detectedSim) detectedSim = sim;
       }
 
-      // Legal Name similarity
-      const legalSim = vendor.legal_name
-        ? calculateSimilarity(detectedName, vendor.legal_name)
-        : 0;
+      // Legal Names similarity (find best match across all legal names)
+      let legalSim = 0;
+      for (const ln of vendor.legal_names || []) {
+        const sim = calculateSimilarity(detectedName, ln);
+        if (sim > legalSim) legalSim = sim;
+      }
 
       // Take the highest similarity
       const bestScore = Math.max(displaySim, detectedSim, legalSim);
