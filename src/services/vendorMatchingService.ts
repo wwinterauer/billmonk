@@ -317,7 +317,7 @@ async function createVendorInternal(
       user_id: userId,
       display_name: name.trim(),
       detected_names: [name.trim()],
-      legal_name: legalName?.trim() || null
+      legal_names: legalName?.trim() ? [legalName.trim()] : []
     })
     .select(`
       *,
