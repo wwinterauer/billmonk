@@ -119,6 +119,14 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+            <Route 
+              path="/invoices" 
+              element={
+                <ProtectedRoute>
+                  <Invoices />
+                </ProtectedRoute>
+              } 
+            />
             <Route path="/share-receive" element={<ShareReceive />} />
             <Route path="/datenschutz" element={<Datenschutz />} />
             <Route path="*" element={<NotFound />} />
