@@ -445,7 +445,7 @@ export function VendorManagement() {
 
     setMergePreview({
       display_name: original.display_name,
-      legal_name: original.legal_name || duplicate.legal_name || '',
+      legal_names: [...new Set([...(original.legal_names || []), ...(duplicate.legal_names || [])])],
       detected_names: allDetectedNames,
       default_category_id: original.default_category_id || duplicate.default_category_id,
       default_vat_rate: original.default_vat_rate || duplicate.default_vat_rate,
