@@ -13,8 +13,7 @@ import { ArrowLeft, Plus, Trash2, Save } from 'lucide-react';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useInvoiceItems, type InvoiceItem } from '@/hooks/useInvoiceItems';
 import { useInvoiceSettings } from '@/hooks/useInvoiceSettings';
-import { useInvoices, type InvoiceLineItem } from '@/hooks/useInvoices';
-import { useAuth } from '@/contexts/AuthContext';
+import { useInvoices } from '@/hooks/useInvoices';
 import { supabase } from '@/integrations/supabase/client';
 
 interface EditorLineItem {

@@ -145,14 +145,21 @@ export function useInvoices() {
       }
     }
 
-    // Increment sequence number
-    await supabase.rpc('increment_invoice_sequence' as any, { p_user_id: user.id }).catch(() => {
-      // If RPC doesn't exist yet, update manually
-      supabase
+    // Increment sequence number (best effort)
+    try {
+      const { data: currentSettings } = await supabase
         .from('invoice_settings')
-        .update({ next_sequence_number: undefined } as any)
-        .eq('user_id', user.id);
-    });
+        .select('id, next_sequence_number')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (currentSettings) {
+        await supabase
+          .from('invoice_settings')
+          .update({ next_sequence_number: (currentSettings.next_sequence_number || 1) + 1 } as any)
+          .eq('id', currentSettings.id);
+      }
+    } catch {}
+
 
     toast({ title: 'Rechnung erstellt' });
     await fetchInvoices();
