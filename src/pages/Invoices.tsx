@@ -170,6 +170,19 @@ const Invoices = () => {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                              <DropdownMenuItem onClick={async () => {
+                                toast({ title: 'PDF wird erstellt…' });
+                                const { data, error } = await supabase.functions.invoke('generate-invoice-pdf', {
+                                  body: { invoice_id: inv.id },
+                                });
+                                if (error) {
+                                  toast({ title: 'Fehler', description: 'PDF konnte nicht erstellt werden', variant: 'destructive' });
+                                } else {
+                                  toast({ title: 'PDF erstellt', description: 'Das PDF wurde generiert.' });
+                                }
+                              }}>
+                                <Download className="h-4 w-4 mr-2" /> PDF generieren
+                              </DropdownMenuItem>
                               {inv.status === 'draft' && (
                                 <DropdownMenuItem onClick={() => updateInvoiceStatus(inv.id, 'sent')}>
                                   <Send className="h-4 w-4 mr-2" /> Als versendet markieren
