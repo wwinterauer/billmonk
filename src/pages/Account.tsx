@@ -539,16 +539,74 @@ const Account = () => {
                   <CardDescription>Aktualisiere dein Passwort für mehr Sicherheit</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Current password */}
+                  <div className="space-y-2">
+                    <Label htmlFor="current_password">Aktuelles Passwort</Label>
+                    <div className="relative">
+                      <Input
+                        id="current_password"
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        value={currentPassword}
+                        onChange={e => setCurrentPassword(e.target.value)}
+                        placeholder="Dein aktuelles Passwort"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* New password */}
                   <div className="space-y-2">
                     <Label htmlFor="new_password">Neues Passwort</Label>
-                    <Input
-                      id="new_password"
-                      type="password"
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      placeholder="Mindestens 6 Zeichen"
-                    />
+                    <div className="relative">
+                      <Input
+                        id="new_password"
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        placeholder="Neues Passwort"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Password rules */}
+                  <div className="space-y-1.5">
+                    {PASSWORD_RULES.map(rule => {
+                      const pass = rule.test(newPassword);
+                      return (
+                        <div key={rule.key} className="flex items-center gap-2 text-sm">
+                          {newPassword.length > 0 ? (
+                            pass ? (
+                              <Check className="h-3.5 w-3.5 text-primary" />
+                            ) : (
+                              <XCircle className="h-3.5 w-3.5 text-destructive" />
+                            )
+                          ) : (
+                            <div className="h-3.5 w-3.5 rounded-full border border-muted-foreground/30" />
+                          )}
+                          <span className={newPassword.length > 0 ? (pass ? 'text-foreground' : 'text-destructive') : 'text-muted-foreground'}>
+                            {rule.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Confirm password */}
                   <div className="space-y-2">
                     <Label htmlFor="confirm_password">Passwort bestätigen</Label>
                     <Input
@@ -558,10 +616,14 @@ const Account = () => {
                       onChange={e => setConfirmPassword(e.target.value)}
                       placeholder="Passwort wiederholen"
                     />
+                    {confirmPassword.length > 0 && !passwordsMatch && (
+                      <p className="text-xs text-destructive">Passwörter stimmen nicht überein</p>
+                    )}
                   </div>
+
                   <Button
                     onClick={handleChangePassword}
-                    disabled={passwordSaving || !newPassword || !confirmPassword}
+                    disabled={passwordSaving || !currentPassword || !allPasswordRulesPass || !passwordsMatch}
                   >
                     {passwordSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Lock className="h-4 w-4 mr-2" />}
                     Passwort ändern
