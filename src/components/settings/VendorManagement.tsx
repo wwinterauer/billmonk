@@ -649,7 +649,7 @@ export function VendorManagement() {
       const query = searchQuery.toLowerCase();
       result = result.filter(v =>
         v.display_name.toLowerCase().includes(query) ||
-        v.legal_name?.toLowerCase().includes(query) ||
+        v.legal_names?.some(n => n.toLowerCase().includes(query)) ||
         v.detected_names.some(n => n.toLowerCase().includes(query)) ||
         v.notes?.toLowerCase().includes(query)
       );
