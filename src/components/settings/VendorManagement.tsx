@@ -175,7 +175,7 @@ export function VendorManagement() {
     setEditingVendor(vendor);
     setFormData({
       display_name: vendor.display_name,
-      legal_name: vendor.legal_name || '',
+      legal_names: vendor.legal_names || [],
       detected_names: vendor.detected_names || [],
       default_category_id: vendor.default_category_id || '',
       default_tag_id: vendor.default_tag_id || '',
