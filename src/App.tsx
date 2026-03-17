@@ -24,6 +24,7 @@ import Checklists from "./pages/Checklists";
 import Datenschutz from "./pages/Datenschutz";
 import Onboarding from "./pages/Onboarding";
 import Invoices from "./pages/Invoices";
+import InvoiceEditor from "./pages/InvoiceEditor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -124,6 +125,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Invoices />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/invoices/new" 
+              element={
+                <ProtectedRoute>
+                  <InvoiceEditor />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/invoices/:id/edit" 
+              element={
+                <ProtectedRoute>
+                  <InvoiceEditor />
                 </ProtectedRoute>
               } 
             />
