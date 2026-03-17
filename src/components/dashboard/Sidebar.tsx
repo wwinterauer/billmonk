@@ -256,9 +256,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem asChild>
-              <Link to="/settings" className="flex items-center gap-2">
+              <Link to="/account" className="flex items-center gap-2">
                 <User className="h-4 w-4" />
-                Profil
+                Mein Konto
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
