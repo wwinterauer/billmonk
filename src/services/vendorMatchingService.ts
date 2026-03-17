@@ -392,7 +392,7 @@ export async function searchVendors(
       .map(v => {
         let score = 0;
         const displayLower = v.display_name.toLowerCase();
-        const legalLower = v.legal_name?.toLowerCase() || '';
+        const legalLowers = (v.legal_names || []).map((n: string) => n.toLowerCase());
         const detectedLower = v.detected_names?.map((n: string) => n.toLowerCase()) || [];
 
         // Exact display_name match = highest score
