@@ -499,6 +499,80 @@ export type Database = {
           },
         ]
       }
+      customers: {
+        Row: {
+          city: string | null
+          company_name: string | null
+          contact_person: string | null
+          country: string | null
+          created_at: string | null
+          customer_number: string | null
+          default_currency: string | null
+          display_name: string
+          email: string | null
+          id: string
+          is_archived: boolean | null
+          notes: string | null
+          payment_terms_days: number | null
+          phone: string | null
+          street: string | null
+          uid_number: string | null
+          updated_at: string | null
+          user_id: string
+          zip: string | null
+        }
+        Insert: {
+          city?: string | null
+          company_name?: string | null
+          contact_person?: string | null
+          country?: string | null
+          created_at?: string | null
+          customer_number?: string | null
+          default_currency?: string | null
+          display_name: string
+          email?: string | null
+          id?: string
+          is_archived?: boolean | null
+          notes?: string | null
+          payment_terms_days?: number | null
+          phone?: string | null
+          street?: string | null
+          uid_number?: string | null
+          updated_at?: string | null
+          user_id: string
+          zip?: string | null
+        }
+        Update: {
+          city?: string | null
+          company_name?: string | null
+          contact_person?: string | null
+          country?: string | null
+          created_at?: string | null
+          customer_number?: string | null
+          default_currency?: string | null
+          display_name?: string
+          email?: string | null
+          id?: string
+          is_archived?: boolean | null
+          notes?: string | null
+          payment_terms_days?: number | null
+          phone?: string | null
+          street?: string | null
+          uid_number?: string | null
+          updated_at?: string | null
+          user_id?: string
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_accounts: {
         Row: {
           created_at: string | null
@@ -945,6 +1019,288 @@ export type Database = {
           },
         ]
       }
+      invoice_items: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+          unit: string | null
+          unit_price: number | null
+          updated_at: string | null
+          user_id: string
+          vat_rate: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string | null
+          user_id: string
+          vat_rate?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string | null
+          user_id?: string
+          vat_rate?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_line_items: {
+        Row: {
+          created_at: string | null
+          description: string
+          id: string
+          invoice_id: string
+          invoice_item_id: string | null
+          line_total: number | null
+          position: number | null
+          quantity: number | null
+          unit: string | null
+          unit_price: number | null
+          vat_rate: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          id?: string
+          invoice_id: string
+          invoice_item_id?: string | null
+          line_total?: number | null
+          position?: number | null
+          quantity?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          vat_rate?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          id?: string
+          invoice_id?: string
+          invoice_item_id?: string | null
+          line_total?: number | null
+          position?: number | null
+          quantity?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          vat_rate?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_line_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_line_items_invoice_item_id_fkey"
+            columns: ["invoice_item_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_settings: {
+        Row: {
+          auto_send_enabled: boolean | null
+          bank_name: string | null
+          bic: string | null
+          company_logo_path: string | null
+          created_at: string | null
+          default_footer_text: string | null
+          default_notes: string | null
+          default_payment_terms_days: number | null
+          iban: string | null
+          id: string
+          invoice_number_format: string | null
+          invoice_number_prefix: string | null
+          next_sequence_number: number | null
+          overdue_reminder_days: number | null
+          overdue_reminder_enabled: boolean | null
+          send_copy_to_self: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          auto_send_enabled?: boolean | null
+          bank_name?: string | null
+          bic?: string | null
+          company_logo_path?: string | null
+          created_at?: string | null
+          default_footer_text?: string | null
+          default_notes?: string | null
+          default_payment_terms_days?: number | null
+          iban?: string | null
+          id?: string
+          invoice_number_format?: string | null
+          invoice_number_prefix?: string | null
+          next_sequence_number?: number | null
+          overdue_reminder_days?: number | null
+          overdue_reminder_enabled?: boolean | null
+          send_copy_to_self?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          auto_send_enabled?: boolean | null
+          bank_name?: string | null
+          bic?: string | null
+          company_logo_path?: string | null
+          created_at?: string | null
+          default_footer_text?: string | null
+          default_notes?: string | null
+          default_payment_terms_days?: number | null
+          iban?: string | null
+          id?: string
+          invoice_number_format?: string | null
+          invoice_number_prefix?: string | null
+          next_sequence_number?: number | null
+          overdue_reminder_days?: number | null
+          overdue_reminder_enabled?: boolean | null
+          send_copy_to_self?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          created_at: string | null
+          credit_note_for: string | null
+          currency: string | null
+          customer_id: string
+          due_date: string | null
+          footer_text: string | null
+          id: string
+          invoice_date: string | null
+          invoice_number: string
+          notes: string | null
+          paid_at: string | null
+          payment_reference: string | null
+          pdf_storage_path: string | null
+          recurring_invoice_id: string | null
+          sent_at: string | null
+          sent_to_email: string | null
+          status: string | null
+          subtotal: number | null
+          total: number | null
+          updated_at: string | null
+          user_id: string
+          vat_total: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          credit_note_for?: string | null
+          currency?: string | null
+          customer_id: string
+          due_date?: string | null
+          footer_text?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_number: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_reference?: string | null
+          pdf_storage_path?: string | null
+          recurring_invoice_id?: string | null
+          sent_at?: string | null
+          sent_to_email?: string | null
+          status?: string | null
+          subtotal?: number | null
+          total?: number | null
+          updated_at?: string | null
+          user_id: string
+          vat_total?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          credit_note_for?: string | null
+          currency?: string | null
+          customer_id?: string
+          due_date?: string | null
+          footer_text?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_number?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_reference?: string | null
+          pdf_storage_path?: string | null
+          recurring_invoice_id?: string | null
+          sent_at?: string | null
+          sent_to_email?: string | null
+          status?: string | null
+          subtotal?: number | null
+          total?: number | null
+          updated_at?: string | null
+          user_id?: string
+          vat_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_credit_note_for_fkey"
+            columns: ["credit_note_for"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_recurring_invoice_id_fkey"
+            columns: ["recurring_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oauth_states: {
         Row: {
           created_at: string | null
@@ -1314,6 +1670,69 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurring_invoices: {
+        Row: {
+          auto_send: boolean | null
+          created_at: string | null
+          customer_id: string
+          footer_text: string | null
+          id: string
+          interval: string
+          is_active: boolean | null
+          last_generated_at: string | null
+          next_invoice_date: string | null
+          notes: string | null
+          template_line_items: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          auto_send?: boolean | null
+          created_at?: string | null
+          customer_id: string
+          footer_text?: string | null
+          id?: string
+          interval?: string
+          is_active?: boolean | null
+          last_generated_at?: string | null
+          next_invoice_date?: string | null
+          notes?: string | null
+          template_line_items?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          auto_send?: boolean | null
+          created_at?: string | null
+          customer_id?: string
+          footer_text?: string | null
+          id?: string
+          interval?: string
+          is_active?: boolean | null
+          last_generated_at?: string | null
+          next_invoice_date?: string | null
+          notes?: string | null
+          template_line_items?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_invoices_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

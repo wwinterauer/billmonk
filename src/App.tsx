@@ -23,6 +23,7 @@ import ShareReceive from "./pages/ShareReceive";
 import Checklists from "./pages/Checklists";
 import Datenschutz from "./pages/Datenschutz";
 import Onboarding from "./pages/Onboarding";
+import Invoices from "./pages/Invoices";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -115,6 +116,14 @@ const App = () => (
               element={
                 <ProtectedRoute skipOnboardingCheck>
                   <Onboarding />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/invoices" 
+              element={
+                <ProtectedRoute>
+                  <Invoices />
                 </ProtectedRoute>
               } 
             />

@@ -15,12 +15,17 @@ import {
   CreditCard,
   Tags,
   Building,
+  Building2,
   Table2,
   Sparkles,
   Brain,
   Mail,
   Landmark,
   Cloud,
+  
+  Package,
+  FileCheck,
+  Settings2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,6 +60,11 @@ import { EmailImportSettings } from '@/components/settings/EmailImportSettings';
 import { BankImportKeywords } from '@/components/settings/BankImportKeywords';
 import { TagManagement } from '@/components/settings/TagManagement';
 import { CloudStorageSettings } from '@/components/settings/CloudStorageSettings';
+import { CustomerManagement } from '@/components/settings/CustomerManagement';
+import { InvoiceItemManagement } from '@/components/settings/InvoiceItemManagement';
+import { InvoiceTemplateSettings } from '@/components/settings/InvoiceTemplateSettings';
+import { InvoiceModuleSettings } from '@/components/settings/InvoiceModuleSettings';
+import { usePlan } from '@/hooks/usePlan';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
@@ -415,6 +425,29 @@ const Settings = () => {
     );
   }
 
+  const { features } = usePlan();
+
+  const allTabs = [
+    { value: 'naming', icon: FileText, label: 'Umbenennung' },
+    { value: 'recognition', icon: Sparkles, label: 'Erkennung' },
+    { value: 'categories', icon: Tags, label: 'Kategorien' },
+    { value: 'tags', icon: Hash, label: 'Tags' },
+    { value: 'vendors', icon: Building, label: 'Lieferanten' },
+    { value: 'export', icon: Table2, label: 'Export' },
+    { value: 'ai-learning', icon: Brain, label: 'KI-Training' },
+    { value: 'bank-keywords', icon: Landmark, label: 'Bank', requiredFeature: 'bankImport' as const },
+    { value: 'email-import', icon: Mail, label: 'E-Mail', requiredFeature: 'emailImport' as const },
+    { value: 'cloud-storage', icon: Cloud, label: 'Cloud', requiredFeature: 'cloudBackup' as const },
+    { value: 'customers', icon: Building2, label: 'Kunden', requiredFeature: 'invoiceModule' as const },
+    { value: 'invoice-items', icon: Package, label: 'Artikel', requiredFeature: 'invoiceModule' as const },
+    { value: 'invoice-templates', icon: FileCheck, label: 'Rechnung', requiredFeature: 'invoiceModule' as const },
+    { value: 'invoice-settings', icon: Settings2, label: 'Fakturierung', requiredFeature: 'invoiceModule' as const },
+  ];
+
+  const visibleTabs = allTabs.filter(t => 
+    !t.requiredFeature || (features as unknown as Record<string, boolean>)[t.requiredFeature]
+  );
+
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -431,48 +464,14 @@ const Settings = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-10">
-            <TabsTrigger value="naming" className="gap-2">
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Umbenennung</span>
-            </TabsTrigger>
-            <TabsTrigger value="recognition" className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              <span className="hidden sm:inline">Erkennung</span>
-            </TabsTrigger>
-            <TabsTrigger value="categories" className="gap-2">
-              <Tags className="h-4 w-4" />
-              <span className="hidden sm:inline">Kategorien</span>
-            </TabsTrigger>
-            <TabsTrigger value="tags" className="gap-2">
-              <Hash className="h-4 w-4" />
-              <span className="hidden sm:inline">Tags</span>
-            </TabsTrigger>
-            <TabsTrigger value="bank-keywords" className="gap-2">
-              <Landmark className="h-4 w-4" />
-              <span className="hidden sm:inline">Bank</span>
-            </TabsTrigger>
-            <TabsTrigger value="vendors" className="gap-2">
-              <Building className="h-4 w-4" />
-              <span className="hidden sm:inline">Lieferanten</span>
-            </TabsTrigger>
-            <TabsTrigger value="export" className="gap-2">
-              <Table2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Export</span>
-            </TabsTrigger>
-            <TabsTrigger value="ai-learning" className="gap-2">
-              <Brain className="h-4 w-4" />
-              <span className="hidden sm:inline">KI-Training</span>
-            </TabsTrigger>
-            <TabsTrigger value="email-import" className="gap-2">
-              <Mail className="h-4 w-4" />
-              <span className="hidden sm:inline">E-Mail</span>
-            </TabsTrigger>
-            <TabsTrigger value="cloud-storage" className="gap-2">
-              <Cloud className="h-4 w-4" />
-              <span className="hidden sm:inline">Cloud</span>
-            </TabsTrigger>
+        <Tabs value={visibleTabs.some(t => t.value === activeTab) ? activeTab : visibleTabs[0]?.value || 'naming'} onValueChange={handleTabChange} className="space-y-6">
+          <TabsList className="flex flex-wrap w-full h-auto gap-1 p-1">
+            {visibleTabs.map(tab => (
+              <TabsTrigger key={tab.value} value={tab.value} className="gap-2 flex-shrink-0">
+                <tab.icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{tab.label}</span>
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           {/* File Naming Tab */}
@@ -938,11 +937,36 @@ const Settings = () => {
 
       {/* Cloud Storage Tab */}
       <TabsContent value="cloud-storage">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <CloudStorageSettings />
+        </motion.div>
+      </TabsContent>
+
+      {/* Customer Management Tab */}
+      <TabsContent value="customers">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <CustomerManagement />
+        </motion.div>
+      </TabsContent>
+
+      {/* Invoice Items Tab */}
+      <TabsContent value="invoice-items">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <InvoiceItemManagement />
+        </motion.div>
+      </TabsContent>
+
+      {/* Invoice Templates Tab */}
+      <TabsContent value="invoice-templates">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <InvoiceTemplateSettings />
+        </motion.div>
+      </TabsContent>
+
+      {/* Invoice Module Settings Tab */}
+      <TabsContent value="invoice-settings">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <InvoiceModuleSettings />
         </motion.div>
       </TabsContent>
     </Tabs>

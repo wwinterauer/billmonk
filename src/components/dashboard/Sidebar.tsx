@@ -15,7 +15,8 @@ import {
   User,
   FileUp,
   ClipboardList,
-  Shield
+  Shield,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +56,7 @@ const navigation: NavItem[] = [
   { name: 'Alle Ausgaben', href: '/expenses', icon: Receipt },
   { name: 'Kontoabgleich', href: '/reconciliation', icon: Building2, requiredFeature: 'reconciliation' },
   { name: 'Konto-Import', href: '/bank-import', icon: FileUp, requiredFeature: 'bankImport' },
+  { name: 'Rechnungen', href: '/invoices', icon: FileText, requiredFeature: 'invoiceModule' },
   { name: 'Berichte', href: '/reports', icon: BarChart3 },
   { name: 'Checklisten', href: '/checklists', icon: ClipboardList },
   { name: 'Einstellungen', href: '/settings', icon: Settings },
