@@ -133,7 +133,7 @@ export function VendorManagement() {
   // Form state
   const [formData, setFormData] = useState({
     display_name: '',
-    legal_name: '',
+    legal_names: [] as string[],
     detected_names: [] as string[],
     default_category_id: '',
     default_tag_id: '',
