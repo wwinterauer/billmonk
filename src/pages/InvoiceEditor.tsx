@@ -40,9 +40,8 @@ const InvoiceEditor = () => {
   const { id } = useParams<{ id: string }>();
   const isEdit = !!id && id !== 'new';
   const navigate = useNavigate();
-  const { user } = useAuth();
 
-  const { customers, loading: custLoading } = useCustomers();
+  const { customers } = useCustomers();
   const { items: articleTemplates } = useInvoiceItems();
   const { settings } = useInvoiceSettings();
   const { createInvoice, fetchLineItems } = useInvoices();
