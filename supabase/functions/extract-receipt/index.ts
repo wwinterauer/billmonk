@@ -1016,13 +1016,30 @@ Beispiel Kleinunternehmer:
           // Try to find vendor by name for VAT learning
           const { data: vendorMatch } = await supabase
             .from('vendors')
-            .select('id, expenses_only_extraction')
+            .select('id, expenses_only_extraction, legal_names')
             .eq('user_id', receiptInfo.user_id)
-            .or(`display_name.ilike.${extractedData.vendor},legal_name.ilike.${extractedData.vendor}`)
+            .or(`display_name.ilike.${extractedData.vendor}`)
             .maybeSingle();
 
-          const vendorId = receiptInfo.vendor_id || vendorMatch?.id;
-          const vendorExpensesOnly = vendorMatch?.expenses_only_extraction === true;
+          // If no match by display_name, check legal_names arrays
+          let finalVendorMatch = vendorMatch;
+          if (!finalVendorMatch) {
+            const { data: allVendors } = await supabase
+              .from('vendors')
+              .select('id, expenses_only_extraction, legal_names')
+              .eq('user_id', receiptInfo.user_id);
+            
+            if (allVendors) {
+              finalVendorMatch = allVendors.find(v => 
+                (v.legal_names || []).some((ln: string) => 
+                  ln.toLowerCase() === extractedData.vendor.toLowerCase()
+                )
+              ) || null;
+            }
+          }
+
+          const vendorId = receiptInfo.vendor_id || finalVendorMatch?.id;
+          const _vendorExpensesOnly = finalVendorMatch?.expenses_only_extraction === true;
 
           if (vendorId) {
             // Check for learned VAT rate

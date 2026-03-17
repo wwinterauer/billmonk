@@ -6,7 +6,7 @@ export interface Vendor {
   id: string;
   user_id: string;
   display_name: string;
-  legal_name: string | null;
+  legal_names: string[];
   detected_names: string[];
   default_category_id: string | null;
   default_tag_id: string | null;
@@ -87,8 +87,9 @@ export function useVendors() {
         const stats = statsMap.get(v.id);
         return {
           ...v,
-          detected_names: v.detected_names || [],
-          receipt_count: stats?.count ?? v.receipt_count ?? 0,
+      legal_names: v.legal_names || [],
+      detected_names: v.detected_names || [],
+      receipt_count: stats?.count ?? v.receipt_count ?? 0,
           total_amount: stats?.total ?? Number(v.total_amount) ?? 0,
           learning_enabled: v.learning_enabled ?? true,
           learning_level: v.learning_level ?? 0,
@@ -142,7 +143,7 @@ export function useVendors() {
       .insert({
         user_id: user.id,
         display_name: displayName,
-        legal_name: options?.legalName || null,
+        legal_names: options?.legalName ? [options.legalName] : [],
         detected_names: options?.detectedNames || [],
         default_category_id: options?.defaultCategoryId || null,
         default_tag_id: options?.defaultTagId || null,
@@ -163,6 +164,7 @@ export function useVendors() {
 
     const newVendor = {
       ...data,
+      legal_names: data.legal_names || [],
       detected_names: data.detected_names || [],
       receipt_count: data.receipt_count || 0,
       total_amount: Number(data.total_amount) || 0,
@@ -185,7 +187,7 @@ export function useVendors() {
 
   const updateVendor = async (
     id: string,
-    updates: Partial<Pick<Vendor, 'display_name' | 'legal_name' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_payment_method' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
+    updates: Partial<Pick<Vendor, 'display_name' | 'legal_names' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_payment_method' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
   ): Promise<{ vendor: Vendor; syncedReceipts: number; autoApprovedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
 
@@ -215,12 +217,13 @@ export function useVendors() {
 
     // Sync linked receipts with new vendor names
     let syncedReceipts = 0;
-    if (updates.display_name !== undefined || updates.legal_name !== undefined) {
-      const newLegalName = updates.legal_name !== undefined ? updates.legal_name : data.legal_name;
+    if (updates.display_name !== undefined || updates.legal_names !== undefined) {
+      const newLegalNames = updates.legal_names !== undefined ? updates.legal_names : (data.legal_names || []);
+      const primaryLegalName = newLegalNames.length > 0 ? newLegalNames[0] : null;
       const newBrandName = updates.display_name !== undefined ? updates.display_name : data.display_name;
       
-      const receiptVendor = newLegalName || newBrandName;
-      const receiptBrand = (newLegalName && newBrandName !== newLegalName) ? newBrandName : null;
+      const receiptVendor = primaryLegalName || newBrandName;
+      const receiptBrand = (primaryLegalName && newBrandName !== primaryLegalName) ? newBrandName : null;
 
       const { data: updateResult, error: syncError } = await supabase
         .from('receipts')
@@ -348,7 +351,11 @@ export function useVendors() {
       // Build list of all name variants to match unlinked receipts
       const nameVariants = new Set<string>();
       if (data.display_name) nameVariants.add(data.display_name.toLowerCase());
-      if (data.legal_name) nameVariants.add(data.legal_name.toLowerCase());
+      if (data.legal_names) {
+        for (const ln of data.legal_names) {
+          if (ln) nameVariants.add(ln.toLowerCase());
+        }
+      }
       if (data.detected_names) {
         for (const n of data.detected_names) {
           if (n) nameVariants.add(n.toLowerCase());
@@ -437,6 +444,7 @@ export function useVendors() {
 
     const updated = {
       ...data,
+      legal_names: data.legal_names || [],
       detected_names: data.detected_names || [],
       receipt_count: data.receipt_count || 0,
       total_amount: Number(data.total_amount) || 0,

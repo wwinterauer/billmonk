@@ -5,7 +5,7 @@ export interface MatchedVendor {
   id: string;
   user_id: string;
   display_name: string;
-  legal_name: string | null;
+  legal_names: string[];
   detected_names: string[];
   default_category_id: string | null;
   default_vat_rate: number | null;
@@ -217,10 +217,12 @@ export async function findOrCreateVendor(
         if (sim > detectedSim) detectedSim = sim;
       }
 
-      // Legal Name similarity
-      const legalSim = vendor.legal_name
-        ? calculateSimilarity(detectedName, vendor.legal_name)
-        : 0;
+      // Legal Names similarity (find best match across all legal names)
+      let legalSim = 0;
+      for (const ln of vendor.legal_names || []) {
+        const sim = calculateSimilarity(detectedName, ln);
+        if (sim > legalSim) legalSim = sim;
+      }
 
       // Take the highest similarity
       const bestScore = Math.max(displaySim, detectedSim, legalSim);
@@ -315,7 +317,7 @@ async function createVendorInternal(
       user_id: userId,
       display_name: name.trim(),
       detected_names: [name.trim()],
-      legal_name: legalName?.trim() || null
+      legal_names: legalName?.trim() ? [legalName.trim()] : []
     })
     .select(`
       *,
@@ -390,7 +392,7 @@ export async function searchVendors(
       .map(v => {
         let score = 0;
         const displayLower = v.display_name.toLowerCase();
-        const legalLower = v.legal_name?.toLowerCase() || '';
+        const legalLowers = (v.legal_names || []).map((n: string) => n.toLowerCase());
         const detectedLower = v.detected_names?.map((n: string) => n.toLowerCase()) || [];
 
         // Exact display_name match = highest score
@@ -399,8 +401,8 @@ export async function searchVendors(
         else if (displayLower.startsWith(normalizedTerm)) score = 80;
         // Contains = medium score
         else if (displayLower.includes(normalizedTerm)) score = 60;
-        // Legal name match
-        else if (legalLower.includes(normalizedTerm)) score = 50;
+        // Legal names match
+        else if (legalLowers.some((n: string) => n.includes(normalizedTerm))) score = 50;
         // Detected names match
         else if (detectedLower.some((n: string) => n.includes(normalizedTerm))) score = 40;
 
@@ -498,7 +500,7 @@ function mapVendor(data: any): MatchedVendor {
     id: data.id,
     user_id: data.user_id,
     display_name: data.display_name,
-    legal_name: data.legal_name,
+    legal_names: data.legal_names || [],
     detected_names: data.detected_names || [],
     default_category_id: data.default_category_id,
     default_vat_rate: data.default_vat_rate,

@@ -80,12 +80,20 @@ export function calculateVendorSimilarity(
   weights += 0.4;
   if (displayNameSim >= 80) reasons.push(`Ähnlicher Name (${displayNameSim}%)`);
 
-  // 2. Legal Name Ähnlichkeit (Gewicht: 30%)
-  if (vendor1.legal_name && vendor2.legal_name) {
-    const legalNameSim = calculateSimilarity(vendor1.legal_name, vendor2.legal_name);
-    totalScore += legalNameSim * 0.3;
+  // 2. Legal Names Ähnlichkeit (Gewicht: 30%)
+  const legalNames1 = vendor1.legal_names || [];
+  const legalNames2 = vendor2.legal_names || [];
+  if (legalNames1.length > 0 && legalNames2.length > 0) {
+    let bestLegalSim = 0;
+    for (const ln1 of legalNames1) {
+      for (const ln2 of legalNames2) {
+        const sim = calculateSimilarity(ln1, ln2);
+        if (sim > bestLegalSim) bestLegalSim = sim;
+      }
+    }
+    totalScore += bestLegalSim * 0.3;
     weights += 0.3;
-    if (legalNameSim >= 80) reasons.push(`Ähnlicher Firmenname (${legalNameSim}%)`);
+    if (bestLegalSim >= 80) reasons.push(`Ähnlicher Firmenname (${bestLegalSim}%)`);
   }
 
   // 3. Detected Names Überschneidung (Gewicht: 30%)
@@ -184,9 +192,9 @@ export function findSimilarVendor(
       bestMatch = { vendor, score: displaySim };
     }
 
-    // Check against legal_name
-    if (vendor.legal_name) {
-      const legalSim = calculateSimilarity(newName, vendor.legal_name);
+    // Check against legal_names
+    for (const legalName of vendor.legal_names || []) {
+      const legalSim = calculateSimilarity(newName, legalName);
       if (legalSim >= minScore && (!bestMatch || legalSim > bestMatch.score)) {
         bestMatch = { vendor, score: legalSim };
       }

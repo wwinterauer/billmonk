@@ -1455,7 +1455,7 @@ export type Database = {
           id: string
           learning_enabled: boolean | null
           learning_level: number | null
-          legal_name: string | null
+          legal_names: string[] | null
           notes: string | null
           prediction_accuracy: number | null
           receipt_count: number | null
@@ -1481,7 +1481,7 @@ export type Database = {
           id?: string
           learning_enabled?: boolean | null
           learning_level?: number | null
-          legal_name?: string | null
+          legal_names?: string[] | null
           notes?: string | null
           prediction_accuracy?: number | null
           receipt_count?: number | null
@@ -1507,7 +1507,7 @@ export type Database = {
           id?: string
           learning_enabled?: boolean | null
           learning_level?: number | null
-          legal_name?: string | null
+          legal_names?: string[] | null
           notes?: string | null
           prediction_accuracy?: number | null
           receipt_count?: number | null

@@ -112,7 +112,7 @@ export function VendorManagement() {
 
   interface MergePreview {
     display_name: string;
-    legal_name: string;
+    legal_names: string[];
     detected_names: string[];
     default_category_id: string | null;
     default_vat_rate: number | null;
@@ -133,7 +133,7 @@ export function VendorManagement() {
   // Form state
   const [formData, setFormData] = useState({
     display_name: '',
-    legal_name: '',
+    legal_names: [] as string[],
     detected_names: [] as string[],
     default_category_id: '',
     default_tag_id: '',
@@ -153,7 +153,7 @@ export function VendorManagement() {
   const resetForm = () => {
     setFormData({
       display_name: '',
-      legal_name: '',
+      legal_names: [],
       detected_names: [],
       default_category_id: '',
       default_tag_id: '',
@@ -175,7 +175,7 @@ export function VendorManagement() {
     setEditingVendor(vendor);
     setFormData({
       display_name: vendor.display_name,
-      legal_name: vendor.legal_name || '',
+      legal_names: vendor.legal_names || [],
       detected_names: vendor.detected_names || [],
       default_category_id: vendor.default_category_id || '',
       default_tag_id: vendor.default_tag_id || '',
@@ -242,7 +242,7 @@ export function VendorManagement() {
       if (editingVendor) {
         const result = await updateVendor(editingVendor.id, {
           display_name: formData.display_name.trim(),
-          legal_name: formData.legal_name.trim() || null,
+          legal_names: formData.legal_names.filter(n => n.trim()),
           detected_names: formData.detected_names,
           default_category_id: formData.default_category_id || null,
           default_tag_id: formData.default_tag_id || null,
@@ -272,7 +272,7 @@ export function VendorManagement() {
         }
       } else {
         await addVendor(formData.display_name.trim(), {
-          legalName: formData.legal_name.trim() || undefined,
+          legalName: formData.legal_names[0]?.trim() || undefined,
           detectedNames: formData.detected_names,
           defaultCategoryId: formData.default_category_id || undefined,
           defaultTagId: formData.default_tag_id || undefined,
@@ -445,7 +445,7 @@ export function VendorManagement() {
 
     setMergePreview({
       display_name: original.display_name,
-      legal_name: original.legal_name || duplicate.legal_name || '',
+      legal_names: [...new Set([...(original.legal_names || []), ...(duplicate.legal_names || [])])],
       detected_names: allDetectedNames,
       default_category_id: original.default_category_id || duplicate.default_category_id,
       default_vat_rate: original.default_vat_rate || duplicate.default_vat_rate,
@@ -467,7 +467,7 @@ export function VendorManagement() {
         .from('vendors')
         .update({
           display_name: mergePreview.display_name,
-          legal_name: mergePreview.legal_name || null,
+          legal_names: mergePreview.legal_names,
           detected_names: mergePreview.detected_names,
           default_category_id: mergePreview.default_category_id,
           default_vat_rate: mergePreview.default_vat_rate,
@@ -649,7 +649,7 @@ export function VendorManagement() {
       const query = searchQuery.toLowerCase();
       result = result.filter(v =>
         v.display_name.toLowerCase().includes(query) ||
-        v.legal_name?.toLowerCase().includes(query) ||
+        v.legal_names?.some(n => n.toLowerCase().includes(query)) ||
         v.detected_names.some(n => n.toLowerCase().includes(query)) ||
         v.notes?.toLowerCase().includes(query)
       );
@@ -980,7 +980,7 @@ export function VendorManagement() {
                             </div>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
-                            {vendor.legal_name || '–'}
+                            {vendor.legal_names?.length ? vendor.legal_names.join(', ') : '–'}
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1 max-w-[200px]">
@@ -1169,17 +1169,63 @@ export function VendorManagement() {
               </p>
             </div>
 
-            {/* Rechtlicher Name */}
+            {/* Rechtliche Firmennamen */}
             <div className="space-y-2">
-              <Label htmlFor="legal_name">Rechtlicher Firmenname</Label>
-              <Input
-                id="legal_name"
-                value={formData.legal_name}
-                onChange={(e) => setFormData(prev => ({ ...prev, legal_name: e.target.value }))}
-                placeholder="z.B. Amazon EU S.à r.l., Mass Response Service GmbH"
-              />
+              <Label>Rechtliche Firmennamen</Label>
+              <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg min-h-[40px]">
+                {formData.legal_names.map((name, i) => (
+                  <Badge key={i} variant="secondary" className="flex items-center gap-1 pr-1">
+                    {name}
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({
+                        ...prev,
+                        legal_names: prev.legal_names.filter((_, idx) => idx !== i)
+                      }))}
+                      className="ml-1 rounded-full hover:bg-destructive/20 p-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+                {formData.legal_names.length === 0 && (
+                  <span className="text-muted-foreground text-sm">Noch keine Firmennamen hinterlegt</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  id="new_legal_name"
+                  placeholder="z.B. Amazon EU S.à r.l."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const input = e.currentTarget;
+                      const val = input.value.trim();
+                      if (val && !formData.legal_names.includes(val)) {
+                        setFormData(prev => ({ ...prev, legal_names: [...prev.legal_names, val] }));
+                        input.value = '';
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const input = document.getElementById('new_legal_name') as HTMLInputElement;
+                    const val = input?.value.trim();
+                    if (val && !formData.legal_names.includes(val)) {
+                      setFormData(prev => ({ ...prev, legal_names: [...prev.legal_names, val] }));
+                      input.value = '';
+                    }
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">
-                Offizieller Firmenname für Buchhaltung und Belege (falls abweichend)
+                Mehrere rechtliche Firmennamen möglich – z.B. für Marktplätze wie Amazon mit verschiedenen Händlern
               </p>
             </div>
 
@@ -1747,8 +1793,8 @@ export function VendorManagement() {
                             </Badge>
                           </div>
                           <p className="font-medium">{item.vendor.display_name}</p>
-                          {item.vendor.legal_name && (
-                            <p className="text-sm text-muted-foreground">{item.vendor.legal_name}</p>
+                          {item.vendor.legal_names?.length > 0 && (
+                            <p className="text-sm text-muted-foreground">{item.vendor.legal_names.join(', ')}</p>
                           )}
                           <p className="text-xs text-muted-foreground mt-1">
                             {item.vendor.receipt_count} Belege • {formatCurrency(item.vendor.total_amount || 0)}
@@ -1783,8 +1829,8 @@ export function VendorManagement() {
                             </Badge>
                           </div>
                           <p className="font-medium">{item.matchingVendor.display_name}</p>
-                          {item.matchingVendor.legal_name && (
-                            <p className="text-sm text-muted-foreground">{item.matchingVendor.legal_name}</p>
+                          {item.matchingVendor.legal_names?.length > 0 && (
+                            <p className="text-sm text-muted-foreground">{item.matchingVendor.legal_names.join(', ')}</p>
                           )}
                           <p className="text-xs text-muted-foreground mt-1">
                             {item.matchingVendor.receipt_count} Belege • {formatCurrency(item.matchingVendor.total_amount || 0)}
@@ -1864,8 +1910,8 @@ export function VendorManagement() {
                 </CardHeader>
                 <CardContent className="text-sm space-y-1">
                   <p className="font-medium">{mergeSource?.display_name}</p>
-                  {mergeSource?.legal_name && (
-                    <p className="text-muted-foreground">{mergeSource.legal_name}</p>
+                  {mergeSource?.legal_names?.length > 0 && (
+                    <p className="text-muted-foreground">{mergeSource.legal_names.join(', ')}</p>
                   )}
                   <p className="text-muted-foreground">
                     {mergeSource?.receipt_count} Belege
@@ -1883,8 +1929,8 @@ export function VendorManagement() {
                 </CardHeader>
                 <CardContent className="text-sm space-y-1">
                   <p className="font-medium">{mergeTarget?.display_name}</p>
-                  {mergeTarget?.legal_name && (
-                    <p className="text-muted-foreground">{mergeTarget.legal_name}</p>
+                  {mergeTarget?.legal_names?.length > 0 && (
+                    <p className="text-muted-foreground">{mergeTarget.legal_names.join(', ')}</p>
                   )}
                   <p className="text-muted-foreground">
                     {mergeTarget?.receipt_count} Belege
@@ -1911,14 +1957,19 @@ export function VendorManagement() {
                   />
                 </div>
 
-                {/* Legal Name */}
+                {/* Legal Names */}
                 <div>
-                  <Label className="text-xs text-muted-foreground">Rechtlicher Firmenname</Label>
-                  <Input
-                    value={mergePreview?.legal_name || ''}
-                    onChange={(e) => setMergePreview(prev => prev ? { ...prev, legal_name: e.target.value } : null)}
-                    placeholder="Optional"
-                  />
+                  <Label className="text-xs text-muted-foreground">Rechtliche Firmennamen</Label>
+                  <div className="flex flex-wrap gap-1 p-2 bg-muted/30 rounded-lg min-h-[40px]">
+                    {mergePreview?.legal_names.map((name, i) => (
+                      <Badge key={i} variant="secondary" className="text-xs">
+                        {name}
+                      </Badge>
+                    ))}
+                    {(!mergePreview?.legal_names.length) && (
+                      <span className="text-xs text-muted-foreground">Keine</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Detected Variants */}

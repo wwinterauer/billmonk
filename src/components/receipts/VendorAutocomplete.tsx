@@ -10,7 +10,7 @@ import { ChevronsUpDown, Search, Plus } from 'lucide-react';
 interface VendorWithCategory {
   id: string;
   display_name: string;
-  legal_name: string | null;
+  legal_names: string[] | null;
   detected_names: string[] | null;
   default_category_id: string | null;
   default_tag_id: string | null;
@@ -74,7 +74,7 @@ export function VendorAutocomplete({
         .select(`
           id,
           display_name,
-          legal_name,
+          legal_names,
           detected_names,
           default_category_id,
           default_tag_id,
@@ -134,7 +134,7 @@ export function VendorAutocomplete({
     } else {
       const filtered = allVendors.filter(v =>
         v.display_name.toLowerCase().includes(search) ||
-        v.legal_name?.toLowerCase().includes(search) ||
+        v.legal_names?.some(n => n.toLowerCase().includes(search)) ||
         v.detected_names?.some(n => n.toLowerCase().includes(search))
       );
 
@@ -280,10 +280,10 @@ export function VendorAutocomplete({
 
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">
-                      {vendor.legal_name || vendor.display_name}
+                      {vendor.legal_names?.length ? vendor.legal_names[0] : vendor.display_name}
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {vendor.legal_name && vendor.legal_name !== vendor.display_name && (
+                      {vendor.legal_names?.length && vendor.legal_names[0] !== vendor.display_name && (
                         <span className="truncate max-w-[120px]">{vendor.display_name}</span>
                       )}
                       {vendor.default_category && (
