@@ -87,8 +87,9 @@ export function useVendors() {
         const stats = statsMap.get(v.id);
         return {
           ...v,
-          detected_names: v.detected_names || [],
-          receipt_count: stats?.count ?? v.receipt_count ?? 0,
+      legal_names: v.legal_names || [],
+      detected_names: v.detected_names || [],
+      receipt_count: stats?.count ?? v.receipt_count ?? 0,
           total_amount: stats?.total ?? Number(v.total_amount) ?? 0,
           learning_enabled: v.learning_enabled ?? true,
           learning_level: v.learning_level ?? 0,
