@@ -401,8 +401,8 @@ export async function searchVendors(
         else if (displayLower.startsWith(normalizedTerm)) score = 80;
         // Contains = medium score
         else if (displayLower.includes(normalizedTerm)) score = 60;
-        // Legal name match
-        else if (legalLower.includes(normalizedTerm)) score = 50;
+        // Legal names match
+        else if (legalLowers.some((n: string) => n.includes(normalizedTerm))) score = 50;
         // Detected names match
         else if (detectedLower.some((n: string) => n.includes(normalizedTerm))) score = 40;
 
