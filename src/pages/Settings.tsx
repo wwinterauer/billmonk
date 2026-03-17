@@ -425,6 +425,29 @@ const Settings = () => {
     );
   }
 
+  const { features } = usePlan();
+
+  const allTabs = [
+    { value: 'naming', icon: FileText, label: 'Umbenennung' },
+    { value: 'recognition', icon: Sparkles, label: 'Erkennung' },
+    { value: 'categories', icon: Tags, label: 'Kategorien' },
+    { value: 'tags', icon: Hash, label: 'Tags' },
+    { value: 'vendors', icon: Building, label: 'Lieferanten' },
+    { value: 'export', icon: Table2, label: 'Export' },
+    { value: 'ai-learning', icon: Brain, label: 'KI-Training' },
+    { value: 'bank-keywords', icon: Landmark, label: 'Bank', requiredFeature: 'bankImport' as const },
+    { value: 'email-import', icon: Mail, label: 'E-Mail', requiredFeature: 'emailImport' as const },
+    { value: 'cloud-storage', icon: Cloud, label: 'Cloud', requiredFeature: 'cloudBackup' as const },
+    { value: 'customers', icon: Building2, label: 'Kunden', requiredFeature: 'invoiceModule' as const },
+    { value: 'invoice-items', icon: Package, label: 'Artikel', requiredFeature: 'invoiceModule' as const },
+    { value: 'invoice-templates', icon: FileCheck, label: 'Rechnung', requiredFeature: 'invoiceModule' as const },
+    { value: 'invoice-settings', icon: Settings2, label: 'Fakturierung', requiredFeature: 'invoiceModule' as const },
+  ];
+
+  const visibleTabs = allTabs.filter(t => 
+    !t.requiredFeature || (features as Record<string, boolean>)[t.requiredFeature]
+  );
+
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
     setActiveTab(value);
