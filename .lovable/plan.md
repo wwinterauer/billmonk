@@ -1,33 +1,39 @@
 
 
-## Plan: Passwort-Funktionalitäten implementieren
+# Gesamtplan: User-Strecke, Stripe-Bezahlung, Admin & Kontingent
 
-### 1. "Passwort vergessen" auf der Login-Seite
+## Status: Phase 1-5 implementiert ✅, Phase 9 vollständig ✅
 
-- Den aktuell deaktivierten Link "Passwort vergessen?" aktivieren und auf `/forgot-password` verlinken
-- **Neue Seite `src/pages/ForgotPassword.tsx`**: E-Mail-Eingabe, ruft `supabase.auth.resetPasswordForEmail(email, { redirectTo: origin + '/reset-password' })` auf, zeigt Bestätigungsmeldung
-- **Neue Seite `src/pages/ResetPassword.tsx`**: Prüft URL-Hash auf `type=recovery`, zeigt Formular für neues Passwort + Bestätigung, ruft `supabase.auth.updateUser({ password })` auf
-- Beide als öffentliche Routen in `App.tsx` registrieren
+### Umgesetzte Phasen:
+- ✅ Phase 1: DB-Migration (profiles erweitert, user_roles, has_role(), reset_monthly_credits())
+- ✅ Phase 2: Admin-Rolle für w.winterauer@gmail.com gesetzt (Business-Plan)
+- ✅ Phase 3: planConfig.ts + usePlan.ts erstellt
+- ✅ Phase 4: Onboarding-Wizard (3 Steps) + ProtectedRoute mit Onboarding-Check
+- ✅ Phase 5: Sidebar mit Kontingent-Balken, Admin-Plan-Switcher, Feature-Gating
+- ✅ Phase 9: Rechnungsmodul komplett
+  - DB: customers, invoice_items, invoices, invoice_line_items, recurring_invoices, invoice_settings (alle mit RLS)
+  - Storage-Bucket: invoices (privat)
+  - Settings-Tabs: Feature-Gating per usePlan + 4 neue Business-Tabs (Kunden, Artikel, Rechnung, Fakturierung)
+  - Hooks: useCustomers, useInvoiceItems, useInvoiceSettings, useInvoices
+  - Komponenten: CustomerManagement, InvoiceItemManagement, InvoiceTemplateSettings, InvoiceModuleSettings
+  - Sidebar: "Rechnungen" Nav-Eintrag (Business-only)
+  - Seiten: /invoices (Liste mit Stats & Filter), /invoices/new (Editor), /invoices/:id/edit (Bearbeitung)
+  - Edge Function: generate-invoice-pdf (PDF-Generierung mit pdf-lib, Upload in Storage)
+  - Edge Function: cron-generate-invoices (täglich 06:00, wiederkehrende Rechnungen + Überfälligkeits-Check)
+  - Cron-Job: generate-recurring-invoices-daily (pg_cron)
 
-### 2. Altes Passwort verifizieren bei Passwortänderung (Account-Seite)
+### Offene Phasen:
+- ⬜ Phase 6: Stripe aktivieren + Edge Functions (create-checkout, stripe-webhook, customer-portal)
+- ⬜ Phase 7: Landing Page Pricing Update (4 Pläne, monatlich/jährlich Toggle)
+- ⬜ Phase 8: Plan-Enforcement (Upload-Limits durchsetzen)
 
-- Im Sicherheits-Tab ein Feld "Aktuelles Passwort" hinzufügen
-- Vor dem Ändern wird `supabase.auth.signInWithPassword({ email, password: currentPassword })` aufgerufen um das alte Passwort zu verifizieren
-- Erst bei Erfolg wird `supabase.auth.updateUser({ password: newPassword })` ausgeführt
-- Passwortstärke-Anforderungen anzeigen (min. 8 Zeichen, Großbuchstabe, Zahl -- analog zur Registrierung)
+---
 
-### 3. Passwort-Validierungsregeln vereinheitlichen
+## Bestehende Bugs
 
-- Gleiche Regeln wie bei der Registrierung: min. 8 Zeichen, 1 Großbuchstabe, 1 Zahl
-- Visuelle Indikatoren (Häkchen/Kreuz) für jede Regel im Sicherheits-Tab und auf der Reset-Seite
-
-### Änderungen
-
-| Datei | Aktion |
-|-------|--------|
-| `src/pages/ForgotPassword.tsx` | Neu: E-Mail-Formular für Passwort-Reset-Link |
-| `src/pages/ResetPassword.tsx` | Neu: Neues Passwort setzen nach Reset-Link |
-| `src/pages/Login.tsx` | Link "Passwort vergessen?" aktivieren → `/forgot-password` |
-| `src/pages/Account.tsx` | Feld "Aktuelles Passwort" + Stärke-Indikatoren hinzufügen |
-| `src/App.tsx` | Routen `/forgot-password` und `/reset-password` hinzufügen |
-
+| Priorität | Problem | Dateien | Aufwand |
+|-----------|---------|---------|--------|
+| HOCH | 4x `parseFloat \|\| null` Bug | `ReceiptDetailPanel.tsx`, `Review.tsx` | 4 Zeilen |
+| HOCH | CorrectionTracking originalVatRate | `useCorrectionTracking.ts` | 1 Zeile |
+| MITTEL | Tote Links `/forgot-password`, `/agb` | `Login.tsx`, `Register.tsx` | 2-50 Zeilen |
+| MITTEL | Badge ohne forwardRef | `badge.tsx` | 5 Zeilen |
