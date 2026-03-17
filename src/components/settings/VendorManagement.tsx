@@ -272,7 +272,7 @@ export function VendorManagement() {
         }
       } else {
         await addVendor(formData.display_name.trim(), {
-          legalName: formData.legal_name.trim() || undefined,
+          legalName: formData.legal_names[0]?.trim() || undefined,
           detectedNames: formData.detected_names,
           defaultCategoryId: formData.default_category_id || undefined,
           defaultTagId: formData.default_tag_id || undefined,
