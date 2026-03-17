@@ -350,7 +350,11 @@ export function useVendors() {
       // Build list of all name variants to match unlinked receipts
       const nameVariants = new Set<string>();
       if (data.display_name) nameVariants.add(data.display_name.toLowerCase());
-      if (data.legal_name) nameVariants.add(data.legal_name.toLowerCase());
+      if (data.legal_names) {
+        for (const ln of data.legal_names) {
+          if (ln) nameVariants.add(ln.toLowerCase());
+        }
+      }
       if (data.detected_names) {
         for (const n of data.detected_names) {
           if (n) nameVariants.add(n.toLowerCase());
