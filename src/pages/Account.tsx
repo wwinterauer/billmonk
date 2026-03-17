@@ -185,18 +185,34 @@ const Account = () => {
   };
 
   const handleChangePassword = async () => {
-    if (newPassword.length < 6) {
-      toast({ variant: 'destructive', title: 'Fehler', description: 'Passwort muss mindestens 6 Zeichen lang sein.' });
+    if (!allPasswordRulesPass) {
+      toast({ variant: 'destructive', title: 'Fehler', description: 'Passwort erfüllt nicht alle Anforderungen.' });
       return;
     }
-    if (newPassword !== confirmPassword) {
+    if (!passwordsMatch) {
       toast({ variant: 'destructive', title: 'Fehler', description: 'Passwörter stimmen nicht überein.' });
       return;
     }
+    if (!currentPassword) {
+      toast({ variant: 'destructive', title: 'Fehler', description: 'Bitte gib dein aktuelles Passwort ein.' });
+      return;
+    }
+
     setPasswordSaving(true);
     try {
+      // Verify current password
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: profile.email,
+        password: currentPassword,
+      });
+      if (signInError) {
+        toast({ variant: 'destructive', title: 'Fehler', description: 'Aktuelles Passwort ist falsch.' });
+        return;
+      }
+
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       toast({ title: 'Passwort geändert', description: 'Dein Passwort wurde erfolgreich aktualisiert.' });
