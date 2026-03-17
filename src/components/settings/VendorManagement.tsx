@@ -112,7 +112,7 @@ export function VendorManagement() {
 
   interface MergePreview {
     display_name: string;
-    legal_name: string;
+    legal_names: string[];
     detected_names: string[];
     default_category_id: string | null;
     default_vat_rate: number | null;
