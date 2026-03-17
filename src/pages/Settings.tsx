@@ -66,6 +66,7 @@ import { InvoiceItemManagement } from '@/components/settings/InvoiceItemManageme
 import { InvoiceTemplateSettings } from '@/components/settings/InvoiceTemplateSettings';
 import { InvoiceModuleSettings } from '@/components/settings/InvoiceModuleSettings';
 import { usePlan } from '@/hooks/usePlan';
+import { SubscriptionSettings } from '@/components/settings/SubscriptionSettings';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
