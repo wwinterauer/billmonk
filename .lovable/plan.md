@@ -1,20 +1,39 @@
 
 
-## Plan: Newsletter-Einstellungen zum Account-Bereich hinzufügen
+# Gesamtplan: User-Strecke, Stripe-Bezahlung, Admin & Kontingent
 
-Der Newsletter-Opt-in wird aktuell nur beim Onboarding gesetzt. Er soll auch in der Account-Seite änderbar sein.
+## Status: Phase 1-5 implementiert ✅, Phase 9 vollständig ✅
 
-### Änderung
+### Umgesetzte Phasen:
+- ✅ Phase 1: DB-Migration (profiles erweitert, user_roles, has_role(), reset_monthly_credits())
+- ✅ Phase 2: Admin-Rolle für w.winterauer@gmail.com gesetzt (Business-Plan)
+- ✅ Phase 3: planConfig.ts + usePlan.ts erstellt
+- ✅ Phase 4: Onboarding-Wizard (3 Steps) + ProtectedRoute mit Onboarding-Check
+- ✅ Phase 5: Sidebar mit Kontingent-Balken, Admin-Plan-Switcher, Feature-Gating
+- ✅ Phase 9: Rechnungsmodul komplett
+  - DB: customers, invoice_items, invoices, invoice_line_items, recurring_invoices, invoice_settings (alle mit RLS)
+  - Storage-Bucket: invoices (privat)
+  - Settings-Tabs: Feature-Gating per usePlan + 4 neue Business-Tabs (Kunden, Artikel, Rechnung, Fakturierung)
+  - Hooks: useCustomers, useInvoiceItems, useInvoiceSettings, useInvoices
+  - Komponenten: CustomerManagement, InvoiceItemManagement, InvoiceTemplateSettings, InvoiceModuleSettings
+  - Sidebar: "Rechnungen" Nav-Eintrag (Business-only)
+  - Seiten: /invoices (Liste mit Stats & Filter), /invoices/new (Editor), /invoices/:id/edit (Bearbeitung)
+  - Edge Function: generate-invoice-pdf (PDF-Generierung mit pdf-lib, Upload in Storage)
+  - Edge Function: cron-generate-invoices (täglich 06:00, wiederkehrende Rechnungen + Überfälligkeits-Check)
+  - Cron-Job: generate-recurring-invoices-daily (pg_cron)
 
-In `src/pages/Account.tsx` (die neue Account-Seite, die im vorherigen Plan beschrieben wurde) wird im **Profil-Tab** ein zusätzlicher Abschnitt "Newsletter" ergänzt:
+### Offene Phasen:
+- ⬜ Phase 6: Stripe aktivieren + Edge Functions (create-checkout, stripe-webhook, customer-portal)
+- ⬜ Phase 7: Landing Page Pricing Update (4 Pläne, monatlich/jährlich Toggle)
+- ⬜ Phase 8: Plan-Enforcement (Upload-Limits durchsetzen)
 
-- Switch/Checkbox für `newsletter_opt_in` mit Label "XpenzAI Newsletter erhalten (Tipps, Updates, Angebote)"
-- Wird beim Laden des Profils aus `profiles.newsletter_opt_in` gelesen
-- Wird beim Speichern zusammen mit den anderen Profildaten persistiert
+---
 
-Kein DB-Schema-Change nötig -- `newsletter_opt_in` existiert bereits in der `profiles`-Tabelle.
+## Bestehende Bugs
 
-### Einordnung
-
-Dies wird als Teil des Profil-Tabs der Account-Seite implementiert, zusammen mit den anderen persönlichen Einstellungen (Name, Telefon, Profilbild). Es ist ein einfacher Switch unterhalb der Kontaktdaten.
-
+| Priorität | Problem | Dateien | Aufwand |
+|-----------|---------|---------|--------|
+| HOCH | 4x `parseFloat \|\| null` Bug | `ReceiptDetailPanel.tsx`, `Review.tsx` | 4 Zeilen |
+| HOCH | CorrectionTracking originalVatRate | `useCorrectionTracking.ts` | 1 Zeile |
+| MITTEL | Tote Links `/forgot-password`, `/agb` | `Login.tsx`, `Register.tsx` | 2-50 Zeilen |
+| MITTEL | Badge ohne forwardRef | `badge.tsx` | 5 Zeilen |

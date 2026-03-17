@@ -1343,6 +1343,7 @@ export type Database = {
         Row: {
           account_type: string | null
           admin_view_plan: string | null
+          avatar_url: string | null
           city: string | null
           company_name: string | null
           country: string | null
@@ -1371,6 +1372,7 @@ export type Database = {
         Insert: {
           account_type?: string | null
           admin_view_plan?: string | null
+          avatar_url?: string | null
           city?: string | null
           company_name?: string | null
           country?: string | null
@@ -1399,6 +1401,7 @@ export type Database = {
         Update: {
           account_type?: string | null
           admin_view_plan?: string | null
+          avatar_url?: string | null
           city?: string | null
           company_name?: string | null
           country?: string | null
