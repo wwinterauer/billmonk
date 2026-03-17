@@ -94,7 +94,7 @@ export function SubscriptionSettings() {
             </div>
             <div className="text-center p-3 rounded-lg bg-muted/50">
               <p className="text-2xl font-bold text-foreground">
-                {receiptsLimit - receiptsUsed + receiptsCredit}
+                {Math.max(0, receiptsLimit - receiptsUsed)}
               </p>
               <p className="text-xs text-muted-foreground">verfügbar</p>
             </div>
