@@ -15,7 +15,8 @@ import {
   User,
   FileUp,
   ClipboardList,
-  Shield
+  Shield,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
