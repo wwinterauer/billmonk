@@ -429,6 +429,7 @@ const Settings = () => {
   }
 
   const allTabs = [
+    { value: 'subscription', icon: Crown, label: 'Abo' },
     { value: 'naming', icon: FileText, label: 'Umbenennung' },
     { value: 'recognition', icon: Sparkles, label: 'Erkennung' },
     { value: 'categories', icon: Tags, label: 'Kategorien' },
