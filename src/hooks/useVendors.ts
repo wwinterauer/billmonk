@@ -221,8 +221,8 @@ export function useVendors() {
       const primaryLegalName = newLegalNames.length > 0 ? newLegalNames[0] : null;
       const newBrandName = updates.display_name !== undefined ? updates.display_name : data.display_name;
       
-      const receiptVendor = newLegalName || newBrandName;
-      const receiptBrand = (newLegalName && newBrandName !== newLegalName) ? newBrandName : null;
+      const receiptVendor = primaryLegalName || newBrandName;
+      const receiptBrand = (primaryLegalName && newBrandName !== primaryLegalName) ? newBrandName : null;
 
       const { data: updateResult, error: syncError } = await supabase
         .from('receipts')
