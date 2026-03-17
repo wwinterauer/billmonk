@@ -74,7 +74,7 @@ export function VendorAutocomplete({
         .select(`
           id,
           display_name,
-          legal_name,
+          legal_names,
           detected_names,
           default_category_id,
           default_tag_id,
