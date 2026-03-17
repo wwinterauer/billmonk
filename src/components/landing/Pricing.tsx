@@ -1,57 +1,120 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { motion } from 'framer-motion';
+import { PLAN_PRICES, PLAN_LIMITS, PlanType } from '@/lib/planConfig';
+import { STRIPE_TIERS } from '@/lib/stripeConfig';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-const plans = [
+interface PlanInfo {
+  name: string;
+  plan: PlanType;
+  description: string;
+  features: string[];
+  cta: string;
+  featured: boolean;
+}
+
+const plans: PlanInfo[] = [
   {
     name: 'Free',
-    price: '€0',
-    period: '/Monat',
+    plan: 'free',
     description: 'Perfekt zum Ausprobieren',
     features: [
-      '10 Belege/Monat',
-      '1 Cloud-Ordner',
+      `${PLAN_LIMITS.free.receiptsPerMonth} Belege/Monat`,
+      'KI-Erkennung',
+      'Beleg-Umbenennung',
       'E-Mail Support',
     ],
     cta: 'Kostenlos starten',
-    href: '/register',
+    featured: false,
+  },
+  {
+    name: 'Starter',
+    plan: 'starter',
+    description: 'Für den Einstieg',
+    features: [
+      `${PLAN_LIMITS.starter.receiptsPerMonth} Belege/Monat`,
+      'Kontoabgleich',
+      'E-Mail Import',
+      'Rollover-Guthaben',
+    ],
+    cta: 'Starter wählen',
     featured: false,
   },
   {
     name: 'Pro',
-    price: '€9,90',
-    period: '/Monat',
+    plan: 'pro',
     description: 'Für Freelancer & Selbstständige',
     features: [
-      '100 Belege/Monat',
-      'Unbegrenzte Cloud-Ordner',
-      'Kontoabgleich',
+      `${PLAN_LIMITS.pro.receiptsPerMonth} Belege/Monat`,
+      'Alles aus Starter',
+      'Cloud-Backup',
       'Priority Support',
     ],
     cta: 'Pro wählen',
-    href: '/register',
     featured: true,
   },
   {
     name: 'Business',
-    price: '€19,90',
-    period: '/Monat',
+    plan: 'business',
     description: 'Für Teams & Unternehmen',
     features: [
-      'Unbegrenzte Belege',
-      'Multi-User',
-      'API-Zugang',
+      `${PLAN_LIMITS.business.receiptsPerMonth} Belege/Monat`,
+      'Alles aus Pro',
+      'Rechnungsmodul',
       'Dedicated Support',
     ],
-    cta: 'Kontakt',
-    href: '/register',
+    cta: 'Business wählen',
     featured: false,
   },
 ];
 
 export function Pricing() {
+  const [yearly, setYearly] = useState(false);
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const getPrice = (plan: PlanType) => {
+    const prices = PLAN_PRICES[plan];
+    if (yearly) {
+      return `€${prices.yearly.toFixed(2).replace('.', ',')}`;
+    }
+    return `€${prices.monthly.toFixed(2).replace('.', ',')}`;
+  };
+
+  const handleCheckout = async (plan: PlanType) => {
+    if (plan === 'free') return;
+
+    setLoadingPlan(plan);
+    try {
+      const tier = STRIPE_TIERS[plan as keyof typeof STRIPE_TIERS];
+      const priceId = yearly ? tier.yearlyPriceId : tier.monthlyPriceId;
+
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { priceId },
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, '_blank');
+      }
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Checkout konnte nicht gestartet werden. Bist du eingeloggt?',
+      });
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
   return (
     <section id="pricing" className="py-20 bg-background">
       <div className="container">
@@ -65,12 +128,28 @@ export function Pricing() {
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
             Einfache Preise
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
             Wähle den Plan, der zu dir passt. Jederzeit kündbar.
           </p>
+
+          {/* Monthly/Yearly Toggle */}
+          <div className="flex items-center justify-center gap-3">
+            <Label htmlFor="billing-toggle" className={!yearly ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+              Monatlich
+            </Label>
+            <Switch
+              id="billing-toggle"
+              checked={yearly}
+              onCheckedChange={setYearly}
+            />
+            <Label htmlFor="billing-toggle" className={yearly ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+              Jährlich
+              <span className="ml-1.5 text-xs text-primary font-semibold">-17%</span>
+            </Label>
+          </div>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {plans.map((plan, index) => (
             <motion.div
               key={plan.name}
@@ -79,10 +158,10 @@ export function Pricing() {
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: index * 0.1 }}
             >
-              <Card 
+              <Card
                 className={`h-full relative ${
-                  plan.featured 
-                    ? 'border-2 border-primary shadow-primary' 
+                  plan.featured
+                    ? 'border-2 border-primary shadow-primary'
                     : 'border-border/50'
                 }`}
               >
@@ -99,10 +178,12 @@ export function Pricing() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="text-center">
-                    <span className="text-4xl font-bold">{plan.price}</span>
-                    <span className="text-muted-foreground">{plan.period}</span>
+                    <span className="text-4xl font-bold">{getPrice(plan.plan)}</span>
+                    <span className="text-muted-foreground">
+                      {yearly ? '/Jahr' : '/Monat'}
+                    </span>
                   </div>
-                  
+
                   <ul className="space-y-3">
                     {plan.features.map((feature) => (
                       <li key={feature} className="flex items-center gap-3 text-sm">
@@ -112,14 +193,22 @@ export function Pricing() {
                     ))}
                   </ul>
 
-                  <Link to={plan.href} className="block">
-                    <Button 
+                  {plan.plan === 'free' ? (
+                    <Link to="/register" className="block">
+                      <Button className="w-full" variant="outline">
+                        {plan.cta}
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Button
                       className={`w-full ${plan.featured ? 'gradient-primary hover:opacity-90' : ''}`}
                       variant={plan.featured ? 'default' : 'outline'}
+                      onClick={() => handleCheckout(plan.plan)}
+                      disabled={loadingPlan === plan.plan}
                     >
-                      {plan.cta}
+                      {loadingPlan === plan.plan ? 'Wird geladen...' : plan.cta}
                     </Button>
-                  </Link>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>

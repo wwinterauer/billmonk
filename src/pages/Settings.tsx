@@ -26,6 +26,7 @@ import {
   Package,
   FileCheck,
   Settings2,
+  Crown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,6 +66,7 @@ import { InvoiceItemManagement } from '@/components/settings/InvoiceItemManageme
 import { InvoiceTemplateSettings } from '@/components/settings/InvoiceTemplateSettings';
 import { InvoiceModuleSettings } from '@/components/settings/InvoiceModuleSettings';
 import { usePlan } from '@/hooks/usePlan';
+import { SubscriptionSettings } from '@/components/settings/SubscriptionSettings';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
@@ -191,7 +193,7 @@ const Settings = () => {
   // Handle tab from URL query parameter - must be before any early returns
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage'];
+  const validTabs = ['subscription', 'naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'naming';
   const [activeTab, setActiveTab] = useState(initialTab);
   
@@ -427,6 +429,7 @@ const Settings = () => {
   }
 
   const allTabs = [
+    { value: 'subscription', icon: Crown, label: 'Abo' },
     { value: 'naming', icon: FileText, label: 'Umbenennung' },
     { value: 'recognition', icon: Sparkles, label: 'Erkennung' },
     { value: 'categories', icon: Tags, label: 'Kategorien' },
@@ -966,6 +969,13 @@ const Settings = () => {
       <TabsContent value="invoice-settings">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <InvoiceModuleSettings />
+        </motion.div>
+      </TabsContent>
+
+      {/* Subscription Tab */}
+      <TabsContent value="subscription">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <SubscriptionSettings />
         </motion.div>
       </TabsContent>
     </Tabs>

@@ -1361,6 +1361,7 @@ export type Database = {
           receipt_credit: number | null
           street: string | null
           stripe_customer_id: string | null
+          stripe_product_id: string | null
           subscription_end_date: string | null
           subscription_status: string | null
           uid_number: string | null
@@ -1388,6 +1389,7 @@ export type Database = {
           receipt_credit?: number | null
           street?: string | null
           stripe_customer_id?: string | null
+          stripe_product_id?: string | null
           subscription_end_date?: string | null
           subscription_status?: string | null
           uid_number?: string | null
@@ -1415,6 +1417,7 @@ export type Database = {
           receipt_credit?: number | null
           street?: string | null
           stripe_customer_id?: string | null
+          stripe_product_id?: string | null
           subscription_end_date?: string | null
           subscription_status?: string | null
           uid_number?: string | null

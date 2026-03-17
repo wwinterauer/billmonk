@@ -27,6 +27,22 @@ export function usePlan(): PlanData {
   const [receiptsCredit, setReceiptsCredit] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  const fetchProfile = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan')
+      .eq('id', user.id)
+      .single();
+
+    if (data) {
+      setPlan((data.plan as PlanType) || 'free');
+      setReceiptsUsed(data.monthly_receipt_count || 0);
+      setReceiptsCredit(data.receipt_credit || 0);
+      setAdminViewPlanState((data.admin_view_plan as PlanType) || null);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!user) {
       setLoading(false);
@@ -34,13 +50,8 @@ export function usePlan(): PlanData {
     }
 
     const fetchData = async () => {
-      // Fetch profile and admin status in parallel
-      const [profileResult, roleResult] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan')
-          .eq('id', user.id)
-          .single(),
+      const [, roleResult] = await Promise.all([
+        fetchProfile(),
         supabase
           .from('user_roles')
           .select('role')
@@ -49,20 +60,33 @@ export function usePlan(): PlanData {
           .maybeSingle(),
       ]);
 
-      if (profileResult.data) {
-        const p = profileResult.data;
-        setPlan((p.plan as PlanType) || 'free');
-        setReceiptsUsed(p.monthly_receipt_count || 0);
-        setReceiptsCredit(p.receipt_credit || 0);
-        setAdminViewPlanState((p.admin_view_plan as PlanType) || null);
-      }
-
       setIsAdmin(!!roleResult.data);
       setLoading(false);
     };
 
     fetchData();
-  }, [user]);
+  }, [user, fetchProfile]);
+
+  // Periodically check subscription (every 60s) and on mount
+  useEffect(() => {
+    if (!user) return;
+
+    const checkSub = async () => {
+      try {
+        await supabase.functions.invoke('check-subscription');
+        // Re-fetch profile to get updated plan
+        await fetchProfile();
+      } catch {
+        // Silent fail - subscription check is best-effort
+      }
+    };
+
+    // Initial check
+    checkSub();
+
+    const interval = setInterval(checkSub, 60_000);
+    return () => clearInterval(interval);
+  }, [user, fetchProfile]);
 
   const effectivePlan: PlanType = isAdmin
     ? (adminViewPlan || 'business')
