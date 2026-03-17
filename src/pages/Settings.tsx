@@ -15,12 +15,17 @@ import {
   CreditCard,
   Tags,
   Building,
+  Building2,
   Table2,
   Sparkles,
   Brain,
   Mail,
   Landmark,
   Cloud,
+  Users,
+  Package,
+  FileCheck,
+  Settings2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,6 +60,11 @@ import { EmailImportSettings } from '@/components/settings/EmailImportSettings';
 import { BankImportKeywords } from '@/components/settings/BankImportKeywords';
 import { TagManagement } from '@/components/settings/TagManagement';
 import { CloudStorageSettings } from '@/components/settings/CloudStorageSettings';
+import { CustomerManagement } from '@/components/settings/CustomerManagement';
+import { InvoiceItemManagement } from '@/components/settings/InvoiceItemManagement';
+import { InvoiceTemplateSettings } from '@/components/settings/InvoiceTemplateSettings';
+import { InvoiceModuleSettings } from '@/components/settings/InvoiceModuleSettings';
+import { usePlan } from '@/hooks/usePlan';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
