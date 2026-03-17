@@ -426,8 +426,6 @@ const Settings = () => {
     );
   }
 
-  const { features } = usePlan();
-
   const allTabs = [
     { value: 'naming', icon: FileText, label: 'Umbenennung' },
     { value: 'recognition', icon: Sparkles, label: 'Erkennung' },
