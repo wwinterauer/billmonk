@@ -74,7 +74,7 @@ export default function Onboarding() {
 
       toast({ title: 'Willkommen bei XpenzAi!', description: 'Dein Profil wurde eingerichtet.' });
       navigate('/dashboard', { replace: true });
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Fehler', description: 'Profil konnte nicht gespeichert werden.', variant: 'destructive' });
     } finally {
       setSaving(false);

@@ -113,7 +113,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const isFeatureEnabled = (requiredFeature?: string): boolean => {
     if (!requiredFeature) return true;
-    return (features as Record<string, boolean>)[requiredFeature] ?? true;
+    return (features as unknown as Record<string, boolean>)[requiredFeature] ?? true;
   };
 
   const usagePercent = receiptsLimit > 0 ? Math.min(100, (receiptsUsed / receiptsLimit) * 100) : 0;
