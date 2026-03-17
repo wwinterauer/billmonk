@@ -649,13 +649,16 @@ export function useReceipts() {
         await addVendorVariant(vendor.id, detectedName);
       }
 
-      // Update vendor's legal_name if not set and we have legal name from receipt
-      if (!vendor.legal_name && extractedData.vendor && extractedData.vendor !== vendor.display_name) {
-        await supabase
-          .from('vendors')
-          .update({ legal_name: extractedData.vendor })
-          .eq('id', vendor.id)
-          .is('legal_name', null);
+      // Update vendor's legal_names if we have a new legal name from receipt
+      if (extractedData.vendor && extractedData.vendor !== vendor.display_name) {
+        const existingLegalNames = vendor.legal_names || [];
+        const newLegalName = extractedData.vendor;
+        if (!existingLegalNames.some(ln => ln.toLowerCase() === newLegalName.toLowerCase())) {
+          await supabase
+            .from('vendors')
+            .update({ legal_names: [...existingLegalNames, newLegalName] })
+            .eq('id', vendor.id);
+        }
       }
 
       // Auto-approve logic for manual vendor selection

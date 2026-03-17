@@ -238,15 +238,19 @@ export async function findVendorIdByName(
 
     if (exactMatch) return exactMatch.id;
 
-    // Try match on legal_name
-    const { data: legalMatch } = await supabase
+    // Try match on legal_names array
+    const { data: allVendorsForLegal } = await supabase
       .from('vendors')
-      .select('id')
-      .eq('user_id', userId)
-      .ilike('legal_name', vendorName)
-      .maybeSingle();
+      .select('id, legal_names')
+      .eq('user_id', userId);
 
-    if (legalMatch) return legalMatch.id;
+    if (allVendorsForLegal) {
+      for (const v of allVendorsForLegal) {
+        if ((v.legal_names || []).some((ln: string) => ln.toLowerCase() === vendorName.toLowerCase())) {
+          return v.id;
+        }
+      }
+    }
 
     // Try partial match on detected_names array
     const { data: allVendors } = await supabase

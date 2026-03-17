@@ -192,9 +192,9 @@ export function findSimilarVendor(
       bestMatch = { vendor, score: displaySim };
     }
 
-    // Check against legal_name
-    if (vendor.legal_name) {
-      const legalSim = calculateSimilarity(newName, vendor.legal_name);
+    // Check against legal_names
+    for (const legalName of vendor.legal_names || []) {
+      const legalSim = calculateSimilarity(newName, legalName);
       if (legalSim >= minScore && (!bestMatch || legalSim > bestMatch.score)) {
         bestMatch = { vendor, score: legalSim };
       }

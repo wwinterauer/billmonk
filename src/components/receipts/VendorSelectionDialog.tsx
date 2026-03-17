@@ -82,8 +82,8 @@ export function VendorSelectionDialog({
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <p className="font-medium">{suggestion.vendor.display_name}</p>
-                    {suggestion.vendor.legal_name && (
-                      <p className="text-sm text-muted-foreground">{suggestion.vendor.legal_name}</p>
+                    {suggestion.vendor.legal_names?.length > 0 && (
+                      <p className="text-sm text-muted-foreground">{suggestion.vendor.legal_names.join(', ')}</p>
                     )}
                     <div className="flex flex-wrap gap-1 mt-1">
                       {suggestion.reasons.map((reason, j) => (

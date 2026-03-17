@@ -134,7 +134,7 @@ export function VendorAutocomplete({
     } else {
       const filtered = allVendors.filter(v =>
         v.display_name.toLowerCase().includes(search) ||
-        v.legal_name?.toLowerCase().includes(search) ||
+        v.legal_names?.some(n => n.toLowerCase().includes(search)) ||
         v.detected_names?.some(n => n.toLowerCase().includes(search))
       );
 
