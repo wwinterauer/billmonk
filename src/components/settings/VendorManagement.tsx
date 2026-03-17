@@ -1957,14 +1957,19 @@ export function VendorManagement() {
                   />
                 </div>
 
-                {/* Legal Name */}
+                {/* Legal Names */}
                 <div>
-                  <Label className="text-xs text-muted-foreground">Rechtlicher Firmenname</Label>
-                  <Input
-                    value={mergePreview?.legal_name || ''}
-                    onChange={(e) => setMergePreview(prev => prev ? { ...prev, legal_name: e.target.value } : null)}
-                    placeholder="Optional"
-                  />
+                  <Label className="text-xs text-muted-foreground">Rechtliche Firmennamen</Label>
+                  <div className="flex flex-wrap gap-1 p-2 bg-muted/30 rounded-lg min-h-[40px]">
+                    {mergePreview?.legal_names.map((name, i) => (
+                      <Badge key={i} variant="secondary" className="text-xs">
+                        {name}
+                      </Badge>
+                    ))}
+                    {(!mergePreview?.legal_names.length) && (
+                      <span className="text-xs text-muted-foreground">Keine</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Detected Variants */}
