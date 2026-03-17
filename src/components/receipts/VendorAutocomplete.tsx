@@ -10,7 +10,7 @@ import { ChevronsUpDown, Search, Plus } from 'lucide-react';
 interface VendorWithCategory {
   id: string;
   display_name: string;
-  legal_name: string | null;
+  legal_names: string[] | null;
   detected_names: string[] | null;
   default_category_id: string | null;
   default_tag_id: string | null;
