@@ -601,7 +601,7 @@ export function useReceipts() {
       id: data.id,
       user_id: data.user_id,
       display_name: data.display_name,
-      legal_name: data.legal_name,
+      legal_names: data.legal_names || [],
       detected_names: data.detected_names || [],
       default_category_id: data.default_category_id,
       default_vat_rate: data.default_vat_rate,
