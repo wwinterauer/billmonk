@@ -174,7 +174,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative',
                 locked
-                  ? 'opacity-60 cursor-not-allowed text-sidebar-foreground/70'
+                  ? 'opacity-60 text-sidebar-foreground/70'
                   : isActive
                     ? 'bg-sidebar-primary text-sidebar-primary-foreground'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent'
