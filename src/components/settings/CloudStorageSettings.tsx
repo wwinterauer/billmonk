@@ -228,6 +228,7 @@ export const CloudStorageSettings = () => {
           backup_include_csv: connection.backup_include_csv,
           backup_zip_pattern: connection.backup_zip_pattern,
           backup_folder_structure: connection.backup_folder_structure,
+          backup_include_invoices: connection.backup_include_invoices,
         } as any)
         .eq('id', connection.id);
 
