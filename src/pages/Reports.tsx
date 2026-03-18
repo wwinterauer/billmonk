@@ -348,6 +348,26 @@ const Reports = () => {
     enabled: !!user && !!previousPeriodRange?.from && !!previousPeriodRange?.to,
   });
 
+  // Fetch previous period invoices for income comparison
+  const { data: previousInvoices } = useQuery({
+    queryKey: ['reports-previous-invoices', previousPeriodRange?.from?.toISOString(), previousPeriodRange?.to?.toISOString(), user?.id],
+    queryFn: async () => {
+      if (!user || !previousPeriodRange?.from || !previousPeriodRange?.to) return [];
+      
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('id, total, paid_at, status')
+        .eq('user_id', user.id)
+        .eq('status', 'paid')
+        .gte('paid_at', previousPeriodRange.from.toISOString())
+        .lte('paid_at', previousPeriodRange.to.toISOString());
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && !!previousPeriodRange?.from && !!previousPeriodRange?.to && showIncome,
+  });
+
   // Calculate KPIs
   const stats = useMemo(() => {
     if (!receipts) return null;
