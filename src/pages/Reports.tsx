@@ -19,6 +19,8 @@ import {
   Activity,
   Info,
   Tag,
+  Users,
+  Lock,
 } from 'lucide-react';
 import { FeatureGate } from '@/components/FeatureGate';
 import { usePlan } from '@/hooks/usePlan';
@@ -98,6 +100,7 @@ const Reports = () => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [vendorSearch, setVendorSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'expenses' | 'income'>('expenses');
 
   const months = [
     'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
@@ -173,7 +176,11 @@ const Reports = () => {
       
       const { data, error } = await supabase
         .from('invoices')
-        .select('id, invoice_number, invoice_date, due_date, total, subtotal, vat_total, status, paid_at, category, customer_id, customers(display_name)')
+        .select(`
+          id, invoice_number, invoice_date, due_date, total, subtotal, vat_total, status, paid_at, category, customer_id,
+          customers(display_name),
+          invoice_tags(tag:tags(id, name, color))
+        `)
         .eq('user_id', user.id)
         .neq('status', 'cancelled');
       
@@ -182,72 +189,6 @@ const Reports = () => {
     },
     enabled: !!user && !!dateRange.from && !!dateRange.to && showIncome,
   });
-
-  // Income stats
-  const incomeStats = useMemo(() => {
-    if (!invoices || !dateRange.from || !dateRange.to) return null;
-
-    const from = dateRange.from;
-    const to = dateRange.to;
-
-    // Paid in period
-    const paidInPeriod = invoices.filter(i => {
-      if (i.status !== 'paid' || !i.paid_at) return false;
-      const d = new Date(i.paid_at);
-      return d >= from && d <= to;
-    });
-
-    // Issued in period
-    const issuedInPeriod = invoices.filter(i => {
-      if (!i.invoice_date) return false;
-      const d = new Date(i.invoice_date);
-      return d >= from && d <= to;
-    });
-
-    const totalIncome = paidInPeriod.reduce((s, i) => s + (i.total || 0), 0);
-    const totalVat = paidInPeriod.reduce((s, i) => s + (i.vat_total || 0), 0);
-    const totalNet = paidInPeriod.reduce((s, i) => s + (i.subtotal || 0), 0);
-    const openInvoices = invoices.filter(i => i.status === 'sent' || i.status === 'overdue');
-    const openAmount = openInvoices.reduce((s, i) => s + (i.total || 0), 0);
-
-    // By customer
-    const byCustomer = new Map<string, { name: string; amount: number; count: number }>();
-    paidInPeriod.forEach(inv => {
-      const name = (inv.customers as any)?.display_name || 'Unbekannt';
-      const existing = byCustomer.get(name);
-      if (existing) {
-        existing.amount += inv.total || 0;
-        existing.count += 1;
-      } else {
-        byCustomer.set(name, { name, amount: inv.total || 0, count: 1 });
-      }
-    });
-
-    // By category
-    const byCategory = new Map<string, { name: string; amount: number; count: number }>();
-    paidInPeriod.forEach(inv => {
-      const cat = inv.category || 'Ohne Kategorie';
-      const existing = byCategory.get(cat);
-      if (existing) {
-        existing.amount += inv.total || 0;
-        existing.count += 1;
-      } else {
-        byCategory.set(cat, { name: cat, amount: inv.total || 0, count: 1 });
-      }
-    });
-
-    return {
-      totalIncome,
-      totalVat,
-      totalNet,
-      paidCount: paidInPeriod.length,
-      issuedCount: issuedInPeriod.length,
-      openCount: openInvoices.length,
-      openAmount,
-      byCustomer: Array.from(byCustomer.values()).sort((a, b) => b.amount - a.amount),
-      byCategory: Array.from(byCategory.values()).sort((a, b) => b.amount - a.amount),
-    };
-  }, [invoices, dateRange]);
 
   // Fetch categories for color mapping
   const { data: categories } = useQuery({
@@ -265,6 +206,97 @@ const Reports = () => {
     },
     enabled: !!user,
   });
+
+  // Income stats
+  const incomeStats = useMemo(() => {
+    if (!invoices || !dateRange.from || !dateRange.to) return null;
+
+    const from = dateRange.from;
+    const to = dateRange.to;
+
+    const paidInPeriod = invoices.filter(i => {
+      if (i.status !== 'paid' || !i.paid_at) return false;
+      const d = new Date(i.paid_at);
+      return d >= from && d <= to;
+    });
+
+    const issuedInPeriod = invoices.filter(i => {
+      if (!i.invoice_date) return false;
+      const d = new Date(i.invoice_date);
+      return d >= from && d <= to;
+    });
+
+    const totalIncome = paidInPeriod.reduce((s, i) => s + (i.total || 0), 0);
+    const totalVat = paidInPeriod.reduce((s, i) => s + (i.vat_total || 0), 0);
+    const totalNet = paidInPeriod.reduce((s, i) => s + (i.subtotal || 0), 0);
+    const openInvoices = invoices.filter(i => i.status === 'sent' || i.status === 'overdue');
+    const openAmount = openInvoices.reduce((s, i) => s + (i.total || 0), 0);
+
+    const categoryColorMap = new Map<string, string>();
+    categories?.forEach((cat) => {
+      categoryColorMap.set(cat.name, cat.color || '#94A3B8');
+    });
+
+    const byCustomer = new Map<string, { name: string; amount: number; count: number }>();
+    paidInPeriod.forEach(inv => {
+      const name = (inv.customers as any)?.display_name || 'Unbekannt';
+      const existing = byCustomer.get(name);
+      if (existing) { existing.amount += inv.total || 0; existing.count += 1; }
+      else { byCustomer.set(name, { name, amount: inv.total || 0, count: 1 }); }
+    });
+
+    const byCategory = new Map<string, { name: string; color: string; amount: number; count: number; vat: number }>();
+    paidInPeriod.forEach(inv => {
+      const cat = inv.category || 'Ohne Kategorie';
+      const color = categoryColorMap.get(cat) || '#94A3B8';
+      const existing = byCategory.get(cat);
+      if (existing) { existing.amount += inv.total || 0; existing.count += 1; existing.vat += inv.vat_total || 0; }
+      else { byCategory.set(cat, { name: cat, color, amount: inv.total || 0, count: 1, vat: inv.vat_total || 0 }); }
+    });
+
+    const tagMap = new Map<string, { id: string; name: string; color: string; amount: number; count: number; vat: number }>();
+    let untaggedAmount = 0;
+    let untaggedCount = 0;
+    paidInPeriod.forEach(inv => {
+      const tags = ((inv as any).invoice_tags || [])
+        .map((rt: any) => rt.tag)
+        .filter(Boolean) as Array<{ id: string; name: string; color: string }>;
+      if (tags.length === 0) { untaggedAmount += inv.total || 0; untaggedCount += 1; }
+      else {
+        tags.forEach(tag => {
+          const existing = tagMap.get(tag.id);
+          if (existing) { existing.amount += inv.total || 0; existing.count += 1; existing.vat += inv.vat_total || 0; }
+          else { tagMap.set(tag.id, { id: tag.id, name: tag.name, color: tag.color, amount: inv.total || 0, count: 1, vat: inv.vat_total || 0 }); }
+        });
+      }
+    });
+
+    const monthlyMap = new Map<string, { key: string; label: string; date: Date; amount: number; count: number; vat: number }>();
+    const monthNames2 = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+    paidInPeriod.forEach(inv => {
+      const d = new Date(inv.paid_at!);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${monthNames2[d.getMonth()]} ${d.getFullYear()}`;
+      const existing = monthlyMap.get(key);
+      if (existing) { existing.amount += inv.total || 0; existing.count += 1; existing.vat += inv.vat_total || 0; }
+      else { monthlyMap.set(key, { key, label, date: d, amount: inv.total || 0, count: 1, vat: inv.vat_total || 0 }); }
+    });
+
+    return {
+      totalIncome,
+      totalVat,
+      totalNet,
+      paidCount: paidInPeriod.length,
+      issuedCount: issuedInPeriod.length,
+      openCount: openInvoices.length,
+      openAmount,
+      byCustomer: Array.from(byCustomer.values()).sort((a, b) => b.amount - a.amount),
+      byCategory: Array.from(byCategory.values()).sort((a, b) => b.amount - a.amount),
+      byTag: Array.from(tagMap.values()).sort((a, b) => b.amount - a.amount),
+      untagged: { amount: untaggedAmount, count: untaggedCount },
+      timeSeries: Array.from(monthlyMap.values()).sort((a, b) => a.date.getTime() - b.date.getTime()),
+    };
+  }, [invoices, dateRange, categories]);
 
   // Fetch previous period data for comparison
   const previousPeriodRange = useMemo(() => {
@@ -867,7 +899,9 @@ const Reports = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Berichte & Auswertungen</h1>
-            <p className="text-muted-foreground">Analysiere deine Ausgaben im Detail</p>
+            <p className="text-muted-foreground">
+              {viewMode === 'expenses' ? 'Analysiere deine Ausgaben im Detail' : 'Übersicht deiner Einnahmen'}
+            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -1078,6 +1112,29 @@ const Reports = () => {
           </CardContent>
         </Card>
 
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-2 mb-6">
+          <Button
+            variant={viewMode === 'expenses' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('expenses')}
+          >
+            <TrendingDown className="w-4 h-4 mr-2" />
+            Ausgaben
+          </Button>
+          <Button
+            variant={viewMode === 'income' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('income')}
+          >
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Einnahmen
+            {!showIncome && <Lock className="w-3 h-3 ml-1" />}
+          </Button>
+        </div>
+
+        {viewMode === 'expenses' ? (
+        <>
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
           {/* Gesamtausgaben */}
@@ -1877,111 +1934,361 @@ const Reports = () => {
             )}
           </CardContent>
         </Card>
-        {/* Income Section (Business Plan) */}
-        <FeatureGate feature="invoiceModule" className="mb-6">
-          <Card className="border-border/50 mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">Einnahmen-Analyse</CardTitle>
-              <CardDescription>Übersicht deiner Ausgangsrechnungen im gewählten Zeitraum</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {invoicesLoading ? (
-                <div className="space-y-2">
-                  {[...Array(3)].map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
-                  ))}
-                </div>
-              ) : !incomeStats ? (
-                <div className="py-8 text-center text-muted-foreground">
-                  Keine Rechnungsdaten verfügbar
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Income KPIs */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+        </>
+        ) : (
+        <FeatureGate feature="invoiceModule">
+          {invoicesLoading ? (
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-32 w-full" />
+              ))}
+            </div>
+          ) : !incomeStats ? (
+            <div className="py-16 text-center text-muted-foreground">
+              Keine Rechnungsdaten für den gewählten Zeitraum
+            </div>
+          ) : (
+          <>
+            {/* Income KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+              <Card className="border-border/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
                       <p className="text-sm text-muted-foreground">Einnahmen (bezahlt)</p>
-                      <p className="text-xl font-bold text-green-600">{formatCurrency(incomeStats.totalIncome)}</p>
-                      <p className="text-xs text-muted-foreground">{incomeStats.paidCount} Rechnungen</p>
+                      <p className="text-2xl font-bold text-success">{formatCurrency(incomeStats.totalIncome)}</p>
                     </div>
-                    <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                      <p className="text-sm text-muted-foreground">Netto</p>
-                      <p className="text-xl font-bold text-foreground">{formatCurrency(incomeStats.totalNet)}</p>
-                      <p className="text-xs text-muted-foreground">USt: {formatCurrency(incomeStats.totalVat)}</p>
+                    <div className="p-3 bg-success/10 rounded-full">
+                      <Euro className="w-5 h-5 text-success" />
                     </div>
-                    <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{incomeStats.paidCount} Rechnungen</p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Nettobetrag</p>
+                      <p className="text-2xl font-bold text-foreground">{formatCurrency(incomeStats.totalNet)}</p>
+                    </div>
+                    <div className="p-3 bg-primary/10 rounded-full">
+                      <Receipt className="w-5 h-5 text-primary" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">USt (Ausgangs)</p>
+                      <p className="text-2xl font-bold text-foreground">{formatCurrency(incomeStats.totalVat)}</p>
+                    </div>
+                    <div className="p-3 bg-success/10 rounded-full">
+                      <Percent className="w-5 h-5 text-success" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
                       <p className="text-sm text-muted-foreground">Offen</p>
-                      <p className="text-xl font-bold text-orange-600">{formatCurrency(incomeStats.openAmount)}</p>
-                      <p className="text-xs text-muted-foreground">{incomeStats.openCount} Rechnungen</p>
+                      <p className="text-2xl font-bold text-warning">{formatCurrency(incomeStats.openAmount)}</p>
                     </div>
-                    <div className={cn(
-                      "p-4 rounded-lg border",
-                      (incomeStats.totalIncome - (stats?.totalGross || 0)) >= 0
-                        ? "bg-green-500/10 border-green-500/20"
-                        : "bg-destructive/10 border-destructive/20"
-                    )}>
+                    <div className="p-3 bg-warning/10 rounded-full">
+                      <FileText className="w-5 h-5 text-warning" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{incomeStats.openCount} Rechnungen</p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
                       <p className="text-sm text-muted-foreground">Gewinn/Verlust</p>
                       <p className={cn(
-                        "text-xl font-bold",
-                        (incomeStats.totalIncome - (stats?.totalGross || 0)) >= 0 ? "text-green-600" : "text-destructive"
+                        "text-2xl font-bold",
+                        (incomeStats.totalIncome - (stats?.totalGross || 0)) >= 0 ? "text-success" : "text-destructive"
                       )}>
                         {formatCurrency(incomeStats.totalIncome - (stats?.totalGross || 0))}
                       </p>
-                      <p className="text-xs text-muted-foreground">Einnahmen − Ausgaben</p>
+                    </div>
+                    <div className={cn(
+                      "p-3 rounded-full",
+                      (incomeStats.totalIncome - (stats?.totalGross || 0)) >= 0 ? "bg-success/10" : "bg-destructive/10"
+                    )}>
+                      <Activity className={cn(
+                        "w-5 h-5",
+                        (incomeStats.totalIncome - (stats?.totalGross || 0)) >= 0 ? "text-success" : "text-destructive"
+                      )} />
                     </div>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">Einnahmen − Ausgaben</p>
+                </CardContent>
+              </Card>
+            </div>
 
-                  {/* Income by Customer */}
-                  {incomeStats.byCustomer.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-foreground mb-3">Einnahmen nach Kunde</h3>
-                      <div className="h-[250px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={incomeStats.byCustomer.slice(0, 8)} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                            <XAxis type="number" tickFormatter={(v) => `€${v}`} stroke="hsl(var(--muted-foreground))" />
-                            <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }} stroke="hsl(var(--muted-foreground))" />
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                            <Bar dataKey="amount" fill="hsl(var(--success))" radius={[0, 4, 4, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
+            {/* Income Category Charts */}
+            {incomeStats.byCategory.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <Card className="border-border/50">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Einnahmen nach Kategorie</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={incomeStats.byCategory.map(c => ({ name: c.name, value: c.amount, color: c.color }))}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={100}
+                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                            labelLine={{ stroke: 'hsl(var(--muted-foreground))' }}
+                          >
+                            {incomeStats.byCategory.map((entry, index) => (
+                              <Cell key={index} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: number) => formatCurrency(value)}
+                            contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
                     </div>
-                  )}
+                  </CardContent>
+                </Card>
 
-                  {/* Income by Category Table */}
-                  {incomeStats.byCategory.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-foreground mb-3">Einnahmen nach Kategorie</h3>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Kategorie</TableHead>
-                            <TableHead className="text-right">Anzahl</TableHead>
-                            <TableHead className="text-right">Betrag</TableHead>
-                            <TableHead className="text-right">Anteil</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {incomeStats.byCategory.map((cat) => (
-                            <TableRow key={cat.name}>
-                              <TableCell>{cat.name}</TableCell>
-                              <TableCell className="text-right">{cat.count}</TableCell>
-                              <TableCell className="text-right font-medium">{formatCurrency(cat.amount)}</TableCell>
-                              <TableCell className="text-right">
-                                {incomeStats.totalIncome > 0 ? ((cat.amount / incomeStats.totalIncome) * 100).toFixed(1) : 0}%
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                <Card className="border-border/50">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Top Kategorien</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={incomeStats.byCategory.slice(0, 5)} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis type="number" tickFormatter={(v) => `€${v}`} stroke="hsl(var(--muted-foreground))" />
+                          <YAxis type="category" dataKey="name" width={120} stroke="hsl(var(--muted-foreground))" tick={{ fill: 'hsl(var(--foreground))' }} />
+                          <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                          <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
+                            {incomeStats.byCategory.slice(0, 5).map((entry, index) => (
+                              <Cell key={index} fill={entry.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Income Category Detail Table */}
+            {incomeStats.byCategory.length > 0 && (
+              <Card className="border-border/50 mb-6">
+                <CardHeader>
+                  <CardTitle className="text-lg">Detailübersicht nach Kategorie</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Kategorie</TableHead>
+                        <TableHead className="text-right">Anzahl</TableHead>
+                        <TableHead className="text-right">Brutto</TableHead>
+                        <TableHead className="text-right">Netto</TableHead>
+                        <TableHead className="text-right">USt</TableHead>
+                        <TableHead className="text-right">Anteil</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {incomeStats.byCategory.map((cat) => (
+                        <TableRow key={cat.name}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                              {cat.name}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">{cat.count}</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(cat.amount)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(cat.amount - cat.vat)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(cat.vat)}</TableCell>
+                          <TableCell className="text-right">
+                            {incomeStats.totalIncome > 0 ? ((cat.amount / incomeStats.totalIncome) * 100).toFixed(1) : 0}%
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell className="font-medium">Gesamt</TableCell>
+                        <TableCell className="text-right font-medium">{incomeStats.paidCount}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(incomeStats.totalIncome)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(incomeStats.totalNet)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(incomeStats.totalVat)}</TableCell>
+                        <TableCell className="text-right font-medium">100%</TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Income Tags Table */}
+            <Card className="border-border/50 mb-6">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Tag className="h-5 w-5" />
+                  Einnahmen nach Tags
+                </CardTitle>
+                <CardDescription>Aufschlüsselung nach Projekten und Tags</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {incomeStats.byTag.length === 0 && incomeStats.untagged.count === 0 ? (
+                  <div className="py-8 text-center text-muted-foreground">
+                    Keine Tags für den gewählten Zeitraum
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tag</TableHead>
+                        <TableHead className="text-right">Anzahl</TableHead>
+                        <TableHead className="text-right">Brutto</TableHead>
+                        <TableHead className="text-right">USt</TableHead>
+                        <TableHead className="text-right">Anteil</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {incomeStats.byTag.map((tag) => (
+                        <TableRow key={tag.id}>
+                          <TableCell className="flex items-center gap-2">
+                            <div className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                            <span className="font-medium">{tag.name}</span>
+                          </TableCell>
+                          <TableCell className="text-right">{tag.count}</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(tag.amount)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(tag.vat)}</TableCell>
+                          <TableCell className="text-right">
+                            {incomeStats.totalIncome > 0 ? ((tag.amount / incomeStats.totalIncome) * 100).toFixed(1) : 0}%
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {incomeStats.untagged.count > 0 && (
+                        <TableRow className="text-muted-foreground">
+                          <TableCell className="flex items-center gap-2">
+                            <div className="h-3 w-3 rounded-full flex-shrink-0 bg-muted" />
+                            <span className="italic">(ohne Tags)</span>
+                          </TableCell>
+                          <TableCell className="text-right">{incomeStats.untagged.count}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(incomeStats.untagged.amount)}</TableCell>
+                          <TableCell className="text-right">–</TableCell>
+                          <TableCell className="text-right">
+                            {incomeStats.totalIncome > 0 ? ((incomeStats.untagged.amount / incomeStats.totalIncome) * 100).toFixed(1) : 0}%
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Income by Customer */}
+            {incomeStats.byCustomer.length > 0 && (
+              <Card className="border-border/50 mb-6">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Einnahmen nach Kunde
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px] mb-6">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={incomeStats.byCustomer.slice(0, 10)} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis type="number" tickFormatter={(v) => `€${v}`} stroke="hsl(var(--muted-foreground))" />
+                        <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                        <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                        <Bar dataKey="amount" fill="hsl(var(--success))" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Kunde</TableHead>
+                        <TableHead className="text-right">Rechnungen</TableHead>
+                        <TableHead className="text-right">Betrag</TableHead>
+                        <TableHead className="text-right">Anteil</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {incomeStats.byCustomer.map((cust) => (
+                        <TableRow key={cust.name}>
+                          <TableCell className="font-medium">{cust.name}</TableCell>
+                          <TableCell className="text-right">{cust.count}</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(cust.amount)}</TableCell>
+                          <TableCell className="text-right">
+                            {incomeStats.totalIncome > 0 ? ((cust.amount / incomeStats.totalIncome) * 100).toFixed(1) : 0}%
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Income Time Series */}
+            {incomeStats.timeSeries.length > 0 && (
+              <Card className="border-border/50 mb-6">
+                <CardHeader>
+                  <CardTitle className="text-lg">Einnahmen im Zeitverlauf</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[350px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={incomeStats.timeSeries}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                        <YAxis tickFormatter={(v) => `€${v}`} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                        <Tooltip
+                          formatter={(value: number, name: string) => {
+                            if (name === 'amount') return [formatCurrency(value), 'Brutto'];
+                            if (name === 'vat') return [formatCurrency(value), 'USt'];
+                            return [value, name];
+                          }}
+                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                        />
+                        <Legend />
+                        <Line type="monotone" dataKey="amount" name="Brutto" stroke="hsl(var(--success))" strokeWidth={2} dot={{ fill: 'hsl(var(--success))' }} />
+                        <Line type="monotone" dataKey="vat" name="USt" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))' }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
+          )}
         </FeatureGate>
+        )}
       </div>
     </DashboardLayout>
   );
