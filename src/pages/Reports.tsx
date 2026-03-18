@@ -87,6 +87,8 @@ import { cn } from '@/lib/utils';
 const Reports = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { effectivePlan } = usePlan();
+  const showIncome = isPlanSufficient(effectivePlan, 'business');
   
   // Period state
   const [periodType, setPeriodType] = useState<'month' | 'quarter' | 'year' | 'custom'>('month');
