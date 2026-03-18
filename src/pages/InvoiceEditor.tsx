@@ -14,6 +14,8 @@ import { useCustomers } from '@/hooks/useCustomers';
 import { useInvoiceItems, type InvoiceItem } from '@/hooks/useInvoiceItems';
 import { useInvoiceSettings } from '@/hooks/useInvoiceSettings';
 import { useInvoices } from '@/hooks/useInvoices';
+import { useCategories } from '@/hooks/useCategories';
+import { InvoiceTagSelector } from '@/components/invoices/InvoiceTagSelector';
 import { supabase } from '@/integrations/supabase/client';
 
 interface EditorLineItem {
