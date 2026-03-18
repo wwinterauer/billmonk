@@ -129,6 +129,7 @@ export const CloudStorageSettings = () => {
           backup_time: data.backup_time || '02:00',
           backup_file_prefix: data.backup_file_prefix || 'XpenzAI-Backup',
           backup_include_files: data.backup_include_files ?? true,
+          backup_include_invoices: (data as any).backup_include_invoices ?? false,
           backup_status_filter: data.backup_status_filter || ['review'],
           backup_template_id: data.backup_template_id,
           backup_include_excel: (data as any).backup_include_excel ?? true,
