@@ -2289,6 +2289,7 @@ const Reports = () => {
           )}
         </FeatureGate>
         )}
+      </div>
     </DashboardLayout>
   );
 };
