@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { FeatureGate } from '@/components/FeatureGate';
 import { motion } from 'framer-motion';
 import { 
   FileSpreadsheet, 
@@ -412,8 +413,8 @@ export default function BankImport() {
 
   return (
     <DashboardLayout>
+      <FeatureGate feature="bankImport">
       <div className="space-y-6">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -746,6 +747,7 @@ export default function BankImport() {
         result={importResult}
         onImportAnother={handleImportAnother}
       />
+      </FeatureGate>
     </DashboardLayout>
   );
 }

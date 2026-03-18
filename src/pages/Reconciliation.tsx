@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { FeatureGate } from '@/components/FeatureGate';
 import { motion } from 'framer-motion';
 import { 
   AlertTriangle, 
@@ -349,6 +350,7 @@ export default function Reconciliation() {
 
   return (
     <DashboardLayout>
+      <FeatureGate feature="reconciliation">
       <div className="space-y-6">
         {/* Header */}
         <motion.div
@@ -743,6 +745,7 @@ export default function Reconciliation() {
           queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
         }}
       />
+      </FeatureGate>
     </DashboardLayout>
   );
 }

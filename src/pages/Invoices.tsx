@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { FeatureGate } from '@/components/FeatureGate';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -62,6 +63,7 @@ const Invoices = () => {
 
   return (
     <DashboardLayout>
+      <FeatureGate feature="invoiceModule">
       <div className="p-6 lg:p-8 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -230,6 +232,7 @@ const Invoices = () => {
           </CardContent>
         </Card>
       </div>
+      </FeatureGate>
     </DashboardLayout>
   );
 };

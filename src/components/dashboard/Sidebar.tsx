@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Upload, 
@@ -41,7 +41,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { usePlan } from '@/hooks/usePlan';
 import { PlanType, PLAN_NAMES, FEATURE_MIN_PLAN, isPlanSufficient } from '@/lib/planConfig';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+
 
 interface NavItem {
   name: string;
@@ -71,7 +71,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
-  const navigate = useNavigate();
+  
   const { user, signOut } = useAuth();
   const [reviewCount, setReviewCount] = useState<number>(0);
   const {
@@ -131,17 +131,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     : userEmail.split('@')[0];
   const userInitials = userName.slice(0, 2).toUpperCase();
 
-  const handleLockedClick = (e: React.MouseEvent, item: NavItem) => {
-    e.preventDefault();
-    const minPlan = FEATURE_MIN_PLAN[item.requiredFeature!];
-    toast(`Verfügbar ab dem ${PLAN_NAMES[minPlan]}-Abo`, {
-      description: item.name,
-      action: {
-        label: 'Upgraden',
-        onClick: () => navigate('/account?tab=subscription'),
-      },
-    });
-  };
+
 
   return (
     <aside className={cn(
@@ -170,12 +160,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           return (
             <Link
               key={item.name}
-              to={locked ? '#' : item.href}
-              onClick={locked ? (e) => handleLockedClick(e, item) : undefined}
+              to={item.href}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative',
                 locked
-                  ? 'opacity-60 cursor-not-allowed text-sidebar-foreground/70'
+                  ? 'opacity-60 text-sidebar-foreground/70'
                   : isActive
                     ? 'bg-sidebar-primary text-sidebar-primary-foreground'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent'

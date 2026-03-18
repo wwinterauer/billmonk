@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Save, 
   FileText, 
@@ -66,7 +66,8 @@ import { InvoiceItemManagement } from '@/components/settings/InvoiceItemManageme
 import { InvoiceTemplateSettings } from '@/components/settings/InvoiceTemplateSettings';
 import { InvoiceModuleSettings } from '@/components/settings/InvoiceModuleSettings';
 import { usePlan } from '@/hooks/usePlan';
-import { FEATURE_MIN_PLAN, FEATURE_DESCRIPTIONS, isPlanSufficient, PLAN_NAMES } from '@/lib/planConfig';
+import { FEATURE_MIN_PLAN, isPlanSufficient } from '@/lib/planConfig';
+import { FeatureGate } from '@/components/FeatureGate';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
@@ -462,31 +463,8 @@ const Settings = () => {
     setSearchParams({ tab: value });
   };
 
-  const UpgradeCard = ({ featureKey }: { featureKey: string }) => {
-    const minPlan = FEATURE_MIN_PLAN[featureKey];
-    const desc = FEATURE_DESCRIPTIONS[featureKey];
-    return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Card className="max-w-md w-full text-center">
-          <CardHeader>
-            <div className="mx-auto mb-2 h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-              <Lock className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <CardTitle className="text-lg">{desc?.title || 'Feature gesperrt'}</CardTitle>
-            <CardDescription>{desc?.description || 'Dieses Feature ist in deinem aktuellen Abo nicht enthalten.'}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Verfügbar ab dem <span className="font-semibold text-foreground">{PLAN_NAMES[minPlan]}</span>-Abo
-            </p>
-            <Button asChild>
-              <Link to="/account?tab=subscription">Jetzt upgraden</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  };
+
+
 
   return (
     <DashboardLayout>
@@ -519,12 +497,9 @@ const Settings = () => {
             })}
 
             {/* Visual separator for invoice group */}
-            <div className="flex items-center px-1.5">
+            <div className="flex items-center px-1">
               <div className="h-5 w-px bg-border" />
             </div>
-            <span className="flex items-center text-[10px] uppercase tracking-wider text-muted-foreground font-medium px-1">
-              Ausgangsrechnungen
-            </span>
 
             {invoiceTabs.map(tab => {
               const locked = isTabLocked(tab.requiredFeature);
@@ -962,20 +937,20 @@ const Settings = () => {
 
       {/* Email Import Tab */}
       <TabsContent value="email-import">
-        {isTabLocked('emailImport') ? <UpgradeCard featureKey="emailImport" /> : (
+        <FeatureGate feature="emailImport">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <EmailImportSettings />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
       {/* Bank Keywords Tab */}
       <TabsContent value="bank-keywords">
-        {isTabLocked('bankImport') ? <UpgradeCard featureKey="bankImport" /> : (
+        <FeatureGate feature="bankImport">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <BankImportKeywords />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
       {/* Tags Tab */}
@@ -1007,47 +982,47 @@ const Settings = () => {
 
       {/* Cloud Storage Tab */}
       <TabsContent value="cloud-storage">
-        {isTabLocked('cloudBackup') ? <UpgradeCard featureKey="cloudBackup" /> : (
+        <FeatureGate feature="cloudBackup">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <CloudStorageSettings />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
       {/* Customer Management Tab */}
       <TabsContent value="customers">
-        {isTabLocked('invoiceModule') ? <UpgradeCard featureKey="invoiceModule" /> : (
+        <FeatureGate feature="invoiceModule">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <CustomerManagement />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
       {/* Invoice Items Tab */}
       <TabsContent value="invoice-items">
-        {isTabLocked('invoiceModule') ? <UpgradeCard featureKey="invoiceModule" /> : (
+        <FeatureGate feature="invoiceModule">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <InvoiceItemManagement />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
       {/* Invoice Templates Tab */}
       <TabsContent value="invoice-templates">
-        {isTabLocked('invoiceModule') ? <UpgradeCard featureKey="invoiceModule" /> : (
+        <FeatureGate feature="invoiceModule">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <InvoiceTemplateSettings />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
       {/* Invoice Module Settings Tab */}
       <TabsContent value="invoice-settings">
-        {isTabLocked('invoiceModule') ? <UpgradeCard featureKey="invoiceModule" /> : (
+        <FeatureGate feature="invoiceModule">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <InvoiceModuleSettings />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
 
