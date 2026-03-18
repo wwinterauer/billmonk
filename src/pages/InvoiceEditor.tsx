@@ -14,6 +14,8 @@ import { useCustomers } from '@/hooks/useCustomers';
 import { useInvoiceItems, type InvoiceItem } from '@/hooks/useInvoiceItems';
 import { useInvoiceSettings } from '@/hooks/useInvoiceSettings';
 import { useInvoices } from '@/hooks/useInvoices';
+import { useCategories } from '@/hooks/useCategories';
+import { InvoiceTagSelector } from '@/components/invoices/InvoiceTagSelector';
 import { supabase } from '@/integrations/supabase/client';
 
 interface EditorLineItem {
@@ -45,6 +47,7 @@ const InvoiceEditor = () => {
   const { items: articleTemplates } = useInvoiceItems();
   const { settings } = useInvoiceSettings();
   const { createInvoice, fetchLineItems } = useInvoices();
+  const { categories } = useCategories();
 
   const [customerId, setCustomerId] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
@@ -54,6 +57,8 @@ const InvoiceEditor = () => {
   const [lines, setLines] = useState<EditorLineItem[]>([newLine()]);
   const [saving, setSaving] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [category, setCategory] = useState('');
+  const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(id && id !== 'new' ? id : null);
 
   // Generate invoice number from settings
   useEffect(() => {
@@ -103,6 +108,7 @@ const InvoiceEditor = () => {
           setNotes(inv.notes || '');
           setFooterText(inv.footer_text || '');
           setInvoiceNumber(inv.invoice_number);
+          setCategory(inv.category || '');
         }
 
         const lineItems = await fetchLineItems(id);
@@ -175,6 +181,7 @@ const InvoiceEditor = () => {
         due_date: dueDate || undefined,
         notes: notes || undefined,
         footer_text: footerText || undefined,
+        category: category || undefined,
       },
       lines.map(l => ({
         description: l.description,
@@ -187,7 +194,10 @@ const InvoiceEditor = () => {
     );
 
     setSaving(false);
-    if (result) navigate('/invoices');
+    if (result) {
+      setSavedInvoiceId(result.id);
+      navigate('/invoices');
+    }
   };
 
   return (
@@ -242,6 +252,28 @@ const InvoiceEditor = () => {
               <Label>Fälligkeitsdatum</Label>
               <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
             </div>
+
+            <div className="space-y-2">
+              <Label>Kategorie</Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Kategorie wählen…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Keine Kategorie</SelectItem>
+                  {categories.filter(c => !c.is_hidden).map(c => (
+                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {savedInvoiceId && (
+              <div className="space-y-2 md:col-span-2">
+                <Label>Tags</Label>
+                <InvoiceTagSelector invoiceId={savedInvoiceId} size="sm" />
+              </div>
+            )}
           </CardContent>
         </Card>
 

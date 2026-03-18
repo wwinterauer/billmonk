@@ -258,6 +258,7 @@ export function ExportTemplateSettings() {
         include_totals: defaultTemplate.include_totals,
         date_format: defaultTemplate.date_format,
         number_format: defaultTemplate.number_format,
+        template_type: defaultTemplate.template_type || 'receipts',
       });
     } else if (!loading && templates.length === 0 && !editingTemplate) {
       setEditingTemplate(createEmptyTemplate());
@@ -289,6 +290,7 @@ export function ExportTemplateSettings() {
         include_totals: template.include_totals,
         date_format: template.date_format,
         number_format: template.number_format,
+        template_type: template.template_type || 'receipts',
       });
       setSelectedColumn(null);
     }

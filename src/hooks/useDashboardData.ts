@@ -12,6 +12,11 @@ interface DashboardStats {
   reviewReceiptCount: number;
   avgAiConfidence: number | null;
   unmatchedTransactions: number;
+  // Invoice stats (Business plan)
+  totalIncome: number;
+  openInvoiceCount: number;
+  openInvoiceAmount: number;
+  paidThisMonth: number;
 }
 
 interface CategoryData {
@@ -50,6 +55,10 @@ export function useDashboardData(year: number, month: number) {
     reviewReceiptCount: 0,
     avgAiConfidence: null,
     unmatchedTransactions: 0,
+    totalIncome: 0,
+    openInvoiceCount: 0,
+    openInvoiceAmount: 0,
+    paidThisMonth: 0,
   });
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
   const [tagData, setTagData] = useState<TagData[]>([]);
@@ -100,6 +109,28 @@ export function useDashboardData(year: number, month: number) {
         .eq('status', 'unmatched');
 
       if (unmatchedError) throw unmatchedError;
+
+      // Fetch invoices for the month (Business plan stats)
+      const { data: monthInvoices, error: invoicesError } = await supabase
+        .from('invoices')
+        .select('id, total, status, paid_at, vat_total')
+        .eq('user_id', user.id)
+        .neq('status', 'cancelled');
+
+      if (invoicesError) throw invoicesError;
+
+      // Calculate invoice stats
+      const allInvoices = monthInvoices || [];
+      const paidThisMonthInvoices = allInvoices.filter(i => {
+        if (i.status !== 'paid' || !i.paid_at) return false;
+        const d = new Date(i.paid_at);
+        return d.getMonth() === month - 1 && d.getFullYear() === year;
+      });
+      const totalIncome = paidThisMonthInvoices.reduce((s, i) => s + (i.total || 0), 0);
+      const openInvoices = allInvoices.filter(i => i.status === 'sent' || i.status === 'overdue');
+      const openInvoiceCount = openInvoices.length;
+      const openInvoiceAmount = openInvoices.reduce((s, i) => s + (i.total || 0), 0);
+      const paidThisMonthAmount = totalIncome;
 
       // Fetch recent receipts
       const { data: recent, error: recentError } = await supabase
@@ -211,6 +242,10 @@ export function useDashboardData(year: number, month: number) {
         reviewReceiptCount,
         avgAiConfidence,
         unmatchedTransactions: unmatchedCount || 0,
+        totalIncome,
+        openInvoiceCount,
+        openInvoiceAmount,
+        paidThisMonth: paidThisMonthAmount,
       });
 
       setCategoryData(catData);

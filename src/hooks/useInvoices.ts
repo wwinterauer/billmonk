@@ -53,6 +53,7 @@ export type InvoiceInsert = {
   notes?: string;
   footer_text?: string;
   currency?: string;
+  category?: string;
 };
 
 export type LineItemInsert = {

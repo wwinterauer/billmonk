@@ -33,6 +33,7 @@ export interface ExportTemplate {
   include_totals: boolean;
   date_format: string;
   number_format: string;
+  template_type: 'receipts' | 'invoices';
   created_at: string;
   updated_at: string;
 }
@@ -52,6 +53,21 @@ export const DEFAULT_COLUMNS: ExportColumn[] = [
   { id: '10', field: 'payment_method', label: 'Zahlungsart', type: 'text', format: null, visible: false, order: 10, align: 'left' },
   { id: '11', field: 'status', label: 'Status', type: 'text', format: null, visible: false, order: 11, align: 'left' },
   { id: '12', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 12, align: 'left' },
+];
+
+// Default columns for invoice export templates
+export const DEFAULT_INVOICE_COLUMNS: ExportColumn[] = [
+  { id: 'i1', field: 'invoice_number', label: 'Rechnungsnr.', type: 'text', format: null, visible: true, order: 0, align: 'left' },
+  { id: 'i2', field: 'customer_name', label: 'Kunde', type: 'text', format: null, visible: true, order: 1, align: 'left' },
+  { id: 'i3', field: 'invoice_date', label: 'Rechnungsdatum', type: 'date', format: 'DD.MM.YYYY', visible: true, order: 2, align: 'left' },
+  { id: 'i4', field: 'due_date', label: 'Fällig am', type: 'date', format: 'DD.MM.YYYY', visible: true, order: 3, align: 'left' },
+  { id: 'i5', field: 'category', label: 'Kategorie', type: 'text', format: null, visible: true, order: 4, align: 'left' },
+  { id: 'i6', field: 'subtotal', label: 'Netto', type: 'currency', format: '€ #.##0,00', visible: true, order: 5, align: 'right' },
+  { id: 'i7', field: 'vat_total', label: 'USt', type: 'currency', format: '€ #.##0,00', visible: true, order: 6, align: 'right' },
+  { id: 'i8', field: 'total', label: 'Brutto', type: 'currency', format: '€ #.##0,00', visible: true, order: 7, align: 'right' },
+  { id: 'i9', field: 'status', label: 'Status', type: 'text', format: null, visible: true, order: 8, align: 'left' },
+  { id: 'i10', field: 'paid_at', label: 'Bezahlt am', type: 'date', format: 'DD.MM.YYYY', visible: false, order: 9, align: 'left' },
+  { id: 'i11', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 10, align: 'left' },
 ];
 
 // Format preview function
@@ -197,6 +213,7 @@ export function useExportTemplates() {
         ...t,
         columns: (t.columns as unknown as ExportColumn[]) || DEFAULT_COLUMNS,
         sort_direction: (t.sort_direction as 'asc' | 'desc') || 'asc',
+        template_type: ((t as any).template_type as 'receipts' | 'invoices') || 'receipts',
       })) as ExportTemplate[];
 
       setTemplates(parsed);
@@ -352,12 +369,12 @@ export function useExportTemplates() {
   };
 
   // Create an empty template structure
-  const createEmptyTemplate = (): Omit<ExportTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'> => ({
-    name: 'Neue Vorlage',
+  const createEmptyTemplate = (type: 'receipts' | 'invoices' = 'receipts'): Omit<ExportTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'> => ({
+    name: type === 'invoices' ? 'Neue Rechnungsvorlage' : 'Neue Vorlage',
     description: null,
     is_default: false,
-    columns: [...DEFAULT_COLUMNS],
-    sort_by: 'receipt_date',
+    columns: type === 'invoices' ? [...DEFAULT_INVOICE_COLUMNS] : [...DEFAULT_COLUMNS],
+    sort_by: type === 'invoices' ? 'invoice_date' : 'receipt_date',
     sort_direction: 'desc',
     group_by: null,
     group_subtotals: true,
@@ -365,6 +382,7 @@ export function useExportTemplates() {
     include_totals: true,
     date_format: 'DD.MM.YYYY',
     number_format: 'de-AT',
+    template_type: type,
   });
 
   return {

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -147,6 +148,7 @@ const Invoices = () => {
                     <TableHead>Kunde</TableHead>
                     <TableHead>Datum</TableHead>
                     <TableHead>Fällig</TableHead>
+                    <TableHead>Kategorie</TableHead>
                     <TableHead className="text-right">Betrag</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-10" />
@@ -161,6 +163,13 @@ const Invoices = () => {
                         <TableCell>{customerName(inv)}</TableCell>
                         <TableCell>{fmtDate(inv.invoice_date)}</TableCell>
                         <TableCell>{fmtDate(inv.due_date)}</TableCell>
+                        <TableCell>
+                          {(inv as any).category ? (
+                            <Badge variant="outline" className="text-xs">{(inv as any).category}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">–</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right font-medium">{fmt(inv.total || 0)}</TableCell>
                         <TableCell>
                           <Badge variant={sc.variant}>{sc.label}</Badge>

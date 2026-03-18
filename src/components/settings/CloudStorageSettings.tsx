@@ -30,6 +30,7 @@ interface CloudConnection {
   backup_time: string;
   backup_file_prefix: string;
   backup_include_files: boolean;
+  backup_include_invoices: boolean;
   backup_status_filter: string[];
   backup_template_id: string | null;
   backup_include_excel: boolean;
@@ -128,6 +129,7 @@ export const CloudStorageSettings = () => {
           backup_time: data.backup_time || '02:00',
           backup_file_prefix: data.backup_file_prefix || 'XpenzAI-Backup',
           backup_include_files: data.backup_include_files ?? true,
+          backup_include_invoices: (data as any).backup_include_invoices ?? false,
           backup_status_filter: data.backup_status_filter || ['review'],
           backup_template_id: data.backup_template_id,
           backup_include_excel: (data as any).backup_include_excel ?? true,
@@ -226,6 +228,7 @@ export const CloudStorageSettings = () => {
           backup_include_csv: connection.backup_include_csv,
           backup_zip_pattern: connection.backup_zip_pattern,
           backup_folder_structure: connection.backup_folder_structure,
+          backup_include_invoices: connection.backup_include_invoices,
         } as any)
         .eq('id', connection.id);
 
@@ -495,6 +498,17 @@ export const CloudStorageSettings = () => {
                     <Switch
                       checked={connection.backup_include_files}
                       onCheckedChange={(checked) => updateConnection({ backup_include_files: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Ausgangsrechnungen einschließen</Label>
+                      <p className="text-xs text-muted-foreground">Rechnungs-PDFs und -Daten mit sichern</p>
+                    </div>
+                    <Switch
+                      checked={(connection as any).backup_include_invoices ?? false}
+                      onCheckedChange={(checked) => updateConnection({ backup_include_invoices: checked } as any)}
                     />
                   </div>
 

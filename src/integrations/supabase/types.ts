@@ -388,6 +388,7 @@ export type Database = {
           backup_include_csv: boolean | null
           backup_include_excel: boolean | null
           backup_include_files: boolean | null
+          backup_include_invoices: boolean | null
           backup_schedule_type: string | null
           backup_status_filter: string[] | null
           backup_template_id: string | null
@@ -423,6 +424,7 @@ export type Database = {
           backup_include_csv?: boolean | null
           backup_include_excel?: boolean | null
           backup_include_files?: boolean | null
+          backup_include_invoices?: boolean | null
           backup_schedule_type?: string | null
           backup_status_filter?: string[] | null
           backup_template_id?: string | null
@@ -458,6 +460,7 @@ export type Database = {
           backup_include_csv?: boolean | null
           backup_include_excel?: boolean | null
           backup_include_files?: boolean | null
+          backup_include_invoices?: boolean | null
           backup_schedule_type?: string | null
           backup_status_filter?: string[] | null
           backup_template_id?: string | null
@@ -909,6 +912,7 @@ export type Database = {
           number_format: string | null
           sort_by: string | null
           sort_direction: string | null
+          template_type: string
           updated_at: string | null
           user_id: string
         }
@@ -927,6 +931,7 @@ export type Database = {
           number_format?: string | null
           sort_by?: string | null
           sort_direction?: string | null
+          template_type?: string
           updated_at?: string | null
           user_id: string
         }
@@ -945,6 +950,7 @@ export type Database = {
           number_format?: string | null
           sort_by?: string | null
           sort_direction?: string | null
+          template_type?: string
           updated_at?: string | null
           user_id?: string
         }
@@ -1197,8 +1203,45 @@ export type Database = {
           },
         ]
       }
+      invoice_tags: {
+        Row: {
+          created_at: string | null
+          id: string
+          invoice_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          invoice_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          invoice_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_tags_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
+          category: string | null
           created_at: string | null
           credit_note_for: string | null
           currency: string | null
@@ -1223,6 +1266,7 @@ export type Database = {
           vat_total: number | null
         }
         Insert: {
+          category?: string | null
           created_at?: string | null
           credit_note_for?: string | null
           currency?: string | null
@@ -1247,6 +1291,7 @@ export type Database = {
           vat_total?: number | null
         }
         Update: {
+          category?: string | null
           created_at?: string | null
           credit_note_for?: string | null
           currency?: string | null
