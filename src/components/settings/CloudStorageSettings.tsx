@@ -30,6 +30,7 @@ interface CloudConnection {
   backup_time: string;
   backup_file_prefix: string;
   backup_include_files: boolean;
+  backup_include_invoices: boolean;
   backup_status_filter: string[];
   backup_template_id: string | null;
   backup_include_excel: boolean;
