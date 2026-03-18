@@ -176,7 +176,11 @@ const Reports = () => {
       
       const { data, error } = await supabase
         .from('invoices')
-        .select('id, invoice_number, invoice_date, due_date, total, subtotal, vat_total, status, paid_at, category, customer_id, customers(display_name)')
+        .select(`
+          id, invoice_number, invoice_date, due_date, total, subtotal, vat_total, status, paid_at, category, customer_id,
+          customers(display_name),
+          invoice_tags(tag:tags(id, name, color))
+        `)
         .eq('user_id', user.id)
         .neq('status', 'cancelled');
       
