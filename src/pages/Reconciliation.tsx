@@ -350,6 +350,7 @@ export default function Reconciliation() {
 
   return (
     <DashboardLayout>
+      <FeatureGate feature="reconciliation">
       <div className="space-y-6">
         {/* Header */}
         <motion.div
