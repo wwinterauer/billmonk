@@ -41,7 +41,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { usePlan } from '@/hooks/usePlan';
 import { PlanType, PLAN_NAMES, FEATURE_MIN_PLAN, isPlanSufficient } from '@/lib/planConfig';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+
 
 interface NavItem {
   name: string;
