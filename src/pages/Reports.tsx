@@ -197,14 +197,12 @@ const Reports = () => {
     const from = dateRange.from;
     const to = dateRange.to;
 
-    // Paid in period
     const paidInPeriod = invoices.filter(i => {
       if (i.status !== 'paid' || !i.paid_at) return false;
       const d = new Date(i.paid_at);
       return d >= from && d <= to;
     });
 
-    // Issued in period
     const issuedInPeriod = invoices.filter(i => {
       if (!i.invoice_date) return false;
       const d = new Date(i.invoice_date);
@@ -217,30 +215,58 @@ const Reports = () => {
     const openInvoices = invoices.filter(i => i.status === 'sent' || i.status === 'overdue');
     const openAmount = openInvoices.reduce((s, i) => s + (i.total || 0), 0);
 
+    const categoryColorMap = new Map<string, string>();
+    categories?.forEach((cat) => {
+      categoryColorMap.set(cat.name, cat.color || '#94A3B8');
+    });
+
     // By customer
     const byCustomer = new Map<string, { name: string; amount: number; count: number }>();
     paidInPeriod.forEach(inv => {
       const name = (inv.customers as any)?.display_name || 'Unbekannt';
       const existing = byCustomer.get(name);
-      if (existing) {
-        existing.amount += inv.total || 0;
-        existing.count += 1;
-      } else {
-        byCustomer.set(name, { name, amount: inv.total || 0, count: 1 });
+      if (existing) { existing.amount += inv.total || 0; existing.count += 1; }
+      else { byCustomer.set(name, { name, amount: inv.total || 0, count: 1 }); }
+    });
+
+    // By category (with colors + vat)
+    const byCategory = new Map<string, { name: string; color: string; amount: number; count: number; vat: number }>();
+    paidInPeriod.forEach(inv => {
+      const cat = inv.category || 'Ohne Kategorie';
+      const color = categoryColorMap.get(cat) || '#94A3B8';
+      const existing = byCategory.get(cat);
+      if (existing) { existing.amount += inv.total || 0; existing.count += 1; existing.vat += inv.vat_total || 0; }
+      else { byCategory.set(cat, { name: cat, color, amount: inv.total || 0, count: 1, vat: inv.vat_total || 0 }); }
+    });
+
+    // By tag
+    const tagMap = new Map<string, { id: string; name: string; color: string; amount: number; count: number; vat: number }>();
+    let untaggedAmount = 0;
+    let untaggedCount = 0;
+    paidInPeriod.forEach(inv => {
+      const tags = ((inv as any).invoice_tags || [])
+        .map((rt: any) => rt.tag)
+        .filter(Boolean) as Array<{ id: string; name: string; color: string }>;
+      if (tags.length === 0) { untaggedAmount += inv.total || 0; untaggedCount += 1; }
+      else {
+        tags.forEach(tag => {
+          const existing = tagMap.get(tag.id);
+          if (existing) { existing.amount += inv.total || 0; existing.count += 1; existing.vat += inv.vat_total || 0; }
+          else { tagMap.set(tag.id, { id: tag.id, name: tag.name, color: tag.color, amount: inv.total || 0, count: 1, vat: inv.vat_total || 0 }); }
+        });
       }
     });
 
-    // By category
-    const byCategory = new Map<string, { name: string; amount: number; count: number }>();
+    // Time series (monthly)
+    const monthlyMap = new Map<string, { key: string; label: string; date: Date; amount: number; count: number; vat: number }>();
+    const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
     paidInPeriod.forEach(inv => {
-      const cat = inv.category || 'Ohne Kategorie';
-      const existing = byCategory.get(cat);
-      if (existing) {
-        existing.amount += inv.total || 0;
-        existing.count += 1;
-      } else {
-        byCategory.set(cat, { name: cat, amount: inv.total || 0, count: 1 });
-      }
+      const d = new Date(inv.paid_at!);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+      const existing = monthlyMap.get(key);
+      if (existing) { existing.amount += inv.total || 0; existing.count += 1; existing.vat += inv.vat_total || 0; }
+      else { monthlyMap.set(key, { key, label, date: d, amount: inv.total || 0, count: 1, vat: inv.vat_total || 0 }); }
     });
 
     return {
@@ -253,8 +279,11 @@ const Reports = () => {
       openAmount,
       byCustomer: Array.from(byCustomer.values()).sort((a, b) => b.amount - a.amount),
       byCategory: Array.from(byCategory.values()).sort((a, b) => b.amount - a.amount),
+      byTag: Array.from(tagMap.values()).sort((a, b) => b.amount - a.amount),
+      untagged: { amount: untaggedAmount, count: untaggedCount },
+      timeSeries: Array.from(monthlyMap.values()).sort((a, b) => a.date.getTime() - b.date.getTime()),
     };
-  }, [invoices, dateRange]);
+  }, [invoices, dateRange, categories]);
 
   // Fetch categories for color mapping
   const { data: categories } = useQuery({
