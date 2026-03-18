@@ -506,10 +506,9 @@ const Settings = () => {
                 <TabsTrigger
                   key={tab.value}
                   value={tab.value}
-                  disabled={locked}
                   className={cn(
                     'gap-2 flex-shrink-0',
-                    locked && 'opacity-50 cursor-not-allowed'
+                    locked && 'opacity-50'
                   )}
                 >
                   <tab.icon className="h-4 w-4" />
