@@ -248,6 +248,79 @@ const Dashboard = () => {
           ))}
         </div>
 
+        {/* Income KPIs (Business feature) */}
+        <FeatureGate feature="invoiceModule" className="mb-8">
+          <div className="grid sm:grid-cols-3 gap-4">
+            <Card className="border-border/50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm text-muted-foreground">Einnahmen (Monat)</span>
+                  <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                    <Euro className="h-4 w-4 text-green-600" />
+                  </div>
+                </div>
+                {loading ? (
+                  <>
+                    <Skeleton className="h-8 w-24 mb-2" />
+                    <Skeleton className="h-4 w-32" />
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold text-foreground mb-1">{formatCurrency(stats.paidThisMonth)}</p>
+                    <p className="text-sm text-muted-foreground">Bezahlte Rechnungen</p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm text-muted-foreground">Offene Rechnungen</span>
+                  <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                    <Clock className="h-4 w-4 text-orange-500" />
+                  </div>
+                </div>
+                {loading ? (
+                  <>
+                    <Skeleton className="h-8 w-24 mb-2" />
+                    <Skeleton className="h-4 w-32" />
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold text-foreground mb-1">{formatCurrency(stats.openInvoiceAmount)}</p>
+                    <p className="text-sm text-muted-foreground">{stats.openInvoiceCount} Rechnung{stats.openInvoiceCount !== 1 ? 'en' : ''} offen</p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm text-muted-foreground">Gewinn/Verlust</span>
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <FileText className="h-4 w-4 text-primary" />
+                  </div>
+                </div>
+                {loading ? (
+                  <>
+                    <Skeleton className="h-8 w-24 mb-2" />
+                    <Skeleton className="h-4 w-32" />
+                  </>
+                ) : (
+                  <>
+                    <p className={`text-2xl font-bold mb-1 ${stats.paidThisMonth - stats.totalExpenses >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                      {formatCurrency(stats.paidThisMonth - stats.totalExpenses)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Einnahmen − Ausgaben</p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </FeatureGate>
+
         {/* Main Content */}
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Recent Receipts */}
