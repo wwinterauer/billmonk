@@ -100,6 +100,7 @@ const Reports = () => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [vendorSearch, setVendorSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'expenses' | 'income'>('expenses');
 
   const months = [
     'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
