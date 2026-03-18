@@ -1,45 +1,44 @@
 
 
-# Gesamtplan: User-Strecke, Stripe-Bezahlung, Admin & Kontingent
+## Konzept: Gesperrte Features sichtbar machen + Umbenennung + visuelle Gruppierung
 
-## Status: Phase 1-6 implementiert ✅, Phase 9 vollständig ✅
+### 1. Umbenennung "Rechnungen" → "Ausgangsrechnungen"
+- **Sidebar.tsx** Zeile 59: Label ändern
 
-### Umgesetzte Phasen:
-- ✅ Phase 1: DB-Migration (profiles erweitert, user_roles, has_role(), reset_monthly_credits())
-- ✅ Phase 2: Admin-Rolle für w.winterauer@gmail.com gesetzt (Business-Plan)
-- ✅ Phase 3: planConfig.ts + usePlan.ts erstellt
-- ✅ Phase 4: Onboarding-Wizard (3 Steps) + ProtectedRoute mit Onboarding-Check
-- ✅ Phase 5: Sidebar mit Kontingent-Balken, Admin-Plan-Switcher, Feature-Gating
-- ✅ Phase 6: Stripe-Integration komplett
-  - Edge Functions: create-checkout (Checkout-Session), check-subscription (Abo-Status prüfen), customer-portal (Self-Service Portal)
-  - Alle 3 Functions mit verify_jwt=false in config.toml, Auth-Prüfung im Code
-  - stripeConfig.ts: Product-IDs + Price-IDs für Starter/Pro/Business (monatlich & jährlich)
-  - AuthContext: Automatischer Abo-Check bei Login + periodisches Polling (60s)
-  - SubscriptionSettings: Abo verwalten, Status prüfen, Plan upgraden
-  - Kein Webhook nötig – Polling via check-subscription synchronisiert den Plan-Status
-- ✅ Phase 9: Rechnungsmodul komplett
-  - DB: customers, invoice_items, invoices, invoice_line_items, recurring_invoices, invoice_settings (alle mit RLS)
-  - Storage-Bucket: invoices (privat)
-  - Settings-Tabs: Feature-Gating per usePlan + 4 neue Business-Tabs (Kunden, Artikel, Rechnung, Fakturierung)
-  - Hooks: useCustomers, useInvoiceItems, useInvoiceSettings, useInvoices
-  - Komponenten: CustomerManagement, InvoiceItemManagement, InvoiceTemplateSettings, InvoiceModuleSettings
-  - Sidebar: "Rechnungen" Nav-Eintrag (Business-only)
-  - Seiten: /invoices (Liste mit Stats & Filter), /invoices/new (Editor), /invoices/:id/edit (Bearbeitung)
-  - Edge Function: generate-invoice-pdf (PDF-Generierung mit pdf-lib, Upload in Storage)
-  - Edge Function: cron-generate-invoices (täglich 06:00, wiederkehrende Rechnungen + Überfälligkeits-Check)
-  - Cron-Job: generate-recurring-invoices-daily (pg_cron)
+### 2. Feature-Min-Plan Mapping (planConfig.ts)
+Neue Map hinzufügen, die pro Feature den Mindest-Plan definiert:
+```typescript
+export const FEATURE_MIN_PLAN: Record<string, PlanType> = {
+  reconciliation: 'starter',
+  bankImport: 'starter',
+  emailImport: 'starter',
+  cloudBackup: 'pro',
+  invoiceModule: 'business',
+};
+```
 
-### Offene Phasen:
-- ⬜ Phase 7: Landing Page Pricing Update (4 Pläne, monatlich/jährlich Toggle)
-- ⬜ Phase 8: Plan-Enforcement (Upload-Limits durchsetzen)
+### 3. Sidebar: Alle Items immer zeigen, gesperrte mit Lock
+- Statt `filteredNavigation` (Zeile 130) alle Items rendern
+- Gesperrte Items: `opacity-60`, Lock-Icon (12px) neben dem Namen, `cursor-not-allowed`
+- Klick auf gesperrtes Item: `e.preventDefault()` + Toast mit Text wie *"Verfügbar ab dem Starter-Abo"* und Action-Button "Upgraden" → `/account?tab=subscription`
+- Im collapsed-Zustand: nur Lock-Icon als Overlay auf dem Feature-Icon
 
----
+### 4. Settings-Tabs: Alle Tabs immer zeigen, gesperrte mit Lock
+- Statt `visibleTabs` Filter (Zeile 447-449) alle Tabs rendern
+- Gesperrte Tabs: `opacity-60` + kleines Lock-Icon im Tab-Label
+- Klick auf gesperrten Tab ist erlaubt (Tab öffnet sich), aber der **Tab-Content** zeigt statt der Einstellungen eine **Upgrade-Karte**:
+  - Zentrierte Card mit Lock-Icon, kurzer Feature-Beschreibung, Plan-Name, und Button "Jetzt upgraden" → `/account?tab=subscription`
+  - So sieht der User, was ihn erwartet, kann aber nichts konfigurieren
 
-## Bestehende Bugs
+### 5. Settings: Invoice-Tabs visuell abgrenzen
+- Vor den Invoice-Tabs (Kunden, Artikel, Rechnung, Fakturierung) einen vertikalen Separator (`|`) oder eine kleine Lücke + dezente Gruppenbezeichnung einfügen
+- Die Invoice-Tabs erhalten einen leicht anderen Hintergrund-Stil (z.B. `border-l-2 border-primary/20` als Gruppe oder `bg-primary/5` auf dem TabsTrigger)
 
-| Priorität | Problem | Dateien | Aufwand |
-|-----------|---------|---------|--------|
-| ✅ BEHOBEN | 4x `parseFloat \|\| null` Bug | `ReceiptDetailPanel.tsx` | 4 Zeilen |
-| ✅ BEHOBEN | CorrectionTracking originalVatRate | `useCorrectionTracking.ts` | 1 Zeile |
-| MITTEL | Tote Links `/forgot-password`, `/agb` | `Login.tsx`, `Register.tsx` | 2-50 Zeilen |
-| MITTEL | Badge ohne forwardRef | `badge.tsx` | 5 Zeilen |
+### 6. Betroffene Dateien
+
+| Datei | Änderung |
+|---|---|
+| `src/lib/planConfig.ts` | `FEATURE_MIN_PLAN` Map + Feature-Beschreibungen |
+| `src/components/dashboard/Sidebar.tsx` | Umbenennung, Lock-Pattern statt Filter |
+| `src/pages/Settings.tsx` | Tabs immer zeigen, Lock-UX, Upgrade-Karte, Invoice-Gruppierung |
+
