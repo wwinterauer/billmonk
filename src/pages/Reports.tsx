@@ -190,6 +190,23 @@ const Reports = () => {
     enabled: !!user && !!dateRange.from && !!dateRange.to && showIncome,
   });
 
+  // Fetch categories for color mapping
+  const { data: categories } = useQuery({
+    queryKey: ['categories', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .or(`user_id.eq.${user.id},is_system.eq.true`);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
   // Income stats
   const incomeStats = useMemo(() => {
     if (!invoices || !dateRange.from || !dateRange.to) return null;
@@ -220,7 +237,6 @@ const Reports = () => {
       categoryColorMap.set(cat.name, cat.color || '#94A3B8');
     });
 
-    // By customer
     const byCustomer = new Map<string, { name: string; amount: number; count: number }>();
     paidInPeriod.forEach(inv => {
       const name = (inv.customers as any)?.display_name || 'Unbekannt';
@@ -229,7 +245,6 @@ const Reports = () => {
       else { byCustomer.set(name, { name, amount: inv.total || 0, count: 1 }); }
     });
 
-    // By category (with colors + vat)
     const byCategory = new Map<string, { name: string; color: string; amount: number; count: number; vat: number }>();
     paidInPeriod.forEach(inv => {
       const cat = inv.category || 'Ohne Kategorie';
@@ -239,7 +254,6 @@ const Reports = () => {
       else { byCategory.set(cat, { name: cat, color, amount: inv.total || 0, count: 1, vat: inv.vat_total || 0 }); }
     });
 
-    // By tag
     const tagMap = new Map<string, { id: string; name: string; color: string; amount: number; count: number; vat: number }>();
     let untaggedAmount = 0;
     let untaggedCount = 0;
@@ -257,13 +271,12 @@ const Reports = () => {
       }
     });
 
-    // Time series (monthly)
     const monthlyMap = new Map<string, { key: string; label: string; date: Date; amount: number; count: number; vat: number }>();
-    const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+    const monthNames2 = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
     paidInPeriod.forEach(inv => {
       const d = new Date(inv.paid_at!);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+      const label = `${monthNames2[d.getMonth()]} ${d.getFullYear()}`;
       const existing = monthlyMap.get(key);
       if (existing) { existing.amount += inv.total || 0; existing.count += 1; existing.vat += inv.vat_total || 0; }
       else { monthlyMap.set(key, { key, label, date: d, amount: inv.total || 0, count: 1, vat: inv.vat_total || 0 }); }
@@ -284,23 +297,6 @@ const Reports = () => {
       timeSeries: Array.from(monthlyMap.values()).sort((a, b) => a.date.getTime() - b.date.getTime()),
     };
   }, [invoices, dateRange, categories]);
-
-  // Fetch categories for color mapping
-  const { data: categories } = useQuery({
-    queryKey: ['categories', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .or(`user_id.eq.${user.id},is_system.eq.true`);
-      
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user,
-  });
 
   // Fetch previous period data for comparison
   const previousPeriodRange = useMemo(() => {
