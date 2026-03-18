@@ -12,6 +12,11 @@ interface DashboardStats {
   reviewReceiptCount: number;
   avgAiConfidence: number | null;
   unmatchedTransactions: number;
+  // Invoice stats (Business plan)
+  totalIncome: number;
+  openInvoiceCount: number;
+  openInvoiceAmount: number;
+  paidThisMonth: number;
 }
 
 interface CategoryData {
