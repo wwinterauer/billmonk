@@ -108,6 +108,7 @@ const InvoiceEditor = () => {
           setNotes(inv.notes || '');
           setFooterText(inv.footer_text || '');
           setInvoiceNumber(inv.invoice_number);
+          setCategory(inv.category || '');
         }
 
         const lineItems = await fetchLineItems(id);
