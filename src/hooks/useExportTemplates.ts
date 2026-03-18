@@ -33,6 +33,7 @@ export interface ExportTemplate {
   include_totals: boolean;
   date_format: string;
   number_format: string;
+  template_type: 'receipts' | 'invoices';
   created_at: string;
   updated_at: string;
 }
