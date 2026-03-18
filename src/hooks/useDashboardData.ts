@@ -242,6 +242,10 @@ export function useDashboardData(year: number, month: number) {
         reviewReceiptCount,
         avgAiConfidence,
         unmatchedTransactions: unmatchedCount || 0,
+        totalIncome,
+        openInvoiceCount,
+        openInvoiceAmount,
+        paidThisMonth: paidThisMonthAmount,
       });
 
       setCategoryData(catData);
