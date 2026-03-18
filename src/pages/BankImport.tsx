@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { FeatureGate } from '@/components/FeatureGate';
 import { motion } from 'framer-motion';
 import { 
   FileSpreadsheet, 
