@@ -148,6 +148,7 @@ const Invoices = () => {
                     <TableHead>Kunde</TableHead>
                     <TableHead>Datum</TableHead>
                     <TableHead>Fällig</TableHead>
+                    <TableHead>Kategorie</TableHead>
                     <TableHead className="text-right">Betrag</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-10" />
