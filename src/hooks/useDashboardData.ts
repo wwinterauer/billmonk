@@ -55,6 +55,10 @@ export function useDashboardData(year: number, month: number) {
     reviewReceiptCount: 0,
     avgAiConfidence: null,
     unmatchedTransactions: 0,
+    totalIncome: 0,
+    openInvoiceCount: 0,
+    openInvoiceAmount: 0,
+    paidThisMonth: 0,
   });
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
   const [tagData, setTagData] = useState<TagData[]>([]);
