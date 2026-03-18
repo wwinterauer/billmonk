@@ -968,11 +968,11 @@ const Settings = () => {
 
       {/* Bank Keywords Tab */}
       <TabsContent value="bank-keywords">
-        {isTabLocked('bankImport') ? <UpgradeCard featureKey="bankImport" /> : (
+        <FeatureGate feature="bankImport">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <BankImportKeywords />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
       {/* Tags Tab */}
