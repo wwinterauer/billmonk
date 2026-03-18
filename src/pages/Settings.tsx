@@ -1013,38 +1013,38 @@ const Settings = () => {
 
       {/* Customer Management Tab */}
       <TabsContent value="customers">
-        {isTabLocked('invoiceModule') ? <UpgradeCard featureKey="invoiceModule" /> : (
+        <FeatureGate feature="invoiceModule">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <CustomerManagement />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
       {/* Invoice Items Tab */}
       <TabsContent value="invoice-items">
-        {isTabLocked('invoiceModule') ? <UpgradeCard featureKey="invoiceModule" /> : (
+        <FeatureGate feature="invoiceModule">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <InvoiceItemManagement />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
       {/* Invoice Templates Tab */}
       <TabsContent value="invoice-templates">
-        {isTabLocked('invoiceModule') ? <UpgradeCard featureKey="invoiceModule" /> : (
+        <FeatureGate feature="invoiceModule">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <InvoiceTemplateSettings />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
       {/* Invoice Module Settings Tab */}
       <TabsContent value="invoice-settings">
-        {isTabLocked('invoiceModule') ? <UpgradeCard featureKey="invoiceModule" /> : (
+        <FeatureGate feature="invoiceModule">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <InvoiceModuleSettings />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
 
