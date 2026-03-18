@@ -1,45 +1,64 @@
 
 
-# Gesamtplan: User-Strecke, Stripe-Bezahlung, Admin & Kontingent
+## Konzept: Gesperrte Features als Vorschau anzeigen + Tab-Layout verbessern
 
-## Status: Phase 1-6 implementiert ✅, Phase 9 vollständig ✅
+### Probleme
+1. **Sidebar**: Gesperrte Menüpunkte zeigen nur einen Toast — der User sieht die Seite gar nicht
+2. **Settings-Tabs**: Gesperrte Tabs zeigen nur eine generische Upgrade-Card — nicht die echte UI
+3. **Tab-Layout**: "Ausgangsrechnungen" als Gruppenbezeichnung nimmt zu viel Platz ein
 
-### Umgesetzte Phasen:
-- ✅ Phase 1: DB-Migration (profiles erweitert, user_roles, has_role(), reset_monthly_credits())
-- ✅ Phase 2: Admin-Rolle für w.winterauer@gmail.com gesetzt (Business-Plan)
-- ✅ Phase 3: planConfig.ts + usePlan.ts erstellt
-- ✅ Phase 4: Onboarding-Wizard (3 Steps) + ProtectedRoute mit Onboarding-Check
-- ✅ Phase 5: Sidebar mit Kontingent-Balken, Admin-Plan-Switcher, Feature-Gating
-- ✅ Phase 6: Stripe-Integration komplett
-  - Edge Functions: create-checkout (Checkout-Session), check-subscription (Abo-Status prüfen), customer-portal (Self-Service Portal)
-  - Alle 3 Functions mit verify_jwt=false in config.toml, Auth-Prüfung im Code
-  - stripeConfig.ts: Product-IDs + Price-IDs für Starter/Pro/Business (monatlich & jährlich)
-  - AuthContext: Automatischer Abo-Check bei Login + periodisches Polling (60s)
-  - SubscriptionSettings: Abo verwalten, Status prüfen, Plan upgraden
-  - Kein Webhook nötig – Polling via check-subscription synchronisiert den Plan-Status
-- ✅ Phase 9: Rechnungsmodul komplett
-  - DB: customers, invoice_items, invoices, invoice_line_items, recurring_invoices, invoice_settings (alle mit RLS)
-  - Storage-Bucket: invoices (privat)
-  - Settings-Tabs: Feature-Gating per usePlan + 4 neue Business-Tabs (Kunden, Artikel, Rechnung, Fakturierung)
-  - Hooks: useCustomers, useInvoiceItems, useInvoiceSettings, useInvoices
-  - Komponenten: CustomerManagement, InvoiceItemManagement, InvoiceTemplateSettings, InvoiceModuleSettings
-  - Sidebar: "Rechnungen" Nav-Eintrag (Business-only)
-  - Seiten: /invoices (Liste mit Stats & Filter), /invoices/new (Editor), /invoices/:id/edit (Bearbeitung)
-  - Edge Function: generate-invoice-pdf (PDF-Generierung mit pdf-lib, Upload in Storage)
-  - Edge Function: cron-generate-invoices (täglich 06:00, wiederkehrende Rechnungen + Überfälligkeits-Check)
-  - Cron-Job: generate-recurring-invoices-daily (pg_cron)
+### Lösung
 
-### Offene Phasen:
-- ⬜ Phase 7: Landing Page Pricing Update (4 Pläne, monatlich/jährlich Toggle)
-- ⬜ Phase 8: Plan-Enforcement (Upload-Limits durchsetzen)
+#### 1. Sidebar: Gesperrte Items navigieren zur Seite
+- Klick auf gesperrte Items navigiert normal zur Seite (kein `e.preventDefault()` mehr, kein Toast)
+- Lock-Icon und `opacity-60` bleiben als visuelle Markierung
+- Die Seiten selbst (Reconciliation, BankImport, Invoices) prüfen den Plan und zeigen bei fehlendem Zugang ein **Overlay/Banner** über dem echten Content:
+  - Echte UI wird gerendert aber mit `pointer-events-none`, `opacity-50` und `select-none` (nicht interagierbar)
+  - Darüber liegt eine halbtransparente Upgrade-Card mit Feature-Beschreibung und Upgrade-Button
+  - So sieht der User was möglich wäre, kann aber nichts tun
 
----
+**Umsetzung**: Neue `FeatureGate`-Wrapper-Komponente die in den betroffenen Seiten genutzt wird:
+```text
+<FeatureGate feature="bankImport">
+  <BankImportContent />   ← wird gerendert aber nicht interagierbar
+</FeatureGate>
+```
 
-## Bestehende Bugs
+#### 2. Settings-Tabs: Echte UI als Vorschau statt Upgrade-Card
+- Gesperrte Tabs zeigen die **echte Komponente** (z.B. `CustomerManagement`, `EmailImportSettings`), aber eingewickelt in den gleichen `FeatureGate`-Wrapper
+- Content wird sichtbar aber nicht interagierbar (`pointer-events-none`, `opacity-50`)
+- Upgrade-Overlay darüber mit Upgrade-Button
 
-| Priorität | Problem | Dateien | Aufwand |
-|-----------|---------|---------|--------|
-| ✅ BEHOBEN | 4x `parseFloat \|\| null` Bug | `ReceiptDetailPanel.tsx` | 4 Zeilen |
-| ✅ BEHOBEN | CorrectionTracking originalVatRate | `useCorrectionTracking.ts` | 1 Zeile |
-| MITTEL | Tote Links `/forgot-password`, `/agb` | `Login.tsx`, `Register.tsx` | 2-50 Zeilen |
-| MITTEL | Badge ohne forwardRef | `badge.tsx` | 5 Zeilen |
+#### 3. Tab-Layout verbessern
+Statt "Ausgangsrechnungen" als Text-Label im Menüband:
+- Nur ein **vertikaler Strich** (`|`) als Separator zwischen Expense- und Invoice-Tabs
+- Invoice-Tabs bekommen ein subtiles visuelles Unterscheidungsmerkmal: ein kleines `FileText`-Icon (4px) vor der Gruppe oder einfach nur den Separator
+- Kein Text-Label → spart Platz
+
+### Betroffene Dateien
+
+| Datei | Änderung |
+|---|---|
+| `src/components/FeatureGate.tsx` | **Neu** — Wrapper-Komponente: rendert children als Vorschau mit Upgrade-Overlay wenn Feature gesperrt |
+| `src/components/dashboard/Sidebar.tsx` | Gesperrte Items navigieren normal (Link auf echte URL statt `#`) |
+| `src/pages/Settings.tsx` | Tab-Layout: "Ausgangsrechnungen"-Text entfernen, nur Separator behalten. Gesperrte TabsContent: echte Komponente in FeatureGate statt UpgradeCard |
+| `src/pages/Reconciliation.tsx` | Content in `<FeatureGate feature="reconciliation">` wrappen |
+| `src/pages/BankImport.tsx` | Content in `<FeatureGate feature="bankImport">` wrappen |
+| `src/pages/Invoices.tsx` | Content in `<FeatureGate feature="invoiceModule">` wrappen |
+
+### FeatureGate Komponente (Konzept)
+```text
+┌─────────────────────────────────────┐
+│  ┌───────────────────────────────┐  │  ← relative container
+│  │  Echte UI (opacity-50,        │  │
+│  │  pointer-events-none,         │  │
+│  │  select-none, blur-[1px])     │  │
+│  └───────────────────────────────┘  │
+│  ┌─────────────────┐               │  ← absolute overlay, centered
+│  │ 🔒 Feature-Name │               │
+│  │ Beschreibung    │               │
+│  │ [Jetzt upgraden]│               │
+│  └─────────────────┘               │
+└─────────────────────────────────────┘
+```
+
