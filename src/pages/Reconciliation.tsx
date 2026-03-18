@@ -745,6 +745,7 @@ export default function Reconciliation() {
           queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
         }}
       />
+      </FeatureGate>
     </DashboardLayout>
   );
 }

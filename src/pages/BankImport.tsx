@@ -413,7 +413,7 @@ export default function BankImport() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <FeatureGate feature="bankImport">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
