@@ -255,12 +255,12 @@ const InvoiceEditor = () => {
 
             <div className="space-y-2">
               <Label>Kategorie</Label>
-              <Select value={category} onValueChange={setCategory}>
+              <Select value={category || '__none__'} onValueChange={(v) => setCategory(v === '__none__' ? '' : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Kategorie wählen…" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Keine Kategorie</SelectItem>
+                  <SelectItem value="__none__">Keine Kategorie</SelectItem>
                   {categories.filter(c => !c.is_hidden).map(c => (
                     <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
                   ))}
