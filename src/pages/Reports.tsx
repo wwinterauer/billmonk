@@ -522,6 +522,49 @@ const Reports = () => {
     return Object.values(monthData);
   }, [receipts, previousReceipts, selectedYear, months]);
 
+  // Income monthly comparison data (current year vs previous year)
+  const incomeMonthlyComparisonData = useMemo(() => {
+    if (!invoices) return [];
+
+    const currentYear = parseInt(selectedYear);
+
+    const monthData: Record<string, { month: string; currentYear: number; previousYear: number }> = {};
+    months.forEach((month, index) => {
+      monthData[index.toString()] = {
+        month: month.substring(0, 3),
+        currentYear: 0,
+        previousYear: 0,
+      };
+    });
+
+    // Current year paid invoices
+    invoices.forEach((inv) => {
+      if (inv.status !== 'paid' || !inv.paid_at) return;
+      const date = new Date(inv.paid_at);
+      if (date.getFullYear() === currentYear) {
+        monthData[date.getMonth().toString()].currentYear += inv.total || 0;
+      }
+    });
+
+    // Previous year invoices
+    previousInvoices?.forEach((inv) => {
+      if (!inv.paid_at) return;
+      const date = new Date(inv.paid_at);
+      monthData[date.getMonth().toString()].previousYear += inv.total || 0;
+    });
+
+    return Object.values(monthData);
+  }, [invoices, previousInvoices, selectedYear, months]);
+
+  // Filtered customer data for table
+  const filteredCustomerData = useMemo(() => {
+    if (!incomeStats) return [];
+    if (!customerSearch) return incomeStats.byCustomer;
+    return incomeStats.byCustomer.filter((c) =>
+      c.name.toLowerCase().includes(customerSearch.toLowerCase())
+    );
+  }, [incomeStats, customerSearch]);
+
   // Trend indicators
   const trendIndicators = useMemo(() => {
     if (!timeSeriesData || timeSeriesData.length === 0) {
