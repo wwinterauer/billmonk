@@ -2,7 +2,7 @@
 
 # Gesamtplan: User-Strecke, Stripe-Bezahlung, Admin & Kontingent
 
-## Status: Phase 1-5 implementiert ✅, Phase 9 vollständig ✅
+## Status: Phase 1-6 implementiert ✅, Phase 9 vollständig ✅
 
 ### Umgesetzte Phasen:
 - ✅ Phase 1: DB-Migration (profiles erweitert, user_roles, has_role(), reset_monthly_credits())
@@ -10,6 +10,13 @@
 - ✅ Phase 3: planConfig.ts + usePlan.ts erstellt
 - ✅ Phase 4: Onboarding-Wizard (3 Steps) + ProtectedRoute mit Onboarding-Check
 - ✅ Phase 5: Sidebar mit Kontingent-Balken, Admin-Plan-Switcher, Feature-Gating
+- ✅ Phase 6: Stripe-Integration komplett
+  - Edge Functions: create-checkout (Checkout-Session), check-subscription (Abo-Status prüfen), customer-portal (Self-Service Portal)
+  - Alle 3 Functions mit verify_jwt=false in config.toml, Auth-Prüfung im Code
+  - stripeConfig.ts: Product-IDs + Price-IDs für Starter/Pro/Business (monatlich & jährlich)
+  - AuthContext: Automatischer Abo-Check bei Login + periodisches Polling (60s)
+  - SubscriptionSettings: Abo verwalten, Status prüfen, Plan upgraden
+  - Kein Webhook nötig – Polling via check-subscription synchronisiert den Plan-Status
 - ✅ Phase 9: Rechnungsmodul komplett
   - DB: customers, invoice_items, invoices, invoice_line_items, recurring_invoices, invoice_settings (alle mit RLS)
   - Storage-Bucket: invoices (privat)
@@ -23,7 +30,6 @@
   - Cron-Job: generate-recurring-invoices-daily (pg_cron)
 
 ### Offene Phasen:
-- ⬜ Phase 6: Stripe aktivieren + Edge Functions (create-checkout, stripe-webhook, customer-portal)
 - ⬜ Phase 7: Landing Page Pricing Update (4 Pläne, monatlich/jährlich Toggle)
 - ⬜ Phase 8: Plan-Enforcement (Upload-Limits durchsetzen)
 
@@ -33,7 +39,7 @@
 
 | Priorität | Problem | Dateien | Aufwand |
 |-----------|---------|---------|--------|
-| HOCH | 4x `parseFloat \|\| null` Bug | `ReceiptDetailPanel.tsx`, `Review.tsx` | 4 Zeilen |
-| HOCH | CorrectionTracking originalVatRate | `useCorrectionTracking.ts` | 1 Zeile |
+| ✅ BEHOBEN | 4x `parseFloat \|\| null` Bug | `ReceiptDetailPanel.tsx` | 4 Zeilen |
+| ✅ BEHOBEN | CorrectionTracking originalVatRate | `useCorrectionTracking.ts` | 1 Zeile |
 | MITTEL | Tote Links `/forgot-password`, `/agb` | `Login.tsx`, `Register.tsx` | 2-50 Zeilen |
 | MITTEL | Badge ohne forwardRef | `badge.tsx` | 5 Zeilen |
