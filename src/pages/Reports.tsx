@@ -283,6 +283,24 @@ const Reports = () => {
       else { monthlyMap.set(key, { key, label, date: d, amount: inv.total || 0, count: 1, vat: inv.vat_total || 0 }); }
     });
 
+    // VAT rate analysis
+    const byVatRate = new Map<string, { rate: number; label: string; net: number; vat: number; gross: number; count: number }>();
+    paidInPeriod.forEach(inv => {
+      const subtotal = inv.subtotal || 0;
+      const vatTotal = inv.vat_total || 0;
+      const effectiveRate = subtotal > 0 ? Math.round((vatTotal / subtotal) * 100) : 0;
+      const key = `${effectiveRate}%`;
+      const existing = byVatRate.get(key);
+      if (existing) {
+        existing.net += subtotal;
+        existing.vat += vatTotal;
+        existing.gross += inv.total || 0;
+        existing.count += 1;
+      } else {
+        byVatRate.set(key, { rate: effectiveRate, label: key, net: subtotal, vat: vatTotal, gross: inv.total || 0, count: 1 });
+      }
+    });
+
     return {
       totalIncome,
       totalVat,
@@ -296,6 +314,7 @@ const Reports = () => {
       byTag: Array.from(tagMap.values()).sort((a, b) => b.amount - a.amount),
       untagged: { amount: untaggedAmount, count: untaggedCount },
       timeSeries: Array.from(monthlyMap.values()).sort((a, b) => a.date.getTime() - b.date.getTime()),
+      byVatRate: Array.from(byVatRate.values()).sort((a, b) => b.rate - a.rate),
     };
   }, [invoices, dateRange, categories]);
 
