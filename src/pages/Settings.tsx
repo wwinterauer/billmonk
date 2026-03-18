@@ -458,9 +458,6 @@ const Settings = () => {
 
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
-    // Don't switch to locked tabs via the Tabs component
-    const tab = allTabs.find(t => t.value === value);
-    if (tab && isTabLocked(tab.requiredFeature)) return;
     setActiveTab(value);
     setSearchParams({ tab: value });
   };
