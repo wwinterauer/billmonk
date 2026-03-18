@@ -2,6 +2,7 @@ import { Header } from '@/components/landing/Header';
 import { Hero } from '@/components/landing/Hero';
 import { HowItWorks } from '@/components/landing/HowItWorks';
 import { Features } from '@/components/landing/Features';
+import { Pricing } from '@/components/landing/Pricing';
 import { CTA } from '@/components/landing/CTA';
 import { Footer } from '@/components/landing/Footer';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,6 +23,7 @@ const Index = () => {
         <Hero />
         <HowItWorks />
         <Features />
+        <Pricing />
         <CTA />
       </main>
       <Footer />
