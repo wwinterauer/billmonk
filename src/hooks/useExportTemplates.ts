@@ -55,6 +55,21 @@ export const DEFAULT_COLUMNS: ExportColumn[] = [
   { id: '12', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 12, align: 'left' },
 ];
 
+// Default columns for invoice export templates
+export const DEFAULT_INVOICE_COLUMNS: ExportColumn[] = [
+  { id: 'i1', field: 'invoice_number', label: 'Rechnungsnr.', type: 'text', format: null, visible: true, order: 0, align: 'left' },
+  { id: 'i2', field: 'customer_name', label: 'Kunde', type: 'text', format: null, visible: true, order: 1, align: 'left' },
+  { id: 'i3', field: 'invoice_date', label: 'Rechnungsdatum', type: 'date', format: 'DD.MM.YYYY', visible: true, order: 2, align: 'left' },
+  { id: 'i4', field: 'due_date', label: 'Fällig am', type: 'date', format: 'DD.MM.YYYY', visible: true, order: 3, align: 'left' },
+  { id: 'i5', field: 'category', label: 'Kategorie', type: 'text', format: null, visible: true, order: 4, align: 'left' },
+  { id: 'i6', field: 'subtotal', label: 'Netto', type: 'currency', format: '€ #.##0,00', visible: true, order: 5, align: 'right' },
+  { id: 'i7', field: 'vat_total', label: 'USt', type: 'currency', format: '€ #.##0,00', visible: true, order: 6, align: 'right' },
+  { id: 'i8', field: 'total', label: 'Brutto', type: 'currency', format: '€ #.##0,00', visible: true, order: 7, align: 'right' },
+  { id: 'i9', field: 'status', label: 'Status', type: 'text', format: null, visible: true, order: 8, align: 'left' },
+  { id: 'i10', field: 'paid_at', label: 'Bezahlt am', type: 'date', format: 'DD.MM.YYYY', visible: false, order: 9, align: 'left' },
+  { id: 'i11', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 10, align: 'left' },
+];
+
 // Format preview function
 export const formatPreview = (type: ExportColumn['type'], format: string | null): string => {
   const sampleValues = {
