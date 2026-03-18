@@ -250,7 +250,8 @@ export function useCorrectionTracking() {
         const correctedStr = String(correctedValue ?? '').replace(',', '.');
         const vatRate = correctedStr !== '' ? parseFloat(correctedStr) : 0;
         const detectedStr = String(detectedValue ?? '').replace(',', '.');
-        const originalVatRate = detectedStr !== '' ? parseFloat(detectedStr) : null;
+        const parsed = detectedStr !== '' ? parseFloat(detectedStr) : NaN;
+        const originalVatRate = !isNaN(parsed) ? parsed : null;
         await recordVatRateCorrection(vendorId, user.id, vatRate, originalVatRate);
         console.log(`[VAT Learning] Recorded correction: ${originalVatRate}% → ${vatRate}%`);
       }

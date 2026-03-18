@@ -1,42 +1,39 @@
 
 
-## Plan: High-Priority Bugs beheben
+# Gesamtplan: User-Strecke, Stripe-Bezahlung, Admin & Kontingent
 
-### Bug 1: `parseFloat || null` → verschluckt Wert 0
+## Status: Phase 1-5 implementiert ✅, Phase 9 vollständig ✅
 
-**Problem**: In `ReceiptDetailPanel.tsx` (Zeilen 762, 764, 794, 795) wird `calculatedValues.net || null` und `calculatedValues.vat || null` verwendet. Wenn der berechnete Wert `0` ist (z.B. bei 0% MwSt), wird er als falsy interpretiert und durch `null` ersetzt.
+### Umgesetzte Phasen:
+- ✅ Phase 1: DB-Migration (profiles erweitert, user_roles, has_role(), reset_monthly_credits())
+- ✅ Phase 2: Admin-Rolle für w.winterauer@gmail.com gesetzt (Business-Plan)
+- ✅ Phase 3: planConfig.ts + usePlan.ts erstellt
+- ✅ Phase 4: Onboarding-Wizard (3 Steps) + ProtectedRoute mit Onboarding-Check
+- ✅ Phase 5: Sidebar mit Kontingent-Balken, Admin-Plan-Switcher, Feature-Gating
+- ✅ Phase 9: Rechnungsmodul komplett
+  - DB: customers, invoice_items, invoices, invoice_line_items, recurring_invoices, invoice_settings (alle mit RLS)
+  - Storage-Bucket: invoices (privat)
+  - Settings-Tabs: Feature-Gating per usePlan + 4 neue Business-Tabs (Kunden, Artikel, Rechnung, Fakturierung)
+  - Hooks: useCustomers, useInvoiceItems, useInvoiceSettings, useInvoices
+  - Komponenten: CustomerManagement, InvoiceItemManagement, InvoiceTemplateSettings, InvoiceModuleSettings
+  - Sidebar: "Rechnungen" Nav-Eintrag (Business-only)
+  - Seiten: /invoices (Liste mit Stats & Filter), /invoices/new (Editor), /invoices/:id/edit (Bearbeitung)
+  - Edge Function: generate-invoice-pdf (PDF-Generierung mit pdf-lib, Upload in Storage)
+  - Edge Function: cron-generate-invoices (täglich 06:00, wiederkehrende Rechnungen + Überfälligkeits-Check)
+  - Cron-Job: generate-recurring-invoices-daily (pg_cron)
 
-**Fix** in `src/components/receipts/ReceiptDetailPanel.tsx`:
-- `calculatedValues.net || null` → `calculatedValues.net ?? null`
-- `calculatedValues.vat || null` → `calculatedValues.vat ?? null`
+### Offene Phasen:
+- ⬜ Phase 6: Stripe aktivieren + Edge Functions (create-checkout, stripe-webhook, customer-portal)
+- ⬜ Phase 7: Landing Page Pricing Update (4 Pläne, monatlich/jährlich Toggle)
+- ⬜ Phase 8: Plan-Enforcement (Upload-Limits durchsetzen)
 
-4 Stellen betroffen (Zeilen ~762, ~764, ~794, ~795).
+---
 
-### Bug 2: Gleicher Bug in Review.tsx
+## Bestehende Bugs
 
-**Problem**: In `Review.tsx` (Zeile 373, 382) wird `parseFloat(...) || 0` verwendet. Hier ist `|| 0` korrekt (Fallback auf 0 für Berechnung). Aber in den Berechnungen (Zeile ~419, ~427) wird `calculations.net` und `calculations.vat` ohne Override ebenfalls berechnet -- diese Stellen sind bereits korrekt mit expliziten if/else. Kein Fix nötig hier.
-
-### Bug 3: `originalVatRate` in CorrectionTracking
-
-**Problem**: In `useCorrectionTracking.ts` (Zeile 251) wird `correctedStr !== '' ? parseFloat(correctedStr) : 0` verwendet. Wenn der korrigierte Wert ein leerer String ist, wird `0` gesetzt -- das ist korrekt (0% MwSt als bewusste Korrektur).
-
-Aber in Zeile 253: `detectedStr !== '' ? parseFloat(detectedStr) : null` -- wenn `detectedValue` den Wert `0` hat, wird `String(0)` = `"0"`, also `parseFloat("0")` = `0`. Das ist korrekt.
-
-Das eigentliche Problem: Wenn `detectedValue` z.B. `undefined` oder `null` ist, wird `String(null)` = `"null"`, und `parseFloat("null")` = `NaN`. Der Fix sollte `NaN` abfangen:
-
-**Fix** in `src/hooks/useCorrectionTracking.ts` (Zeile 251-253):
-```typescript
-const correctedStr = String(correctedValue ?? '').replace(',', '.');
-const vatRate = correctedStr !== '' ? parseFloat(correctedStr) : 0;
-const detectedStr = String(detectedValue ?? '').replace(',', '.');
-const parsed = detectedStr !== '' ? parseFloat(detectedStr) : NaN;
-const originalVatRate = !isNaN(parsed) ? parsed : null;
-```
-
-### Zusammenfassung
-
-| Datei | Fix |
-|-------|-----|
-| `src/components/receipts/ReceiptDetailPanel.tsx` | 4× `\|\| null` → `?? null` bei berechneten Netto/MwSt-Werten |
-| `src/hooks/useCorrectionTracking.ts` | `NaN`-Check für `originalVatRate` hinzufügen |
-
+| Priorität | Problem | Dateien | Aufwand |
+|-----------|---------|---------|--------|
+| HOCH | 4x `parseFloat \|\| null` Bug | `ReceiptDetailPanel.tsx`, `Review.tsx` | 4 Zeilen |
+| HOCH | CorrectionTracking originalVatRate | `useCorrectionTracking.ts` | 1 Zeile |
+| MITTEL | Tote Links `/forgot-password`, `/agb` | `Login.tsx`, `Register.tsx` | 2-50 Zeilen |
+| MITTEL | Badge ohne forwardRef | `badge.tsx` | 5 Zeilen |
