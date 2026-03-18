@@ -519,12 +519,9 @@ const Settings = () => {
             })}
 
             {/* Visual separator for invoice group */}
-            <div className="flex items-center px-1.5">
+            <div className="flex items-center px-1">
               <div className="h-5 w-px bg-border" />
             </div>
-            <span className="flex items-center text-[10px] uppercase tracking-wider text-muted-foreground font-medium px-1">
-              Ausgangsrechnungen
-            </span>
 
             {invoiceTabs.map(tab => {
               const locked = isTabLocked(tab.requiredFeature);
