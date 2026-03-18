@@ -612,9 +612,10 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `${receipts.length} Belege als ZIP gesichert (${zipName}).`,
+        message: `${receipts.length} Belege${invoiceCount > 0 ? ` und ${invoiceCount} Rechnungen` : ''} als ZIP gesichert (${zipName}).`,
         count: receipts.length,
         filesUploaded: uploadedFiles,
+        invoicesUploaded: invoiceCount,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
