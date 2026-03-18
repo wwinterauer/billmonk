@@ -252,6 +252,28 @@ const InvoiceEditor = () => {
               <Label>Fälligkeitsdatum</Label>
               <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
             </div>
+
+            <div className="space-y-2">
+              <Label>Kategorie</Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Kategorie wählen…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Keine Kategorie</SelectItem>
+                  {categories.filter(c => !c.is_hidden).map(c => (
+                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {savedInvoiceId && (
+              <div className="space-y-2 md:col-span-2">
+                <Label>Tags</Label>
+                <InvoiceTagSelector invoiceId={savedInvoiceId} size="sm" />
+              </div>
+            )}
           </CardContent>
         </Card>
 
