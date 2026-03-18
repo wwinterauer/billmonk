@@ -93,6 +93,7 @@ import {
 import {
   useExportTemplates,
   DEFAULT_COLUMNS,
+  DEFAULT_INVOICE_COLUMNS,
   FIELD_TYPES,
   SORTABLE_FIELDS,
   GROUPING_OPTIONS,

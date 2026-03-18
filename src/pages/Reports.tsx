@@ -1877,6 +1877,111 @@ const Reports = () => {
             )}
           </CardContent>
         </Card>
+        {/* Income Section (Business Plan) */}
+        <FeatureGate feature="invoiceModule" className="mb-6">
+          <Card className="border-border/50 mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Einnahmen-Analyse</CardTitle>
+              <CardDescription>Übersicht deiner Ausgangsrechnungen im gewählten Zeitraum</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {invoicesLoading ? (
+                <div className="space-y-2">
+                  {[...Array(3)].map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : !incomeStats ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  Keine Rechnungsdaten verfügbar
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Income KPIs */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                      <p className="text-sm text-muted-foreground">Einnahmen (bezahlt)</p>
+                      <p className="text-xl font-bold text-green-600">{formatCurrency(incomeStats.totalIncome)}</p>
+                      <p className="text-xs text-muted-foreground">{incomeStats.paidCount} Rechnungen</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                      <p className="text-sm text-muted-foreground">Netto</p>
+                      <p className="text-xl font-bold text-foreground">{formatCurrency(incomeStats.totalNet)}</p>
+                      <p className="text-xs text-muted-foreground">USt: {formatCurrency(incomeStats.totalVat)}</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                      <p className="text-sm text-muted-foreground">Offen</p>
+                      <p className="text-xl font-bold text-orange-600">{formatCurrency(incomeStats.openAmount)}</p>
+                      <p className="text-xs text-muted-foreground">{incomeStats.openCount} Rechnungen</p>
+                    </div>
+                    <div className={cn(
+                      "p-4 rounded-lg border",
+                      (incomeStats.totalIncome - (stats?.totalGross || 0)) >= 0
+                        ? "bg-green-500/10 border-green-500/20"
+                        : "bg-destructive/10 border-destructive/20"
+                    )}>
+                      <p className="text-sm text-muted-foreground">Gewinn/Verlust</p>
+                      <p className={cn(
+                        "text-xl font-bold",
+                        (incomeStats.totalIncome - (stats?.totalGross || 0)) >= 0 ? "text-green-600" : "text-destructive"
+                      )}>
+                        {formatCurrency(incomeStats.totalIncome - (stats?.totalGross || 0))}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Einnahmen − Ausgaben</p>
+                    </div>
+                  </div>
+
+                  {/* Income by Customer */}
+                  {incomeStats.byCustomer.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground mb-3">Einnahmen nach Kunde</h3>
+                      <div className="h-[250px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={incomeStats.byCustomer.slice(0, 8)} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                            <XAxis type="number" tickFormatter={(v) => `€${v}`} stroke="hsl(var(--muted-foreground))" />
+                            <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                            <Bar dataKey="amount" fill="hsl(var(--success))" radius={[0, 4, 4, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Income by Category Table */}
+                  {incomeStats.byCategory.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground mb-3">Einnahmen nach Kategorie</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Kategorie</TableHead>
+                            <TableHead className="text-right">Anzahl</TableHead>
+                            <TableHead className="text-right">Betrag</TableHead>
+                            <TableHead className="text-right">Anteil</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {incomeStats.byCategory.map((cat) => (
+                            <TableRow key={cat.name}>
+                              <TableCell>{cat.name}</TableCell>
+                              <TableCell className="text-right">{cat.count}</TableCell>
+                              <TableCell className="text-right font-medium">{formatCurrency(cat.amount)}</TableCell>
+                              <TableCell className="text-right">
+                                {incomeStats.totalIncome > 0 ? ((cat.amount / incomeStats.totalIncome) * 100).toFixed(1) : 0}%
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </FeatureGate>
       </div>
     </DashboardLayout>
   );
