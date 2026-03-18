@@ -193,7 +193,7 @@ const Settings = () => {
   // Handle tab from URL query parameter - must be before any early returns
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage'];
+  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage', 'customers', 'invoice-items', 'invoice-templates', 'invoice-settings'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'naming';
   const [activeTab, setActiveTab] = useState(initialTab);
   
