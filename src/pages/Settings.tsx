@@ -463,31 +463,8 @@ const Settings = () => {
     setSearchParams({ tab: value });
   };
 
-  const UpgradeCard = ({ featureKey }: { featureKey: string }) => {
-    const minPlan = FEATURE_MIN_PLAN[featureKey];
-    const desc = FEATURE_DESCRIPTIONS[featureKey];
-    return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Card className="max-w-md w-full text-center">
-          <CardHeader>
-            <div className="mx-auto mb-2 h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-              <Lock className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <CardTitle className="text-lg">{desc?.title || 'Feature gesperrt'}</CardTitle>
-            <CardDescription>{desc?.description || 'Dieses Feature ist in deinem aktuellen Abo nicht enthalten.'}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Verfügbar ab dem <span className="font-semibold text-foreground">{PLAN_NAMES[minPlan]}</span>-Abo
-            </p>
-            <Button asChild>
-              <Link to="/account?tab=subscription">Jetzt upgraden</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  };
+
+
 
   return (
     <DashboardLayout>
