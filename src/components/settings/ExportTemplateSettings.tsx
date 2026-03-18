@@ -290,6 +290,7 @@ export function ExportTemplateSettings() {
         include_totals: template.include_totals,
         date_format: template.date_format,
         number_format: template.number_format,
+        template_type: template.template_type || 'receipts',
       });
       setSelectedColumn(null);
     }
