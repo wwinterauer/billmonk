@@ -486,7 +486,6 @@ const Reports = () => {
     if (!receipts) return [];
 
     const currentYear = parseInt(selectedYear);
-    const previousYear = currentYear - 1;
 
     // Initialize all months
     const monthData: Record<string, { month: string; currentYear: number; previousYear: number }> = {};
