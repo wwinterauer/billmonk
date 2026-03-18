@@ -71,7 +71,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
-  const navigate = useNavigate();
+  
   const { user, signOut } = useAuth();
   const [reviewCount, setReviewCount] = useState<number>(0);
   const {
