@@ -1,38 +1,37 @@
 
 
-# Gesamtplan: User-Strecke, Stripe-Bezahlung, Admin & Kontingent
+## Plan: Fehlende Einnahmen-Abschnitte ergänzen
 
-## Status: Phase 1-6 implementiert ✅, Phase 9 vollständig ✅, Integration vollständig ✅
+### Ist-Zustand
+Die Einnahmen-Ansicht hat bereits: KPI-Cards, Kategorie (Pie + Bar + Detail-Tabelle), Tags, Kunden (Top 10 Bar + Tabelle), Zeitverlauf.
 
-### Umgesetzte Phasen:
-- ✅ Phase 1: DB-Migration (profiles erweitert, user_roles, has_role(), reset_monthly_credits())
-- ✅ Phase 2: Admin-Rolle für w.winterauer@gmail.com gesetzt (Business-Plan)
-- ✅ Phase 3: planConfig.ts + usePlan.ts erstellt
-- ✅ Phase 4: Onboarding-Wizard (3 Steps) + ProtectedRoute mit Onboarding-Check
-- ✅ Phase 5: Sidebar mit Kontingent-Balken, Admin-Plan-Switcher, Feature-Gating
-- ✅ Phase 6: Stripe-Integration komplett
-- ✅ Phase 9: Rechnungsmodul komplett
+### Fehlend gegenüber Ausgaben
+1. **USt-Übersicht** (Ausgaben hat "Vorsteuer-Übersicht" nach MwSt-Satz) -- Einnahmen braucht eine "Umsatzsteuer-Übersicht" gruppiert nach Steuersatz
+2. **Monatsvergleich** (aktuelles Jahr vs. Vorjahr als BarChart) -- fehlt komplett bei Einnahmen
+3. **Alle Kunden** durchsuchbar (analog zu "Alle Lieferanten" mit Suchfeld) -- aktuell zeigt die Kunden-Tabelle alle, aber ohne Suchfeld
 
-### Rechnungs-Integration (alle implementiert):
-- ✅ DB: invoices.category, invoice_tags + RLS, export_templates.template_type, cloud_connections.backup_include_invoices
-- ✅ InvoiceEditor: Kategorie-Dropdown + InvoiceTagSelector
-- ✅ Invoices-Liste: Kategorie-Spalte
-- ✅ Dashboard: Einnahmen-KPIs (Einnahmen, Offene Rechnungen, Gewinn/Verlust) in FeatureGate
-- ✅ Reports: Einnahmen-Analyse (KPIs, nach Kunde, nach Kategorie, Gewinn/Verlust) in FeatureGate
-- ✅ Export-Vorlagen: Typ-Umschalter (Belege/Rechnungen) + DEFAULT_INVOICE_COLUMNS + template_type Filter
-- ✅ Cloud-Backup: backup_include_invoices Flag + backup-to-drive lädt Rechnungen + PDFs in eigenen Ordner
+### Umsetzung in `src/pages/Reports.tsx`
 
-### Offene Phasen:
-- ⬜ Phase 7: Landing Page Pricing Update (4 Pläne, monatlich/jährlich Toggle)
-- ⬜ Phase 8: Plan-Enforcement (Upload-Limits durchsetzen)
+1. **`incomeStats` erweitern**: 
+   - `byVatRate` Map berechnen (gruppiert nach `vat_rate` aus invoice line items -- da invoices nur `vat_total` haben, nutzen wir stattdessen die Gesamtwerte und schätzen anhand der Kategorie; alternativ einfacher: wir gruppieren nach dem Verhältnis `vat_total/subtotal` pro Rechnung als effektiven Steuersatz)
+   - Da wir keine Line-Items in der Query haben, berechnen wir den effektiven USt-Satz pro Rechnung: `Math.round((vat_total / subtotal) * 100)` und gruppieren danach
+   - Vorjahres-Einnahmen via separatem Query laden (analog zu `previousReceipts`)
 
----
+2. **Vorjahres-Invoice-Query**: Neuer `useQuery` für `previous-invoices` mit dem `previousPeriodRange`
 
-## Bestehende Bugs
+3. **Neue Abschnitte rendern** (nach Tags, vor Kunden):
+   - **Umsatzsteuer-Übersicht**: Tabelle mit Spalten: Steuersatz, Netto, USt, Brutto, Anzahl (analog zur Vorsteuer-Übersicht bei Ausgaben)
+   - **Einnahmen-Monatsvergleich**: BarChart mit aktuellem vs. Vorjahr (analog zum Ausgaben-Monatsvergleich)
+   - **Kunden-Suchfeld**: `vendorSearch`-äquivalent (`customerSearch` State) + Filter auf die Kunden-Tabelle
 
-| Priorität | Problem | Dateien | Aufwand |
-|-----------|---------|---------|--------|
-| ✅ BEHOBEN | 4x `parseFloat \|\| null` Bug | `ReceiptDetailPanel.tsx` | 4 Zeilen |
-| ✅ BEHOBEN | CorrectionTracking originalVatRate | `useCorrectionTracking.ts` | 1 Zeile |
-| MITTEL | Tote Links `/forgot-password`, `/agb` | `Login.tsx`, `Register.tsx` | 2-50 Zeilen |
-| MITTEL | Badge ohne forwardRef | `badge.tsx` | 5 Zeilen |
+### Reihenfolge der Einnahmen-Abschnitte (nach Änderung)
+1. KPI-Cards
+2. Kategorie Pie + Bar
+3. Kategorie Detail-Tabelle
+4. Tags-Tabelle
+5. **Umsatzsteuer-Übersicht** (NEU)
+6. Zeitverlauf
+7. **Monatsvergleich** (NEU)
+8. Top 10 Kunden (Bar)
+9. **Alle Kunden** mit Suchfeld (ERWEITERT)
+
