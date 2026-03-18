@@ -899,7 +899,9 @@ const Reports = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Berichte & Auswertungen</h1>
-            <p className="text-muted-foreground">Analysiere deine Ausgaben im Detail</p>
+            <p className="text-muted-foreground">
+              {viewMode === 'expenses' ? 'Analysiere deine Ausgaben im Detail' : 'Übersicht deiner Einnahmen'}
+            </p>
           </div>
 
           <div className="flex items-center gap-2">
