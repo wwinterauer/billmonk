@@ -1004,11 +1004,11 @@ const Settings = () => {
 
       {/* Cloud Storage Tab */}
       <TabsContent value="cloud-storage">
-        {isTabLocked('cloudBackup') ? <UpgradeCard featureKey="cloudBackup" /> : (
+        <FeatureGate feature="cloudBackup">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <CloudStorageSettings />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
       {/* Customer Management Tab */}
