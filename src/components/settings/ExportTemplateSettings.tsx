@@ -394,9 +394,10 @@ export function ExportTemplateSettings() {
 
   const resetColumns = () => {
     if (!editingTemplate) return;
+    const cols = editingTemplate.template_type === 'invoices' ? [...DEFAULT_INVOICE_COLUMNS] : [...DEFAULT_COLUMNS];
     setEditingTemplate({
       ...editingTemplate,
-      columns: [...DEFAULT_COLUMNS],
+      columns: cols,
     });
     setSelectedColumn(null);
   };
