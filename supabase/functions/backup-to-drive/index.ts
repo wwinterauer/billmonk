@@ -337,6 +337,18 @@ const DEFAULT_COLUMNS: ExportColumn[] = [
   { field: "file_name", label: "Dateiname", type: "text", visible: true, order: 10 },
 ];
 
+const DEFAULT_INVOICE_COLUMNS: ExportColumn[] = [
+  { field: "invoice_number", label: "Rechnungsnr.", type: "text", visible: true, order: 0 },
+  { field: "customer_name", label: "Kunde", type: "text", visible: true, order: 1 },
+  { field: "invoice_date", label: "Rechnungsdatum", type: "date", visible: true, order: 2 },
+  { field: "due_date", label: "Fällig am", type: "date", visible: true, order: 3 },
+  { field: "category", label: "Kategorie", type: "text", visible: true, order: 4 },
+  { field: "subtotal", label: "Netto", type: "currency", visible: true, order: 5 },
+  { field: "vat_total", label: "USt", type: "currency", visible: true, order: 6 },
+  { field: "total", label: "Brutto", type: "currency", visible: true, order: 7 },
+  { field: "status", label: "Status", type: "text", visible: true, order: 8 },
+];
+
 function resolveZipName(pattern: string, prefix: string, count: number): string {
   const now = new Date();
   return pattern
