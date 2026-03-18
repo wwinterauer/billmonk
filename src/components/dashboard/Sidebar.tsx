@@ -170,8 +170,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           return (
             <Link
               key={item.name}
-              to={locked ? '#' : item.href}
-              onClick={locked ? (e) => handleLockedClick(e, item) : undefined}
+              to={item.href}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative',
                 locked
