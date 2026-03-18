@@ -959,11 +959,11 @@ const Settings = () => {
 
       {/* Email Import Tab */}
       <TabsContent value="email-import">
-        {isTabLocked('emailImport') ? <UpgradeCard featureKey="emailImport" /> : (
+        <FeatureGate feature="emailImport">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <EmailImportSettings />
         </motion.div>
-        )}
+        </FeatureGate>
       </TabsContent>
 
       {/* Bank Keywords Tab */}
