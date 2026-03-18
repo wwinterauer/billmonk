@@ -747,6 +747,7 @@ export default function BankImport() {
         result={importResult}
         onImportAnother={handleImportAnother}
       />
+      </FeatureGate>
     </DashboardLayout>
   );
 }

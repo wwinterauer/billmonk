@@ -232,6 +232,7 @@ const Invoices = () => {
           </CardContent>
         </Card>
       </div>
+      </FeatureGate>
     </DashboardLayout>
   );
 };
