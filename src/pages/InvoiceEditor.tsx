@@ -47,6 +47,7 @@ const InvoiceEditor = () => {
   const { items: articleTemplates } = useInvoiceItems();
   const { settings } = useInvoiceSettings();
   const { createInvoice, fetchLineItems } = useInvoices();
+  const { categories } = useCategories();
 
   const [customerId, setCustomerId] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
