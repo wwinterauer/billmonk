@@ -347,6 +347,42 @@ export default function Datenschutz() {
                 </p>
               </CardContent>
             </Card>
+
+            {/* AGB */}
+            <Card id="agb">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  Allgemeine Geschäftsbedingungen (AGB)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm text-muted-foreground">
+                <div>
+                  <h3 className="font-semibold text-foreground mb-1">1. Geltungsbereich</h3>
+                  <p>Diese AGB gelten für die Nutzung der BelegPilot-Plattform. Mit der Registrierung akzeptieren Sie diese Bedingungen.</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground mb-1">2. Leistungsbeschreibung</h3>
+                  <p>BelegPilot bietet eine KI-gestützte Belegverwaltung mit verschiedenen Abo-Modellen (Free, Starter, Pro, Business). Der Funktionsumfang richtet sich nach dem gewählten Tarif.</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground mb-1">3. Vertragsschluss & Kündigung</h3>
+                  <p>Der Vertrag kommt mit der Registrierung zustande. Kostenpflichtige Abonnements sind jederzeit zum Ende der Abrechnungsperiode kündbar.</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground mb-1">4. Preise & Zahlung</h3>
+                  <p>Alle Preise verstehen sich inklusive der gesetzlichen Umsatzsteuer. Die Abrechnung erfolgt monatlich oder jährlich im Voraus über Stripe.</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground mb-1">5. Haftung</h3>
+                  <p>BelegPilot ersetzt keine steuerliche Beratung. Die KI-Erkennung erfolgt nach bestem Wissen, eine Garantie für die Richtigkeit der extrahierten Daten wird nicht übernommen.</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground mb-1">6. Anwendbares Recht</h3>
+                  <p>Es gilt österreichisches Recht. Gerichtsstand ist Gmunden, Österreich.</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>
