@@ -57,6 +57,8 @@ const InvoiceEditor = () => {
   const [lines, setLines] = useState<EditorLineItem[]>([newLine()]);
   const [saving, setSaving] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [category, setCategory] = useState('');
+  const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(id && id !== 'new' ? id : null);
 
   // Generate invoice number from settings
   useEffect(() => {
