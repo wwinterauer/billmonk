@@ -181,6 +181,7 @@ const InvoiceEditor = () => {
         due_date: dueDate || undefined,
         notes: notes || undefined,
         footer_text: footerText || undefined,
+        category: category || undefined,
       },
       lines.map(l => ({
         description: l.description,
