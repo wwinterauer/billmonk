@@ -255,7 +255,7 @@ const InvoiceEditor = () => {
 
             <div className="space-y-2">
               <Label>Kategorie</Label>
-              <Select value={category} onValueChange={setCategory}>
+              <Select value={category || '__none__'} onValueChange={(v) => setCategory(v === '__none__' ? '' : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Kategorie wählen…" />
                 </SelectTrigger>
