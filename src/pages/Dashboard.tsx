@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/tooltip';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
+import { FeatureGate } from '@/components/FeatureGate';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
