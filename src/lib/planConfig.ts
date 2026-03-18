@@ -41,3 +41,32 @@ export const PLAN_PRICES: Record<PlanType, { monthly: number; yearly: number }> 
   pro: { monthly: 4.99, yearly: 47.90 },
   business: { monthly: 9.99, yearly: 95.90 },
 };
+
+// Minimum plan required per feature key
+export const FEATURE_MIN_PLAN: Record<string, PlanType> = {
+  reconciliation: 'starter',
+  bankImport: 'starter',
+  emailImport: 'starter',
+  cloudBackup: 'pro',
+  invoiceModule: 'business',
+};
+
+// Human-readable feature descriptions for upgrade cards
+export const FEATURE_DESCRIPTIONS: Record<string, { title: string; description: string }> = {
+  reconciliation: { title: 'Kontoabgleich', description: 'Gleiche deine Belege automatisch mit Banktransaktionen ab.' },
+  bankImport: { title: 'Konto-Import & Bank-Schlagwörter', description: 'Importiere Kontoauszüge und erstelle automatische Zuordnungsregeln.' },
+  emailImport: { title: 'E-Mail-Import', description: 'Empfange Belege automatisch per E-Mail und verarbeite sie.' },
+  cloudBackup: { title: 'Cloud-Backup', description: 'Sichere deine Belege automatisch in der Cloud.' },
+  invoiceModule: { title: 'Ausgangsrechnungen', description: 'Erstelle und verwalte Rechnungen, Kunden und Artikel.' },
+};
+
+// Plan hierarchy for comparison
+const PLAN_ORDER: PlanType[] = ['free', 'starter', 'pro', 'business'];
+
+export function isPlanSufficient(currentPlan: PlanType, requiredPlan: PlanType): boolean {
+  return PLAN_ORDER.indexOf(currentPlan) >= PLAN_ORDER.indexOf(requiredPlan);
+}
+
+export function getMinPlanForFeature(featureKey: string): PlanType | null {
+  return FEATURE_MIN_PLAN[featureKey] || null;
+}

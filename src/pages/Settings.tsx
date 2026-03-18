@@ -22,7 +22,7 @@ import {
   Mail,
   Landmark,
   Cloud,
-  
+  Lock,
   Package,
   FileCheck,
   Settings2,
