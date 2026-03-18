@@ -131,17 +131,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     : userEmail.split('@')[0];
   const userInitials = userName.slice(0, 2).toUpperCase();
 
-  const handleLockedClick = (e: React.MouseEvent, item: NavItem) => {
-    e.preventDefault();
-    const minPlan = FEATURE_MIN_PLAN[item.requiredFeature!];
-    toast(`Verfügbar ab dem ${PLAN_NAMES[minPlan]}-Abo`, {
-      description: item.name,
-      action: {
-        label: 'Upgraden',
-        onClick: () => navigate('/account?tab=subscription'),
-      },
-    });
-  };
+
 
   return (
     <aside className={cn(
