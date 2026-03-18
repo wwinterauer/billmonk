@@ -759,9 +759,9 @@ export function ReceiptDetailPanel({
         invoice_number: invoiceNumber || null,
         receipt_date: receiptDate ? format(receiptDate, 'yyyy-MM-dd') : null,
         amount_gross: amountGross !== '' ? parseFloat(amountGross) : null,
-        amount_net: amountNetOverride ? parseFloat(amountNetOverride) : (calculatedValues.net || null),
+        amount_net: amountNetOverride ? parseFloat(amountNetOverride) : (calculatedValues.net ?? null),
         vat_rate: vatRate !== '' ? parseFloat(vatRate) : null,
-        vat_amount: vatAmountOverride ? parseFloat(vatAmountOverride) : (calculatedValues.vat || null),
+        vat_amount: vatAmountOverride ? parseFloat(vatAmountOverride) : (calculatedValues.vat ?? null),
         description: processedDescription,
         category: category || null,
       };
