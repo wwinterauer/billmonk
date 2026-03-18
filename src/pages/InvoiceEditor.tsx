@@ -194,7 +194,10 @@ const InvoiceEditor = () => {
     );
 
     setSaving(false);
-    if (result) navigate('/invoices');
+    if (result) {
+      setSavedInvoiceId(result.id);
+      navigate('/invoices');
+    }
   };
 
   return (
