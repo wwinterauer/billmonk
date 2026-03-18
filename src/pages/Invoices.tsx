@@ -163,6 +163,13 @@ const Invoices = () => {
                         <TableCell>{customerName(inv)}</TableCell>
                         <TableCell>{fmtDate(inv.invoice_date)}</TableCell>
                         <TableCell>{fmtDate(inv.due_date)}</TableCell>
+                        <TableCell>
+                          {(inv as any).category ? (
+                            <Badge variant="outline" className="text-xs">{(inv as any).category}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">–</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right font-medium">{fmt(inv.total || 0)}</TableCell>
                         <TableCell>
                           <Badge variant={sc.variant}>{sc.label}</Badge>
