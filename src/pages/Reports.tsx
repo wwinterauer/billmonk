@@ -1112,6 +1112,29 @@ const Reports = () => {
           </CardContent>
         </Card>
 
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-2 mb-6">
+          <Button
+            variant={viewMode === 'expenses' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('expenses')}
+          >
+            <TrendingDown className="w-4 h-4 mr-2" />
+            Ausgaben
+          </Button>
+          <Button
+            variant={viewMode === 'income' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('income')}
+          >
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Einnahmen
+            {!showIncome && <Lock className="w-3 h-3 ml-1" />}
+          </Button>
+        </div>
+
+        {viewMode === 'expenses' ? (
+        <>
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
           {/* Gesamtausgaben */}
