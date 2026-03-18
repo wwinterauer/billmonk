@@ -20,6 +20,9 @@ import {
   Info,
   Tag,
 } from 'lucide-react';
+import { FeatureGate } from '@/components/FeatureGate';
+import { usePlan } from '@/hooks/usePlan';
+import { isPlanSufficient } from '@/lib/planConfig';
 import {
   PieChart,
   Pie,
@@ -82,6 +85,8 @@ import { cn } from '@/lib/utils';
 const Reports = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { effectivePlan } = usePlan();
+  const showIncome = isPlanSufficient(effectivePlan, 'business');
   
   // Period state
   const [periodType, setPeriodType] = useState<'month' | 'quarter' | 'year' | 'custom'>('month');
@@ -159,6 +164,90 @@ const Reports = () => {
     },
     enabled: !!user && !!dateRange.from && !!dateRange.to,
   });
+
+  // Fetch invoices data for income analysis (Business plan)
+  const { data: invoices, isLoading: invoicesLoading } = useQuery({
+    queryKey: ['reports-invoices', dateRange.from?.toISOString(), dateRange.to?.toISOString(), user?.id],
+    queryFn: async () => {
+      if (!user || !dateRange.from || !dateRange.to) return [];
+      
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, invoice_date, due_date, total, subtotal, vat_total, status, paid_at, category, customer_id, customers(display_name)')
+        .eq('user_id', user.id)
+        .neq('status', 'cancelled');
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && !!dateRange.from && !!dateRange.to && showIncome,
+  });
+
+  // Income stats
+  const incomeStats = useMemo(() => {
+    if (!invoices || !dateRange.from || !dateRange.to) return null;
+
+    const from = dateRange.from;
+    const to = dateRange.to;
+
+    // Paid in period
+    const paidInPeriod = invoices.filter(i => {
+      if (i.status !== 'paid' || !i.paid_at) return false;
+      const d = new Date(i.paid_at);
+      return d >= from && d <= to;
+    });
+
+    // Issued in period
+    const issuedInPeriod = invoices.filter(i => {
+      if (!i.invoice_date) return false;
+      const d = new Date(i.invoice_date);
+      return d >= from && d <= to;
+    });
+
+    const totalIncome = paidInPeriod.reduce((s, i) => s + (i.total || 0), 0);
+    const totalVat = paidInPeriod.reduce((s, i) => s + (i.vat_total || 0), 0);
+    const totalNet = paidInPeriod.reduce((s, i) => s + (i.subtotal || 0), 0);
+    const openInvoices = invoices.filter(i => i.status === 'sent' || i.status === 'overdue');
+    const openAmount = openInvoices.reduce((s, i) => s + (i.total || 0), 0);
+
+    // By customer
+    const byCustomer = new Map<string, { name: string; amount: number; count: number }>();
+    paidInPeriod.forEach(inv => {
+      const name = (inv.customers as any)?.display_name || 'Unbekannt';
+      const existing = byCustomer.get(name);
+      if (existing) {
+        existing.amount += inv.total || 0;
+        existing.count += 1;
+      } else {
+        byCustomer.set(name, { name, amount: inv.total || 0, count: 1 });
+      }
+    });
+
+    // By category
+    const byCategory = new Map<string, { name: string; amount: number; count: number }>();
+    paidInPeriod.forEach(inv => {
+      const cat = inv.category || 'Ohne Kategorie';
+      const existing = byCategory.get(cat);
+      if (existing) {
+        existing.amount += inv.total || 0;
+        existing.count += 1;
+      } else {
+        byCategory.set(cat, { name: cat, amount: inv.total || 0, count: 1 });
+      }
+    });
+
+    return {
+      totalIncome,
+      totalVat,
+      totalNet,
+      paidCount: paidInPeriod.length,
+      issuedCount: issuedInPeriod.length,
+      openCount: openInvoices.length,
+      openAmount,
+      byCustomer: Array.from(byCustomer.values()).sort((a, b) => b.amount - a.amount),
+      byCategory: Array.from(byCategory.values()).sort((a, b) => b.amount - a.amount),
+    };
+  }, [invoices, dateRange]);
 
   // Fetch categories for color mapping
   const { data: categories } = useQuery({
@@ -1788,6 +1877,111 @@ const Reports = () => {
             )}
           </CardContent>
         </Card>
+        {/* Income Section (Business Plan) */}
+        <FeatureGate feature="invoiceModule" className="mb-6">
+          <Card className="border-border/50 mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Einnahmen-Analyse</CardTitle>
+              <CardDescription>Übersicht deiner Ausgangsrechnungen im gewählten Zeitraum</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {invoicesLoading ? (
+                <div className="space-y-2">
+                  {[...Array(3)].map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : !incomeStats ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  Keine Rechnungsdaten verfügbar
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Income KPIs */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                      <p className="text-sm text-muted-foreground">Einnahmen (bezahlt)</p>
+                      <p className="text-xl font-bold text-green-600">{formatCurrency(incomeStats.totalIncome)}</p>
+                      <p className="text-xs text-muted-foreground">{incomeStats.paidCount} Rechnungen</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                      <p className="text-sm text-muted-foreground">Netto</p>
+                      <p className="text-xl font-bold text-foreground">{formatCurrency(incomeStats.totalNet)}</p>
+                      <p className="text-xs text-muted-foreground">USt: {formatCurrency(incomeStats.totalVat)}</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                      <p className="text-sm text-muted-foreground">Offen</p>
+                      <p className="text-xl font-bold text-orange-600">{formatCurrency(incomeStats.openAmount)}</p>
+                      <p className="text-xs text-muted-foreground">{incomeStats.openCount} Rechnungen</p>
+                    </div>
+                    <div className={cn(
+                      "p-4 rounded-lg border",
+                      (incomeStats.totalIncome - (stats?.totalGross || 0)) >= 0
+                        ? "bg-green-500/10 border-green-500/20"
+                        : "bg-destructive/10 border-destructive/20"
+                    )}>
+                      <p className="text-sm text-muted-foreground">Gewinn/Verlust</p>
+                      <p className={cn(
+                        "text-xl font-bold",
+                        (incomeStats.totalIncome - (stats?.totalGross || 0)) >= 0 ? "text-green-600" : "text-destructive"
+                      )}>
+                        {formatCurrency(incomeStats.totalIncome - (stats?.totalGross || 0))}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Einnahmen − Ausgaben</p>
+                    </div>
+                  </div>
+
+                  {/* Income by Customer */}
+                  {incomeStats.byCustomer.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground mb-3">Einnahmen nach Kunde</h3>
+                      <div className="h-[250px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={incomeStats.byCustomer.slice(0, 8)} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                            <XAxis type="number" tickFormatter={(v) => `€${v}`} stroke="hsl(var(--muted-foreground))" />
+                            <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                            <Bar dataKey="amount" fill="hsl(var(--success))" radius={[0, 4, 4, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Income by Category Table */}
+                  {incomeStats.byCategory.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground mb-3">Einnahmen nach Kategorie</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Kategorie</TableHead>
+                            <TableHead className="text-right">Anzahl</TableHead>
+                            <TableHead className="text-right">Betrag</TableHead>
+                            <TableHead className="text-right">Anteil</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {incomeStats.byCategory.map((cat) => (
+                            <TableRow key={cat.name}>
+                              <TableCell>{cat.name}</TableCell>
+                              <TableCell className="text-right">{cat.count}</TableCell>
+                              <TableCell className="text-right font-medium">{formatCurrency(cat.amount)}</TableCell>
+                              <TableCell className="text-right">
+                                {incomeStats.totalIncome > 0 ? ((cat.amount / incomeStats.totalIncome) * 100).toFixed(1) : 0}%
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </FeatureGate>
       </div>
     </DashboardLayout>
   );

@@ -93,6 +93,7 @@ import {
 import {
   useExportTemplates,
   DEFAULT_COLUMNS,
+  DEFAULT_INVOICE_COLUMNS,
   FIELD_TYPES,
   SORTABLE_FIELDS,
   GROUPING_OPTIONS,
@@ -393,9 +394,10 @@ export function ExportTemplateSettings() {
 
   const resetColumns = () => {
     if (!editingTemplate) return;
+    const cols = editingTemplate.template_type === 'invoices' ? [...DEFAULT_INVOICE_COLUMNS] : [...DEFAULT_COLUMNS];
     setEditingTemplate({
       ...editingTemplate,
-      columns: [...DEFAULT_COLUMNS],
+      columns: cols,
     });
     setSelectedColumn(null);
   };
@@ -493,6 +495,39 @@ export function ExportTemplateSettings() {
     <div className="space-y-6">
       {/* Header with template selection */}
       <div className="flex flex-wrap items-center gap-3">
+        {/* Template Type Toggle */}
+        <Select
+          value={editingTemplate.template_type || 'receipts'}
+          onValueChange={(v) => {
+            const type = v as 'receipts' | 'invoices';
+            setEditingTemplate({
+              ...editingTemplate,
+              template_type: type,
+              columns: type === 'invoices' ? [...DEFAULT_INVOICE_COLUMNS] : [...DEFAULT_COLUMNS],
+              name: editingTemplate.name || (type === 'invoices' ? 'Neue Rechnungsvorlage' : 'Neue Vorlage'),
+            });
+            setSelectedColumn(null);
+          }}
+        >
+          <SelectTrigger className="w-[160px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="receipts">
+              <span className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Belege
+              </span>
+            </SelectItem>
+            <SelectItem value="invoices">
+              <span className="flex items-center gap-2">
+                <FileSpreadsheet className="h-4 w-4" />
+                Rechnungen
+              </span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
         <Select
           value={selectedTemplateId || 'new'}
           onValueChange={loadTemplate}
@@ -508,7 +543,9 @@ export function ExportTemplateSettings() {
               </span>
             </SelectItem>
             {templates.length > 0 && <Separator className="my-1" />}
-            {templates.map(t => (
+            {templates
+              .filter(t => (t.template_type || 'receipts') === (editingTemplate.template_type || 'receipts'))
+              .map(t => (
               <SelectItem key={t.id} value={t.id}>
                 <span className="flex items-center gap-2">
                   {t.name}
