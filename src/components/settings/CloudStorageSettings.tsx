@@ -500,6 +500,17 @@ export const CloudStorageSettings = () => {
 
                   <div className="flex items-center justify-between">
                     <div>
+                      <Label>Ausgangsrechnungen einschließen</Label>
+                      <p className="text-xs text-muted-foreground">Rechnungs-PDFs und -Daten mit sichern</p>
+                    </div>
+                    <Switch
+                      checked={(connection as any).backup_include_invoices ?? false}
+                      onCheckedChange={(checked) => updateConnection({ backup_include_invoices: checked } as any)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
                       <Label>Excel-Export (.xlsx)</Label>
                       <p className="text-xs text-muted-foreground">Zusammenfassung als Excel-Datei nach Vorlage</p>
                     </div>

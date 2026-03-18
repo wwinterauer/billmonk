@@ -369,12 +369,12 @@ export function useExportTemplates() {
   };
 
   // Create an empty template structure
-  const createEmptyTemplate = (): Omit<ExportTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'> => ({
-    name: 'Neue Vorlage',
+  const createEmptyTemplate = (type: 'receipts' | 'invoices' = 'receipts'): Omit<ExportTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'> => ({
+    name: type === 'invoices' ? 'Neue Rechnungsvorlage' : 'Neue Vorlage',
     description: null,
     is_default: false,
-    columns: [...DEFAULT_COLUMNS],
-    sort_by: 'receipt_date',
+    columns: type === 'invoices' ? [...DEFAULT_INVOICE_COLUMNS] : [...DEFAULT_COLUMNS],
+    sort_by: type === 'invoices' ? 'invoice_date' : 'receipt_date',
     sort_direction: 'desc',
     group_by: null,
     group_subtotals: true,
@@ -382,6 +382,7 @@ export function useExportTemplates() {
     include_totals: true,
     date_format: 'DD.MM.YYYY',
     number_format: 'de-AT',
+    template_type: type,
   });
 
   return {
