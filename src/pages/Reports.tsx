@@ -19,7 +19,12 @@ import {
   Activity,
   Info,
   Tag,
+  Users,
+  ArrowRightLeft,
 } from 'lucide-react';
+import { FeatureGate } from '@/components/FeatureGate';
+import { usePlan } from '@/hooks/usePlan';
+import { isPlanSufficient } from '@/lib/planConfig';
 import {
   PieChart,
   Pie,
