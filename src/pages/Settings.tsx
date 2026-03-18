@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { 
   Save, 
   FileText, 
@@ -22,7 +22,7 @@ import {
   Mail,
   Landmark,
   Cloud,
-  
+  Lock,
   Package,
   FileCheck,
   Settings2,
@@ -49,6 +49,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CategoryManagement } from '@/components/settings/CategoryManagement';
 import { VendorManagement } from '@/components/settings/VendorManagement';
@@ -65,7 +66,7 @@ import { InvoiceItemManagement } from '@/components/settings/InvoiceItemManageme
 import { InvoiceTemplateSettings } from '@/components/settings/InvoiceTemplateSettings';
 import { InvoiceModuleSettings } from '@/components/settings/InvoiceModuleSettings';
 import { usePlan } from '@/hooks/usePlan';
-
+import { FEATURE_MIN_PLAN, FEATURE_DESCRIPTIONS, isPlanSufficient, PLAN_NAMES } from '@/lib/planConfig';
 import type { Json } from '@/integrations/supabase/types';
 
 interface NamingSettings {
@@ -187,12 +188,12 @@ const Settings = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
-  const { features } = usePlan();
+  const { effectivePlan } = usePlan();
   
   // Handle tab from URL query parameter - must be before any early returns
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage'];
+  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage', 'customers', 'invoice-items', 'invoice-templates', 'invoice-settings'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'naming';
   const [activeTab, setActiveTab] = useState(initialTab);
   
@@ -444,14 +445,47 @@ const Settings = () => {
     { value: 'invoice-settings', icon: Settings2, label: 'Fakturierung', requiredFeature: 'invoiceModule' as const },
   ];
 
-  const visibleTabs = allTabs.filter(t => 
-    !t.requiredFeature || (features as unknown as Record<string, boolean>)[t.requiredFeature]
-  );
+  const isTabLocked = (requiredFeature?: string): boolean => {
+    if (!requiredFeature) return false;
+    const minPlan = FEATURE_MIN_PLAN[requiredFeature];
+    if (!minPlan) return false;
+    return !isPlanSufficient(effectivePlan, minPlan);
+  };
+
+  // Split tabs into expense group and invoice group
+  const expenseTabs = allTabs.filter(t => !['customers', 'invoice-items', 'invoice-templates', 'invoice-settings'].includes(t.value));
+  const invoiceTabs = allTabs.filter(t => ['customers', 'invoice-items', 'invoice-templates', 'invoice-settings'].includes(t.value));
 
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     setSearchParams({ tab: value });
+  };
+
+  const UpgradeCard = ({ featureKey }: { featureKey: string }) => {
+    const minPlan = FEATURE_MIN_PLAN[featureKey];
+    const desc = FEATURE_DESCRIPTIONS[featureKey];
+    return (
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <Card className="max-w-md w-full text-center">
+          <CardHeader>
+            <div className="mx-auto mb-2 h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+              <Lock className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <CardTitle className="text-lg">{desc?.title || 'Feature gesperrt'}</CardTitle>
+            <CardDescription>{desc?.description || 'Dieses Feature ist in deinem aktuellen Abo nicht enthalten.'}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Verfügbar ab dem <span className="font-semibold text-foreground">{PLAN_NAMES[minPlan]}</span>-Abo
+            </p>
+            <Button asChild>
+              <Link to="/account?tab=subscription">Jetzt upgraden</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   };
 
   return (
@@ -464,14 +498,52 @@ const Settings = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs value={visibleTabs.some(t => t.value === activeTab) ? activeTab : visibleTabs[0]?.value || 'naming'} onValueChange={handleTabChange} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="flex flex-wrap w-full h-auto gap-1 p-1">
-            {visibleTabs.map(tab => (
-              <TabsTrigger key={tab.value} value={tab.value} className="gap-2 flex-shrink-0">
-                <tab.icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{tab.label}</span>
-              </TabsTrigger>
-            ))}
+            {expenseTabs.map(tab => {
+              const locked = isTabLocked(tab.requiredFeature);
+              return (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className={cn(
+                    'gap-2 flex-shrink-0',
+                    locked && 'opacity-50'
+                  )}
+                >
+                  <tab.icon className="h-4 w-4" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
+                </TabsTrigger>
+              );
+            })}
+
+            {/* Visual separator for invoice group */}
+            <div className="flex items-center px-1.5">
+              <div className="h-5 w-px bg-border" />
+            </div>
+            <span className="flex items-center text-[10px] uppercase tracking-wider text-muted-foreground font-medium px-1">
+              Ausgangsrechnungen
+            </span>
+
+            {invoiceTabs.map(tab => {
+              const locked = isTabLocked(tab.requiredFeature);
+              return (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className={cn(
+                    'gap-2 flex-shrink-0 border-primary/10',
+                    locked && 'opacity-50',
+                    !locked && 'bg-primary/5'
+                  )}
+                >
+                  <tab.icon className="h-4 w-4" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
+                </TabsTrigger>
+              );
+            })}
           </TabsList>
 
           {/* File Naming Tab */}
@@ -890,22 +962,20 @@ const Settings = () => {
 
       {/* Email Import Tab */}
       <TabsContent value="email-import">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        {isTabLocked('emailImport') ? <UpgradeCard featureKey="emailImport" /> : (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <EmailImportSettings />
         </motion.div>
+        )}
       </TabsContent>
 
       {/* Bank Keywords Tab */}
       <TabsContent value="bank-keywords">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        {isTabLocked('bankImport') ? <UpgradeCard featureKey="bankImport" /> : (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <BankImportKeywords />
         </motion.div>
+        )}
       </TabsContent>
 
       {/* Tags Tab */}
@@ -937,37 +1007,47 @@ const Settings = () => {
 
       {/* Cloud Storage Tab */}
       <TabsContent value="cloud-storage">
+        {isTabLocked('cloudBackup') ? <UpgradeCard featureKey="cloudBackup" /> : (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <CloudStorageSettings />
         </motion.div>
+        )}
       </TabsContent>
 
       {/* Customer Management Tab */}
       <TabsContent value="customers">
+        {isTabLocked('invoiceModule') ? <UpgradeCard featureKey="invoiceModule" /> : (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <CustomerManagement />
         </motion.div>
+        )}
       </TabsContent>
 
       {/* Invoice Items Tab */}
       <TabsContent value="invoice-items">
+        {isTabLocked('invoiceModule') ? <UpgradeCard featureKey="invoiceModule" /> : (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <InvoiceItemManagement />
         </motion.div>
+        )}
       </TabsContent>
 
       {/* Invoice Templates Tab */}
       <TabsContent value="invoice-templates">
+        {isTabLocked('invoiceModule') ? <UpgradeCard featureKey="invoiceModule" /> : (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <InvoiceTemplateSettings />
         </motion.div>
+        )}
       </TabsContent>
 
       {/* Invoice Module Settings Tab */}
       <TabsContent value="invoice-settings">
+        {isTabLocked('invoiceModule') ? <UpgradeCard featureKey="invoiceModule" /> : (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <InvoiceModuleSettings />
         </motion.div>
+        )}
       </TabsContent>
 
 

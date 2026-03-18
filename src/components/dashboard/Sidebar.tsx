@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Upload, 
@@ -17,6 +17,7 @@ import {
   ClipboardList,
   Shield,
   FileText,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,8 +39,9 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { usePlan } from '@/hooks/usePlan';
-import { PlanType, PLAN_NAMES } from '@/lib/planConfig';
+import { PlanType, PLAN_NAMES, FEATURE_MIN_PLAN, isPlanSufficient } from '@/lib/planConfig';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface NavItem {
   name: string;
@@ -56,7 +58,7 @@ const navigation: NavItem[] = [
   { name: 'Alle Ausgaben', href: '/expenses', icon: Receipt },
   { name: 'Kontoabgleich', href: '/reconciliation', icon: Building2, requiredFeature: 'reconciliation' },
   { name: 'Konto-Import', href: '/bank-import', icon: FileUp, requiredFeature: 'bankImport' },
-  { name: 'Rechnungen', href: '/invoices', icon: FileText, requiredFeature: 'invoiceModule' },
+  { name: 'Ausgangsrechnungen', href: '/invoices', icon: FileText, requiredFeature: 'invoiceModule' },
   { name: 'Berichte', href: '/reports', icon: BarChart3 },
   { name: 'Checklisten', href: '/checklists', icon: ClipboardList },
   { name: 'Einstellungen', href: '/settings', icon: Settings },
@@ -69,6 +71,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const [reviewCount, setReviewCount] = useState<number>(0);
   const {
@@ -79,7 +82,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     receiptsCredit,
     receiptsLimit,
     receiptsAvailable,
-    features,
     planName,
     setAdminViewPlan,
   } = usePlan();
@@ -113,9 +115,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     return null;
   };
 
-  const isFeatureEnabled = (requiredFeature?: string): boolean => {
-    if (!requiredFeature) return true;
-    return (features as unknown as Record<string, boolean>)[requiredFeature] ?? true;
+  const isFeatureLocked = (requiredFeature?: string): boolean => {
+    if (!requiredFeature) return false;
+    const minPlan = FEATURE_MIN_PLAN[requiredFeature];
+    if (!minPlan) return false;
+    return !isPlanSufficient(effectivePlan, minPlan);
   };
 
   const usagePercent = receiptsLimit > 0 ? Math.min(100, (receiptsUsed / receiptsLimit) * 100) : 0;
@@ -127,7 +131,17 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     : userEmail.split('@')[0];
   const userInitials = userName.slice(0, 2).toUpperCase();
 
-  const filteredNavigation = navigation.filter(item => isFeatureEnabled(item.requiredFeature));
+  const handleLockedClick = (e: React.MouseEvent, item: NavItem) => {
+    e.preventDefault();
+    const minPlan = FEATURE_MIN_PLAN[item.requiredFeature!];
+    toast(`Verfügbar ab dem ${PLAN_NAMES[minPlan]}-Abo`, {
+      description: item.name,
+      action: {
+        label: 'Upgraden',
+        onClick: () => navigate('/account?tab=subscription'),
+      },
+    });
+  };
 
   return (
     <aside className={cn(
@@ -149,32 +163,44 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-        {filteredNavigation.map((item) => {
+        {navigation.map((item) => {
           const isActive = location.pathname === item.href;
           const badgeCount = getBadgeCount(item.badgeKey);
+          const locked = isFeatureLocked(item.requiredFeature);
           return (
             <Link
               key={item.name}
-              to={item.href}
+              to={locked ? '#' : item.href}
+              onClick={locked ? (e) => handleLockedClick(e, item) : undefined}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative',
-                isActive
-                  ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                locked
+                  ? 'opacity-60 cursor-not-allowed text-sidebar-foreground/70'
+                  : isActive
+                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent'
               )}
             >
-              <item.icon className="h-5 w-5 flex-shrink-0" />
+              <div className="relative flex-shrink-0">
+                <item.icon className="h-5 w-5" />
+                {locked && collapsed && (
+                  <Lock className="h-3 w-3 absolute -bottom-1 -right-1 text-muted-foreground" />
+                )}
+              </div>
               {!collapsed && (
                 <>
                   <span className="truncate">{item.name}</span>
-                  {badgeCount !== null && (
+                  {locked && (
+                    <Lock className="h-3.5 w-3.5 ml-auto flex-shrink-0 text-muted-foreground" />
+                  )}
+                  {!locked && badgeCount !== null && (
                     <Badge variant="destructive" className="ml-auto h-auto min-w-5 px-1.5 py-0.5 flex items-center justify-center text-xs">
                       {badgeCount}
                     </Badge>
                   )}
                 </>
               )}
-              {collapsed && badgeCount !== null && (
+              {collapsed && !locked && badgeCount !== null && (
                 <Badge variant="destructive" className="absolute -top-1 -right-1 h-auto min-w-4 px-1 py-0 flex items-center justify-center text-[10px]">
                   {badgeCount}
                 </Badge>
