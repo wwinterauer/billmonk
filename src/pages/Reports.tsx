@@ -100,6 +100,7 @@ const Reports = () => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [vendorSearch, setVendorSearch] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
   const [viewMode, setViewMode] = useState<'expenses' | 'income'>('expenses');
 
   const months = [
@@ -282,6 +283,24 @@ const Reports = () => {
       else { monthlyMap.set(key, { key, label, date: d, amount: inv.total || 0, count: 1, vat: inv.vat_total || 0 }); }
     });
 
+    // VAT rate analysis
+    const byVatRate = new Map<string, { rate: number; label: string; net: number; vat: number; gross: number; count: number }>();
+    paidInPeriod.forEach(inv => {
+      const subtotal = inv.subtotal || 0;
+      const vatTotal = inv.vat_total || 0;
+      const effectiveRate = subtotal > 0 ? Math.round((vatTotal / subtotal) * 100) : 0;
+      const key = `${effectiveRate}%`;
+      const existing = byVatRate.get(key);
+      if (existing) {
+        existing.net += subtotal;
+        existing.vat += vatTotal;
+        existing.gross += inv.total || 0;
+        existing.count += 1;
+      } else {
+        byVatRate.set(key, { rate: effectiveRate, label: key, net: subtotal, vat: vatTotal, gross: inv.total || 0, count: 1 });
+      }
+    });
+
     return {
       totalIncome,
       totalVat,
@@ -295,6 +314,7 @@ const Reports = () => {
       byTag: Array.from(tagMap.values()).sort((a, b) => b.amount - a.amount),
       untagged: { amount: untaggedAmount, count: untaggedCount },
       timeSeries: Array.from(monthlyMap.values()).sort((a, b) => a.date.getTime() - b.date.getTime()),
+      byVatRate: Array.from(byVatRate.values()).sort((a, b) => b.rate - a.rate),
     };
   }, [invoices, dateRange, categories]);
 
@@ -326,6 +346,26 @@ const Reports = () => {
       return data || [];
     },
     enabled: !!user && !!previousPeriodRange?.from && !!previousPeriodRange?.to,
+  });
+
+  // Fetch previous period invoices for income comparison
+  const { data: previousInvoices } = useQuery({
+    queryKey: ['reports-previous-invoices', previousPeriodRange?.from?.toISOString(), previousPeriodRange?.to?.toISOString(), user?.id],
+    queryFn: async () => {
+      if (!user || !previousPeriodRange?.from || !previousPeriodRange?.to) return [];
+      
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('id, total, paid_at, status')
+        .eq('user_id', user.id)
+        .eq('status', 'paid')
+        .gte('paid_at', previousPeriodRange.from.toISOString())
+        .lte('paid_at', previousPeriodRange.to.toISOString());
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && !!previousPeriodRange?.from && !!previousPeriodRange?.to && showIncome,
   });
 
   // Calculate KPIs
@@ -446,7 +486,6 @@ const Reports = () => {
     if (!receipts) return [];
 
     const currentYear = parseInt(selectedYear);
-    const previousYear = currentYear - 1;
 
     // Initialize all months
     const monthData: Record<string, { month: string; currentYear: number; previousYear: number }> = {};
@@ -481,6 +520,49 @@ const Reports = () => {
 
     return Object.values(monthData);
   }, [receipts, previousReceipts, selectedYear, months]);
+
+  // Income monthly comparison data (current year vs previous year)
+  const incomeMonthlyComparisonData = useMemo(() => {
+    if (!invoices) return [];
+
+    const currentYear = parseInt(selectedYear);
+
+    const monthData: Record<string, { month: string; currentYear: number; previousYear: number }> = {};
+    months.forEach((month, index) => {
+      monthData[index.toString()] = {
+        month: month.substring(0, 3),
+        currentYear: 0,
+        previousYear: 0,
+      };
+    });
+
+    // Current year paid invoices
+    invoices.forEach((inv) => {
+      if (inv.status !== 'paid' || !inv.paid_at) return;
+      const date = new Date(inv.paid_at);
+      if (date.getFullYear() === currentYear) {
+        monthData[date.getMonth().toString()].currentYear += inv.total || 0;
+      }
+    });
+
+    // Previous year invoices
+    previousInvoices?.forEach((inv) => {
+      if (!inv.paid_at) return;
+      const date = new Date(inv.paid_at);
+      monthData[date.getMonth().toString()].previousYear += inv.total || 0;
+    });
+
+    return Object.values(monthData);
+  }, [invoices, previousInvoices, selectedYear, months]);
+
+  // Filtered customer data for table
+  const filteredCustomerData = useMemo(() => {
+    if (!incomeStats) return [];
+    if (!customerSearch) return incomeStats.byCustomer;
+    return incomeStats.byCustomer.filter((c) =>
+      c.name.toLowerCase().includes(customerSearch.toLowerCase())
+    );
+  }, [incomeStats, customerSearch]);
 
   // Trend indicators
   const trendIndicators = useMemo(() => {
@@ -2208,48 +2290,47 @@ const Reports = () => {
               </CardContent>
             </Card>
 
-            {/* Income by Customer */}
-            {incomeStats.byCustomer.length > 0 && (
+            {/* USt-Übersicht (Umsatzsteuer) */}
+            {incomeStats.byVatRate.length > 0 && (
               <Card className="border-border/50 mb-6">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Einnahmen nach Kunde
+                    <Percent className="h-5 w-5" />
+                    Umsatzsteuer-Übersicht
                   </CardTitle>
+                  <CardDescription>Aufschlüsselung nach effektivem Steuersatz</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[300px] mb-6">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={incomeStats.byCustomer.slice(0, 10)} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis type="number" tickFormatter={(v) => `€${v}`} stroke="hsl(var(--muted-foreground))" />
-                        <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }} stroke="hsl(var(--muted-foreground))" />
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                        <Bar dataKey="amount" fill="hsl(var(--success))" radius={[0, 4, 4, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Kunde</TableHead>
-                        <TableHead className="text-right">Rechnungen</TableHead>
-                        <TableHead className="text-right">Betrag</TableHead>
-                        <TableHead className="text-right">Anteil</TableHead>
+                        <TableHead>USt-Satz</TableHead>
+                        <TableHead className="text-right">Anzahl</TableHead>
+                        <TableHead className="text-right">Netto</TableHead>
+                        <TableHead className="text-right">USt</TableHead>
+                        <TableHead className="text-right">Brutto</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {incomeStats.byCustomer.map((cust) => (
-                        <TableRow key={cust.name}>
-                          <TableCell className="font-medium">{cust.name}</TableCell>
-                          <TableCell className="text-right">{cust.count}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(cust.amount)}</TableCell>
-                          <TableCell className="text-right">
-                            {incomeStats.totalIncome > 0 ? ((cust.amount / incomeStats.totalIncome) * 100).toFixed(1) : 0}%
-                          </TableCell>
+                      {incomeStats.byVatRate.map((vat) => (
+                        <TableRow key={vat.label}>
+                          <TableCell className="font-medium">{vat.label}</TableCell>
+                          <TableCell className="text-right">{vat.count}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(vat.net)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(vat.vat)}</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(vat.gross)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell className="font-medium">Gesamt</TableCell>
+                        <TableCell className="text-right font-medium">{incomeStats.paidCount}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(incomeStats.totalNet)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(incomeStats.totalVat)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(incomeStats.totalIncome)}</TableCell>
+                      </TableRow>
+                    </TableFooter>
                   </Table>
                 </CardContent>
               </Card>
@@ -2285,6 +2366,129 @@ const Reports = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Income Monthly Comparison */}
+            {periodType === 'year' && (
+              <Card className="border-border/50 mb-6">
+                <CardHeader>
+                  <CardTitle className="text-lg">Einnahmen-Monatsvergleich</CardTitle>
+                  <CardDescription>{selectedYear} vs. {parseInt(selectedYear) - 1}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {incomeMonthlyComparisonData.every((m) => m.currentYear === 0 && m.previousYear === 0) ? (
+                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                      Keine Daten für den Vergleich vorhanden
+                    </div>
+                  ) : (
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={incomeMonthlyComparisonData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" tick={{ fill: 'hsl(var(--foreground))' }} />
+                          <YAxis tickFormatter={(v) => `€${v}`} stroke="hsl(var(--muted-foreground))" />
+                          <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                          <Legend />
+                          <Bar dataKey="currentYear" name={selectedYear} fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="previousYear" name={String(parseInt(selectedYear) - 1)} fill="hsl(var(--muted))" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Top 10 Customers Bar Chart */}
+            {incomeStats.byCustomer.length > 0 && (
+              <Card className="border-border/50 mb-6">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Top 10 Kunden
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[400px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={incomeStats.byCustomer.slice(0, 10)} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis type="number" tickFormatter={(v) => `€${v}`} stroke="hsl(var(--muted-foreground))" />
+                        <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }} stroke="hsl(var(--muted-foreground))" />
+                        <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                        <Bar dataKey="amount" fill="hsl(var(--success))" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* All Customers Table with Search */}
+            <Card className="border-border/50 mb-6">
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Alle Kunden
+                  </CardTitle>
+                  <Input
+                    placeholder="Kunde suchen..."
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    className="w-full sm:w-[250px]"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                {filteredCustomerData.length === 0 ? (
+                  <div className="py-8 text-center text-muted-foreground">
+                    {customerSearch ? 'Keine Kunden gefunden' : 'Keine Daten für den gewählten Zeitraum'}
+                  </div>
+                ) : (
+                  <>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Kunde</TableHead>
+                          <TableHead className="text-right">Rechnungen</TableHead>
+                          <TableHead className="text-right">Brutto</TableHead>
+                          <TableHead className="text-right">Ø pro Rechnung</TableHead>
+                          <TableHead className="text-right">Anteil</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredCustomerData.slice(0, 20).map((cust) => (
+                          <TableRow key={cust.name}>
+                            <TableCell className="font-medium">{cust.name}</TableCell>
+                            <TableCell className="text-right">{cust.count}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(cust.amount)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(cust.amount / cust.count)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <div className="w-16 bg-muted rounded-full h-2">
+                                  <div
+                                    className="bg-success h-2 rounded-full"
+                                    style={{ width: `${incomeStats.totalIncome ? (cust.amount / incomeStats.totalIncome) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm w-12 text-right">
+                                  {incomeStats.totalIncome ? ((cust.amount / incomeStats.totalIncome) * 100).toFixed(1) : 0}%
+                                </span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {filteredCustomerData.length > 20 && (
+                      <p className="text-sm text-muted-foreground mt-4 text-center">
+                        Zeige 20 von {filteredCustomerData.length} Kunden
+                      </p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
           </>
           )}
         </FeatureGate>
