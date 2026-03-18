@@ -165,6 +165,90 @@ const Reports = () => {
     enabled: !!user && !!dateRange.from && !!dateRange.to,
   });
 
+  // Fetch invoices data for income analysis (Business plan)
+  const { data: invoices, isLoading: invoicesLoading } = useQuery({
+    queryKey: ['reports-invoices', dateRange.from?.toISOString(), dateRange.to?.toISOString(), user?.id],
+    queryFn: async () => {
+      if (!user || !dateRange.from || !dateRange.to) return [];
+      
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, invoice_date, due_date, total, subtotal, vat_total, status, paid_at, category, customer_id, customers(display_name)')
+        .eq('user_id', user.id)
+        .neq('status', 'cancelled');
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && !!dateRange.from && !!dateRange.to && showIncome,
+  });
+
+  // Income stats
+  const incomeStats = useMemo(() => {
+    if (!invoices || !dateRange.from || !dateRange.to) return null;
+
+    const from = dateRange.from;
+    const to = dateRange.to;
+
+    // Paid in period
+    const paidInPeriod = invoices.filter(i => {
+      if (i.status !== 'paid' || !i.paid_at) return false;
+      const d = new Date(i.paid_at);
+      return d >= from && d <= to;
+    });
+
+    // Issued in period
+    const issuedInPeriod = invoices.filter(i => {
+      if (!i.invoice_date) return false;
+      const d = new Date(i.invoice_date);
+      return d >= from && d <= to;
+    });
+
+    const totalIncome = paidInPeriod.reduce((s, i) => s + (i.total || 0), 0);
+    const totalVat = paidInPeriod.reduce((s, i) => s + (i.vat_total || 0), 0);
+    const totalNet = paidInPeriod.reduce((s, i) => s + (i.subtotal || 0), 0);
+    const openInvoices = invoices.filter(i => i.status === 'sent' || i.status === 'overdue');
+    const openAmount = openInvoices.reduce((s, i) => s + (i.total || 0), 0);
+
+    // By customer
+    const byCustomer = new Map<string, { name: string; amount: number; count: number }>();
+    paidInPeriod.forEach(inv => {
+      const name = (inv.customers as any)?.display_name || 'Unbekannt';
+      const existing = byCustomer.get(name);
+      if (existing) {
+        existing.amount += inv.total || 0;
+        existing.count += 1;
+      } else {
+        byCustomer.set(name, { name, amount: inv.total || 0, count: 1 });
+      }
+    });
+
+    // By category
+    const byCategory = new Map<string, { name: string; amount: number; count: number }>();
+    paidInPeriod.forEach(inv => {
+      const cat = inv.category || 'Ohne Kategorie';
+      const existing = byCategory.get(cat);
+      if (existing) {
+        existing.amount += inv.total || 0;
+        existing.count += 1;
+      } else {
+        byCategory.set(cat, { name: cat, amount: inv.total || 0, count: 1 });
+      }
+    });
+
+    return {
+      totalIncome,
+      totalVat,
+      totalNet,
+      paidCount: paidInPeriod.length,
+      issuedCount: issuedInPeriod.length,
+      openCount: openInvoices.length,
+      openAmount,
+      byCustomer: Array.from(byCustomer.values()).sort((a, b) => b.amount - a.amount),
+      byCategory: Array.from(byCategory.values()).sort((a, b) => b.amount - a.amount),
+    };
+  }, [invoices, dateRange]);
+
   // Fetch categories for color mapping
   const { data: categories } = useQuery({
     queryKey: ['categories', user?.id],
