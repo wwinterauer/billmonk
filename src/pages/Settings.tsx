@@ -66,7 +66,7 @@ import { InvoiceItemManagement } from '@/components/settings/InvoiceItemManageme
 import { InvoiceTemplateSettings } from '@/components/settings/InvoiceTemplateSettings';
 import { InvoiceModuleSettings } from '@/components/settings/InvoiceModuleSettings';
 import { usePlan } from '@/hooks/usePlan';
-import { FEATURE_MIN_PLAN, FEATURE_DESCRIPTIONS, isPlanSufficient, PLAN_NAMES } from '@/lib/planConfig';
+import { FEATURE_MIN_PLAN, isPlanSufficient } from '@/lib/planConfig';
 import { FeatureGate } from '@/components/FeatureGate';
 import type { Json } from '@/integrations/supabase/types';
 
