@@ -511,6 +511,74 @@ serve(async (req) => {
       }
     }
 
+    // === INVOICES BACKUP ===
+    const includeInvoices = connection.backup_include_invoices ?? false;
+    let invoiceCount = 0;
+
+    if (includeInvoices) {
+      // Load invoices with customer names
+      const { data: invoicesData, error: invError } = await supabase
+        .from("invoices")
+        .select("id, invoice_number, invoice_date, due_date, total, subtotal, vat_total, status, paid_at, category, pdf_storage_path, customers(display_name)")
+        .eq("user_id", user.id)
+        .neq("status", "cancelled")
+        .order("invoice_date", { ascending: true });
+
+      if (!invError && invoicesData && invoicesData.length > 0) {
+        // Flatten customer name
+        const flatInvoices = invoicesData.map(inv => ({
+          ...inv,
+          customer_name: (inv.customers as any)?.display_name || "",
+        }));
+
+        // Load invoice export template if available
+        let invColumns: ExportColumn[] = DEFAULT_INVOICE_COLUMNS;
+        if (connection.backup_template_id) {
+          const { data: invTemplate } = await supabase
+            .from("export_templates")
+            .select("columns, template_type")
+            .eq("id", connection.backup_template_id)
+            .eq("user_id", user.id)
+            .single();
+
+          if (invTemplate && (invTemplate as any).template_type === "invoices" && invTemplate.columns) {
+            invColumns = invTemplate.columns as unknown as ExportColumn[];
+          }
+        }
+
+        // Add invoice CSV
+        if (includeCsv) {
+          const invCsv = generateCsv(flatInvoices, invColumns);
+          zipFiles.push({ name: "Ausgangsrechnungen/Rechnungen.csv", data: invCsv });
+        }
+
+        // Add invoice Excel
+        if (includeExcel) {
+          const invXlsx = generateXlsx(flatInvoices, invColumns);
+          zipFiles.push({ name: "Ausgangsrechnungen/Rechnungen.xlsx", data: invXlsx });
+        }
+
+        // Add invoice PDFs
+        for (const inv of invoicesData) {
+          if (!inv.pdf_storage_path) continue;
+          try {
+            const { data: pdfData, error: pdfError } = await supabase.storage
+              .from("invoices")
+              .download(inv.pdf_storage_path);
+
+            if (pdfError || !pdfData) continue;
+
+            const pdfBytes = new Uint8Array(await pdfData.arrayBuffer());
+            const pdfName = `${inv.invoice_number || inv.id}.pdf`;
+            zipFiles.push({ name: `Ausgangsrechnungen/${pdfName}`, data: pdfBytes });
+            invoiceCount++;
+          } catch (err) {
+            console.error(`Error downloading invoice PDF ${inv.id}:`, err);
+          }
+        }
+      }
+    }
+
     // Build and upload ZIP
     const zipData = buildZip(zipFiles);
     const zipName = resolveZipName(zipPattern, prefix, receipts.length) + ".zip";
@@ -533,13 +601,13 @@ serve(async (req) => {
       .from("cloud_connections")
       .update({
         last_backup_at: new Date().toISOString(),
-        last_backup_count: receipts.length,
+        last_backup_count: receipts.length + invoiceCount,
         last_backup_error: null,
         last_sync: new Date().toISOString(),
       })
       .eq("id", connection.id);
 
-    console.log(`Backup completed: ${receipts.length} receipts, ${uploadedFiles} files, ZIP: ${zipName}`);
+    console.log(`Backup completed: ${receipts.length} receipts, ${uploadedFiles} files, ${invoiceCount} invoices, ZIP: ${zipName}`);
 
     return new Response(
       JSON.stringify({
