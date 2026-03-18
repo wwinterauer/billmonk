@@ -967,12 +967,11 @@ const Settings = () => {
 
       {/* Email Import Tab */}
       <TabsContent value="email-import">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        {isTabLocked('emailImport') ? <UpgradeCard featureKey="emailImport" /> : (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <EmailImportSettings />
         </motion.div>
+        )}
       </TabsContent>
 
       {/* Bank Keywords Tab */}
