@@ -165,11 +165,16 @@ const Invoices = () => {
                     const sc = STATUS_CONFIG[inv.status || 'draft'] || STATUS_CONFIG.draft;
                     const hasVersion = !!(inv as any).version;
                     return (
-                      <TableRow key={inv.id} className="cursor-pointer" onClick={() => navigate(`/invoices/${inv.id}/edit`)}>
-                        <TableCell className="font-medium">
-                          {inv.invoice_number}
-                          {hasVersion && <Badge variant="outline" className="ml-1 text-[10px]">{(inv as any).version}</Badge>}
-                        </TableCell>
+                        <TableRow key={inv.id} className="cursor-pointer" onClick={() => navigate(`/invoices/${inv.id}/edit`)}>
+                          <TableCell className="font-medium">
+                            {inv.invoice_number}
+                            {hasVersion && <Badge variant="outline" className="ml-1 text-[10px]">{(inv as any).version}</Badge>}
+                            {(inv as any).invoice_subtype && (inv as any).invoice_subtype !== 'normal' && (
+                              <Badge variant="secondary" className="ml-1 text-[10px]">
+                                {{ deposit: 'Anzahlung', partial: 'Teilzahlung', final: 'Schlussrechnung' }[(inv as any).invoice_subtype] || ''}
+                              </Badge>
+                            )}
+                          </TableCell>
                         <TableCell>{customerName(inv)}</TableCell>
                         <TableCell>{fmtDate(inv.invoice_date)}</TableCell>
                         <TableCell>{fmtDate(inv.due_date)}</TableCell>
