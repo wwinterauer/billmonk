@@ -87,6 +87,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     receiptsCredit,
     receiptsLimit,
     receiptsAvailable,
+    documentsUsed,
+    documentsCredit,
+    documentsLimit,
+    documentsAvailable,
     planName,
     setAdminViewPlan,
   } = usePlan();
