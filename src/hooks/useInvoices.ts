@@ -433,11 +433,20 @@ export function useInvoices() {
   const convertDocument = async (sourceId: string, targetType: 'order_confirmation' | 'invoice' | 'delivery_note') => {
     if (!user) return null;
 
-    const { data: settings } = await supabase
+    let { data: settings } = await supabase
       .from('invoice_settings')
       .select('*')
       .eq('user_id', user.id)
       .maybeSingle();
+
+    if (!settings) {
+      const { data: newSettings } = await supabase
+        .from('invoice_settings')
+        .insert({ user_id: user.id, next_sequence_number: 1 } as any)
+        .select('*')
+        .single();
+      settings = newSettings;
+    }
 
     const prefixMap: Record<string, string> = {
       quote: settings?.invoice_number_prefix || 'AG',
