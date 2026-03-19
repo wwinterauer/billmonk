@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useInvoiceSettings } from '@/hooks/useInvoiceSettings';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { InvoiceLayoutPreview } from './InvoiceLayoutPreview';
 import { Loader2 } from 'lucide-react';
 
 const LAYOUT_VARIANTS = [
@@ -19,6 +21,7 @@ const LAYOUT_VARIANTS = [
 
 export function InvoiceTemplateSettings() {
   const { settings, loading, saveSettings } = useInvoiceSettings();
+  const { settings: companySettings, getLogoUrl } = useCompanySettings();
   const [form, setForm] = useState({
     invoice_number_prefix: 'RE',
     invoice_number_format: '{prefix}-{year}-{seq}',
@@ -136,6 +139,15 @@ export function InvoiceTemplateSettings() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="mt-4">
+              <InvoiceLayoutPreview
+                layoutVariant={form.layout_variant}
+                companySettings={companySettings}
+                invoiceNumber={previewInvoiceNumber}
+                footerText={form.default_footer_text}
+                logoUrl={getLogoUrl(companySettings?.logo_path ?? null)}
+              />
+            </div>
           </div>
 
           <Separator />
