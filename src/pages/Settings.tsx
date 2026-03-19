@@ -67,6 +67,7 @@ import { InvoiceTemplateSettings } from '@/components/settings/InvoiceTemplateSe
 import { QuoteTemplateSettings } from '@/components/settings/QuoteTemplateSettings';
 import { InvoiceModuleSettings } from '@/components/settings/InvoiceModuleSettings';
 import { CompanySettings } from '@/components/settings/CompanySettings';
+import { LiveBankSettings } from '@/components/settings/LiveBankSettings';
 import { usePlan } from '@/hooks/usePlan';
 import { FEATURE_MIN_PLAN, isPlanSufficient } from '@/lib/planConfig';
 import { FeatureGate } from '@/components/FeatureGate';
@@ -196,7 +197,7 @@ const Settings = () => {
   // Handle tab from URL query parameter - must be before any early returns
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage', 'company', 'customers', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'];
+  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'bank-live', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage', 'company', 'customers', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'naming';
   const [activeTab, setActiveTab] = useState(initialTab);
   
@@ -440,6 +441,7 @@ const Settings = () => {
     { value: 'export', icon: Table2, label: 'Export' },
     { value: 'ai-learning', icon: Brain, label: 'KI-Training' },
     { value: 'bank-keywords', icon: Landmark, label: 'Bank', requiredFeature: 'bankImport' as const },
+    { value: 'bank-live', icon: Building2, label: 'Bankanbindung', requiredFeature: 'liveBankConnection' as const },
     { value: 'email-import', icon: Mail, label: 'E-Mail', requiredFeature: 'emailImport' as const },
     { value: 'cloud-storage', icon: Cloud, label: 'Cloud', requiredFeature: 'cloudBackup' as const },
     { value: 'company', icon: Building2, label: 'Firma', requiredFeature: 'invoiceModule' as const },
@@ -1041,6 +1043,15 @@ const Settings = () => {
         <FeatureGate feature="invoiceModule">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <InvoiceModuleSettings />
+        </motion.div>
+        </FeatureGate>
+      </TabsContent>
+
+      {/* Live Bank Connection Tab */}
+      <TabsContent value="bank-live">
+        <FeatureGate feature="liveBankConnection">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <LiveBankSettings />
         </motion.div>
         </FeatureGate>
       </TabsContent>

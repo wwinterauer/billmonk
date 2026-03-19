@@ -52,6 +52,62 @@ export type Database = {
           },
         ]
       }
+      bank_connections_live: {
+        Row: {
+          account_id: string | null
+          created_at: string | null
+          iban: string | null
+          id: string
+          institution_id: string | null
+          institution_logo: string | null
+          institution_name: string | null
+          last_sync_at: string | null
+          provider: string
+          requisition_id: string | null
+          status: string
+          sync_error: string | null
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string | null
+          iban?: string | null
+          id?: string
+          institution_id?: string | null
+          institution_logo?: string | null
+          institution_name?: string | null
+          last_sync_at?: string | null
+          provider?: string
+          requisition_id?: string | null
+          status?: string
+          sync_error?: string | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string | null
+          iban?: string | null
+          id?: string
+          institution_id?: string | null
+          institution_logo?: string | null
+          institution_name?: string | null
+          last_sync_at?: string | null
+          provider?: string
+          requisition_id?: string | null
+          status?: string
+          sync_error?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_connections_live_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bank_import_keywords: {
         Row: {
           category: string | null
@@ -148,11 +204,14 @@ export type Database = {
           bank_account_id: string | null
           created_at: string | null
           description: string | null
+          external_id: string | null
           id: string
           import_batch_id: string | null
+          invoice_id: string | null
           is_expense: boolean | null
           raw_data: Json | null
           receipt_id: string | null
+          source: string
           status: string | null
           transaction_date: string | null
           user_id: string
@@ -163,11 +222,14 @@ export type Database = {
           bank_account_id?: string | null
           created_at?: string | null
           description?: string | null
+          external_id?: string | null
           id?: string
           import_batch_id?: string | null
+          invoice_id?: string | null
           is_expense?: boolean | null
           raw_data?: Json | null
           receipt_id?: string | null
+          source?: string
           status?: string | null
           transaction_date?: string | null
           user_id: string
@@ -178,11 +240,14 @@ export type Database = {
           bank_account_id?: string | null
           created_at?: string | null
           description?: string | null
+          external_id?: string | null
           id?: string
           import_batch_id?: string | null
+          invoice_id?: string | null
           is_expense?: boolean | null
           raw_data?: Json | null
           receipt_id?: string | null
+          source?: string
           status?: string | null
           transaction_date?: string | null
           user_id?: string
@@ -201,6 +266,13 @@ export type Database = {
             columns: ["import_batch_id"]
             isOneToOne: false
             referencedRelation: "bank_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
           {

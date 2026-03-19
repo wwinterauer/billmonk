@@ -13,6 +13,7 @@ export interface PlanFeatures {
   emailImport: boolean;
   cloudBackup: boolean;
   reconciliation: boolean;
+  liveBankConnection: boolean;
 }
 
 export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
@@ -23,10 +24,10 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
 };
 
 export const PLAN_FEATURES: Record<PlanType, PlanFeatures> = {
-  free: { invoiceModule: false, bankImport: false, emailImport: false, cloudBackup: false, reconciliation: false },
-  starter: { invoiceModule: false, bankImport: true, emailImport: true, cloudBackup: false, reconciliation: true },
-  pro: { invoiceModule: false, bankImport: true, emailImport: true, cloudBackup: true, reconciliation: true },
-  business: { invoiceModule: true, bankImport: true, emailImport: true, cloudBackup: true, reconciliation: true },
+  free: { invoiceModule: false, bankImport: false, emailImport: false, cloudBackup: false, reconciliation: false, liveBankConnection: false },
+  starter: { invoiceModule: false, bankImport: true, emailImport: true, cloudBackup: false, reconciliation: true, liveBankConnection: false },
+  pro: { invoiceModule: false, bankImport: true, emailImport: true, cloudBackup: true, reconciliation: true, liveBankConnection: false },
+  business: { invoiceModule: true, bankImport: true, emailImport: true, cloudBackup: true, reconciliation: true, liveBankConnection: true },
 };
 
 export const PLAN_NAMES: Record<PlanType, string> = {
@@ -51,6 +52,7 @@ export const FEATURE_MIN_PLAN: Record<string, PlanType> = {
   cloudBackup: 'pro',
   invoiceModule: 'business',
   taxExport: 'business',
+  liveBankConnection: 'business',
 };
 
 // Human-readable feature descriptions for upgrade cards
@@ -61,6 +63,7 @@ export const FEATURE_DESCRIPTIONS: Record<string, { title: string; description: 
   cloudBackup: { title: 'Cloud-Backup', description: 'Sichere deine Belege automatisch in der Cloud.' },
   invoiceModule: { title: 'Ausgangsrechnungen', description: 'Erstelle und verwalte Rechnungen, Kunden und Artikel.' },
   taxExport: { title: 'Steuerberater-Export', description: 'Exportiere Buchungsdaten im DATEV- oder BMD-Format für deinen Steuerberater.' },
+  liveBankConnection: { title: 'Live-Bankanbindung', description: 'Verbinde dein Bankkonto direkt und gleiche Ein- & Ausgangsrechnungen automatisch ab.' },
 };
 
 // Plan hierarchy for comparison

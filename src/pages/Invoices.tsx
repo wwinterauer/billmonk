@@ -195,7 +195,19 @@ const Invoices = () => {
                         </TableCell>
                         <TableCell className="text-right font-medium">{fmt(inv.total || 0)}</TableCell>
                         <TableCell>
-                          <Badge variant={sc.variant}>{sc.label}</Badge>
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant={sc.variant}>{sc.label}</Badge>
+                            {inv.paid_at && inv.status === 'paid' && (
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Bezahlt am {new Date(inv.paid_at).toLocaleDateString('de-AT')}
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
