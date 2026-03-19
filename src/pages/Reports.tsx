@@ -2119,13 +2119,17 @@ const Reports = () => {
             </div>
 
             {/* Income Category Charts */}
-            {incomeStats.byCategory.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <Card className="border-border/50">
                   <CardHeader>
                     <CardTitle className="text-lg">Einnahmen nach Kategorie</CardTitle>
                   </CardHeader>
                   <CardContent>
+                    {incomeStats.byCategory.length === 0 ? (
+                      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                        Keine Daten für den gewählten Zeitraum
+                      </div>
+                    ) : (
                     <div className="h-[300px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -2150,6 +2154,7 @@ const Reports = () => {
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -2158,6 +2163,11 @@ const Reports = () => {
                     <CardTitle className="text-lg">Top Kategorien</CardTitle>
                   </CardHeader>
                   <CardContent>
+                    {incomeStats.byCategory.length === 0 ? (
+                      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                        Keine Daten für den gewählten Zeitraum
+                      </div>
+                    ) : (
                     <div className="h-[300px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={incomeStats.byCategory.slice(0, 5)} layout="vertical">
@@ -2173,10 +2183,10 @@ const Reports = () => {
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
-            )}
 
             {/* Income Category Detail Table */}
             {incomeStats.byCategory.length > 0 && (
