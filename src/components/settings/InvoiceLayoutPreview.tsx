@@ -6,6 +6,7 @@ interface Props {
   invoiceNumber: string;
   footerText: string;
   logoUrl: string | null;
+  documentTitle?: string;
 }
 
 const SAMPLE_CUSTOMER = {
@@ -22,7 +23,7 @@ const SAMPLE_ITEMS = [
   { description: 'Hosting (Jahrespaket)', qty: 1, unit: 'Stk', price: 180 },
 ];
 
-export function InvoiceLayoutPreview({ layoutVariant, companySettings, invoiceNumber, footerText, logoUrl }: Props) {
+export function InvoiceLayoutPreview({ layoutVariant, companySettings, invoiceNumber, footerText, logoUrl, documentTitle = 'Rechnung' }: Props) {
   const company = {
     name: companySettings?.company_name || 'Meine Firma GmbH',
     street: companySettings?.street || 'Beispielgasse 1',
@@ -100,7 +101,7 @@ export function InvoiceLayoutPreview({ layoutVariant, companySettings, invoiceNu
 
         {/* Title + Meta */}
         <div className={`flex justify-between items-end mb-1 ${gap}`}>
-          <div className={`${titleSize} font-bold text-gray-900`}>Rechnung</div>
+          <div className={`${titleSize} font-bold text-gray-900`}>{documentTitle}</div>
           <div className={`${textSize} text-gray-600 text-right`}>
             <div>Nr: <span className="font-mono">{invoiceNumber}</span></div>
             <div>Datum: {today}</div>

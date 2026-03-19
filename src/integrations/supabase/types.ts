@@ -1632,6 +1632,56 @@ export type Database = {
         }
         Relationships: []
       }
+      quote_settings: {
+        Row: {
+          created_at: string | null
+          default_footer_text: string | null
+          default_notes: string | null
+          default_validity_days: number | null
+          id: string
+          layout_variant: string | null
+          next_sequence_number: number | null
+          quote_number_format: string | null
+          quote_number_prefix: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          default_footer_text?: string | null
+          default_notes?: string | null
+          default_validity_days?: number | null
+          id?: string
+          layout_variant?: string | null
+          next_sequence_number?: number | null
+          quote_number_format?: string | null
+          quote_number_prefix?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          default_footer_text?: string | null
+          default_notes?: string | null
+          default_validity_days?: number | null
+          id?: string
+          layout_variant?: string | null
+          next_sequence_number?: number | null
+          quote_number_format?: string | null
+          quote_number_prefix?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       receipt_tags: {
         Row: {
           created_at: string | null
