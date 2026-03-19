@@ -26,7 +26,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
 };
 
 const Invoices = () => {
-  const { invoices, loading, updateInvoiceStatus, deleteInvoice, copyInvoice, createCorrectionVersion } = useInvoices();
+  const { invoices, loading, updateInvoiceStatus, deleteInvoice, copyInvoice, createCorrectionVersion, convertDocument, createPartialInvoice } = useInvoices();
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const navigate = useNavigate();
