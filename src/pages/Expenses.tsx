@@ -307,6 +307,8 @@ const Expenses = () => {
   const [exportEditorOpen, setExportEditorOpen] = useState(false);
   const [exportFormatDialogOpen, setExportFormatDialogOpen] = useState(false);
   const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>('csv');
+  const [taxExportOpen, setTaxExportOpen] = useState(false);
+  const { effectivePlan } = usePlan();
 
   // Detail panel state (edit mode)
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
