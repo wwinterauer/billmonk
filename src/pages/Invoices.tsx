@@ -42,9 +42,9 @@ const Invoices = () => {
   }, [invoiceOnly, statusFilter]);
 
   const stats = useMemo(() => {
-    const open = invoices.filter(i => i.status === 'sent').reduce((s, i) => s + (i.total || 0), 0);
-    const overdue = invoices.filter(i => i.status === 'overdue').reduce((s, i) => s + (i.total || 0), 0);
-    const paidThisMonth = invoices
+    const open = invoiceOnly.filter(i => i.status === 'sent').reduce((s, i) => s + (i.total || 0), 0);
+    const overdue = invoiceOnly.filter(i => i.status === 'overdue').reduce((s, i) => s + (i.total || 0), 0);
+    const paidThisMonth = invoiceOnly
       .filter(i => {
         if (i.status !== 'paid' || !i.paid_at) return false;
         const d = new Date(i.paid_at);
@@ -53,7 +53,7 @@ const Invoices = () => {
       })
       .reduce((s, i) => s + (i.total || 0), 0);
     return { open, overdue, paidThisMonth };
-  }, [invoices]);
+  }, [invoiceOnly]);
 
   const fmt = (n: number) =>
     new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(n);
