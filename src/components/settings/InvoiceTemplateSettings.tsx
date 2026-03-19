@@ -31,6 +31,9 @@ export function InvoiceTemplateSettings() {
     default_notes: '',
     default_discount_percent: 0,
     default_discount_days: 0,
+    default_rabatt_percent: 0,
+    order_confirmation_prefix: 'AB',
+    delivery_note_prefix: 'LS',
     layout_variant: 'classic',
   });
   const [saving, setSaving] = useState(false);
