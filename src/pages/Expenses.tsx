@@ -94,6 +94,9 @@ import { DuplicateComparisonModal } from '@/components/receipts/DuplicateCompari
 import { ExportDialog } from '@/components/exports/ExportDialog';
 import { ExportFormatDialog, type ExportFormat } from '@/components/exports/ExportFormatDialog';
 import { ExportTemplateEditor } from '@/components/exports/ExportTemplateEditor';
+import { TaxExportDialog } from '@/components/exports/TaxExportDialog';
+import { usePlan } from '@/hooks/usePlan';
+import { isPlanSufficient } from '@/lib/planConfig';
 import { TagSelector } from '@/components/tags/TagSelector';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
@@ -304,6 +307,8 @@ const Expenses = () => {
   const [exportEditorOpen, setExportEditorOpen] = useState(false);
   const [exportFormatDialogOpen, setExportFormatDialogOpen] = useState(false);
   const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>('csv');
+  const [taxExportOpen, setTaxExportOpen] = useState(false);
+  const { effectivePlan } = usePlan();
 
   // Detail panel state (edit mode)
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
@@ -1422,6 +1427,13 @@ const Expenses = () => {
                   <Archive className="h-4 w-4 mr-2" />
                   Belege als ZIP
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {isPlanSufficient(effectivePlan, 'business') && (
+                  <DropdownMenuItem onClick={() => setTaxExportOpen(true)}>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    Steuerberater-Export (DATEV/BMD)
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate('/settings?tab=export')}>
                   <Settings2 className="h-4 w-4 mr-2" />
@@ -2793,6 +2805,13 @@ const Expenses = () => {
         receipts={filteredReceipts}
         format={selectedExportFormat}
         dateRange={{ from: dateFrom, to: dateTo }}
+      />
+
+      {/* Tax Export Dialog */}
+      <TaxExportDialog
+        open={taxExportOpen}
+        onOpenChange={setTaxExportOpen}
+        defaultBookingType="expenses"
       />
 
       {/* Split Suggestion Dialog */}

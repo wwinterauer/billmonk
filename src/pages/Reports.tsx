@@ -21,6 +21,7 @@ import {
   Tag,
   Users,
   Lock,
+  Landmark,
 } from 'lucide-react';
 import { FeatureGate } from '@/components/FeatureGate';
 import { usePlan } from '@/hooks/usePlan';
@@ -83,6 +84,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { TaxExportDialog } from '@/components/exports/TaxExportDialog';
 
 const Reports = () => {
   const { toast } = useToast();
@@ -102,6 +104,7 @@ const Reports = () => {
   const [vendorSearch, setVendorSearch] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
   const [viewMode, setViewMode] = useState<'expenses' | 'income'>('expenses');
+  const [taxExportOpen, setTaxExportOpen] = useState(false);
 
   const months = [
     'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
@@ -1008,6 +1011,14 @@ const Reports = () => {
                   <File className="w-4 h-4 mr-2" />
                   Als CSV
                 </DropdownMenuItem>
+                {isPlanSufficient(effectivePlan, 'business') && (
+                  <>
+                    <DropdownMenuItem onClick={() => setTaxExportOpen(true)}>
+                      <Landmark className="w-4 h-4 mr-2" />
+                      Steuerberater-Export (DATEV/BMD)
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -2592,6 +2603,13 @@ const Reports = () => {
         </FeatureGate>
         )}
       </div>
+
+      {/* Tax Export Dialog */}
+      <TaxExportDialog
+        open={taxExportOpen}
+        onOpenChange={setTaxExportOpen}
+        defaultBookingType="both"
+      />
     </DashboardLayout>
   );
 };

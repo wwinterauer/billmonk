@@ -39,7 +39,7 @@ export const PLAN_PRICES: Record<PlanType, { monthly: number; yearly: number }> 
   free: { monthly: 0, yearly: 0 },
   starter: { monthly: 1.99, yearly: 19.90 },
   pro: { monthly: 4.99, yearly: 47.90 },
-  business: { monthly: 9.99, yearly: 95.90 },
+  business: { monthly: 14.99, yearly: 143.90 },
 };
 
 // Minimum plan required per feature key
@@ -49,6 +49,7 @@ export const FEATURE_MIN_PLAN: Record<string, PlanType> = {
   emailImport: 'starter',
   cloudBackup: 'pro',
   invoiceModule: 'business',
+  taxExport: 'business',
 };
 
 // Human-readable feature descriptions for upgrade cards
@@ -58,6 +59,7 @@ export const FEATURE_DESCRIPTIONS: Record<string, { title: string; description: 
   emailImport: { title: 'E-Mail-Import', description: 'Empfange Belege automatisch per E-Mail und verarbeite sie.' },
   cloudBackup: { title: 'Cloud-Backup', description: 'Sichere deine Belege automatisch in der Cloud.' },
   invoiceModule: { title: 'Ausgangsrechnungen', description: 'Erstelle und verwalte Rechnungen, Kunden und Artikel.' },
+  taxExport: { title: 'Steuerberater-Export', description: 'Exportiere Buchungsdaten im DATEV- oder BMD-Format für deinen Steuerberater.' },
 };
 
 // Plan hierarchy for comparison

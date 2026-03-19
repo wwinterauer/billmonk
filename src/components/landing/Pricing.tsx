@@ -67,7 +67,9 @@ const plans: PlanInfo[] = [
     features: [
       `${PLAN_LIMITS.business.receiptsPerMonth} Belege/Monat`,
       'Alles aus Pro',
+      'Angebote, AB & Lieferscheine',
       'Rechnungsmodul',
+      'DATEV/BMD Export',
       'Dedicated Support',
     ],
     cta: 'Business wählen',

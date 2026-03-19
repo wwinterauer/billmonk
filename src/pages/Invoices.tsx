@@ -9,11 +9,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { FileText, Plus, MoreHorizontal, CheckCircle, Send, XCircle, Trash2, Euro, Clock, AlertTriangle, Download, Copy, GitBranch, ArrowRight, Receipt } from 'lucide-react';
+import { FileText, Plus, MoreHorizontal, CheckCircle, Send, XCircle, Trash2, Euro, Clock, AlertTriangle, Download, Copy, GitBranch, ArrowRight, Receipt, Landmark } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useInvoices, type Invoice } from '@/hooks/useInvoices';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { TaxExportDialog } from '@/components/exports/TaxExportDialog';
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Entwurf', variant: 'secondary' },
@@ -29,6 +30,7 @@ const Invoices = () => {
   const { invoices, loading, updateInvoiceStatus, deleteInvoice, copyInvoice, createCorrectionVersion, convertDocument, createPartialInvoice } = useInvoices();
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [taxExportOpen, setTaxExportOpen] = useState(false);
   const navigate = useNavigate();
 
   // Filter only invoices (not quotes/order_confirmations)
@@ -78,12 +80,18 @@ const Invoices = () => {
             <h1 className="text-2xl font-bold text-foreground">Rechnungen</h1>
             <p className="text-muted-foreground">Ausgangsrechnungen erstellen und verwalten</p>
           </div>
-          <Button asChild>
-            <Link to="/invoices/new">
-              <Plus className="h-4 w-4 mr-2" />
-              Neue Rechnung
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setTaxExportOpen(true)}>
+              <Landmark className="h-4 w-4 mr-2" />
+              Steuerberater-Export
+            </Button>
+            <Button asChild>
+              <Link to="/invoices/new">
+                <Plus className="h-4 w-4 mr-2" />
+                Neue Rechnung
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -275,6 +283,13 @@ const Invoices = () => {
         </Card>
       </div>
       </FeatureGate>
+
+      {/* Tax Export Dialog */}
+      <TaxExportDialog
+        open={taxExportOpen}
+        onOpenChange={setTaxExportOpen}
+        defaultBookingType="income"
+      />
     </DashboardLayout>
   );
 };
