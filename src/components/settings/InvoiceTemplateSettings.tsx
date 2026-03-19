@@ -1,13 +1,21 @@
 import { useState, useEffect } from 'react';
-import { Save, FileText, Building2 } from 'lucide-react';
+import { Save, FileText, Building2, Layout, Percent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useInvoiceSettings } from '@/hooks/useInvoiceSettings';
 import { Loader2 } from 'lucide-react';
+
+const LAYOUT_VARIANTS = [
+  { value: 'classic', label: 'Klassisch', description: 'Logo links, Empfänger rechts, Standard-Layout' },
+  { value: 'modern', label: 'Modern', description: 'Logo zentriert, farbige Akzente' },
+  { value: 'minimal', label: 'Minimal', description: 'Kein Logo-Header, sehr schlicht' },
+  { value: 'compact', label: 'Kompakt', description: 'Kompakte Tabelle, mehr auf eine Seite' },
+];
 
 export function InvoiceTemplateSettings() {
   const { settings, loading, saveSettings } = useInvoiceSettings();
@@ -18,9 +26,12 @@ export function InvoiceTemplateSettings() {
     default_payment_terms_days: 14,
     default_footer_text: '',
     default_notes: '',
-    bank_name: '',
-    iban: '',
-    bic: '',
+    default_discount_percent: 0,
+    default_discount_days: 0,
+    layout_variant: 'classic',
+    customer_number_prefix: 'KD',
+    customer_number_format: '{prefix}-{seq}',
+    next_customer_number: 1,
   });
   const [saving, setSaving] = useState(false);
 
@@ -33,9 +44,12 @@ export function InvoiceTemplateSettings() {
         default_payment_terms_days: settings.default_payment_terms_days || 14,
         default_footer_text: settings.default_footer_text || '',
         default_notes: settings.default_notes || '',
-        bank_name: settings.bank_name || '',
-        iban: settings.iban || '',
-        bic: settings.bic || '',
+        default_discount_percent: (settings as any).default_discount_percent || 0,
+        default_discount_days: (settings as any).default_discount_days || 0,
+        layout_variant: (settings as any).layout_variant || 'classic',
+        customer_number_prefix: (settings as any).customer_number_prefix || 'KD',
+        customer_number_format: (settings as any).customer_number_format || '{prefix}-{seq}',
+        next_customer_number: (settings as any).next_customer_number || 1,
       });
     }
   }, [settings]);
@@ -46,10 +60,14 @@ export function InvoiceTemplateSettings() {
     setSaving(false);
   };
 
-  const previewNumber = form.invoice_number_format
+  const previewInvoiceNumber = form.invoice_number_format
     .replace('{prefix}', form.invoice_number_prefix)
     .replace('{year}', new Date().getFullYear().toString())
     .replace('{seq}', String(form.next_sequence_number).padStart(4, '0'));
+
+  const previewCustomerNumber = form.customer_number_format
+    .replace('{prefix}', form.customer_number_prefix)
+    .replace('{seq}', String(form.next_customer_number).padStart(4, '0'));
 
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
@@ -63,12 +81,12 @@ export function InvoiceTemplateSettings() {
             </div>
             <div>
               <CardTitle>Rechnungsvorlage</CardTitle>
-              <CardDescription>Nummernformat, Bankdaten, Fußzeile</CardDescription>
+              <CardDescription>Nummernformat, Skonto, Layout, Fußzeile</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Number Format */}
+          {/* Invoice Number Format */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium">Rechnungsnummer</h3>
             <div className="grid grid-cols-3 gap-3">
@@ -76,31 +94,69 @@ export function InvoiceTemplateSettings() {
               <div><Label>Format</Label><Input value={form.invoice_number_format} onChange={e => setForm(f => ({ ...f, invoice_number_format: e.target.value }))} /></div>
               <div><Label>Nächste Nr.</Label><Input type="number" value={form.next_sequence_number} onChange={e => setForm(f => ({ ...f, next_sequence_number: parseInt(e.target.value) || 1 }))} /></div>
             </div>
-            <p className="text-xs text-muted-foreground">Vorschau: <span className="font-mono font-medium text-foreground">{previewNumber}</span></p>
+            <p className="text-xs text-muted-foreground">Vorschau: <span className="font-mono font-medium text-foreground">{previewInvoiceNumber}</span></p>
             <p className="text-xs text-muted-foreground">Platzhalter: {'{prefix}'}, {'{year}'}, {'{seq}'}</p>
           </div>
 
           <Separator />
 
-          {/* Payment Terms */}
+          {/* Customer Number Format */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium">Zahlungsbedingungen</h3>
-            <div className="max-w-xs">
-              <Label>Standard-Zahlungsziel (Tage)</Label>
-              <Input type="number" value={form.default_payment_terms_days} onChange={e => setForm(f => ({ ...f, default_payment_terms_days: parseInt(e.target.value) || 14 }))} />
+            <h3 className="text-sm font-medium flex items-center gap-2"><Building2 className="h-4 w-4" /> Kundennummernkreis</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div><Label>Präfix</Label><Input value={form.customer_number_prefix} onChange={e => setForm(f => ({ ...f, customer_number_prefix: e.target.value }))} /></div>
+              <div><Label>Format</Label><Input value={form.customer_number_format} onChange={e => setForm(f => ({ ...f, customer_number_format: e.target.value }))} /></div>
+              <div><Label>Nächste Nr.</Label><Input type="number" value={form.next_customer_number} onChange={e => setForm(f => ({ ...f, next_customer_number: parseInt(e.target.value) || 1 }))} /></div>
             </div>
+            <p className="text-xs text-muted-foreground">Vorschau: <span className="font-mono font-medium text-foreground">{previewCustomerNumber}</span></p>
           </div>
 
           <Separator />
 
-          {/* Bank Details */}
+          {/* Payment Terms + Discount */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium flex items-center gap-2"><Building2 className="h-4 w-4" /> Bankdaten</h3>
+            <h3 className="text-sm font-medium flex items-center gap-2"><Percent className="h-4 w-4" /> Zahlungsbedingungen & Skonto</h3>
             <div className="grid grid-cols-3 gap-3">
-              <div><Label>Bank</Label><Input value={form.bank_name} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))} /></div>
-              <div><Label>IBAN</Label><Input value={form.iban} onChange={e => setForm(f => ({ ...f, iban: e.target.value }))} /></div>
-              <div><Label>BIC</Label><Input value={form.bic} onChange={e => setForm(f => ({ ...f, bic: e.target.value }))} /></div>
+              <div>
+                <Label>Zahlungsziel (Tage)</Label>
+                <Input type="number" value={form.default_payment_terms_days} onChange={e => setForm(f => ({ ...f, default_payment_terms_days: parseInt(e.target.value) || 14 }))} />
+              </div>
+              <div>
+                <Label>Skonto %</Label>
+                <Input type="number" step="0.5" min="0" value={form.default_discount_percent} onChange={e => setForm(f => ({ ...f, default_discount_percent: parseFloat(e.target.value) || 0 }))} />
+              </div>
+              <div>
+                <Label>Skonto-Frist (Tage)</Label>
+                <Input type="number" min="0" value={form.default_discount_days} onChange={e => setForm(f => ({ ...f, default_discount_days: parseInt(e.target.value) || 0 }))} />
+              </div>
             </div>
+            {form.default_discount_percent > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Hinweis: Bei Zahlung innerhalb von {form.default_discount_days} Tagen gewähren Sie {form.default_discount_percent}% Skonto.
+              </p>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Layout Variant */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium flex items-center gap-2"><Layout className="h-4 w-4" /> Layout-Variante</h3>
+            <Select value={form.layout_variant} onValueChange={v => setForm(f => ({ ...f, layout_variant: v }))}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LAYOUT_VARIANTS.map(lv => (
+                  <SelectItem key={lv.value} value={lv.value}>
+                    <div>
+                      <span className="font-medium">{lv.label}</span>
+                      <span className="text-muted-foreground ml-2 text-xs">– {lv.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <Separator />
