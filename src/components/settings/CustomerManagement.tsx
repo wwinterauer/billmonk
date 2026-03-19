@@ -32,6 +32,9 @@ const EMPTY_FORM = {
   shipping_zip: '',
   shipping_city: '',
   shipping_country: 'AT',
+  default_discount_percent: 0,
+  default_skonto_percent: 0,
+  default_skonto_days: 0,
 };
 
 export function CustomerManagement() {
