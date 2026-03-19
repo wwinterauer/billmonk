@@ -23,7 +23,7 @@ const SAMPLE_ITEMS = [
   { description: 'Hosting (Jahrespaket)', qty: 1, unit: 'Stk', price: 180 },
 ];
 
-export function InvoiceLayoutPreview({ layoutVariant, companySettings, invoiceNumber, footerText, logoUrl }: Props) {
+export function InvoiceLayoutPreview({ layoutVariant, companySettings, invoiceNumber, footerText, logoUrl, documentTitle = 'Rechnung' }: Props) {
   const company = {
     name: companySettings?.company_name || 'Meine Firma GmbH',
     street: companySettings?.street || 'Beispielgasse 1',
