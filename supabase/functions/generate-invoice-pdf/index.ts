@@ -265,6 +265,30 @@ Deno.serve(async (req) => {
     let currentGroupName: string | null = null;
     let groupSubtotal = 0;
 
+    // Pre-load item images
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const imageCache: Record<string, any> = {};
+    for (const item of items) {
+      const imgPath = (item as any).image_path;
+      if (imgPath && !imageCache[imgPath]) {
+        try {
+          const { data: imgData } = await adminClient.storage
+            .from("item-images")
+            .download(imgPath);
+          if (imgData) {
+            const imgBytes = new Uint8Array(await imgData.arrayBuffer());
+            const isPng = imgPath.toLowerCase().endsWith(".png");
+            imageCache[imgPath] = isPng
+              ? await pdfDoc.embedPng(imgBytes)
+              : await pdfDoc.embedJpg(imgBytes);
+          }
+        } catch (e) {
+          console.error("Item image embed error:", e);
+        }
+      }
+    }
+
     for (let i = 0; i < items.length; i++) {
       const item = items[i] as any;
 
@@ -298,15 +322,34 @@ Deno.serve(async (req) => {
       const lineNet = (item.quantity || 1) * (item.unit_price || 0);
       if (currentGroupName) groupSubtotal += lineNet;
 
+      // Check if this item has an image
+      const itemImage = item.image_path ? imageCache[item.image_path] : null;
+      const rowHeight = itemImage ? 34 : 14;
+
       const desc = (item.description || "").substring(0, 45);
-      drawText(String(posCounter), colX.pos, y, { size: 8 });
-      drawText(desc, colX.desc, y, { size: 8 });
-      drawText(fmtNum(item.quantity || 1), colX.qty, y, { size: 8 });
-      drawText(item.unit || "Stk", colX.unit, y, { size: 8 });
-      drawText(fmtNum(item.unit_price || 0), colX.price, y, { size: 8 });
-      if (showVat) drawText(`${fmtNum(item.vat_rate || 0)} %`, colX.vat, y, { size: 8 });
-      drawText(fmtNum(lineNet), colX.total, y, { size: 8 });
-      y -= 14;
+      const textY = itemImage ? y - 10 : y; // Center text vertically if image present
+
+      drawText(String(posCounter), colX.pos, textY, { size: 8 });
+
+      if (itemImage) {
+        const imgDims = itemImage.scaleToFit(28, 28);
+        page.drawImage(itemImage, {
+          x: colX.desc,
+          y: y - imgDims.height + 4,
+          width: imgDims.width,
+          height: imgDims.height,
+        });
+        drawText(desc, colX.desc + 32, textY, { size: 8 });
+      } else {
+        drawText(desc, colX.desc, textY, { size: 8 });
+      }
+
+      drawText(fmtNum(item.quantity || 1), colX.qty, textY, { size: 8 });
+      drawText(item.unit || "Stk", colX.unit, textY, { size: 8 });
+      drawText(fmtNum(item.unit_price || 0), colX.price, textY, { size: 8 });
+      if (showVat) drawText(`${fmtNum(item.vat_rate || 0)} %`, colX.vat, textY, { size: 8 });
+      drawText(fmtNum(lineNet), colX.total, textY, { size: 8 });
+      y -= rowHeight;
     }
 
     // Final group subtotal
