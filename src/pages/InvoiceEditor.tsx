@@ -493,9 +493,29 @@ const InvoiceEditor = () => {
                     <SelectValue placeholder="Aus Vorlage…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {articleTemplates.filter(a => a.is_active).map(a => (
-                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                    ))}
+                    {(() => {
+                      const active = articleTemplates.filter(a => a.is_active);
+                      const grouped = itemGroups.map(g => ({
+                        name: g.name,
+                        items: active.filter(a => a.item_group_id === g.id),
+                      })).filter(g => g.items.length > 0);
+                      const ungrouped = active.filter(a => !a.item_group_id);
+                      return (
+                        <>
+                          {grouped.map(g => (
+                            <div key={g.name}>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{g.name}</div>
+                              {g.items.map(a => (
+                                <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                              ))}
+                            </div>
+                          ))}
+                          {ungrouped.map(a => (
+                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          ))}
+                        </>
+                      );
+                    })()}
                   </SelectContent>
                 </Select>
               )}
