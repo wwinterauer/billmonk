@@ -1,22 +1,38 @@
 
 
-## Plan: Einnahmen-Ansicht Fix und FeatureGate-Vorschau
+# Gesamtplan: User-Strecke, Stripe-Bezahlung, Admin & Kontingent
 
-### Problem
-1. **Daten-Query blockiert**: Die Invoices-Query hat `enabled: ... && showIncome` (Zeile 191). Wenn `usePlan()` initial noch `loading` ist, wird `effectivePlan` auf `'free'` gesetzt, `showIncome` ist `false`, und die Query wird nie aktiviert. Selbst nach Plan-Update kann es zu Race Conditions kommen.
-2. **Vorschau fehlt**: Für Nicht-Business-Nutzer sollte die FeatureGate eine echte Vorschau (mit echten Daten, aber nicht interaktiv) zeigen. Aktuell werden die Daten gar nicht geladen wenn `showIncome = false`.
+## Status: Phase 1-6 implementiert ✅, Phase 9 vollständig ✅, Integration vollständig ✅
 
-### Lösung in `src/pages/Reports.tsx`
+### Umgesetzte Phasen:
+- ✅ Phase 1: DB-Migration (profiles erweitert, user_roles, has_role(), reset_monthly_credits())
+- ✅ Phase 2: Admin-Rolle für w.winterauer@gmail.com gesetzt (Business-Plan)
+- ✅ Phase 3: planConfig.ts + usePlan.ts erstellt
+- ✅ Phase 4: Onboarding-Wizard (3 Steps) + ProtectedRoute mit Onboarding-Check
+- ✅ Phase 5: Sidebar mit Kontingent-Balken, Admin-Plan-Switcher, Feature-Gating
+- ✅ Phase 6: Stripe-Integration komplett
+- ✅ Phase 9: Rechnungsmodul komplett
 
-1. **`showIncome`-Gate von der Query entfernen**: Die Invoices-Query soll IMMER Daten laden (unabhängig vom Plan). So kann die FeatureGate-Vorschau echte Daten anzeigen.
-   - Zeile 191: `enabled: !!user && !!dateRange.from && !!dateRange.to` (ohne `&& showIncome`)
+### Rechnungs-Integration (alle implementiert):
+- ✅ DB: invoices.category, invoice_tags + RLS, export_templates.template_type, cloud_connections.backup_include_invoices
+- ✅ InvoiceEditor: Kategorie-Dropdown + InvoiceTagSelector
+- ✅ Invoices-Liste: Kategorie-Spalte
+- ✅ Dashboard: Einnahmen-KPIs (Einnahmen, Offene Rechnungen, Gewinn/Verlust) in FeatureGate
+- ✅ Reports: Einnahmen-Analyse (KPIs, nach Kunde, nach Kategorie, Gewinn/Verlust) in FeatureGate
+- ✅ Export-Vorlagen: Typ-Umschalter (Belege/Rechnungen) + DEFAULT_INVOICE_COLUMNS + template_type Filter
+- ✅ Cloud-Backup: backup_include_invoices Flag + backup-to-drive lädt Rechnungen + PDFs in eigenen Ordner
 
-2. **FeatureGate bleibt**: Der FeatureGate-Wrapper um den Income-Content (Zeile 2021) bleibt bestehen. Für Business-Nutzer wird er transparent durchgereicht, für andere zeigt er die verschwommene Vorschau mit Upgrade-Overlay.
+### Offene Phasen:
+- ⬜ Phase 7: Landing Page Pricing Update (4 Pläne, monatlich/jährlich Toggle)
+- ⬜ Phase 8: Plan-Enforcement (Upload-Limits durchsetzen)
 
-3. **`incomeStats`-Memo**: Ebenfalls die `showIncome`-Abhängigkeit entfernen, damit die Daten immer berechnet werden (für die Vorschau).
+---
 
-### Betroffene Änderungen
-- Zeile 191: `showIncome` aus `enabled` entfernen
-- Ggf. `showIncome`-Variable komplett entfernen (wird nicht mehr benötigt, da FeatureGate die Gating-Logik übernimmt)
-- Die Vorjahres-Invoices-Query ebenfalls von `showIncome` befreien (falls vorhanden)
+## Bestehende Bugs
 
+| Priorität | Problem | Dateien | Aufwand |
+|-----------|---------|---------|--------|
+| ✅ BEHOBEN | 4x `parseFloat \|\| null` Bug | `ReceiptDetailPanel.tsx` | 4 Zeilen |
+| ✅ BEHOBEN | CorrectionTracking originalVatRate | `useCorrectionTracking.ts` | 1 Zeile |
+| MITTEL | Tote Links `/forgot-password`, `/agb` | `Login.tsx`, `Register.tsx` | 2-50 Zeilen |
+| MITTEL | Badge ohne forwardRef | `badge.tsx` | 5 Zeilen |
