@@ -233,12 +233,21 @@ export function useInvoices() {
             .eq('id', quoteSettings.id);
         }
       } else if (docType === 'invoice' || docType === 'order_confirmation' || docType === 'delivery_note') {
-        const { data: currentSettings } = await supabase
+        let { data: currentSettings } = await supabase
           .from('invoice_settings')
           .select('id, next_sequence_number')
           .eq('user_id', user.id)
           .maybeSingle();
-        if (currentSettings) {
+        
+        // Auto-create invoice_settings if missing
+        if (!currentSettings) {
+          const { data: newSettings } = await supabase
+            .from('invoice_settings')
+            .insert({ user_id: user.id, next_sequence_number: 2 } as any)
+            .select('id, next_sequence_number')
+            .single();
+          currentSettings = newSettings;
+        } else {
           await supabase
             .from('invoice_settings')
             .update({ next_sequence_number: (currentSettings.next_sequence_number || 1) + 1 } as any)
@@ -247,13 +256,21 @@ export function useInvoices() {
       }
     } catch {}
 
+    const subtypeLabelMap: Record<string, string> = {
+      deposit: 'Anzahlungsrechnung',
+      partial: 'Teilrechnung',
+      final: 'Schlussrechnung',
+    };
     const docLabelMap: Record<string, string> = {
       quote: 'Angebot',
       order_confirmation: 'Auftragsbestätigung',
       delivery_note: 'Lieferschein',
       invoice: 'Rechnung',
     };
-    const docLabel = docLabelMap[invoice.document_type || 'invoice'] || 'Rechnung';
+    const subtype = invoice.invoice_subtype;
+    const docLabel = (subtype && subtype !== 'normal' && subtypeLabelMap[subtype])
+      ? subtypeLabelMap[subtype]
+      : docLabelMap[invoice.document_type || 'invoice'] || 'Rechnung';
     toast({ title: `${docLabel} erstellt` });
     await fetchInvoices();
     return typedInv;
@@ -416,11 +433,20 @@ export function useInvoices() {
   const convertDocument = async (sourceId: string, targetType: 'order_confirmation' | 'invoice' | 'delivery_note') => {
     if (!user) return null;
 
-    const { data: settings } = await supabase
+    let { data: settings } = await supabase
       .from('invoice_settings')
       .select('*')
       .eq('user_id', user.id)
       .maybeSingle();
+
+    if (!settings) {
+      const { data: newSettings } = await supabase
+        .from('invoice_settings')
+        .insert({ user_id: user.id, next_sequence_number: 1 } as any)
+        .select('*')
+        .single();
+      settings = newSettings;
+    }
 
     const prefixMap: Record<string, string> = {
       quote: settings?.invoice_number_prefix || 'AG',
@@ -481,11 +507,21 @@ export function useInvoices() {
       show_group_subtotal: li.show_group_subtotal || false,
     }));
 
-    const { data: settings } = await supabase
+    let { data: settings } = await supabase
       .from('invoice_settings')
       .select('*')
       .eq('user_id', user.id)
       .maybeSingle();
+
+    // Auto-create invoice_settings if missing
+    if (!settings) {
+      const { data: newSettings } = await supabase
+        .from('invoice_settings')
+        .insert({ user_id: user.id, next_sequence_number: 1 } as any)
+        .select('*')
+        .single();
+      settings = newSettings;
+    }
 
     const prefix = settings?.invoice_number_prefix || 'RE';
     const seq = settings?.next_sequence_number || 1;
