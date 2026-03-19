@@ -2119,13 +2119,17 @@ const Reports = () => {
             </div>
 
             {/* Income Category Charts */}
-            {incomeStats.byCategory.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <Card className="border-border/50">
                   <CardHeader>
                     <CardTitle className="text-lg">Einnahmen nach Kategorie</CardTitle>
                   </CardHeader>
                   <CardContent>
+                    {incomeStats.byCategory.length === 0 ? (
+                      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                        Keine Daten für den gewählten Zeitraum
+                      </div>
+                    ) : (
                     <div className="h-[300px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -2150,6 +2154,7 @@ const Reports = () => {
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -2158,6 +2163,11 @@ const Reports = () => {
                     <CardTitle className="text-lg">Top Kategorien</CardTitle>
                   </CardHeader>
                   <CardContent>
+                    {incomeStats.byCategory.length === 0 ? (
+                      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                        Keine Daten für den gewählten Zeitraum
+                      </div>
+                    ) : (
                     <div className="h-[300px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={incomeStats.byCategory.slice(0, 5)} layout="vertical">
@@ -2173,18 +2183,22 @@ const Reports = () => {
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
-            )}
 
             {/* Income Category Detail Table */}
-            {incomeStats.byCategory.length > 0 && (
-              <Card className="border-border/50 mb-6">
+            <Card className="border-border/50 mb-6">
                 <CardHeader>
                   <CardTitle className="text-lg">Detailübersicht nach Kategorie</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {incomeStats.byCategory.length === 0 ? (
+                    <div className="py-8 text-center text-muted-foreground">
+                      Keine Daten für den gewählten Zeitraum
+                    </div>
+                  ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2226,9 +2240,9 @@ const Reports = () => {
                       </TableRow>
                     </TableFooter>
                   </Table>
+                  )}
                 </CardContent>
               </Card>
-            )}
 
             {/* Income Tags Table */}
             <Card className="border-border/50 mb-6">
@@ -2291,8 +2305,7 @@ const Reports = () => {
             </Card>
 
             {/* USt-Übersicht (Umsatzsteuer) */}
-            {incomeStats.byVatRate.length > 0 && (
-              <Card className="border-border/50 mb-6">
+            <Card className="border-border/50 mb-6">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Percent className="h-5 w-5" />
@@ -2301,6 +2314,12 @@ const Reports = () => {
                   <CardDescription>Aufschlüsselung nach effektivem Steuersatz</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {incomeStats.byVatRate.length === 0 ? (
+                    <div className="py-8 text-center text-muted-foreground">
+                      Keine Daten für den gewählten Zeitraum
+                    </div>
+                  ) : (
+                  <>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2332,17 +2351,40 @@ const Reports = () => {
                       </TableRow>
                     </TableFooter>
                   </Table>
+
+                  {/* USt Note */}
+                  <div className="mt-4 p-3 bg-blue-500/10 rounded-lg flex items-start gap-2">
+                    <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-blue-600 dark:text-blue-400">
+                      Die Umsatzsteuer von{' '}
+                      <strong>{formatCurrency(incomeStats.totalVat)}</strong> muss in
+                      der UVA für den Zeitraum{' '}
+                      {dateRange.from
+                        ? format(dateRange.from, 'dd.MM.yyyy', { locale: de })
+                        : ''}{' '}
+                      -{' '}
+                      {dateRange.to
+                        ? format(dateRange.to, 'dd.MM.yyyy', { locale: de })
+                        : ''}{' '}
+                      abgeführt werden.
+                    </p>
+                  </div>
+                  </>
+                  )}
                 </CardContent>
               </Card>
-            )}
 
             {/* Income Time Series */}
-            {incomeStats.timeSeries.length > 0 && (
-              <Card className="border-border/50 mb-6">
+            <Card className="border-border/50 mb-6">
                 <CardHeader>
                   <CardTitle className="text-lg">Einnahmen im Zeitverlauf</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {incomeStats.timeSeries.length === 0 ? (
+                    <div className="h-[350px] flex items-center justify-center text-muted-foreground">
+                      Keine Daten für den gewählten Zeitraum
+                    </div>
+                  ) : (
                   <div className="h-[350px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={incomeStats.timeSeries}>
@@ -2363,9 +2405,61 @@ const Reports = () => {
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
+                  )}
                 </CardContent>
               </Card>
-            )}
+
+            {/* Income Trend Indicators */}
+            {incomeStats.timeSeries.length > 1 && (() => {
+              const highestIncome = incomeStats.timeSeries.reduce((max, item) => item.amount > max.amount ? item : max, incomeStats.timeSeries[0]);
+              const lowestIncome = incomeStats.timeSeries.reduce((min, item) => item.amount < min.amount ? item : min, incomeStats.timeSeries[0]);
+              const avgIncome = incomeStats.timeSeries.reduce((sum, item) => sum + item.amount, 0) / incomeStats.timeSeries.length;
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <Card className="border-border/50">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-success/10 rounded-lg">
+                          <TrendingUp className="w-5 h-5 text-success" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Höchste Einnahmen</p>
+                          <p className="font-semibold text-foreground">{highestIncome.label}</p>
+                          <p className="text-lg font-bold text-success">{formatCurrency(highestIncome.amount)}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-border/50">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-destructive/10 rounded-lg">
+                          <TrendingDown className="w-5 h-5 text-destructive" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Niedrigste Einnahmen</p>
+                          <p className="font-semibold text-foreground">{lowestIncome.label}</p>
+                          <p className="text-lg font-bold text-destructive">{formatCurrency(lowestIncome.amount)}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-border/50">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-500/10 rounded-lg">
+                          <Activity className="w-5 h-5 text-blue-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Monatsdurchschnitt</p>
+                          <p className="text-lg font-bold text-foreground">{formatCurrency(avgIncome)}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })()}
 
             {/* Income Monthly Comparison */}
             {periodType === 'year' && (
@@ -2399,8 +2493,7 @@ const Reports = () => {
             )}
 
             {/* Top 10 Customers Bar Chart */}
-            {incomeStats.byCustomer.length > 0 && (
-              <Card className="border-border/50 mb-6">
+            <Card className="border-border/50 mb-6">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Users className="h-5 w-5" />
@@ -2408,6 +2501,11 @@ const Reports = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {incomeStats.byCustomer.length === 0 ? (
+                    <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+                      Keine Daten für den gewählten Zeitraum
+                    </div>
+                  ) : (
                   <div className="h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={incomeStats.byCustomer.slice(0, 10)} layout="vertical">
@@ -2419,9 +2517,9 @@ const Reports = () => {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
+                  )}
                 </CardContent>
               </Card>
-            )}
 
             {/* All Customers Table with Search */}
             <Card className="border-border/50 mb-6">
