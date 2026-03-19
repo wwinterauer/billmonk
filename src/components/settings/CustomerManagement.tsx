@@ -5,9 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
 import { useCustomers, Customer } from '@/hooks/useCustomers';
+import { useInvoiceSettings } from '@/hooks/useInvoiceSettings';
 import { Loader2 } from 'lucide-react';
 
 const EMPTY_FORM = {
@@ -24,10 +27,16 @@ const EMPTY_FORM = {
   customer_number: '',
   payment_terms_days: 14,
   notes: '',
+  has_different_shipping_address: false,
+  shipping_street: '',
+  shipping_zip: '',
+  shipping_city: '',
+  shipping_country: 'AT',
 };
 
 export function CustomerManagement() {
   const { customers, loading, addCustomer, updateCustomer, deleteCustomer } = useCustomers();
+  const { settings: invoiceSettings } = useInvoiceSettings();
   const [search, setSearch] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -42,9 +51,21 @@ export function CustomerManagement() {
     return !q || c.display_name.toLowerCase().includes(q) || c.company_name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q);
   });
 
+  const generateCustomerNumber = (): string => {
+    const prefix = invoiceSettings?.customer_number_prefix || 'KD';
+    const seq = invoiceSettings?.next_customer_number || 1;
+    const format = invoiceSettings?.customer_number_format || '{prefix}-{seq}';
+    return format
+      .replace('{prefix}', prefix)
+      .replace('{seq}', String(seq).padStart(4, '0'));
+  };
+
   const openCreate = () => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({
+      ...EMPTY_FORM,
+      customer_number: generateCustomerNumber(),
+    });
     setDialogOpen(true);
   };
 
@@ -64,16 +85,28 @@ export function CustomerManagement() {
       customer_number: c.customer_number || '',
       payment_terms_days: c.payment_terms_days || 14,
       notes: c.notes || '',
+      has_different_shipping_address: c.has_different_shipping_address || false,
+      shipping_street: c.shipping_street || '',
+      shipping_zip: c.shipping_zip || '',
+      shipping_city: c.shipping_city || '',
+      shipping_country: c.shipping_country || 'AT',
     });
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
     if (!form.display_name.trim()) return;
+    const payload: any = { ...form };
+    if (!payload.has_different_shipping_address) {
+      payload.shipping_street = null;
+      payload.shipping_zip = null;
+      payload.shipping_city = null;
+      payload.shipping_country = null;
+    }
     if (editingId) {
-      await updateCustomer(editingId, form as any);
+      await updateCustomer(editingId, payload);
     } else {
-      await addCustomer(form as any);
+      await addCustomer(payload);
     }
     setDialogOpen(false);
   };
@@ -129,6 +162,7 @@ export function CustomerManagement() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium truncate">{c.display_name}</span>
+                      {c.customer_number && <Badge variant="outline" className="text-xs">{c.customer_number}</Badge>}
                       {c.company_name && <Badge variant="secondary" className="text-xs">{c.company_name}</Badge>}
                       {c.is_archived && <Badge variant="outline" className="text-xs">Archiviert</Badge>}
                     </div>
@@ -169,18 +203,46 @@ export function CustomerManagement() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Kontaktperson</Label><Input value={form.contact_person} onChange={e => setForm(f => ({ ...f, contact_person: e.target.value }))} /></div>
-              <div><Label>Kundennummer</Label><Input value={form.customer_number} onChange={e => setForm(f => ({ ...f, customer_number: e.target.value }))} /></div>
+              <div><Label>Kundennummer</Label><Input value={form.customer_number} onChange={e => setForm(f => ({ ...f, customer_number: e.target.value }))} placeholder="Wird automatisch generiert" /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>E-Mail</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
               <div><Label>Telefon</Label><Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
             </div>
+
+            <Separator />
+            <p className="text-sm font-medium text-muted-foreground">Rechnungsanschrift</p>
+
             <div><Label>Straße</Label><Input value={form.street} onChange={e => setForm(f => ({ ...f, street: e.target.value }))} /></div>
             <div className="grid grid-cols-3 gap-3">
               <div><Label>PLZ</Label><Input value={form.zip} onChange={e => setForm(f => ({ ...f, zip: e.target.value }))} /></div>
               <div><Label>Stadt</Label><Input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} /></div>
               <div><Label>Land</Label><Input value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))} /></div>
             </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="different-shipping"
+                checked={form.has_different_shipping_address}
+                onCheckedChange={(checked) => setForm(f => ({ ...f, has_different_shipping_address: !!checked }))}
+              />
+              <Label htmlFor="different-shipping" className="cursor-pointer">Abweichende Lieferanschrift</Label>
+            </div>
+
+            {form.has_different_shipping_address && (
+              <>
+                <p className="text-sm font-medium text-muted-foreground">Lieferanschrift</p>
+                <div><Label>Straße</Label><Input value={form.shipping_street} onChange={e => setForm(f => ({ ...f, shipping_street: e.target.value }))} /></div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div><Label>PLZ</Label><Input value={form.shipping_zip} onChange={e => setForm(f => ({ ...f, shipping_zip: e.target.value }))} /></div>
+                  <div><Label>Stadt</Label><Input value={form.shipping_city} onChange={e => setForm(f => ({ ...f, shipping_city: e.target.value }))} /></div>
+                  <div><Label>Land</Label><Input value={form.shipping_country} onChange={e => setForm(f => ({ ...f, shipping_country: e.target.value }))} /></div>
+                </div>
+              </>
+            )}
+
+            <Separator />
+
             <div className="grid grid-cols-2 gap-3">
               <div><Label>UID-Nummer</Label><Input value={form.uid_number} onChange={e => setForm(f => ({ ...f, uid_number: e.target.value }))} /></div>
               <div><Label>Zahlungsziel (Tage)</Label><Input type="number" value={form.payment_terms_days} onChange={e => setForm(f => ({ ...f, payment_terms_days: parseInt(e.target.value) || 14 }))} /></div>

@@ -20,6 +20,12 @@ export interface InvoiceSettings {
   send_copy_to_self: boolean | null;
   overdue_reminder_enabled: boolean | null;
   overdue_reminder_days: number | null;
+  default_discount_percent: number | null;
+  default_discount_days: number | null;
+  layout_variant: string | null;
+  customer_number_prefix: string | null;
+  customer_number_format: string | null;
+  next_customer_number: number | null;
   created_at: string | null;
   updated_at: string | null;
 }
