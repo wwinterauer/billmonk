@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Archive, Search, Building2, Mail, Phone, MapPin } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, Search, Building2, Mail, Phone, MapPin, Save, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,13 +36,40 @@ const EMPTY_FORM = {
 
 export function CustomerManagement() {
   const { customers, loading, addCustomer, updateCustomer, deleteCustomer } = useCustomers();
-  const { settings: invoiceSettings } = useInvoiceSettings();
+  const { settings: invoiceSettings, saveSettings } = useInvoiceSettings();
   const [search, setSearch] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [customerNumberPrefix, setCustomerNumberPrefix] = useState('KD');
+  const [customerNumberFormat, setCustomerNumberFormat] = useState('{prefix}-{seq}');
+  const [nextCustomerNumber, setNextCustomerNumber] = useState(1);
+  const [savingNumberSettings, setSavingNumberSettings] = useState(false);
+  const [numberSettingsLoaded, setNumberSettingsLoaded] = useState(false);
+
+  // Sync number settings from invoiceSettings
+  if (invoiceSettings && !numberSettingsLoaded) {
+    setCustomerNumberPrefix((invoiceSettings as any).customer_number_prefix || 'KD');
+    setCustomerNumberFormat((invoiceSettings as any).customer_number_format || '{prefix}-{seq}');
+    setNextCustomerNumber((invoiceSettings as any).next_customer_number || 1);
+    setNumberSettingsLoaded(true);
+  }
+
+  const previewCustomerNumber = customerNumberFormat
+    .replace('{prefix}', customerNumberPrefix)
+    .replace('{seq}', String(nextCustomerNumber).padStart(4, '0'));
+
+  const handleSaveNumberSettings = async () => {
+    setSavingNumberSettings(true);
+    await saveSettings({
+      customer_number_prefix: customerNumberPrefix,
+      customer_number_format: customerNumberFormat,
+      next_customer_number: nextCustomerNumber,
+    } as any);
+    setSavingNumberSettings(false);
+  };
 
   const filtered = customers.filter(c => {
     if (!showArchived && c.is_archived) return false;
@@ -126,6 +153,35 @@ export function CustomerManagement() {
 
   return (
     <div className="space-y-4">
+      {/* Kundennummernkreis */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Hash className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Kundennummernkreis</CardTitle>
+              <CardDescription>Format und Zähler für automatische Kundennummern</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div><Label>Präfix</Label><Input value={customerNumberPrefix} onChange={e => setCustomerNumberPrefix(e.target.value)} /></div>
+            <div><Label>Format</Label><Input value={customerNumberFormat} onChange={e => setCustomerNumberFormat(e.target.value)} /></div>
+            <div><Label>Nächste Nr.</Label><Input type="number" value={nextCustomerNumber} onChange={e => setNextCustomerNumber(parseInt(e.target.value) || 1)} /></div>
+          </div>
+          <p className="text-xs text-muted-foreground">Vorschau: <span className="font-mono font-medium text-foreground">{previewCustomerNumber}</span></p>
+          <p className="text-xs text-muted-foreground">Platzhalter: {'{prefix}'}, {'{seq}'}</p>
+          <Button size="sm" onClick={handleSaveNumberSettings} disabled={savingNumberSettings}>
+            {savingNumberSettings ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+            Speichern
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Kundenliste */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">

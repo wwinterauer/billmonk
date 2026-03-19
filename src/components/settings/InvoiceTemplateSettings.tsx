@@ -29,9 +29,6 @@ export function InvoiceTemplateSettings() {
     default_discount_percent: 0,
     default_discount_days: 0,
     layout_variant: 'classic',
-    customer_number_prefix: 'KD',
-    customer_number_format: '{prefix}-{seq}',
-    next_customer_number: 1,
   });
   const [saving, setSaving] = useState(false);
 
@@ -47,9 +44,6 @@ export function InvoiceTemplateSettings() {
         default_discount_percent: (settings as any).default_discount_percent || 0,
         default_discount_days: (settings as any).default_discount_days || 0,
         layout_variant: (settings as any).layout_variant || 'classic',
-        customer_number_prefix: (settings as any).customer_number_prefix || 'KD',
-        customer_number_format: (settings as any).customer_number_format || '{prefix}-{seq}',
-        next_customer_number: (settings as any).next_customer_number || 1,
       });
     }
   }, [settings]);
@@ -65,9 +59,6 @@ export function InvoiceTemplateSettings() {
     .replace('{year}', new Date().getFullYear().toString())
     .replace('{seq}', String(form.next_sequence_number).padStart(4, '0'));
 
-  const previewCustomerNumber = form.customer_number_format
-    .replace('{prefix}', form.customer_number_prefix)
-    .replace('{seq}', String(form.next_customer_number).padStart(4, '0'));
 
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
@@ -98,20 +89,8 @@ export function InvoiceTemplateSettings() {
             <p className="text-xs text-muted-foreground">Platzhalter: {'{prefix}'}, {'{year}'}, {'{seq}'}</p>
           </div>
 
-          <Separator />
 
-          {/* Customer Number Format */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium flex items-center gap-2"><Building2 className="h-4 w-4" /> Kundennummernkreis</h3>
-            <div className="grid grid-cols-3 gap-3">
-              <div><Label>Präfix</Label><Input value={form.customer_number_prefix} onChange={e => setForm(f => ({ ...f, customer_number_prefix: e.target.value }))} /></div>
-              <div><Label>Format</Label><Input value={form.customer_number_format} onChange={e => setForm(f => ({ ...f, customer_number_format: e.target.value }))} /></div>
-              <div><Label>Nächste Nr.</Label><Input type="number" value={form.next_customer_number} onChange={e => setForm(f => ({ ...f, next_customer_number: parseInt(e.target.value) || 1 }))} /></div>
-            </div>
-            <p className="text-xs text-muted-foreground">Vorschau: <span className="font-mono font-medium text-foreground">{previewCustomerNumber}</span></p>
-          </div>
 
-          <Separator />
 
           {/* Payment Terms + Discount */}
           <div className="space-y-3">
