@@ -1047,6 +1047,15 @@ const Settings = () => {
         </FeatureGate>
       </TabsContent>
 
+      {/* Live Bank Connection Tab */}
+      <TabsContent value="bank-live">
+        <FeatureGate feature="liveBankConnection">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <LiveBankSettings />
+        </motion.div>
+        </FeatureGate>
+      </TabsContent>
+
 
     </Tabs>
       </div>
