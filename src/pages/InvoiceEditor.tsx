@@ -393,10 +393,37 @@ const InvoiceEditor = () => {
               </Select>
             </div>
 
-            {savedInvoiceId && (
+            {savedInvoiceId ? (
               <div className="space-y-2 md:col-span-2">
                 <Label>Tags</Label>
                 <InvoiceTagSelector invoiceId={savedInvoiceId} size="sm" />
+              </div>
+            ) : activeTags.length > 0 && (
+              <div className="space-y-2 md:col-span-2">
+                <Label>Tags</Label>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {activeTags.map(tag => {
+                    const isSelected = selectedTagIds.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => setSelectedTagIds(prev =>
+                          isSelected ? prev.filter(id => id !== tag.id) : [...prev, tag.id]
+                        )}
+                        className="inline-flex items-center rounded-full text-sm px-2.5 py-1 gap-1.5 font-medium transition-all duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 border"
+                        style={{
+                          backgroundColor: isSelected ? tag.color : 'transparent',
+                          borderColor: !isSelected ? tag.color : 'transparent',
+                          color: isSelected ? 'white' : tag.color,
+                        }}
+                      >
+                        {isSelected && <Check className="h-3.5 w-3.5 flex-shrink-0" />}
+                        <span className="truncate max-w-[120px]">{tag.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </CardContent>
