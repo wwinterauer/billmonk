@@ -45,6 +45,8 @@ export function usePlan(): PlanData {
       setPlan((data.plan as PlanType) || 'free');
       setReceiptsUsed(data.monthly_receipt_count || 0);
       setReceiptsCredit(data.receipt_credit || 0);
+      setDocumentsUsed((data as any).monthly_document_count || 0);
+      setDocumentsCredit((data as any).document_credit || 0);
       setAdminViewPlanState((data.admin_view_plan as PlanType) || null);
     }
   }, [user]);
