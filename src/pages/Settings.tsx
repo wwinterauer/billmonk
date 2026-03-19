@@ -441,6 +441,7 @@ const Settings = () => {
     { value: 'export', icon: Table2, label: 'Export' },
     { value: 'ai-learning', icon: Brain, label: 'KI-Training' },
     { value: 'bank-keywords', icon: Landmark, label: 'Bank', requiredFeature: 'bankImport' as const },
+    { value: 'bank-live', icon: Building2, label: 'Bankanbindung', requiredFeature: 'liveBankConnection' as const },
     { value: 'email-import', icon: Mail, label: 'E-Mail', requiredFeature: 'emailImport' as const },
     { value: 'cloud-storage', icon: Cloud, label: 'Cloud', requiredFeature: 'cloudBackup' as const },
     { value: 'company', icon: Building2, label: 'Firma', requiredFeature: 'invoiceModule' as const },
