@@ -14,6 +14,7 @@ import {
   LogOut,
   User,
   FileUp,
+  ClipboardList,
   Truck,
   Shield,
   FileText,
