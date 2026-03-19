@@ -87,6 +87,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     receiptsCredit,
     receiptsLimit,
     receiptsAvailable,
+    documentsUsed,
+    documentsCredit,
+    documentsLimit,
+    documentsAvailable,
     planName,
     setAdminViewPlan,
   } = usePlan();
@@ -129,6 +133,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const usagePercent = receiptsLimit > 0 ? Math.min(100, (receiptsUsed / receiptsLimit) * 100) : 0;
   const quotaColor = usagePercent > 95 ? 'text-destructive' : usagePercent > 80 ? 'text-yellow-500' : 'text-primary';
+
+  const docUsagePercent = documentsLimit > 0 ? Math.min(100, (documentsUsed / documentsLimit) * 100) : 0;
+  const docQuotaColor = docUsagePercent > 95 ? 'text-destructive' : docUsagePercent > 80 ? 'text-yellow-500' : 'text-primary';
 
   const userEmail = user?.email || 'user@example.com';
   const userName = user?.user_metadata?.first_name 
@@ -252,6 +259,31 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               <span className="text-sidebar-foreground/50">{receiptsAvailable} verfügbar</span>
             </div>
           </div>
+
+          {/* Document Quota Bar */}
+          {documentsLimit > 0 && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-sidebar-foreground/60">Dokumente</span>
+                <span className={cn('font-medium', docQuotaColor)}>
+                  {documentsUsed} / {documentsLimit}
+                </span>
+              </div>
+              <Progress 
+                value={docUsagePercent} 
+                className="h-1.5"
+              />
+              {documentsCredit > 0 && (
+                <p className="text-[10px] text-sidebar-foreground/50">
+                  (+{documentsCredit} Guthaben)
+                </p>
+              )}
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-sidebar-foreground/50">Ausgangsbelege</span>
+                <span className="text-sidebar-foreground/50">{documentsAvailable} verfügbar</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

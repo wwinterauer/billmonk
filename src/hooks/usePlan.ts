@@ -12,6 +12,10 @@ export interface PlanData {
   receiptsCredit: number;
   receiptsLimit: number;
   receiptsAvailable: number;
+  documentsUsed: number;
+  documentsCredit: number;
+  documentsLimit: number;
+  documentsAvailable: number;
   features: typeof PLAN_FEATURES[PlanType];
   planName: string;
   loading: boolean;
@@ -25,13 +29,15 @@ export function usePlan(): PlanData {
   const [isAdmin, setIsAdmin] = useState(false);
   const [receiptsUsed, setReceiptsUsed] = useState(0);
   const [receiptsCredit, setReceiptsCredit] = useState(0);
+  const [documentsUsed, setDocumentsUsed] = useState(0);
+  const [documentsCredit, setDocumentsCredit] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
       .from('profiles')
-      .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan')
+      .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan, monthly_document_count, document_credit')
       .eq('id', user.id)
       .single();
 
@@ -39,6 +45,8 @@ export function usePlan(): PlanData {
       setPlan((data.plan as PlanType) || 'free');
       setReceiptsUsed(data.monthly_receipt_count || 0);
       setReceiptsCredit(data.receipt_credit || 0);
+      setDocumentsUsed((data as any).monthly_document_count || 0);
+      setDocumentsCredit((data as any).document_credit || 0);
       setAdminViewPlanState((data.admin_view_plan as PlanType) || null);
     }
   }, [user]);
@@ -95,6 +103,8 @@ export function usePlan(): PlanData {
   const limits = PLAN_LIMITS[effectivePlan];
   const receiptsLimit = limits.receiptsPerMonth + receiptsCredit;
   const receiptsAvailable = Math.max(0, receiptsLimit - receiptsUsed);
+  const documentsLimit = limits.documentsPerMonth + documentsCredit;
+  const documentsAvailable = Math.max(0, documentsLimit - documentsUsed);
 
   const setAdminViewPlan = useCallback(async (newPlan: PlanType | null) => {
     if (!user || !isAdmin) return;
@@ -114,6 +124,10 @@ export function usePlan(): PlanData {
     receiptsCredit,
     receiptsLimit,
     receiptsAvailable,
+    documentsUsed,
+    documentsCredit,
+    documentsLimit,
+    documentsAvailable,
     features: PLAN_FEATURES[effectivePlan],
     planName: PLAN_NAMES[effectivePlan],
     loading,

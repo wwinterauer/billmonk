@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { usePlan } from '@/hooks/usePlan';
 import type { Customer } from '@/hooks/useCustomers';
 
 export interface Invoice {
@@ -114,6 +115,7 @@ export type LineItemInsert = {
 export function useInvoices() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { documentsAvailable, documentsLimit } = usePlan();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -137,6 +139,16 @@ export function useInvoices() {
 
   const createInvoice = async (invoice: InvoiceInsert, lineItems: Omit<LineItemInsert, 'invoice_id'>[]) => {
     if (!user) return null;
+
+    // Check document limit
+    if (documentsLimit > 0 && documentsAvailable <= 0) {
+      toast({
+        title: 'Dokumenten-Limit erreicht',
+        description: 'Du hast dein monatliches Kontingent aufgebraucht. Upgrade deinen Plan für mehr Dokumente.',
+        variant: 'destructive',
+      });
+      return null;
+    }
 
     let subtotal = 0;
     let vatTotal = 0;

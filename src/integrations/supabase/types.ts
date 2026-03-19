@@ -1646,10 +1646,12 @@ export type Database = {
           country: string | null
           created_at: string | null
           description_settings: Json | null
+          document_credit: number
           email: string
           first_name: string | null
           id: string
           last_name: string | null
+          monthly_document_count: number
           monthly_receipt_count: number | null
           naming_settings: Json | null
           newsletter_opt_in: boolean | null
@@ -1675,10 +1677,12 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           description_settings?: Json | null
+          document_credit?: number
           email: string
           first_name?: string | null
           id: string
           last_name?: string | null
+          monthly_document_count?: number
           monthly_receipt_count?: number | null
           naming_settings?: Json | null
           newsletter_opt_in?: boolean | null
@@ -1704,10 +1708,12 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           description_settings?: Json | null
+          document_credit?: number
           email?: string
           first_name?: string | null
           id?: string
           last_name?: string | null
+          monthly_document_count?: number
           monthly_receipt_count?: number | null
           naming_settings?: Json | null
           newsletter_opt_in?: boolean | null

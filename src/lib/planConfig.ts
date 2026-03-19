@@ -2,6 +2,7 @@ export type PlanType = 'free' | 'starter' | 'pro' | 'business';
 
 export interface PlanLimits {
   receiptsPerMonth: number;
+  documentsPerMonth: number;
   maxTotal: number | null;
   retentionYears: number | null;
 }
@@ -15,10 +16,10 @@ export interface PlanFeatures {
 }
 
 export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
-  free: { receiptsPerMonth: 10, maxTotal: 100, retentionYears: null },
-  starter: { receiptsPerMonth: 30, maxTotal: null, retentionYears: 7 },
-  pro: { receiptsPerMonth: 100, maxTotal: null, retentionYears: 10 },
-  business: { receiptsPerMonth: 250, maxTotal: null, retentionYears: 10 },
+  free: { receiptsPerMonth: 10, documentsPerMonth: 0, maxTotal: 100, retentionYears: null },
+  starter: { receiptsPerMonth: 30, documentsPerMonth: 0, maxTotal: null, retentionYears: 7 },
+  pro: { receiptsPerMonth: 100, documentsPerMonth: 0, maxTotal: null, retentionYears: 10 },
+  business: { receiptsPerMonth: 250, documentsPerMonth: 250, maxTotal: null, retentionYears: 10 },
 };
 
 export const PLAN_FEATURES: Record<PlanType, PlanFeatures> = {
