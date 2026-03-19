@@ -92,6 +92,8 @@ Deno.serve(async (req) => {
     const isSmallBusiness = company?.is_small_business || false;
     const documentType = invoice.document_type || "invoice";
     const layoutVariant = settings?.layout_variant || "classic";
+    const isDeliveryNote = documentType === "delivery_note";
+    const invoiceSubtype = invoice.invoice_subtype || "normal";
 
     // Document title based on type
     const docTitleMap: Record<string, string> = {
@@ -99,8 +101,33 @@ Deno.serve(async (req) => {
       order_confirmation: "Auftragsbestätigung",
       invoice: "Rechnung",
       credit_note: "Gutschrift",
+      delivery_note: "Lieferschein",
     };
-    const docTitle = docTitleMap[documentType] || "Rechnung";
+
+    // Subtype overrides for invoices
+    const subtypeTitleMap: Record<string, string> = {
+      deposit: "Anzahlungsrechnung",
+      partial: "Teilrechnung",
+      final: "Schlussrechnung",
+    };
+
+    let docTitle = docTitleMap[documentType] || "Rechnung";
+    if (documentType === "invoice" && invoiceSubtype !== "normal" && subtypeTitleMap[invoiceSubtype]) {
+      docTitle = subtypeTitleMap[invoiceSubtype];
+    }
+
+    // Fetch related order number for partial invoices
+    let relatedOrderNumber: string | null = null;
+    if (invoice.related_order_id) {
+      const { data: relatedOrder } = await supabase
+        .from("invoices")
+        .select("invoice_number, document_type")
+        .eq("id", invoice.related_order_id)
+        .single();
+      if (relatedOrder) {
+        relatedOrderNumber = relatedOrder.invoice_number;
+      }
+    }
 
     // Build PDF using pdf-lib
     const { PDFDocument, rgb, StandardFonts } = await import("npm:pdf-lib@1.17.1");
