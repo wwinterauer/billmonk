@@ -22,6 +22,7 @@ const LAYOUT_VARIANTS = [
 export function InvoiceTemplateSettings() {
   const { settings, loading, saveSettings } = useInvoiceSettings();
   const { settings: companySettings, getLogoUrl } = useCompanySettings();
+  const [form, setForm] = useState({
     invoice_number_prefix: 'RE',
     invoice_number_format: '{prefix}-{year}-{seq}',
     next_sequence_number: 1,
