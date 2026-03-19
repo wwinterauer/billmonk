@@ -65,6 +65,7 @@ import { CustomerManagement } from '@/components/settings/CustomerManagement';
 import { InvoiceItemManagement } from '@/components/settings/InvoiceItemManagement';
 import { InvoiceTemplateSettings } from '@/components/settings/InvoiceTemplateSettings';
 import { InvoiceModuleSettings } from '@/components/settings/InvoiceModuleSettings';
+import { CompanySettings } from '@/components/settings/CompanySettings';
 import { usePlan } from '@/hooks/usePlan';
 import { FEATURE_MIN_PLAN, isPlanSufficient } from '@/lib/planConfig';
 import { FeatureGate } from '@/components/FeatureGate';
@@ -194,7 +195,7 @@ const Settings = () => {
   // Handle tab from URL query parameter - must be before any early returns
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage', 'customers', 'invoice-items', 'invoice-templates', 'invoice-settings'];
+  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage', 'company', 'customers', 'invoice-items', 'invoice-templates', 'invoice-settings'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'naming';
   const [activeTab, setActiveTab] = useState(initialTab);
   
@@ -440,6 +441,7 @@ const Settings = () => {
     { value: 'bank-keywords', icon: Landmark, label: 'Bank', requiredFeature: 'bankImport' as const },
     { value: 'email-import', icon: Mail, label: 'E-Mail', requiredFeature: 'emailImport' as const },
     { value: 'cloud-storage', icon: Cloud, label: 'Cloud', requiredFeature: 'cloudBackup' as const },
+    { value: 'company', icon: Building2, label: 'Firma', requiredFeature: 'invoiceModule' as const },
     { value: 'customers', icon: Building2, label: 'Kunden', requiredFeature: 'invoiceModule' as const },
     { value: 'invoice-items', icon: Package, label: 'Artikel', requiredFeature: 'invoiceModule' as const },
     { value: 'invoice-templates', icon: FileCheck, label: 'Rechnung', requiredFeature: 'invoiceModule' as const },
@@ -455,7 +457,7 @@ const Settings = () => {
 
   // Split tabs into expense group and invoice group
   const expenseTabs = allTabs.filter(t => !['customers', 'invoice-items', 'invoice-templates', 'invoice-settings'].includes(t.value));
-  const invoiceTabs = allTabs.filter(t => ['customers', 'invoice-items', 'invoice-templates', 'invoice-settings'].includes(t.value));
+  const invoiceTabs = allTabs.filter(t => ['company', 'customers', 'invoice-items', 'invoice-templates', 'invoice-settings'].includes(t.value));
 
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
@@ -985,6 +987,15 @@ const Settings = () => {
         <FeatureGate feature="cloudBackup">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <CloudStorageSettings />
+        </motion.div>
+        </FeatureGate>
+      </TabsContent>
+
+      {/* Company Settings Tab */}
+      <TabsContent value="company">
+        <FeatureGate feature="invoiceModule">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <CompanySettings />
         </motion.div>
         </FeatureGate>
       </TabsContent>

@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { FileText, Plus, MoreHorizontal, CheckCircle, Send, XCircle, Trash2, Euro, Clock, AlertTriangle, Download } from 'lucide-react';
+import { FileText, Plus, MoreHorizontal, CheckCircle, Send, XCircle, Trash2, Euro, Clock, AlertTriangle, Download, Copy, GitBranch } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useInvoices, type Invoice } from '@/hooks/useInvoices';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,23 +22,29 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
   overdue: { label: 'Überfällig', variant: 'destructive' },
   cancelled: { label: 'Storniert', variant: 'secondary' },
   credited: { label: 'Gutgeschrieben', variant: 'secondary' },
+  corrected: { label: 'Korrigiert', variant: 'secondary' },
 };
 
 const Invoices = () => {
-  const { invoices, loading, updateInvoiceStatus, deleteInvoice } = useInvoices();
+  const { invoices, loading, updateInvoiceStatus, deleteInvoice, copyInvoice, createCorrectionVersion } = useInvoices();
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const navigate = useNavigate();
 
+  // Filter only invoices (not quotes/order_confirmations)
+  const invoiceOnly = useMemo(() => {
+    return invoices.filter(inv => !(inv as any).document_type || (inv as any).document_type === 'invoice');
+  }, [invoices]);
+
   const filtered = useMemo(() => {
-    if (statusFilter === 'all') return invoices;
-    return invoices.filter(inv => inv.status === statusFilter);
-  }, [invoices, statusFilter]);
+    if (statusFilter === 'all') return invoiceOnly;
+    return invoiceOnly.filter(inv => inv.status === statusFilter);
+  }, [invoiceOnly, statusFilter]);
 
   const stats = useMemo(() => {
-    const open = invoices.filter(i => i.status === 'sent').reduce((s, i) => s + (i.total || 0), 0);
-    const overdue = invoices.filter(i => i.status === 'overdue').reduce((s, i) => s + (i.total || 0), 0);
-    const paidThisMonth = invoices
+    const open = invoiceOnly.filter(i => i.status === 'sent').reduce((s, i) => s + (i.total || 0), 0);
+    const overdue = invoiceOnly.filter(i => i.status === 'overdue').reduce((s, i) => s + (i.total || 0), 0);
+    const paidThisMonth = invoiceOnly
       .filter(i => {
         if (i.status !== 'paid' || !i.paid_at) return false;
         const d = new Date(i.paid_at);
@@ -47,7 +53,7 @@ const Invoices = () => {
       })
       .reduce((s, i) => s + (i.total || 0), 0);
     return { open, overdue, paidThisMonth };
-  }, [invoices]);
+  }, [invoiceOnly]);
 
   const fmt = (n: number) =>
     new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(n);
@@ -157,9 +163,13 @@ const Invoices = () => {
                 <TableBody>
                   {filtered.map(inv => {
                     const sc = STATUS_CONFIG[inv.status || 'draft'] || STATUS_CONFIG.draft;
+                    const hasVersion = !!(inv as any).version;
                     return (
                       <TableRow key={inv.id} className="cursor-pointer" onClick={() => navigate(`/invoices/${inv.id}/edit`)}>
-                        <TableCell className="font-medium">{inv.invoice_number}</TableCell>
+                        <TableCell className="font-medium">
+                          {inv.invoice_number}
+                          {hasVersion && <Badge variant="outline" className="ml-1 text-[10px]">{(inv as any).version}</Badge>}
+                        </TableCell>
                         <TableCell>{customerName(inv)}</TableCell>
                         <TableCell>{fmtDate(inv.invoice_date)}</TableCell>
                         <TableCell>{fmtDate(inv.due_date)}</TableCell>
@@ -194,6 +204,12 @@ const Invoices = () => {
                                 }
                               }}>
                                 <Download className="h-4 w-4 mr-2" /> PDF generieren
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => copyInvoice(inv.id)}>
+                                <Copy className="h-4 w-4 mr-2" /> Kopieren
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => createCorrectionVersion(inv.id)}>
+                                <GitBranch className="h-4 w-4 mr-2" /> Korrektur erstellen
                               </DropdownMenuItem>
                               {inv.status === 'draft' && (
                                 <DropdownMenuItem onClick={() => updateInvoiceStatus(inv.id, 'sent')}>
