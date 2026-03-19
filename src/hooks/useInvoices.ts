@@ -58,6 +58,7 @@ export interface InvoiceLineItem {
   group_name?: string | null;
   is_group_header?: boolean | null;
   show_group_subtotal?: boolean | null;
+  image_path?: string | null;
 }
 
 export type InvoiceInsert = {
