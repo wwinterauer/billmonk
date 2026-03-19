@@ -2189,12 +2189,16 @@ const Reports = () => {
               </div>
 
             {/* Income Category Detail Table */}
-            {incomeStats.byCategory.length > 0 && (
-              <Card className="border-border/50 mb-6">
+            <Card className="border-border/50 mb-6">
                 <CardHeader>
                   <CardTitle className="text-lg">Detailübersicht nach Kategorie</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {incomeStats.byCategory.length === 0 ? (
+                    <div className="py-8 text-center text-muted-foreground">
+                      Keine Daten für den gewählten Zeitraum
+                    </div>
+                  ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2236,9 +2240,9 @@ const Reports = () => {
                       </TableRow>
                     </TableFooter>
                   </Table>
+                  )}
                 </CardContent>
               </Card>
-            )}
 
             {/* Income Tags Table */}
             <Card className="border-border/50 mb-6">
