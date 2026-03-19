@@ -441,6 +441,7 @@ const Settings = () => {
     { value: 'bank-keywords', icon: Landmark, label: 'Bank', requiredFeature: 'bankImport' as const },
     { value: 'email-import', icon: Mail, label: 'E-Mail', requiredFeature: 'emailImport' as const },
     { value: 'cloud-storage', icon: Cloud, label: 'Cloud', requiredFeature: 'cloudBackup' as const },
+    { value: 'company', icon: Building2, label: 'Firma', requiredFeature: 'invoiceModule' as const },
     { value: 'customers', icon: Building2, label: 'Kunden', requiredFeature: 'invoiceModule' as const },
     { value: 'invoice-items', icon: Package, label: 'Artikel', requiredFeature: 'invoiceModule' as const },
     { value: 'invoice-templates', icon: FileCheck, label: 'Rechnung', requiredFeature: 'invoiceModule' as const },
