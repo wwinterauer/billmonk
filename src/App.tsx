@@ -149,6 +149,14 @@ const App = () => (
               } 
             />
             <Route 
+              path="/quotes" 
+              element={
+                <ProtectedRoute>
+                  <Quotes />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/account" 
               element={
                 <ProtectedRoute>

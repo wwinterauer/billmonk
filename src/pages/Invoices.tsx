@@ -205,6 +205,12 @@ const Invoices = () => {
                               }}>
                                 <Download className="h-4 w-4 mr-2" /> PDF generieren
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => copyInvoice(inv.id)}>
+                                <Copy className="h-4 w-4 mr-2" /> Kopieren
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => createCorrectionVersion(inv.id)}>
+                                <GitBranch className="h-4 w-4 mr-2" /> Korrektur erstellen
+                              </DropdownMenuItem>
                               {inv.status === 'draft' && (
                                 <DropdownMenuItem onClick={() => updateInvoiceStatus(inv.id, 'sent')}>
                                   <Send className="h-4 w-4 mr-2" /> Als versendet markieren
