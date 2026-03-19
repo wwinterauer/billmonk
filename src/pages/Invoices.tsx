@@ -22,6 +22,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
   overdue: { label: 'Überfällig', variant: 'destructive' },
   cancelled: { label: 'Storniert', variant: 'secondary' },
   credited: { label: 'Gutgeschrieben', variant: 'secondary' },
+  corrected: { label: 'Korrigiert', variant: 'secondary' },
 };
 
 const Invoices = () => {
