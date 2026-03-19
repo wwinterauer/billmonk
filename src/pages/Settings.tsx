@@ -1029,6 +1029,15 @@ const Settings = () => {
         </FeatureGate>
       </TabsContent>
 
+      {/* Quote Templates Tab */}
+      <TabsContent value="quote-templates">
+        <FeatureGate feature="invoiceModule">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <QuoteTemplateSettings />
+        </motion.div>
+        </FeatureGate>
+      </TabsContent>
+
       {/* Invoice Module Settings Tab */}
       <TabsContent value="invoice-settings">
         <FeatureGate feature="invoiceModule">
