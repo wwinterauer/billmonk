@@ -151,12 +151,20 @@ const App = () => (
               } 
             />
             <Route 
+              path="/order-confirmations" 
+              element={
+                <ProtectedRoute>
+                  <OrderConfirmations />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/quotes" 
               element={
                 <ProtectedRoute>
                   <Quotes />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route 
               path="/delivery-notes" 

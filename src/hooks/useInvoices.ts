@@ -219,7 +219,20 @@ export function useInvoices() {
     // Increment sequence number (best effort)
     try {
       const docType = invoice.document_type || 'invoice';
-      if (docType === 'invoice' || docType === 'order_confirmation' || docType === 'delivery_note') {
+      if (docType === 'quote') {
+        // Quotes use their own sequence counter
+        const { data: quoteSettings } = await (supabase as any)
+          .from('quote_settings')
+          .select('id, next_sequence_number')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (quoteSettings) {
+          await (supabase as any)
+            .from('quote_settings')
+            .update({ next_sequence_number: (quoteSettings.next_sequence_number || 1) + 1 })
+            .eq('id', quoteSettings.id);
+        }
+      } else if (docType === 'invoice' || docType === 'order_confirmation' || docType === 'delivery_note') {
         const { data: currentSettings } = await supabase
           .from('invoice_settings')
           .select('id, next_sequence_number')
