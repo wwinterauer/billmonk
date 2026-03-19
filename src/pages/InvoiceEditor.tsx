@@ -14,6 +14,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ArrowLeft, Plus, Trash2, Save, FolderPlus, Check } from 'lucide-react';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useInvoiceItems, type InvoiceItem } from '@/hooks/useInvoiceItems';
+import { useItemGroups } from '@/hooks/useItemGroups';
 import { useInvoiceSettings } from '@/hooks/useInvoiceSettings';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useCategories } from '@/hooks/useCategories';
