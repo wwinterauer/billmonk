@@ -1,131 +1,61 @@
 
 
-## Erweiterter Dokumenten-Workflow mit Lieferschein, Teilzahlungen und kaskadierenden Konditionen
+## PDF-Edge-Function Update: Lieferschein, Rabatt, Lieferzeiten, Teilrechnungen
 
 ### Übersicht
 
-Erweiterung des bestehenden Belegsystems um den vollständigen Workflow (Angebot → AB → Lieferschein → Rechnung), Anzahlungs-/Teilzahlungsrechnungen und kaskadierende Rabatt-/Skonto-/Zahlungsziel-Logik.
+Die `generate-invoice-pdf/index.ts` wird erweitert um vier fehlende Aspekte: (1) Lieferschein-Layout ohne Preise/MwSt, (2) Rabatt-Zeile im Summenblock, (3) Lieferzeiten-Anzeige, (4) Teilrechnungs-Hinweise.
 
-### 1. Datenbank-Migrationen
+### Aktuelle Lücken
 
-**Migration 1: Kunden-Konditionen + Firmen-Defaults + Lieferzeiten + Nummernkreise**
-```sql
--- Kunden: Rabatt, Skonto, Zahlungsziel
-ALTER TABLE customers ADD COLUMN default_discount_percent numeric DEFAULT 0;
-ALTER TABLE customers ADD COLUMN default_skonto_percent numeric DEFAULT 0;
-ALTER TABLE customers ADD COLUMN default_skonto_days integer DEFAULT 0;
+- `docTitleMap` fehlt `delivery_note: "Lieferschein"`
+- Preisspalten werden immer gerendert, auch bei Lieferscheinen
+- Kein Rabatt (`rabatt_percent`) im Summenblock
+- Lieferzeiten (`delivery_time` auf Beleg- und Positionsebene) werden ignoriert
+- Kein Hinweis auf `invoice_subtype` (Anzahlung/Teil/Schlussrechnung)
+- Keine Referenz auf verknüpfte AB (`related_order_id`)
 
--- Firmen-Standard-Rabatt + AB/LS-Präfixe
-ALTER TABLE invoice_settings ADD COLUMN default_rabatt_percent numeric DEFAULT 0;
-ALTER TABLE invoice_settings ADD COLUMN order_confirmation_prefix text DEFAULT 'AB';
-ALTER TABLE invoice_settings ADD COLUMN delivery_note_prefix text DEFAULT 'LS';
-
--- Lieferzeiten (Freitext)
-ALTER TABLE invoices ADD COLUMN delivery_time text;
-ALTER TABLE invoices ADD COLUMN rabatt_percent numeric DEFAULT 0;
-ALTER TABLE invoice_line_items ADD COLUMN delivery_time text;
-ALTER TABLE invoice_items ADD COLUMN default_delivery_time text;
-```
-
-**Migration 2: Teilzahlungen**
-```sql
--- Rechnungsart (normal, Anzahlung, Teilzahlung, Schlussrechnung)
-ALTER TABLE invoices ADD COLUMN invoice_subtype text DEFAULT 'normal';
--- Verknüpfung zu übergeordnetem Auftrag/AB
-ALTER TABLE invoices ADD COLUMN related_order_id uuid REFERENCES invoices(id);
-```
-
-### 2. Code-Änderungen
-
-**`src/hooks/useInvoices.ts`**
-- `Invoice` Interface: `delivery_time`, `rabatt_percent`, `invoice_subtype`, `related_order_id`
-- `InvoiceInsert`: gleiche Felder
-- `LineItemInsert`: `delivery_time`
-- `convertDocument()`: erweitern um `delivery_note` Typ, Präfix aus Settings (AB/LS) laden
-- Neue Methode `createPartialInvoice(sourceId, subtype: 'deposit'|'partial'|'final', lineItems)` — erstellt Teilrechnung mit Verweis auf Quell-AB/Rechnung
-
-**`src/hooks/useCustomers.ts`**
-- Interface erweitern: `default_discount_percent`, `default_skonto_percent`, `default_skonto_days`
-
-**`src/hooks/useInvoiceSettings.ts`**
-- Interface erweitern: `default_rabatt_percent`, `order_confirmation_prefix`, `delivery_note_prefix`
-
-**`src/pages/InvoiceEditor.tsx`**
-- Kaskadierende Defaults beim Kundenauswahl:
-  - Zahlungsziel: Settings → Kunde → manuell
-  - Skonto: Settings → Kunde → manuell
-  - Rabatt: Settings → Kunde → manuell
-- Lieferzeit-Felder (Gesamt + pro Position) bei Angebot/AB
-- Lieferschein-Modus: Preise ausblenden
-- Neuer "Dokumenttyp"-Hinweis wenn `?type=delivery_note`
-- Teilzahlungs-UI: Bei Rechnungen aus AB → Option "Anzahlung"/"Teilzahlung"/"Schlussrechnung", Betrag/Positionen auswählbar
-- Rabatt-Feld (Gesamtrabatt %) im Summenblock
-
-**Neue Seite: `src/pages/DeliveryNotes.tsx`**
-- Analog zu `Quotes.tsx`, filtert `document_type === 'delivery_note'`
-- Kein Betrag in Tabelle, nur Positionen/Mengen
-- Status: Entwurf → Versendet → Zugestellt
-- Aktionen: In Rechnung umwandeln, Kopieren, Löschen
-
-**`src/pages/Quotes.tsx`**
-- Dropdown-Aktion "In Lieferschein umwandeln" hinzufügen
-
-**`src/pages/Invoices.tsx`**
-- Dropdown-Aktion "Teilrechnung erstellen" hinzufügen
-- Anzeige von `invoice_subtype` (Anzahlung/Teil/Schluss) als Badge
-
-**`src/App.tsx`**
-- Route `/delivery-notes` → `DeliveryNotes`
-
-**`src/components/dashboard/Sidebar.tsx`**
-- Neuer Eintrag "Lieferscheine" mit Truck-Icon
-
-**`src/components/settings/CustomerManagement.tsx`**
-- Neue Sektion "Konditionen" im Dialog: Rabatt %, Skonto %, Skonto-Tage
-
-**`src/components/settings/InvoiceTemplateSettings.tsx`**
-- AB-Präfix und LS-Präfix Eingabefelder
+### Änderungen in einer Datei
 
 **`supabase/functions/generate-invoice-pdf/index.ts`**
-- Lieferschein-Layout: keine Preisspalten, kein MwSt-Block, kein Skonto
-- Titel "LIEFERSCHEIN" / "AUFTRAGSBESTÄTIGUNG"
-- Lieferzeiten anzeigen (gesamt + pro Position)
-- Rabatt-Zeile im Summenblock
-- Teilrechnungs-Hinweis (z.B. "Anzahlungsrechnung" im Titel, Verweis auf AB-Nr.)
 
-### 3. Workflow-Kette
+1. **Document Title Map** (Zeile ~97-103)
+   - `delivery_note: "Lieferschein"` hinzufügen
+   - Subtype-Titel: `deposit` → "Anzahlungsrechnung", `partial` → "Teilrechnung", `final` → "Schlussrechnung"
 
-```text
-Angebot (AG) 
-  → "In AB umwandeln" → Auftragsbestätigung (AB)
-    → "In Lieferschein umwandeln" → Lieferschein (LS, ohne Preise)
-    → "Rechnung erstellen" → Rechnung (RE)
-    → "Anzahlungsrechnung" → Rechnung (RE, subtype=deposit)
-    → "Teilrechnung" → Rechnung (RE, subtype=partial)
-    → "Schlussrechnung" → Rechnung (RE, subtype=final)
-```
+2. **Lieferschein-Modus** (neue Variable ~Zeile 94)
+   - `const isDeliveryNote = documentType === 'delivery_note'`
+   - Bei Lieferschein: `showVat = false`, Preisspalten (`Preis`, `MwSt`, `Netto`) ausblenden
+   - Spalten-Layout anpassen: nur Pos, Beschreibung, Menge, Einheit + optional Lieferzeit
 
-Alle Umwandlungen setzen `copied_from_id` auf das Quelldokument. Teilrechnungen setzen zusätzlich `related_order_id` auf die AB.
+3. **Positions-Rendering** (Zeile ~292-353)
+   - Bei `isDeliveryNote`: kein `unit_price`, kein `vat_rate`, kein `lineNet` rendern
+   - Lieferzeit pro Position anzeigen (wenn vorhanden)
 
-### 4. Kaskadierungs-Logik
+4. **Lieferzeit auf Belegebene** (nach Meta-Block ~Zeile 242)
+   - Wenn `invoice.delivery_time` vorhanden und Typ = quote/order_confirmation/delivery_note: "Lieferzeit: ..." anzeigen
 
-```text
-Zahlungsziel:  invoice_settings.default_payment_terms_days
-               → customer.payment_terms_days (wenn gesetzt)
-               → Beleg-Eingabe (überschreibt)
+5. **Summenblock** (Zeile ~369-403)
+   - Bei `isDeliveryNote`: gesamten Summenblock überspringen (keine Preise)
+   - Rabatt-Zeile einfügen: wenn `invoice.rabatt_percent > 0`:
+     ```
+     Netto:            € X.XXX,XX
+     Rabatt X%:       −€ XXX,XX
+     Netto nach Rabatt: € X.XXX,XX
+     MwSt ...
+     ```
+   - Berechnung: `rabattAmount = subtotal * rabatt_percent / 100`, MwSt auf reduziertes Netto
 
-Skonto:        invoice_settings.default_discount_percent/days
-               → customer.default_skonto_percent/days (wenn > 0)
-               → Beleg-Eingabe
+6. **Teilrechnungs-Hinweis** (nach Dokumenttitel ~Zeile 229)
+   - Wenn `invoice.invoice_subtype` != 'normal': Subtype als Untertitel
+   - Wenn `invoice.related_order_id`: AB-Nummer laden und "Zu Auftrag: AB-XXXX" anzeigen
 
-Rabatt:        invoice_settings.default_rabatt_percent
-               → customer.default_discount_percent (wenn > 0)
-               → Beleg-Eingabe (rabatt_percent)
-```
+7. **Bankverbindung bei Lieferschein** (Zeile ~419-428)
+   - Bei `isDeliveryNote`: Bankverbindung überspringen
 
-### Umfang
-- 2 DB-Migrationen
-- 1 neue Seite (DeliveryNotes)
-- ~10 bestehende Dateien anpassen
-- PDF-Edge-Function erweitern
+### Technische Details
+
+- Für `related_order_id` wird ein zusätzlicher Supabase-Query benötigt um die AB-Nummer zu laden
+- Die Rabatt-Berechnung folgt: Netto → Rabatt abziehen → MwSt auf reduziertes Netto
+- Lieferzeit-Spalte bei Lieferschein nutzt den freigewordenen Platz der Preisspalten
 
