@@ -1011,6 +1011,14 @@ const Reports = () => {
                   <File className="w-4 h-4 mr-2" />
                   Als CSV
                 </DropdownMenuItem>
+                {isPlanSufficient(effectivePlan, 'business') && (
+                  <>
+                    <DropdownMenuItem onClick={() => setTaxExportOpen(true)}>
+                      <Landmark className="w-4 h-4 mr-2" />
+                      Steuerberater-Export (DATEV/BMD)
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 
