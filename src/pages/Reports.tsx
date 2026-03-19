@@ -188,7 +188,7 @@ const Reports = () => {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user && !!dateRange.from && !!dateRange.to && showIncome,
+    enabled: !!user && !!dateRange.from && !!dateRange.to,
   });
 
   // Fetch categories for color mapping
