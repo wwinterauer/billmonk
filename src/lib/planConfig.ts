@@ -49,6 +49,7 @@ export const FEATURE_MIN_PLAN: Record<string, PlanType> = {
   emailImport: 'starter',
   cloudBackup: 'pro',
   invoiceModule: 'business',
+  taxExport: 'business',
 };
 
 // Human-readable feature descriptions for upgrade cards
