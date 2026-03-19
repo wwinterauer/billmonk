@@ -2807,6 +2807,13 @@ const Expenses = () => {
         dateRange={{ from: dateFrom, to: dateTo }}
       />
 
+      {/* Tax Export Dialog */}
+      <TaxExportDialog
+        open={taxExportOpen}
+        onOpenChange={setTaxExportOpen}
+        defaultBookingType="expenses"
+      />
+
       {/* Split Suggestion Dialog */}
       {splitDialogReceipt && (
         <SplitSuggestionDialog

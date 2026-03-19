@@ -2603,6 +2603,13 @@ const Reports = () => {
         </FeatureGate>
         )}
       </div>
+
+      {/* Tax Export Dialog */}
+      <TaxExportDialog
+        open={taxExportOpen}
+        onOpenChange={setTaxExportOpen}
+        defaultBookingType="both"
+      />
     </DashboardLayout>
   );
 };

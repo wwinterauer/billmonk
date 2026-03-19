@@ -283,6 +283,13 @@ const Invoices = () => {
         </Card>
       </div>
       </FeatureGate>
+
+      {/* Tax Export Dialog */}
+      <TaxExportDialog
+        open={taxExportOpen}
+        onOpenChange={setTaxExportOpen}
+        defaultBookingType="income"
+      />
     </DashboardLayout>
   );
 };
