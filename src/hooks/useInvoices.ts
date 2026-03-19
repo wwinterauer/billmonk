@@ -233,12 +233,21 @@ export function useInvoices() {
             .eq('id', quoteSettings.id);
         }
       } else if (docType === 'invoice' || docType === 'order_confirmation' || docType === 'delivery_note') {
-        const { data: currentSettings } = await supabase
+        let { data: currentSettings } = await supabase
           .from('invoice_settings')
           .select('id, next_sequence_number')
           .eq('user_id', user.id)
           .maybeSingle();
-        if (currentSettings) {
+        
+        // Auto-create invoice_settings if missing
+        if (!currentSettings) {
+          const { data: newSettings } = await supabase
+            .from('invoice_settings')
+            .insert({ user_id: user.id, next_sequence_number: 2 } as any)
+            .select('id, next_sequence_number')
+            .single();
+          currentSettings = newSettings;
+        } else {
           await supabase
             .from('invoice_settings')
             .update({ next_sequence_number: (currentSettings.next_sequence_number || 1) + 1 } as any)
@@ -247,13 +256,21 @@ export function useInvoices() {
       }
     } catch {}
 
+    const subtypeLabelMap: Record<string, string> = {
+      deposit: 'Anzahlungsrechnung',
+      partial: 'Teilrechnung',
+      final: 'Schlussrechnung',
+    };
     const docLabelMap: Record<string, string> = {
       quote: 'Angebot',
       order_confirmation: 'Auftragsbestätigung',
       delivery_note: 'Lieferschein',
       invoice: 'Rechnung',
     };
-    const docLabel = docLabelMap[invoice.document_type || 'invoice'] || 'Rechnung';
+    const subtype = invoice.invoice_subtype;
+    const docLabel = (subtype && subtype !== 'normal' && subtypeLabelMap[subtype])
+      ? subtypeLabelMap[subtype]
+      : docLabelMap[invoice.document_type || 'invoice'] || 'Rechnung';
     toast({ title: `${docLabel} erstellt` });
     await fetchInvoices();
     return typedInv;
