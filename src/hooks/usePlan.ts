@@ -103,6 +103,8 @@ export function usePlan(): PlanData {
   const limits = PLAN_LIMITS[effectivePlan];
   const receiptsLimit = limits.receiptsPerMonth + receiptsCredit;
   const receiptsAvailable = Math.max(0, receiptsLimit - receiptsUsed);
+  const documentsLimit = limits.documentsPerMonth + documentsCredit;
+  const documentsAvailable = Math.max(0, documentsLimit - documentsUsed);
 
   const setAdminViewPlan = useCallback(async (newPlan: PlanType | null) => {
     if (!user || !isAdmin) return;
