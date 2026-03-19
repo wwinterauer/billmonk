@@ -21,6 +21,7 @@ import {
   Tag,
   Users,
   Lock,
+  Landmark,
 } from 'lucide-react';
 import { FeatureGate } from '@/components/FeatureGate';
 import { usePlan } from '@/hooks/usePlan';
