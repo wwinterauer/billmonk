@@ -101,7 +101,7 @@ export function InvoiceLayoutPreview({ layoutVariant, companySettings, invoiceNu
 
         {/* Title + Meta */}
         <div className={`flex justify-between items-end mb-1 ${gap}`}>
-          <div className={`${titleSize} font-bold text-gray-900`}>Rechnung</div>
+          <div className={`${titleSize} font-bold text-gray-900`}>{documentTitle}</div>
           <div className={`${textSize} text-gray-600 text-right`}>
             <div>Nr: <span className="font-mono">{invoiceNumber}</span></div>
             <div>Datum: {today}</div>
