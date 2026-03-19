@@ -39,7 +39,7 @@ export const PLAN_PRICES: Record<PlanType, { monthly: number; yearly: number }> 
   free: { monthly: 0, yearly: 0 },
   starter: { monthly: 1.99, yearly: 19.90 },
   pro: { monthly: 4.99, yearly: 47.90 },
-  business: { monthly: 9.99, yearly: 95.90 },
+  business: { monthly: 14.99, yearly: 143.90 },
 };
 
 // Minimum plan required per feature key
