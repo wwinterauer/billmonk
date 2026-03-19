@@ -73,6 +73,7 @@ const InvoiceEditor = () => {
 
   const { customers } = useCustomers();
   const { items: articleTemplates } = useInvoiceItems();
+  const { groups: itemGroups } = useItemGroups();
   const { settings, loading: settingsLoading } = useInvoiceSettings();
   const { createInvoice, fetchLineItems } = useInvoices();
   const { categories } = useCategories();
