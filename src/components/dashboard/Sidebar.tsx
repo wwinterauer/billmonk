@@ -16,6 +16,7 @@ import {
   FileUp,
   ClipboardList,
   Truck,
+  ClipboardCheck,
   Shield,
   FileText,
   Lock,
