@@ -520,7 +520,8 @@ const Settings = () => {
                 </TabsTrigger>
               );
             })}
-          </TabsList>
+            </TabsList>
+          </div>
 
           {/* File Naming Tab */}
           <TabsContent value="naming">
