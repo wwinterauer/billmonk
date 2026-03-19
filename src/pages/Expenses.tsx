@@ -94,6 +94,9 @@ import { DuplicateComparisonModal } from '@/components/receipts/DuplicateCompari
 import { ExportDialog } from '@/components/exports/ExportDialog';
 import { ExportFormatDialog, type ExportFormat } from '@/components/exports/ExportFormatDialog';
 import { ExportTemplateEditor } from '@/components/exports/ExportTemplateEditor';
+import { TaxExportDialog } from '@/components/exports/TaxExportDialog';
+import { usePlan } from '@/hooks/usePlan';
+import { isPlanSufficient } from '@/lib/planConfig';
 import { TagSelector } from '@/components/tags/TagSelector';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
