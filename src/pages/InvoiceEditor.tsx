@@ -49,6 +49,7 @@ const newLine = (vatRate = 20): EditorLineItem => ({
   group_name: null,
   is_group_header: false,
   show_group_subtotal: false,
+  image_path: null,
 });
 
 const newGroupHeader = (name: string): EditorLineItem => ({
