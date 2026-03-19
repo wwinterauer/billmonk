@@ -304,10 +304,17 @@ export function CustomerManagement() {
             )}
 
             <Separator />
+            <p className="text-sm font-medium text-muted-foreground">Konditionen</p>
+            <p className="text-xs text-muted-foreground">Überschreiben die Firmen-Standardwerte für diesen Kunden</p>
 
             <div className="grid grid-cols-2 gap-3">
               <div><Label>UID-Nummer</Label><Input value={form.uid_number} onChange={e => setForm(f => ({ ...f, uid_number: e.target.value }))} /></div>
               <div><Label>Zahlungsziel (Tage)</Label><Input type="number" value={form.payment_terms_days} onChange={e => setForm(f => ({ ...f, payment_terms_days: parseInt(e.target.value) || 14 }))} /></div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div><Label>Rabatt %</Label><Input type="number" step="0.5" min="0" value={form.default_discount_percent} onChange={e => setForm(f => ({ ...f, default_discount_percent: parseFloat(e.target.value) || 0 }))} /></div>
+              <div><Label>Skonto %</Label><Input type="number" step="0.5" min="0" value={form.default_skonto_percent} onChange={e => setForm(f => ({ ...f, default_skonto_percent: parseFloat(e.target.value) || 0 }))} /></div>
+              <div><Label>Skonto-Tage</Label><Input type="number" min="0" value={form.default_skonto_days} onChange={e => setForm(f => ({ ...f, default_skonto_days: parseInt(e.target.value) || 0 }))} /></div>
             </div>
             <div><Label>Notizen</Label><Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} /></div>
           </div>

@@ -113,7 +113,7 @@ export function InvoiceTemplateSettings() {
           {/* Payment Terms + Discount */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium flex items-center gap-2"><Percent className="h-4 w-4" /> Zahlungsbedingungen & Skonto</h3>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <div>
                 <Label>Zahlungsziel (Tage)</Label>
                 <Input type="number" value={form.default_payment_terms_days} onChange={e => setForm(f => ({ ...f, default_payment_terms_days: parseInt(e.target.value) || 14 }))} />
@@ -126,10 +126,19 @@ export function InvoiceTemplateSettings() {
                 <Label>Skonto-Frist (Tage)</Label>
                 <Input type="number" min="0" value={form.default_discount_days} onChange={e => setForm(f => ({ ...f, default_discount_days: parseInt(e.target.value) || 0 }))} />
               </div>
+              <div>
+                <Label>Standard-Rabatt %</Label>
+                <Input type="number" step="0.5" min="0" value={form.default_rabatt_percent} onChange={e => setForm(f => ({ ...f, default_rabatt_percent: parseFloat(e.target.value) || 0 }))} />
+              </div>
             </div>
             {form.default_discount_percent > 0 && (
               <p className="text-xs text-muted-foreground">
                 Hinweis: Bei Zahlung innerhalb von {form.default_discount_days} Tagen gewähren Sie {form.default_discount_percent}% Skonto.
+              </p>
+            )}
+            {form.default_rabatt_percent > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Standard-Gesamtrabatt: {form.default_rabatt_percent}% auf den Nettobetrag (wird von Kunden-/Belegspezifischen Werten überschrieben).
               </p>
             )}
           </div>
