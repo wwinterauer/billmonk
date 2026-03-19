@@ -423,7 +423,7 @@ Deno.serve(async (req) => {
       const lastGroupHeader = items.find((it: any) => it.is_group_header && (it.group_name === currentGroupName || it.description === currentGroupName)) as any;
       if (lastGroupHeader?.show_group_subtotal) {
         drawText(`Zwischensumme ${currentGroupName}`, colX.desc, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
-        drawText(fmtNum(groupSubtotal), colX.total, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
+        if (showPrices) drawText(fmtNum(groupSubtotal), colX.total, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
         y -= 16;
       }
     }
