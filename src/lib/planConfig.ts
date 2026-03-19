@@ -13,6 +13,7 @@ export interface PlanFeatures {
   emailImport: boolean;
   cloudBackup: boolean;
   reconciliation: boolean;
+  liveBankConnection: boolean;
 }
 
 export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
