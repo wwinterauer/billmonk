@@ -310,6 +310,7 @@ const InvoiceEditor = () => {
         group_name: l.group_name || undefined,
         is_group_header: l.is_group_header,
         show_group_subtotal: l.show_group_subtotal,
+        image_path: l.image_path || undefined,
       }))
     );
 
