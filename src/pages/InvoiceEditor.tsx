@@ -97,6 +97,7 @@ const InvoiceEditor = () => {
   // Skonto
   const [discountPercent, setDiscountPercent] = useState(0);
   const [discountDays, setDiscountDays] = useState(0);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
   // Generate invoice number from settings
   useEffect(() => {
