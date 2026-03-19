@@ -440,8 +440,7 @@ Deno.serve(async (req) => {
     // Upload to storage
     const storagePath = `${userId}/${invoice.invoice_number.replace(/[^a-zA-Z0-9-_]/g, "_")}${invoice.version || ""}.pdf`;
 
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    // adminClient already created above for image loading
 
     const { error: uploadErr } = await adminClient.storage
       .from("invoices")
