@@ -97,6 +97,7 @@ export type LineItemInsert = {
   group_name?: string;
   is_group_header?: boolean;
   show_group_subtotal?: boolean;
+  image_path?: string;
 };
 
 export function useInvoices() {

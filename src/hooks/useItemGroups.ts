@@ -3,84 +3,75 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
-export interface InvoiceItem {
+export interface ItemGroup {
   id: string;
   user_id: string;
   name: string;
-  description: string | null;
-  unit: string | null;
-  unit_price: number | null;
-  vat_rate: number | null;
-  is_active: boolean | null;
   sort_order: number | null;
-  icon: string | null;
-  image_path: string | null;
-  item_group_id: string | null;
   created_at: string | null;
-  updated_at: string | null;
 }
 
-export function useInvoiceItems() {
+export function useItemGroups() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [groups, setGroups] = useState<ItemGroup[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchItems = useCallback(async () => {
+  const fetchGroups = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     const { data, error } = await supabase
-      .from('invoice_items')
+      .from('item_groups')
       .select('*')
       .eq('user_id', user.id)
       .order('sort_order', { ascending: true });
     if (error) {
       toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
     } else {
-      setItems(data as InvoiceItem[]);
+      setGroups(data as ItemGroup[]);
     }
     setLoading(false);
   }, [user, toast]);
 
-  useEffect(() => { fetchItems(); }, [fetchItems]);
+  useEffect(() => { fetchGroups(); }, [fetchGroups]);
 
-  const addItem = async (item: Partial<InvoiceItem>) => {
+  const addGroup = async (name: string) => {
     if (!user) return null;
     const { data, error } = await supabase
-      .from('invoice_items')
-      .insert({ ...item, user_id: user.id, name: item.name || '' } as any)
+      .from('item_groups')
+      .insert({ user_id: user.id, name } as any)
       .select()
       .single();
     if (error) {
       toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
       return null;
     }
-    toast({ title: 'Artikel erstellt' });
-    await fetchItems();
-    return data as InvoiceItem;
+    toast({ title: 'Artikelgruppe erstellt' });
+    await fetchGroups();
+    return data as ItemGroup;
   };
 
-  const updateItem = async (id: string, updates: Partial<InvoiceItem>) => {
-    const { error } = await supabase.from('invoice_items').update(updates as any).eq('id', id);
+  const updateGroup = async (id: string, name: string) => {
+    const { error } = await supabase.from('item_groups').update({ name } as any).eq('id', id);
     if (error) {
       toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
       return false;
     }
-    toast({ title: 'Artikel aktualisiert' });
-    await fetchItems();
+    toast({ title: 'Artikelgruppe aktualisiert' });
+    await fetchGroups();
     return true;
   };
 
-  const deleteItem = async (id: string) => {
-    const { error } = await supabase.from('invoice_items').delete().eq('id', id);
+  const deleteGroup = async (id: string) => {
+    const { error } = await supabase.from('item_groups').delete().eq('id', id);
     if (error) {
       toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
       return false;
     }
-    toast({ title: 'Artikel gelöscht' });
-    await fetchItems();
+    toast({ title: 'Artikelgruppe gelöscht' });
+    await fetchGroups();
     return true;
   };
 
-  return { items, loading, fetchItems, addItem, updateItem, deleteItem };
+  return { groups, loading, fetchGroups, addGroup, updateGroup, deleteGroup };
 }
