@@ -27,6 +27,7 @@ import Invoices from "./pages/Invoices";
 import InvoiceEditor from "./pages/InvoiceEditor";
 import Quotes from "./pages/Quotes";
 import DeliveryNotes from "./pages/DeliveryNotes";
+import OrderConfirmations from "./pages/OrderConfirmations";
 import Account from "./pages/Account";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -150,12 +151,20 @@ const App = () => (
               } 
             />
             <Route 
+              path="/order-confirmations" 
+              element={
+                <ProtectedRoute>
+                  <OrderConfirmations />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/quotes" 
               element={
                 <ProtectedRoute>
                   <Quotes />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route 
               path="/delivery-notes" 
