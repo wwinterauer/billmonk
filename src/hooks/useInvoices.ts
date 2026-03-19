@@ -58,6 +58,7 @@ export interface InvoiceLineItem {
   group_name?: string | null;
   is_group_header?: boolean | null;
   show_group_subtotal?: boolean | null;
+  image_path?: string | null;
 }
 
 export type InvoiceInsert = {
@@ -97,6 +98,7 @@ export type LineItemInsert = {
   group_name?: string;
   is_group_header?: boolean;
   show_group_subtotal?: boolean;
+  image_path?: string;
 };
 
 export function useInvoices() {
@@ -175,6 +177,7 @@ export function useInvoices() {
         group_name: li.group_name || null,
         is_group_header: li.is_group_header || false,
         show_group_subtotal: li.show_group_subtotal || false,
+        image_path: li.image_path || null,
       }));
 
       const { error: liError } = await supabase

@@ -1124,8 +1124,11 @@ export type Database = {
         Row: {
           created_at: string | null
           description: string | null
+          icon: string | null
           id: string
+          image_path: string | null
           is_active: boolean | null
+          item_group_id: string | null
           name: string
           sort_order: number | null
           unit: string | null
@@ -1137,8 +1140,11 @@ export type Database = {
         Insert: {
           created_at?: string | null
           description?: string | null
+          icon?: string | null
           id?: string
+          image_path?: string | null
           is_active?: boolean | null
+          item_group_id?: string | null
           name: string
           sort_order?: number | null
           unit?: string | null
@@ -1150,8 +1156,11 @@ export type Database = {
         Update: {
           created_at?: string | null
           description?: string | null
+          icon?: string | null
           id?: string
+          image_path?: string | null
           is_active?: boolean | null
+          item_group_id?: string | null
           name?: string
           sort_order?: number | null
           unit?: string | null
@@ -1161,6 +1170,13 @@ export type Database = {
           vat_rate?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "invoice_items_item_group_id_fkey"
+            columns: ["item_group_id"]
+            isOneToOne: false
+            referencedRelation: "item_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "invoice_items_user_id_fkey"
             columns: ["user_id"]
@@ -1176,6 +1192,7 @@ export type Database = {
           description: string
           group_name: string | null
           id: string
+          image_path: string | null
           invoice_id: string
           invoice_item_id: string | null
           is_group_header: boolean | null
@@ -1192,6 +1209,7 @@ export type Database = {
           description: string
           group_name?: string | null
           id?: string
+          image_path?: string | null
           invoice_id: string
           invoice_item_id?: string | null
           is_group_header?: boolean | null
@@ -1208,6 +1226,7 @@ export type Database = {
           description?: string
           group_name?: string | null
           id?: string
+          image_path?: string | null
           invoice_id?: string
           invoice_item_id?: string | null
           is_group_header?: boolean | null
@@ -1497,6 +1516,38 @@ export type Database = {
           },
           {
             foreignKeyName: "invoices_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      item_groups: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          sort_order: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          sort_order?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          sort_order?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_groups_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"

@@ -14,6 +14,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ArrowLeft, Plus, Trash2, Save, FolderPlus, Check } from 'lucide-react';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useInvoiceItems, type InvoiceItem } from '@/hooks/useInvoiceItems';
+import { useItemGroups } from '@/hooks/useItemGroups';
 import { useInvoiceSettings } from '@/hooks/useInvoiceSettings';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useCategories } from '@/hooks/useCategories';
@@ -34,6 +35,7 @@ interface EditorLineItem {
   group_name: string | null;
   is_group_header: boolean;
   show_group_subtotal: boolean;
+  image_path: string | null;
 }
 
 const newLine = (vatRate = 20): EditorLineItem => ({
@@ -47,6 +49,7 @@ const newLine = (vatRate = 20): EditorLineItem => ({
   group_name: null,
   is_group_header: false,
   show_group_subtotal: false,
+  image_path: null,
 });
 
 const newGroupHeader = (name: string): EditorLineItem => ({
@@ -60,6 +63,7 @@ const newGroupHeader = (name: string): EditorLineItem => ({
   group_name: name,
   is_group_header: true,
   show_group_subtotal: true,
+  image_path: null,
 });
 
 const InvoiceEditor = () => {
@@ -69,6 +73,7 @@ const InvoiceEditor = () => {
 
   const { customers } = useCustomers();
   const { items: articleTemplates } = useInvoiceItems();
+  const { groups: itemGroups } = useItemGroups();
   const { settings, loading: settingsLoading } = useInvoiceSettings();
   const { createInvoice, fetchLineItems } = useInvoices();
   const { categories } = useCategories();
@@ -175,6 +180,7 @@ const InvoiceEditor = () => {
             group_name: li.group_name || null,
             is_group_header: li.is_group_header || false,
             show_group_subtotal: li.show_group_subtotal || false,
+            image_path: (li as any).image_path || null,
           })));
         }
       })();
@@ -197,6 +203,7 @@ const InvoiceEditor = () => {
       group_name: null,
       is_group_header: false,
       show_group_subtotal: false,
+      image_path: template.image_path || null,
     }]);
   };
 
@@ -303,6 +310,7 @@ const InvoiceEditor = () => {
         group_name: l.group_name || undefined,
         is_group_header: l.is_group_header,
         show_group_subtotal: l.show_group_subtotal,
+        image_path: l.image_path || undefined,
       }))
     );
 
@@ -485,9 +493,29 @@ const InvoiceEditor = () => {
                     <SelectValue placeholder="Aus Vorlage…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {articleTemplates.filter(a => a.is_active).map(a => (
-                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                    ))}
+                    {(() => {
+                      const active = articleTemplates.filter(a => a.is_active);
+                      const grouped = itemGroups.map(g => ({
+                        name: g.name,
+                        items: active.filter(a => a.item_group_id === g.id),
+                      })).filter(g => g.items.length > 0);
+                      const ungrouped = active.filter(a => !a.item_group_id);
+                      return (
+                        <>
+                          {grouped.map(g => (
+                            <div key={g.name}>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{g.name}</div>
+                              {g.items.map(a => (
+                                <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                              ))}
+                            </div>
+                          ))}
+                          {ungrouped.map(a => (
+                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          ))}
+                        </>
+                      );
+                    })()}
                   </SelectContent>
                 </Select>
               )}
