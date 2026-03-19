@@ -138,6 +138,15 @@ export function InvoiceTemplateSettings() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="mt-4">
+              <InvoiceLayoutPreview
+                layoutVariant={form.layout_variant}
+                companySettings={companySettings}
+                invoiceNumber={previewInvoiceNumber}
+                footerText={form.default_footer_text}
+                logoUrl={getLogoUrl(companySettings?.logo_path ?? null)}
+              />
+            </div>
           </div>
 
           <Separator />
