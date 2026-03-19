@@ -63,6 +63,7 @@ export const FEATURE_DESCRIPTIONS: Record<string, { title: string; description: 
   cloudBackup: { title: 'Cloud-Backup', description: 'Sichere deine Belege automatisch in der Cloud.' },
   invoiceModule: { title: 'Ausgangsrechnungen', description: 'Erstelle und verwalte Rechnungen, Kunden und Artikel.' },
   taxExport: { title: 'Steuerberater-Export', description: 'Exportiere Buchungsdaten im DATEV- oder BMD-Format für deinen Steuerberater.' },
+  liveBankConnection: { title: 'Live-Bankanbindung', description: 'Verbinde dein Bankkonto direkt und gleiche Ein- & Ausgangsrechnungen automatisch ab.' },
 };
 
 // Plan hierarchy for comparison
