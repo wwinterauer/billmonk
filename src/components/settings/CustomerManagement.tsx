@@ -153,6 +153,35 @@ export function CustomerManagement() {
 
   return (
     <div className="space-y-4">
+      {/* Kundennummernkreis */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Hash className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Kundennummernkreis</CardTitle>
+              <CardDescription>Format und Zähler für automatische Kundennummern</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div><Label>Präfix</Label><Input value={customerNumberPrefix} onChange={e => setCustomerNumberPrefix(e.target.value)} /></div>
+            <div><Label>Format</Label><Input value={customerNumberFormat} onChange={e => setCustomerNumberFormat(e.target.value)} /></div>
+            <div><Label>Nächste Nr.</Label><Input type="number" value={nextCustomerNumber} onChange={e => setNextCustomerNumber(parseInt(e.target.value) || 1)} /></div>
+          </div>
+          <p className="text-xs text-muted-foreground">Vorschau: <span className="font-mono font-medium text-foreground">{previewCustomerNumber}</span></p>
+          <p className="text-xs text-muted-foreground">Platzhalter: {'{prefix}'}, {'{seq}'}</p>
+          <Button size="sm" onClick={handleSaveNumberSettings} disabled={savingNumberSettings}>
+            {savingNumberSettings ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+            Speichern
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Kundenliste */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">

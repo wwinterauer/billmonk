@@ -89,20 +89,8 @@ export function InvoiceTemplateSettings() {
             <p className="text-xs text-muted-foreground">Platzhalter: {'{prefix}'}, {'{year}'}, {'{seq}'}</p>
           </div>
 
-          <Separator />
 
-          {/* Customer Number Format */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium flex items-center gap-2"><Building2 className="h-4 w-4" /> Kundennummernkreis</h3>
-            <div className="grid grid-cols-3 gap-3">
-              <div><Label>Präfix</Label><Input value={form.customer_number_prefix} onChange={e => setForm(f => ({ ...f, customer_number_prefix: e.target.value }))} /></div>
-              <div><Label>Format</Label><Input value={form.customer_number_format} onChange={e => setForm(f => ({ ...f, customer_number_format: e.target.value }))} /></div>
-              <div><Label>Nächste Nr.</Label><Input type="number" value={form.next_customer_number} onChange={e => setForm(f => ({ ...f, next_customer_number: parseInt(e.target.value) || 1 }))} /></div>
-            </div>
-            <p className="text-xs text-muted-foreground">Vorschau: <span className="font-mono font-medium text-foreground">{previewCustomerNumber}</span></p>
-          </div>
 
-          <Separator />
 
           {/* Payment Terms + Discount */}
           <div className="space-y-3">
