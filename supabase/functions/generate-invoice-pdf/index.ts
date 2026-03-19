@@ -92,6 +92,8 @@ Deno.serve(async (req) => {
     const isSmallBusiness = company?.is_small_business || false;
     const documentType = invoice.document_type || "invoice";
     const layoutVariant = settings?.layout_variant || "classic";
+    const isDeliveryNote = documentType === "delivery_note";
+    const invoiceSubtype = invoice.invoice_subtype || "normal";
 
     // Document title based on type
     const docTitleMap: Record<string, string> = {
@@ -99,8 +101,33 @@ Deno.serve(async (req) => {
       order_confirmation: "Auftragsbestätigung",
       invoice: "Rechnung",
       credit_note: "Gutschrift",
+      delivery_note: "Lieferschein",
     };
-    const docTitle = docTitleMap[documentType] || "Rechnung";
+
+    // Subtype overrides for invoices
+    const subtypeTitleMap: Record<string, string> = {
+      deposit: "Anzahlungsrechnung",
+      partial: "Teilrechnung",
+      final: "Schlussrechnung",
+    };
+
+    let docTitle = docTitleMap[documentType] || "Rechnung";
+    if (documentType === "invoice" && invoiceSubtype !== "normal" && subtypeTitleMap[invoiceSubtype]) {
+      docTitle = subtypeTitleMap[invoiceSubtype];
+    }
+
+    // Fetch related order number for partial invoices
+    let relatedOrderNumber: string | null = null;
+    if (invoice.related_order_id) {
+      const { data: relatedOrder } = await supabase
+        .from("invoices")
+        .select("invoice_number, document_type")
+        .eq("id", invoice.related_order_id)
+        .single();
+      if (relatedOrder) {
+        relatedOrderNumber = relatedOrder.invoice_number;
+      }
+    }
 
     // Build PDF using pdf-lib
     const { PDFDocument, rgb, StandardFonts } = await import("npm:pdf-lib@1.17.1");
@@ -230,9 +257,29 @@ Deno.serve(async (req) => {
     drawText(titleText, margin, y, { size: 16, bold: true });
     y -= 20;
 
+    // Partial invoice reference
+    if (relatedOrderNumber) {
+      drawText(`Zu Auftrag: ${relatedOrderNumber}`, margin, y, { size: 9, color: rgb(0.3, 0.3, 0.3) });
+      y -= 14;
+    }
+
+    // Delivery time (document level)
+    if (invoice.delivery_time && ["quote", "order_confirmation", "delivery_note"].includes(documentType)) {
+      drawText(`Lieferzeit: ${invoice.delivery_time}`, margin, y, { size: 9 });
+      y -= 14;
+    }
+
     // Meta info right-aligned
     const metaX = 380;
-    drawText(`${docTitle}datum:`, metaX, y + 20); drawText(fmtDate(invoice.invoice_date), metaX + 100, y + 20);
+    const metaLabelMap: Record<string, string> = {
+      quote: "Angebotsdatum",
+      order_confirmation: "Auftragsdatum",
+      delivery_note: "Lieferdatum",
+      invoice: "Rechnungsdatum",
+      credit_note: "Gutschriftsdatum",
+    };
+    const metaLabel = metaLabelMap[documentType] || "Datum";
+    drawText(`${metaLabel}:`, metaX, y + 20); drawText(fmtDate(invoice.invoice_date), metaX + 100, y + 20);
     if (documentType === "invoice") {
       drawText("Fälligkeitsdatum:", metaX, y + 8); drawText(fmtDate(invoice.due_date), metaX + 100, y + 8);
     }
@@ -242,10 +289,19 @@ Deno.serve(async (req) => {
     y -= 10;
 
     // --- LINE ITEMS TABLE ---
-    const showVat = !isSmallBusiness;
-    const colX = showVat
-      ? { pos: margin, desc: margin + 25, qty: 310, unit: 355, price: 400, vat: 455, total: 500 }
-      : { pos: margin, desc: margin + 25, qty: 330, unit: 380, price: 420, vat: 0, total: 490 };
+    const showVat = !isSmallBusiness && !isDeliveryNote;
+    const showPrices = !isDeliveryNote;
+
+    // Column layout depends on mode
+    let colX: any;
+    if (isDeliveryNote) {
+      // Delivery note: Pos, Beschreibung, Menge, Einheit, Lieferzeit
+      colX = { pos: margin, desc: margin + 25, qty: 340, unit: 390, deliveryTime: 440, price: 0, vat: 0, total: 0 };
+    } else if (showVat) {
+      colX = { pos: margin, desc: margin + 25, qty: 310, unit: 355, price: 400, vat: 455, total: 500, deliveryTime: 0 };
+    } else {
+      colX = { pos: margin, desc: margin + 25, qty: 330, unit: 380, price: 420, vat: 0, total: 490, deliveryTime: 0 };
+    }
 
     page.drawLine({ start: { x: margin, y }, end: { x: 545, y }, thickness: 0.5, color: rgb(0.7, 0.7, 0.7) });
     y -= 12;
@@ -253,9 +309,14 @@ Deno.serve(async (req) => {
     drawText("Beschreibung", colX.desc, y, { bold: true, size: 8 });
     drawText("Menge", colX.qty, y, { bold: true, size: 8 });
     drawText("Einheit", colX.unit, y, { bold: true, size: 8 });
-    drawText("Preis", colX.price, y, { bold: true, size: 8 });
-    if (showVat) drawText("MwSt", colX.vat, y, { bold: true, size: 8 });
-    drawText("Netto", colX.total, y, { bold: true, size: 8 });
+    if (showPrices) {
+      drawText("Preis", colX.price, y, { bold: true, size: 8 });
+      if (showVat) drawText("MwSt", colX.vat, y, { bold: true, size: 8 });
+      drawText("Netto", colX.total, y, { bold: true, size: 8 });
+    }
+    if (isDeliveryNote) {
+      drawText("Lieferzeit", colX.deliveryTime, y, { bold: true, size: 8 });
+    }
     y -= 4;
     page.drawLine({ start: { x: margin, y }, end: { x: 545, y }, thickness: 0.5, color: rgb(0.7, 0.7, 0.7) });
     y -= 12;
@@ -299,7 +360,7 @@ Deno.serve(async (req) => {
         // Show subtotal of previous group if applicable
         if (currentGroupName && groupSubtotal > 0) {
           drawText(`Zwischensumme ${currentGroupName}`, colX.desc, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
-          drawText(fmtNum(groupSubtotal), colX.total, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
+          if (showPrices) drawText(fmtNum(groupSubtotal), colX.total, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
           y -= 16;
         }
         currentGroupName = item.group_name || item.description;
@@ -346,9 +407,14 @@ Deno.serve(async (req) => {
 
       drawText(fmtNum(item.quantity || 1), colX.qty, textY, { size: 8 });
       drawText(item.unit || "Stk", colX.unit, textY, { size: 8 });
-      drawText(fmtNum(item.unit_price || 0), colX.price, textY, { size: 8 });
-      if (showVat) drawText(`${fmtNum(item.vat_rate || 0)} %`, colX.vat, textY, { size: 8 });
-      drawText(fmtNum(lineNet), colX.total, textY, { size: 8 });
+      if (showPrices) {
+        drawText(fmtNum(item.unit_price || 0), colX.price, textY, { size: 8 });
+        if (showVat) drawText(`${fmtNum(item.vat_rate || 0)} %`, colX.vat, textY, { size: 8 });
+        drawText(fmtNum(lineNet), colX.total, textY, { size: 8 });
+      }
+      if (isDeliveryNote && item.delivery_time) {
+        drawText(item.delivery_time, colX.deliveryTime, textY, { size: 8 });
+      }
       y -= rowHeight;
     }
 
@@ -357,7 +423,7 @@ Deno.serve(async (req) => {
       const lastGroupHeader = items.find((it: any) => it.is_group_header && (it.group_name === currentGroupName || it.description === currentGroupName)) as any;
       if (lastGroupHeader?.show_group_subtotal) {
         drawText(`Zwischensumme ${currentGroupName}`, colX.desc, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
-        drawText(fmtNum(groupSubtotal), colX.total, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
+        if (showPrices) drawText(fmtNum(groupSubtotal), colX.total, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
         y -= 16;
       }
     }
@@ -366,46 +432,100 @@ Deno.serve(async (req) => {
     page.drawLine({ start: { x: margin, y }, end: { x: 545, y }, thickness: 0.5, color: rgb(0.7, 0.7, 0.7) });
     y -= 16;
 
-    // --- TOTALS ---
-    const totalsX = 400;
-    drawText("Netto:", totalsX, y); drawText(fmtCur(invoice.subtotal || 0), 490, y);
-    y -= 14;
+    // --- TOTALS (skip for delivery notes) ---
+    if (!isDeliveryNote) {
+      const totalsX = 400;
+      const rawSubtotal = invoice.subtotal || 0;
+      const rabattPercent = invoice.rabatt_percent || 0;
 
-    if (showVat) {
-      // VAT groups
-      const vatGroups: Record<number, number> = {};
-      for (const item of items) {
-        if ((item as any).is_group_header) continue;
-        const lineNet = ((item as any).quantity || 1) * ((item as any).unit_price || 0);
-        const rate = (item as any).vat_rate || 0;
-        vatGroups[rate] = (vatGroups[rate] || 0) + lineNet * (rate / 100);
-      }
-      for (const [rate, amount] of Object.entries(vatGroups)) {
-        drawText(`MwSt ${rate} %:`, totalsX, y); drawText(fmtCur(amount as number), 490, y);
+      if (rabattPercent > 0) {
+        // Show subtotal before discount
+        drawText("Netto:", totalsX, y); drawText(fmtCur(rawSubtotal), 490, y);
         y -= 14;
+
+        const rabattAmount = rawSubtotal * (rabattPercent / 100);
+        const nettoNachRabatt = rawSubtotal - rabattAmount;
+
+        drawText(`Rabatt ${fmtNum(rabattPercent)} %:`, totalsX, y);
+        drawText(`-${fmtCur(rabattAmount)}`, 490, y);
+        y -= 14;
+
+        drawText("Netto nach Rabatt:", totalsX, y); drawText(fmtCur(nettoNachRabatt), 490, y);
+        y -= 14;
+
+        if (showVat) {
+          const vatGroups: Record<number, number> = {};
+          for (const item of items) {
+            if ((item as any).is_group_header) continue;
+            const lineNet = ((item as any).quantity || 1) * ((item as any).unit_price || 0);
+            const rate = (item as any).vat_rate || 0;
+            // Apply rabatt proportionally
+            const discountedLineNet = lineNet * (1 - rabattPercent / 100);
+            vatGroups[rate] = (vatGroups[rate] || 0) + discountedLineNet * (rate / 100);
+          }
+          for (const [rate, amount] of Object.entries(vatGroups)) {
+            drawText(`MwSt ${rate} %:`, totalsX, y); drawText(fmtCur(amount as number), 490, y);
+            y -= 14;
+          }
+        }
+
+        page.drawLine({ start: { x: totalsX, y: y + 4 }, end: { x: 545, y: y + 4 }, thickness: 1, color: rgb(0, 0, 0) });
+        const vatOnDiscounted = showVat ? Object.values(
+          items.reduce((acc: Record<number, number>, item: any) => {
+            if (item.is_group_header) return acc;
+            const lineNet = (item.quantity || 1) * (item.unit_price || 0);
+            const rate = item.vat_rate || 0;
+            const discounted = lineNet * (1 - rabattPercent / 100);
+            acc[rate] = (acc[rate] || 0) + discounted * (rate / 100);
+            return acc;
+          }, {})
+        ).reduce((a: number, b: number) => a + b, 0) : 0;
+        const totalAmount = nettoNachRabatt + vatOnDiscounted;
+        drawText("Gesamt:", totalsX, y, { bold: true, size: 11 });
+        drawText(fmtCur(totalAmount), 490, y, { bold: true, size: 11 });
+        y -= 20;
+      } else {
+        // No rabatt - standard totals
+        drawText("Netto:", totalsX, y); drawText(fmtCur(rawSubtotal), 490, y);
+        y -= 14;
+
+        if (showVat) {
+          const vatGroups: Record<number, number> = {};
+          for (const item of items) {
+            if ((item as any).is_group_header) continue;
+            const lineNet = ((item as any).quantity || 1) * ((item as any).unit_price || 0);
+            const rate = (item as any).vat_rate || 0;
+            vatGroups[rate] = (vatGroups[rate] || 0) + lineNet * (rate / 100);
+          }
+          for (const [rate, amount] of Object.entries(vatGroups)) {
+            drawText(`MwSt ${rate} %:`, totalsX, y); drawText(fmtCur(amount as number), 490, y);
+            y -= 14;
+          }
+        }
+
+        page.drawLine({ start: { x: totalsX, y: y + 4 }, end: { x: 545, y: y + 4 }, thickness: 1, color: rgb(0, 0, 0) });
+        const totalAmount = isSmallBusiness ? rawSubtotal : (invoice.total || 0);
+        drawText("Gesamt:", totalsX, y, { bold: true, size: 11 });
+        drawText(fmtCur(totalAmount), 490, y, { bold: true, size: 11 });
+        y -= 20;
       }
-    }
 
-    page.drawLine({ start: { x: totalsX, y: y + 4 }, end: { x: 545, y: y + 4 }, thickness: 1, color: rgb(0, 0, 0) });
-    const totalAmount = isSmallBusiness ? (invoice.subtotal || 0) : (invoice.total || 0);
-    drawText("Gesamt:", totalsX, y, { bold: true, size: 11 });
-    drawText(fmtCur(totalAmount), 490, y, { bold: true, size: 11 });
-    y -= 20;
+      // Discount / Skonto
+      if (invoice.discount_percent && invoice.discount_percent > 0) {
+        const totalForSkonto = invoice.total || invoice.subtotal || 0;
+        const discountAmt = totalForSkonto * (invoice.discount_percent / 100);
+        drawText(
+          `Bei Zahlung innerhalb von ${invoice.discount_days || 0} Tagen: ${fmtNum(invoice.discount_percent)}% Skonto (${fmtCur(totalForSkonto - discountAmt)})`,
+          margin, y, { size: 8, color: rgb(0.3, 0.3, 0.3) }
+        );
+        y -= 16;
+      }
 
-    // Discount / Skonto
-    if (invoice.discount_percent && invoice.discount_percent > 0) {
-      const discountAmt = totalAmount * (invoice.discount_percent / 100);
-      drawText(
-        `Bei Zahlung innerhalb von ${invoice.discount_days || 0} Tagen: ${fmtNum(invoice.discount_percent)}% Skonto (${fmtCur(totalAmount - discountAmt)})`,
-        margin, y, { size: 8, color: rgb(0.3, 0.3, 0.3) }
-      );
-      y -= 16;
-    }
-
-    // Small business notice
-    if (isSmallBusiness && company?.small_business_text) {
-      drawText(company.small_business_text, margin, y, { size: 8, color: rgb(0.3, 0.3, 0.3) });
-      y -= 16;
+      // Small business notice
+      if (isSmallBusiness && company?.small_business_text) {
+        drawText(company.small_business_text, margin, y, { size: 8, color: rgb(0.3, 0.3, 0.3) });
+        y -= 16;
+      }
     }
 
     // --- NOTES ---
@@ -416,8 +536,8 @@ Deno.serve(async (req) => {
       y -= 16;
     }
 
-    // --- BANK DETAILS (from company_settings) ---
-    if (company?.iban || company?.bank_name) {
+    // --- BANK DETAILS (skip for delivery notes) ---
+    if (!isDeliveryNote && (company?.iban || company?.bank_name)) {
       drawText("Bankverbindung:", margin, y, { bold: true, size: 8 });
       y -= 12;
       if (company.bank_name) { drawText(company.bank_name, margin, y, { size: 8 }); y -= 11; }
