@@ -2,6 +2,7 @@ export type PlanType = 'free' | 'starter' | 'pro' | 'business';
 
 export interface PlanLimits {
   receiptsPerMonth: number;
+  documentsPerMonth: number;
   maxTotal: number | null;
   retentionYears: number | null;
 }
