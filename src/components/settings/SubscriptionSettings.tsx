@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PLAN_NAMES, PLAN_LIMITS, PLAN_PRICES, PlanType } from '@/lib/planConfig';
 
 export function SubscriptionSettings() {
-  const { plan, effectivePlan, isAdmin, receiptsUsed, receiptsLimit, receiptsCredit, loading: planLoading } = usePlan();
+  const { plan, effectivePlan, isAdmin, receiptsUsed, receiptsLimit, receiptsCredit, documentsUsed, documentsLimit, documentsCredit, loading: planLoading } = usePlan();
   const { toast } = useToast();
   const [portalLoading, setPortalLoading] = useState(false);
   const [checkLoading, setCheckLoading] = useState(false);
