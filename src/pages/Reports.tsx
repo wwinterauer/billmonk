@@ -84,6 +84,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { TaxExportDialog } from '@/components/exports/TaxExportDialog';
 
 const Reports = () => {
   const { toast } = useToast();
