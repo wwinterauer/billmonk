@@ -471,11 +471,11 @@ export function InvoiceItemManagement() {
 // Small component for loading thumbnails
 function ItemImageThumb({ path }: { path: string }) {
   const [url, setUrl] = useState<string | null>(null);
-  useState(() => {
+  useEffect(() => {
     supabase.storage.from('item-images').createSignedUrl(path, 3600).then(({ data }) => {
       if (data?.signedUrl) setUrl(data.signedUrl);
     });
-  });
+  }, [path]);
   if (!url) return <ImageIcon className="h-4 w-4 text-muted-foreground" />;
   return <img src={url} alt="" className="h-8 w-8 object-cover rounded-md" />;
 }
