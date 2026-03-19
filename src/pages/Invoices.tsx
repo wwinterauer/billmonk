@@ -80,12 +80,18 @@ const Invoices = () => {
             <h1 className="text-2xl font-bold text-foreground">Rechnungen</h1>
             <p className="text-muted-foreground">Ausgangsrechnungen erstellen und verwalten</p>
           </div>
-          <Button asChild>
-            <Link to="/invoices/new">
-              <Plus className="h-4 w-4 mr-2" />
-              Neue Rechnung
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setTaxExportOpen(true)}>
+              <Landmark className="h-4 w-4 mr-2" />
+              Steuerberater-Export
+            </Button>
+            <Button asChild>
+              <Link to="/invoices/new">
+                <Plus className="h-4 w-4 mr-2" />
+                Neue Rechnung
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
