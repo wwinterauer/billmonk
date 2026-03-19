@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useInvoiceSettings } from '@/hooks/useInvoiceSettings';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { InvoiceLayoutPreview } from './InvoiceLayoutPreview';
 import { Loader2 } from 'lucide-react';
 
 const LAYOUT_VARIANTS = [
