@@ -201,6 +201,7 @@ const InvoiceEditor = () => {
       group_name: null,
       is_group_header: false,
       show_group_subtotal: false,
+      image_path: template.image_path || null,
     }]);
   };
 
