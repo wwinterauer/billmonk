@@ -360,7 +360,7 @@ Deno.serve(async (req) => {
         // Show subtotal of previous group if applicable
         if (currentGroupName && groupSubtotal > 0) {
           drawText(`Zwischensumme ${currentGroupName}`, colX.desc, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
-          drawText(fmtNum(groupSubtotal), colX.total, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
+          if (showPrices) drawText(fmtNum(groupSubtotal), colX.total, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
           y -= 16;
         }
         currentGroupName = item.group_name || item.description;
