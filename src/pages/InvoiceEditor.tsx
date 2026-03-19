@@ -18,6 +18,8 @@ import { useInvoiceSettings } from '@/hooks/useInvoiceSettings';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useCategories } from '@/hooks/useCategories';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useTags } from '@/hooks/useTags';
+import { useInvoiceTags } from '@/hooks/useInvoiceTags';
 import { InvoiceTagSelector } from '@/components/invoices/InvoiceTagSelector';
 import { supabase } from '@/integrations/supabase/client';
 
