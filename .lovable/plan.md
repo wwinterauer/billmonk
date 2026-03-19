@@ -1,61 +1,67 @@
 
 
-## PDF-Edge-Function Update: Lieferschein, Rabatt, Lieferzeiten, Teilrechnungen
+## Plan: Business-Preis anpassen + DATEV/BMD Steuerberater-Export
 
-### Übersicht
+### Teil 1: Business-Preis von €9,99 auf €14,99 anheben
 
-Die `generate-invoice-pdf/index.ts` wird erweitert um vier fehlende Aspekte: (1) Lieferschein-Layout ohne Preise/MwSt, (2) Rabatt-Zeile im Summenblock, (3) Lieferzeiten-Anzeige, (4) Teilrechnungs-Hinweise.
+**Dateien:**
+- `src/lib/planConfig.ts` — Business monthly: 14.99, yearly: 143.90 (12×14.99 abzgl. ~20% Rabatt)
+- `src/components/landing/Pricing.tsx` — Features-Liste um "Angebote, AB & Lieferscheine" und "DATEV/BMD Export" ergänzen
 
-### Aktuelle Lücken
+**Stripe**: Die Stripe-Preise (`stripeConfig.ts`) müssen im Stripe-Dashboard separat angepasst werden — der Code referenziert nur die Price-IDs. Bestehende Abonnenten bleiben auf dem alten Preis bis zur nächsten Verlängerung.
 
-- `docTitleMap` fehlt `delivery_note: "Lieferschein"`
-- Preisspalten werden immer gerendert, auch bei Lieferscheinen
-- Kein Rabatt (`rabatt_percent`) im Summenblock
-- Lieferzeiten (`delivery_time` auf Beleg- und Positionsebene) werden ignoriert
-- Kein Hinweis auf `invoice_subtype` (Anzahlung/Teil/Schlussrechnung)
-- Keine Referenz auf verknüpfte AB (`related_order_id`)
+---
 
-### Änderungen in einer Datei
+### Teil 2: Steuerberater-Export (DATEV + BMD NTCS)
 
-**`supabase/functions/generate-invoice-pdf/index.ts`**
+#### Machbarkeit: Ja, gut umsetzbar
 
-1. **Document Title Map** (Zeile ~97-103)
-   - `delivery_note: "Lieferschein"` hinzufügen
-   - Subtype-Titel: `deposit` → "Anzahlungsrechnung", `partial` → "Teilrechnung", `final` → "Schlussrechnung"
+Beide Formate sind CSV-basiert mit festgelegter Spaltenstruktur. Alle benötigten Daten (Datum, Betrag, MwSt, Konto, Buchungstext) sind bereits in `receipts` und `invoices` vorhanden.
 
-2. **Lieferschein-Modus** (neue Variable ~Zeile 94)
-   - `const isDeliveryNote = documentType === 'delivery_note'`
-   - Bei Lieferschein: `showVat = false`, Preisspalten (`Preis`, `MwSt`, `Netto`) ausblenden
-   - Spalten-Layout anpassen: nur Pos, Beschreibung, Menge, Einheit + optional Lieferzeit
+#### DATEV Buchungsstapel-Format (Deutschland/International)
+CSV mit 2-Zeilen-Header:
+- **Zeile 1**: Metadaten (Format-ID "EXTF", Version, Kategorie 21=Buchungsstapel, Berater-Nr, Mandanten-Nr, WJ-Beginn, Sachkontenlänge, Datum)
+- **Zeile 2**: Spaltenüberschriften
+- **Pflichtfelder**: Umsatz, Soll/Haben-Kz (S/H), Konto, Gegenkonto, BU-Schlüssel (Steuerschlüssel), Belegdatum, Buchungstext, Belegfeld 1 (Rechnungsnr)
 
-3. **Positions-Rendering** (Zeile ~292-353)
-   - Bei `isDeliveryNote`: kein `unit_price`, kein `vat_rate`, kein `lineNet` rendern
-   - Lieferzeit pro Position anzeigen (wenn vorhanden)
+BU-Schlüssel-Mapping:
+- 20% → BU 9 (Vorsteuer 19% DE) bzw. Österreich-spezifisch
+- 10% → BU 8
+- 13% → BU 7
 
-4. **Lieferzeit auf Belegebene** (nach Meta-Block ~Zeile 242)
-   - Wenn `invoice.delivery_time` vorhanden und Typ = quote/order_confirmation/delivery_note: "Lieferzeit: ..." anzeigen
+#### BMD NTCS Fleximport-Format (Österreich)
+CSV mit Buchungssymbol-Logik:
+- **ER** (Eingangsrechnungen/Ausgaben): Konto, Gegenkonto, Betrag, Datum, Buchungstext, Steuercode, Belegnummer
+- **AR** (Ausgangsrechnungen/Einnahmen): gleiche Struktur, anderes Symbol
+- Personenkonten (Lieferanten/Kunden) als separate Stammdaten-CSV möglich
 
-5. **Summenblock** (Zeile ~369-403)
-   - Bei `isDeliveryNote`: gesamten Summenblock überspringen (keine Preise)
-   - Rabatt-Zeile einfügen: wenn `invoice.rabatt_percent > 0`:
-     ```
-     Netto:            € X.XXX,XX
-     Rabatt X%:       −€ XXX,XX
-     Netto nach Rabatt: € X.XXX,XX
-     MwSt ...
-     ```
-   - Berechnung: `rabattAmount = subtotal * rabatt_percent / 100`, MwSt auf reduziertes Netto
+#### Umsetzung
 
-6. **Teilrechnungs-Hinweis** (nach Dokumenttitel ~Zeile 229)
-   - Wenn `invoice.invoice_subtype` != 'normal': Subtype als Untertitel
-   - Wenn `invoice.related_order_id`: AB-Nummer laden und "Zu Auftrag: AB-XXXX" anzeigen
+**Neue Datei: `src/lib/taxExportFormats.ts`**
+- DATEV-Header-Generator mit konfigurierbarer Berater-/Mandantennummer und Sachkontenlänge
+- BMD-CSV-Generator mit Buchungssymbol ER/AR
+- BU-Schlüssel-Mapping für gängige MwSt-Sätze
+- Gemeinsame Hilfsfunktionen für Konten-Zuordnung
 
-7. **Bankverbindung bei Lieferschein** (Zeile ~419-428)
-   - Bei `isDeliveryNote`: Bankverbindung überspringen
+**Neue Datei: `src/components/exports/TaxExportDialog.tsx`**
+- Dialog mit Formatauswahl (DATEV/BMD)
+- Konfigurationsfelder: Berater-Nr, Mandanten-Nr, Sachkontenlänge (DATEV) / Buchungssymbol (BMD)
+- Auswahl: nur Ausgaben, nur Einnahmen, oder beides
+- Zeitraum-Auswahl
+- Einstellungen werden in `profiles` oder `localStorage` gespeichert
+
+**Integration in bestehende UI:**
+- `Expenses.tsx` — neuer "Steuerberater-Export" Button neben dem bestehenden Export
+- `Invoices.tsx` — gleicher Button für Ausgangsrechnungen
+- `Reports.tsx` — kombinierter Export beider Seiten
+- Optional: `Settings.tsx` — Steuerberater-Einstellungen (Standardwerte für Berater-Nr etc.)
+
+**Feature-Gate**: Steuerberater-Export hinter `business`-Plan (da es Teil des erweiterten Workflows ist)
 
 ### Technische Details
 
-- Für `related_order_id` wird ein zusätzlicher Supabase-Query benötigt um die AB-Nummer zu laden
-- Die Rabatt-Berechnung folgt: Netto → Rabatt abziehen → MwSt auf reduziertes Netto
-- Lieferzeit-Spalte bei Lieferschein nutzt den freigewordenen Platz der Preisspalten
+- DATEV erwartet Semikolon als Trennzeichen, UTF-8 mit BOM, Dezimalkomma
+- BMD erwartet Semikolon, Windows-1252 oder UTF-8, Dezimalkomma
+- Kontenrahmen-Zuordnung: User konfiguriert Standardkonten (z.B. Aufwandskonto 5000-6999, Erlöskonto 4000-4999, Bank 2800)
+- Export als `.csv`-Datei mit korrekter Benennung (DATEV: `EXTF_Buchungsstapel_JJJJ.csv`, BMD: `ER-Buchungen.csv` / `AR-Buchungen.csv`)
 
