@@ -310,6 +310,10 @@ const InvoiceEditor = () => {
 
     setSaving(false);
     if (result) {
+      // Assign selected tags to the new invoice
+      for (const tagId of selectedTagIds) {
+        try { await assignTag(result.id, tagId); } catch {}
+      }
       setSavedInvoiceId(result.id);
       navigate('/invoices');
     }
