@@ -64,6 +64,7 @@ import { CloudStorageSettings } from '@/components/settings/CloudStorageSettings
 import { CustomerManagement } from '@/components/settings/CustomerManagement';
 import { InvoiceItemManagement } from '@/components/settings/InvoiceItemManagement';
 import { InvoiceTemplateSettings } from '@/components/settings/InvoiceTemplateSettings';
+import { QuoteTemplateSettings } from '@/components/settings/QuoteTemplateSettings';
 import { InvoiceModuleSettings } from '@/components/settings/InvoiceModuleSettings';
 import { CompanySettings } from '@/components/settings/CompanySettings';
 import { usePlan } from '@/hooks/usePlan';
