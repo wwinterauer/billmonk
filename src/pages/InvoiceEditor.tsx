@@ -73,6 +73,8 @@ const InvoiceEditor = () => {
   const { createInvoice, fetchLineItems } = useInvoices();
   const { categories } = useCategories();
   const { settings: companySettings } = useCompanySettings();
+  const { activeTags } = useTags();
+  const { assignTag } = useInvoiceTags();
 
   const isSmallBusiness = companySettings?.is_small_business || false;
   const defaultVatRate = isSmallBusiness ? 0 : 20;
