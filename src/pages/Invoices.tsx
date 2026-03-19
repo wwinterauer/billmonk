@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { FileText, Plus, MoreHorizontal, CheckCircle, Send, XCircle, Trash2, Euro, Clock, AlertTriangle, Download, Copy, GitBranch } from 'lucide-react';
+import { FileText, Plus, MoreHorizontal, CheckCircle, Send, XCircle, Trash2, Euro, Clock, AlertTriangle, Download, Copy, GitBranch, ArrowRight, Receipt } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useInvoices, type Invoice } from '@/hooks/useInvoices';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,7 +26,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
 };
 
 const Invoices = () => {
-  const { invoices, loading, updateInvoiceStatus, deleteInvoice, copyInvoice, createCorrectionVersion } = useInvoices();
+  const { invoices, loading, updateInvoiceStatus, deleteInvoice, copyInvoice, createCorrectionVersion, convertDocument, createPartialInvoice } = useInvoices();
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const navigate = useNavigate();
@@ -165,11 +165,16 @@ const Invoices = () => {
                     const sc = STATUS_CONFIG[inv.status || 'draft'] || STATUS_CONFIG.draft;
                     const hasVersion = !!(inv as any).version;
                     return (
-                      <TableRow key={inv.id} className="cursor-pointer" onClick={() => navigate(`/invoices/${inv.id}/edit`)}>
-                        <TableCell className="font-medium">
-                          {inv.invoice_number}
-                          {hasVersion && <Badge variant="outline" className="ml-1 text-[10px]">{(inv as any).version}</Badge>}
-                        </TableCell>
+                        <TableRow key={inv.id} className="cursor-pointer" onClick={() => navigate(`/invoices/${inv.id}/edit`)}>
+                          <TableCell className="font-medium">
+                            {inv.invoice_number}
+                            {hasVersion && <Badge variant="outline" className="ml-1 text-[10px]">{(inv as any).version}</Badge>}
+                            {(inv as any).invoice_subtype && (inv as any).invoice_subtype !== 'normal' && (
+                              <Badge variant="secondary" className="ml-1 text-[10px]">
+                                {{ deposit: 'Anzahlung', partial: 'Teilzahlung', final: 'Schlussrechnung' }[(inv as any).invoice_subtype] || ''}
+                              </Badge>
+                            )}
+                          </TableCell>
                         <TableCell>{customerName(inv)}</TableCell>
                         <TableCell>{fmtDate(inv.invoice_date)}</TableCell>
                         <TableCell>{fmtDate(inv.due_date)}</TableCell>
@@ -210,6 +215,18 @@ const Invoices = () => {
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => createCorrectionVersion(inv.id)}>
                                 <GitBranch className="h-4 w-4 mr-2" /> Korrektur erstellen
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => convertDocument(inv.id, 'delivery_note')}>
+                                <ArrowRight className="h-4 w-4 mr-2" /> In Lieferschein
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => createPartialInvoice(inv.id, 'deposit')}>
+                                <Receipt className="h-4 w-4 mr-2" /> Anzahlungsrechnung
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => createPartialInvoice(inv.id, 'partial')}>
+                                <Receipt className="h-4 w-4 mr-2" /> Teilrechnung
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => createPartialInvoice(inv.id, 'final')}>
+                                <Receipt className="h-4 w-4 mr-2" /> Schlussrechnung
                               </DropdownMenuItem>
                               {inv.status === 'draft' && (
                                 <DropdownMenuItem onClick={() => updateInvoiceStatus(inv.id, 'sent')}>

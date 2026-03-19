@@ -26,6 +26,9 @@ export interface Customer {
   shipping_zip: string | null;
   shipping_city: string | null;
   shipping_country: string | null;
+  default_discount_percent: number | null;
+  default_skonto_percent: number | null;
+  default_skonto_days: number | null;
   created_at: string | null;
   updated_at: string | null;
 }

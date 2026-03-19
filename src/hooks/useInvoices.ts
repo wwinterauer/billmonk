@@ -28,7 +28,6 @@ export interface Invoice {
   created_at: string | null;
   updated_at: string | null;
   customers?: Customer;
-  // New fields
   document_type?: string | null;
   version?: string | null;
   parent_invoice_id?: string | null;
@@ -41,6 +40,11 @@ export interface Invoice {
   shipping_zip?: string | null;
   shipping_city?: string | null;
   shipping_country?: string | null;
+  delivery_time?: string | null;
+  rabatt_percent?: number | null;
+  invoice_subtype?: string | null;
+  related_order_id?: string | null;
+  category?: string | null;
 }
 
 export interface InvoiceLineItem {
@@ -59,6 +63,7 @@ export interface InvoiceLineItem {
   is_group_header?: boolean | null;
   show_group_subtotal?: boolean | null;
   image_path?: string | null;
+  delivery_time?: string | null;
 }
 
 export type InvoiceInsert = {
@@ -83,6 +88,10 @@ export type InvoiceInsert = {
   copied_from_id?: string;
   parent_invoice_id?: string;
   version?: string;
+  delivery_time?: string;
+  rabatt_percent?: number;
+  invoice_subtype?: string;
+  related_order_id?: string;
 };
 
 export type LineItemInsert = {
@@ -99,6 +108,7 @@ export type LineItemInsert = {
   is_group_header?: boolean;
   show_group_subtotal?: boolean;
   image_path?: string;
+  delivery_time?: string;
 };
 
 export function useInvoices() {
@@ -136,9 +146,25 @@ export function useInvoices() {
       subtotal += lineNet;
       vatTotal += lineNet * ((item.vat_rate || 0) / 100);
     }
+
+    // Apply rabatt (Gesamtrabatt) before VAT
+    const rabattPercent = invoice.rabatt_percent || 0;
+    if (rabattPercent > 0) {
+      const rabattAmount = subtotal * (rabattPercent / 100);
+      subtotal -= rabattAmount;
+      // Recalculate VAT on reduced subtotal
+      vatTotal = 0;
+      for (const item of lineItems) {
+        if (item.is_group_header) continue;
+        const lineNet = (item.quantity || 1) * (item.unit_price || 0);
+        const proportion = subtotal > 0 ? (lineNet / (subtotal + subtotal * rabattPercent / (100 - rabattPercent))) : 0;
+        vatTotal += (lineNet * (1 - rabattPercent / 100)) * ((item.vat_rate || 0) / 100);
+      }
+    }
+
     const total = subtotal + vatTotal;
 
-    // Calculate discount
+    // Calculate skonto discount
     const discountAmount = invoice.discount_percent
       ? total * (invoice.discount_percent / 100)
       : 0;
@@ -178,6 +204,7 @@ export function useInvoices() {
         is_group_header: li.is_group_header || false,
         show_group_subtotal: li.show_group_subtotal || false,
         image_path: li.image_path || null,
+        delivery_time: li.delivery_time || null,
       }));
 
       const { error: liError } = await supabase
@@ -192,7 +219,7 @@ export function useInvoices() {
     // Increment sequence number (best effort)
     try {
       const docType = invoice.document_type || 'invoice';
-      if (docType === 'invoice') {
+      if (docType === 'invoice' || docType === 'order_confirmation' || docType === 'delivery_note') {
         const { data: currentSettings } = await supabase
           .from('invoice_settings')
           .select('id, next_sequence_number')
@@ -207,7 +234,13 @@ export function useInvoices() {
       }
     } catch {}
 
-    const docLabel = (invoice.document_type === 'quote') ? 'Angebot' : (invoice.document_type === 'order_confirmation') ? 'Auftragsbestätigung' : 'Rechnung';
+    const docLabelMap: Record<string, string> = {
+      quote: 'Angebot',
+      order_confirmation: 'Auftragsbestätigung',
+      delivery_note: 'Lieferschein',
+      invoice: 'Rechnung',
+    };
+    const docLabel = docLabelMap[invoice.document_type || 'invoice'] || 'Rechnung';
     toast({ title: `${docLabel} erstellt` });
     await fetchInvoices();
     return typedInv;
@@ -256,7 +289,6 @@ export function useInvoices() {
   const copyInvoice = async (sourceId: string, overrides?: Partial<InvoiceInsert>) => {
     if (!user) return null;
 
-    // Fetch source
     const { data: source } = await supabase
       .from('invoices')
       .select('*')
@@ -266,7 +298,6 @@ export function useInvoices() {
 
     const lineItems = await fetchLineItems(sourceId);
 
-    // Generate new number
     const { data: settings } = await supabase
       .from('invoice_settings')
       .select('*')
@@ -294,6 +325,8 @@ export function useInvoices() {
         document_type: s.document_type || 'invoice',
         discount_percent: s.discount_percent || 0,
         discount_days: s.discount_days || 0,
+        rabatt_percent: s.rabatt_percent || 0,
+        delivery_time: s.delivery_time || undefined,
         copied_from_id: sourceId,
         ...overrides,
       },
@@ -307,6 +340,7 @@ export function useInvoices() {
         group_name: li.group_name || undefined,
         is_group_header: li.is_group_header || false,
         show_group_subtotal: li.show_group_subtotal || false,
+        delivery_time: li.delivery_time || undefined,
       }))
     );
   };
@@ -314,14 +348,13 @@ export function useInvoices() {
   const createCorrectionVersion = async (sourceId: string) => {
     if (!user) return null;
 
-    // Count existing versions
     const { count } = await supabase
       .from('invoices')
       .select('*', { count: 'exact', head: true })
       .eq('parent_invoice_id', sourceId);
 
     const versionIndex = (count || 0);
-    const versionSuffix = `-${String.fromCharCode(65 + versionIndex)}`; // -A, -B, -C...
+    const versionSuffix = `-${String.fromCharCode(65 + versionIndex)}`;
 
     const { data: source } = await supabase
       .from('invoices')
@@ -332,7 +365,6 @@ export function useInvoices() {
 
     const s = source as any;
 
-    // Mark original as corrected
     await supabase.from('invoices').update({ status: 'corrected' } as any).eq('id', sourceId);
 
     const lineItems = await fetchLineItems(sourceId);
@@ -349,6 +381,7 @@ export function useInvoices() {
         document_type: s.document_type || 'invoice',
         discount_percent: s.discount_percent || 0,
         discount_days: s.discount_days || 0,
+        rabatt_percent: s.rabatt_percent || 0,
         parent_invoice_id: sourceId,
         version: versionSuffix,
       },
@@ -362,30 +395,35 @@ export function useInvoices() {
         group_name: li.group_name || undefined,
         is_group_header: li.is_group_header || false,
         show_group_subtotal: li.show_group_subtotal || false,
+        delivery_time: li.delivery_time || undefined,
       }))
     );
   };
 
-  const convertDocument = async (sourceId: string, targetType: 'order_confirmation' | 'invoice') => {
+  const convertDocument = async (sourceId: string, targetType: 'order_confirmation' | 'invoice' | 'delivery_note') => {
     if (!user) return null;
 
-    const prefixMap: Record<string, string> = {
-      quote: 'AN',
-      order_confirmation: 'AB',
-      invoice: 'RE',
-    };
-
-    // Get settings for number generation
     const { data: settings } = await supabase
       .from('invoice_settings')
       .select('*')
       .eq('user_id', user.id)
       .maybeSingle();
 
+    const prefixMap: Record<string, string> = {
+      quote: settings?.invoice_number_prefix || 'AG',
+      order_confirmation: (settings as any)?.order_confirmation_prefix || 'AB',
+      delivery_note: (settings as any)?.delivery_note_prefix || 'LS',
+      invoice: settings?.invoice_number_prefix || 'RE',
+    };
+
     const prefix = prefixMap[targetType] || 'RE';
     const seq = settings?.next_sequence_number || 1;
     const year = new Date().getFullYear();
-    const newNumber = `${prefix}-${year}-${String(seq).padStart(4, '0')}`;
+    const format = settings?.invoice_number_format || '{prefix}-{year}-{seq}';
+    const newNumber = format
+      .replace('{prefix}', prefix)
+      .replace('{year}', String(year))
+      .replace('{seq}', String(seq).padStart(4, '0'));
 
     const result = await copyInvoice(sourceId, {
       document_type: targetType,
@@ -393,10 +431,83 @@ export function useInvoices() {
     });
 
     if (result) {
-      const label = targetType === 'order_confirmation' ? 'Auftragsbestätigung' : 'Rechnung';
-      toast({ title: `${label} erstellt`, description: `Aus dem Originaldokument umgewandelt.` });
+      const labelMap: Record<string, string> = {
+        order_confirmation: 'Auftragsbestätigung',
+        invoice: 'Rechnung',
+        delivery_note: 'Lieferschein',
+      };
+      toast({ title: `${labelMap[targetType] || targetType} erstellt`, description: 'Aus dem Originaldokument umgewandelt.' });
     }
     return result;
+  };
+
+  const createPartialInvoice = async (
+    sourceId: string,
+    subtype: 'deposit' | 'partial' | 'final',
+    lineItems?: Omit<LineItemInsert, 'invoice_id'>[]
+  ) => {
+    if (!user) return null;
+
+    const { data: source } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('id', sourceId)
+      .single();
+    if (!source) { toast({ title: 'Fehler', description: 'Quelldokument nicht gefunden', variant: 'destructive' }); return null; }
+
+    const s = source as any;
+    const sourceLines = lineItems || (await fetchLineItems(sourceId)).map(li => ({
+      description: li.description,
+      quantity: li.quantity || 1,
+      unit: li.unit || 'Stk',
+      unit_price: li.unit_price || 0,
+      vat_rate: li.vat_rate ?? 20,
+      invoice_item_id: li.invoice_item_id || undefined,
+      group_name: li.group_name || undefined,
+      is_group_header: li.is_group_header || false,
+      show_group_subtotal: li.show_group_subtotal || false,
+    }));
+
+    const { data: settings } = await supabase
+      .from('invoice_settings')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    const prefix = settings?.invoice_number_prefix || 'RE';
+    const seq = settings?.next_sequence_number || 1;
+    const year = new Date().getFullYear();
+    const format = settings?.invoice_number_format || '{prefix}-{year}-{seq}';
+    const newNumber = format
+      .replace('{prefix}', prefix)
+      .replace('{year}', String(year))
+      .replace('{seq}', String(seq).padStart(4, '0'));
+
+    const subtypeLabel: Record<string, string> = {
+      deposit: 'Anzahlung',
+      partial: 'Teilzahlung',
+      final: 'Schlussrechnung',
+    };
+
+    return createInvoice(
+      {
+        customer_id: s.customer_id,
+        invoice_number: newNumber,
+        status: 'draft',
+        invoice_date: new Date().toISOString().split('T')[0],
+        notes: s.notes || undefined,
+        footer_text: s.footer_text || undefined,
+        category: s.category || undefined,
+        document_type: 'invoice',
+        discount_percent: s.discount_percent || 0,
+        discount_days: s.discount_days || 0,
+        rabatt_percent: s.rabatt_percent || 0,
+        invoice_subtype: subtype,
+        related_order_id: sourceId,
+        copied_from_id: sourceId,
+      },
+      sourceLines
+    );
   };
 
   return {
@@ -410,5 +521,6 @@ export function useInvoices() {
     copyInvoice,
     createCorrectionVersion,
     convertDocument,
+    createPartialInvoice,
   };
 }

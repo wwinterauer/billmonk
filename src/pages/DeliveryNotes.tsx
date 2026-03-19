@@ -8,37 +8,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { FileText, Plus, MoreHorizontal, CheckCircle, Send, Trash2, ArrowRight, Copy } from 'lucide-react';
+import { Truck, Plus, MoreHorizontal, Send, Trash2, ArrowRight, Copy, CheckCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useInvoices, type Invoice } from '@/hooks/useInvoices';
-import { useToast } from '@/hooks/use-toast';
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Entwurf', variant: 'secondary' },
   sent: { label: 'Versendet', variant: 'default' },
-  accepted: { label: 'Angenommen', variant: 'outline' },
-  rejected: { label: 'Abgelehnt', variant: 'destructive' },
-  expired: { label: 'Abgelaufen', variant: 'secondary' },
+  delivered: { label: 'Zugestellt', variant: 'outline' },
 };
 
-const Quotes = () => {
+const DeliveryNotes = () => {
   const { invoices, loading, updateInvoiceStatus, deleteInvoice, copyInvoice, convertDocument } = useInvoices();
-  const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const navigate = useNavigate();
 
-  // Filter only quotes
-  const quotes = useMemo(() => {
-    return invoices.filter(inv => (inv as any).document_type === 'quote');
+  const deliveryNotes = useMemo(() => {
+    return invoices.filter(inv => (inv as any).document_type === 'delivery_note');
   }, [invoices]);
 
   const filtered = useMemo(() => {
-    if (statusFilter === 'all') return quotes;
-    return quotes.filter(inv => inv.status === statusFilter);
-  }, [quotes, statusFilter]);
-
-  const fmt = (n: number) =>
-    new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(n);
+    if (statusFilter === 'all') return deliveryNotes;
+    return deliveryNotes.filter(inv => inv.status === statusFilter);
+  }, [deliveryNotes, statusFilter]);
 
   const fmtDate = (d: string | null) => {
     if (!d) return '–';
@@ -56,20 +48,20 @@ const Quotes = () => {
         <div className="p-6 lg:p-8 space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Angebote</h1>
-              <p className="text-muted-foreground">Angebote erstellen und in Aufträge oder Rechnungen umwandeln</p>
+              <h1 className="text-2xl font-bold text-foreground">Lieferscheine</h1>
+              <p className="text-muted-foreground">Lieferscheine erstellen und in Rechnungen umwandeln</p>
             </div>
             <Button asChild>
-              <Link to="/invoices/new?type=quote">
+              <Link to="/invoices/new?type=delivery_note">
                 <Plus className="h-4 w-4 mr-2" />
-                Neues Angebot
+                Neuer Lieferschein
               </Link>
             </Button>
           </div>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Alle Angebote</CardTitle>
+              <CardTitle>Alle Lieferscheine</CardTitle>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Status filtern" />
@@ -78,8 +70,7 @@ const Quotes = () => {
                   <SelectItem value="all">Alle Status</SelectItem>
                   <SelectItem value="draft">Entwurf</SelectItem>
                   <SelectItem value="sent">Versendet</SelectItem>
-                  <SelectItem value="accepted">Angenommen</SelectItem>
-                  <SelectItem value="rejected">Abgelehnt</SelectItem>
+                  <SelectItem value="delivered">Zugestellt</SelectItem>
                 </SelectContent>
               </Select>
             </CardHeader>
@@ -88,10 +79,10 @@ const Quotes = () => {
                 <p className="text-muted-foreground text-center py-8">Laden…</p>
               ) : filtered.length === 0 ? (
                 <div className="text-center py-12 space-y-3">
-                  <FileText className="h-10 w-10 mx-auto text-muted-foreground" />
-                  <p className="text-muted-foreground">Keine Angebote vorhanden</p>
+                  <Truck className="h-10 w-10 mx-auto text-muted-foreground" />
+                  <p className="text-muted-foreground">Keine Lieferscheine vorhanden</p>
                   <Button asChild variant="outline">
-                    <Link to="/invoices/new?type=quote">Erstes Angebot erstellen</Link>
+                    <Link to="/invoices/new?type=delivery_note">Ersten Lieferschein erstellen</Link>
                   </Button>
                 </div>
               ) : (
@@ -101,8 +92,7 @@ const Quotes = () => {
                       <TableHead>Nr.</TableHead>
                       <TableHead>Kunde</TableHead>
                       <TableHead>Datum</TableHead>
-                      <TableHead>Gültig bis</TableHead>
-                      <TableHead className="text-right">Betrag</TableHead>
+                      <TableHead>Lieferzeit</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="w-10" />
                     </TableRow>
@@ -115,8 +105,7 @@ const Quotes = () => {
                           <TableCell className="font-medium">{inv.invoice_number}</TableCell>
                           <TableCell>{customerName(inv)}</TableCell>
                           <TableCell>{fmtDate(inv.invoice_date)}</TableCell>
-                          <TableCell>{fmtDate(inv.due_date)}</TableCell>
-                          <TableCell className="text-right font-medium">{fmt(inv.total || 0)}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{(inv as any).delivery_time || '–'}</TableCell>
                           <TableCell>
                             <Badge variant={sc.variant}>{sc.label}</Badge>
                           </TableCell>
@@ -128,12 +117,6 @@ const Quotes = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
-                                <DropdownMenuItem onClick={() => convertDocument(inv.id, 'order_confirmation')}>
-                                  <ArrowRight className="h-4 w-4 mr-2" /> In Auftragsbestätigung
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => convertDocument(inv.id, 'delivery_note')}>
-                                  <ArrowRight className="h-4 w-4 mr-2" /> In Lieferschein
-                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => convertDocument(inv.id, 'invoice')}>
                                   <ArrowRight className="h-4 w-4 mr-2" /> In Rechnung umwandeln
                                 </DropdownMenuItem>
@@ -146,8 +129,8 @@ const Quotes = () => {
                                   </DropdownMenuItem>
                                 )}
                                 {inv.status === 'sent' && (
-                                  <DropdownMenuItem onClick={() => updateInvoiceStatus(inv.id, 'accepted')}>
-                                    <CheckCircle className="h-4 w-4 mr-2" /> Als angenommen markieren
+                                  <DropdownMenuItem onClick={() => updateInvoiceStatus(inv.id, 'delivered')}>
+                                    <CheckCircle className="h-4 w-4 mr-2" /> Als zugestellt markieren
                                   </DropdownMenuItem>
                                 )}
                                 <AlertDialog>
@@ -158,9 +141,9 @@ const Quotes = () => {
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>Angebot löschen?</AlertDialogTitle>
+                                      <AlertDialogTitle>Lieferschein löschen?</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Das Angebot {inv.invoice_number} wird unwiderruflich gelöscht.
+                                        Der Lieferschein {inv.invoice_number} wird unwiderruflich gelöscht.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -186,4 +169,4 @@ const Quotes = () => {
   );
 };
 
-export default Quotes;
+export default DeliveryNotes;

@@ -591,6 +591,9 @@ export type Database = {
           created_at: string | null
           customer_number: string | null
           default_currency: string | null
+          default_discount_percent: number | null
+          default_skonto_days: number | null
+          default_skonto_percent: number | null
           display_name: string
           email: string | null
           has_different_shipping_address: boolean | null
@@ -617,6 +620,9 @@ export type Database = {
           created_at?: string | null
           customer_number?: string | null
           default_currency?: string | null
+          default_discount_percent?: number | null
+          default_skonto_days?: number | null
+          default_skonto_percent?: number | null
           display_name: string
           email?: string | null
           has_different_shipping_address?: boolean | null
@@ -643,6 +649,9 @@ export type Database = {
           created_at?: string | null
           customer_number?: string | null
           default_currency?: string | null
+          default_discount_percent?: number | null
+          default_skonto_days?: number | null
+          default_skonto_percent?: number | null
           display_name?: string
           email?: string | null
           has_different_shipping_address?: boolean | null
@@ -1123,6 +1132,7 @@ export type Database = {
       invoice_items: {
         Row: {
           created_at: string | null
+          default_delivery_time: string | null
           description: string | null
           icon: string | null
           id: string
@@ -1139,6 +1149,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          default_delivery_time?: string | null
           description?: string | null
           icon?: string | null
           id?: string
@@ -1155,6 +1166,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          default_delivery_time?: string | null
           description?: string | null
           icon?: string | null
           id?: string
@@ -1189,6 +1201,7 @@ export type Database = {
       invoice_line_items: {
         Row: {
           created_at: string | null
+          delivery_time: string | null
           description: string
           group_name: string | null
           id: string
@@ -1206,6 +1219,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          delivery_time?: string | null
           description: string
           group_name?: string | null
           id?: string
@@ -1223,6 +1237,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          delivery_time?: string | null
           description?: string
           group_name?: string | null
           id?: string
@@ -1269,6 +1284,8 @@ export type Database = {
           default_footer_text: string | null
           default_notes: string | null
           default_payment_terms_days: number | null
+          default_rabatt_percent: number | null
+          delivery_note_prefix: string | null
           iban: string | null
           id: string
           invoice_number_format: string | null
@@ -1276,6 +1293,7 @@ export type Database = {
           layout_variant: string | null
           next_customer_number: number | null
           next_sequence_number: number | null
+          order_confirmation_prefix: string | null
           overdue_reminder_days: number | null
           overdue_reminder_enabled: boolean | null
           send_copy_to_self: boolean | null
@@ -1295,6 +1313,8 @@ export type Database = {
           default_footer_text?: string | null
           default_notes?: string | null
           default_payment_terms_days?: number | null
+          default_rabatt_percent?: number | null
+          delivery_note_prefix?: string | null
           iban?: string | null
           id?: string
           invoice_number_format?: string | null
@@ -1302,6 +1322,7 @@ export type Database = {
           layout_variant?: string | null
           next_customer_number?: number | null
           next_sequence_number?: number | null
+          order_confirmation_prefix?: string | null
           overdue_reminder_days?: number | null
           overdue_reminder_enabled?: boolean | null
           send_copy_to_self?: boolean | null
@@ -1321,6 +1342,8 @@ export type Database = {
           default_footer_text?: string | null
           default_notes?: string | null
           default_payment_terms_days?: number | null
+          default_rabatt_percent?: number | null
+          delivery_note_prefix?: string | null
           iban?: string | null
           id?: string
           invoice_number_format?: string | null
@@ -1328,6 +1351,7 @@ export type Database = {
           layout_variant?: string | null
           next_customer_number?: number | null
           next_sequence_number?: number | null
+          order_confirmation_prefix?: string | null
           overdue_reminder_days?: number | null
           overdue_reminder_enabled?: boolean | null
           send_copy_to_self?: boolean | null
@@ -1388,6 +1412,7 @@ export type Database = {
           credit_note_for: string | null
           currency: string | null
           customer_id: string
+          delivery_time: string | null
           discount_amount: number | null
           discount_days: number | null
           discount_percent: number | null
@@ -1397,12 +1422,15 @@ export type Database = {
           id: string
           invoice_date: string | null
           invoice_number: string
+          invoice_subtype: string | null
           notes: string | null
           paid_at: string | null
           parent_invoice_id: string | null
           payment_reference: string | null
           pdf_storage_path: string | null
+          rabatt_percent: number | null
           recurring_invoice_id: string | null
+          related_order_id: string | null
           sent_at: string | null
           sent_to_email: string | null
           shipping_address_mode: string | null
@@ -1425,6 +1453,7 @@ export type Database = {
           credit_note_for?: string | null
           currency?: string | null
           customer_id: string
+          delivery_time?: string | null
           discount_amount?: number | null
           discount_days?: number | null
           discount_percent?: number | null
@@ -1434,12 +1463,15 @@ export type Database = {
           id?: string
           invoice_date?: string | null
           invoice_number: string
+          invoice_subtype?: string | null
           notes?: string | null
           paid_at?: string | null
           parent_invoice_id?: string | null
           payment_reference?: string | null
           pdf_storage_path?: string | null
+          rabatt_percent?: number | null
           recurring_invoice_id?: string | null
+          related_order_id?: string | null
           sent_at?: string | null
           sent_to_email?: string | null
           shipping_address_mode?: string | null
@@ -1462,6 +1494,7 @@ export type Database = {
           credit_note_for?: string | null
           currency?: string | null
           customer_id?: string
+          delivery_time?: string | null
           discount_amount?: number | null
           discount_days?: number | null
           discount_percent?: number | null
@@ -1471,12 +1504,15 @@ export type Database = {
           id?: string
           invoice_date?: string | null
           invoice_number?: string
+          invoice_subtype?: string | null
           notes?: string | null
           paid_at?: string | null
           parent_invoice_id?: string | null
           payment_reference?: string | null
           pdf_storage_path?: string | null
+          rabatt_percent?: number | null
           recurring_invoice_id?: string | null
+          related_order_id?: string | null
           sent_at?: string | null
           sent_to_email?: string | null
           shipping_address_mode?: string | null
@@ -1512,6 +1548,13 @@ export type Database = {
             columns: ["recurring_invoice_id"]
             isOneToOne: false
             referencedRelation: "recurring_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
           {
