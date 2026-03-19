@@ -481,7 +481,6 @@ const InvoiceEditor = () => {
               <TableBody>
                 {lines.map((line, idx) => {
                   // Track group transitions for subtotals
-                  const prevGroup = currentGroup;
                   if (line.is_group_header) {
                     // Before rendering a new group header, show subtotal of previous group
                     currentGroup = line.group_name;
