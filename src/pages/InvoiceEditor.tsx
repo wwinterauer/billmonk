@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ArrowLeft, Plus, Trash2, Save, FolderPlus } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, FolderPlus, Check } from 'lucide-react';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useInvoiceItems, type InvoiceItem } from '@/hooks/useInvoiceItems';
 import { useInvoiceSettings } from '@/hooks/useInvoiceSettings';
