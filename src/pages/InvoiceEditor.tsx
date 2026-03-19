@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,7 +69,7 @@ const InvoiceEditor = () => {
 
   const { customers } = useCustomers();
   const { items: articleTemplates } = useInvoiceItems();
-  const { settings } = useInvoiceSettings();
+  const { settings, loading: settingsLoading } = useInvoiceSettings();
   const { createInvoice, fetchLineItems } = useInvoices();
   const { categories } = useCategories();
   const { settings: companySettings } = useCompanySettings();
@@ -100,27 +100,25 @@ const InvoiceEditor = () => {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
   // Generate invoice number from settings
+  const invoiceNumberInitialized = useRef(false);
   useEffect(() => {
-    if (settings && !isEdit) {
-      const prefix = settings.invoice_number_prefix || 'RE';
-      const seq = settings.next_sequence_number || 1;
-      const year = new Date().getFullYear();
-      const formatted = (settings.invoice_number_format || '{prefix}-{year}-{seq}')
-        .replace('{prefix}', prefix)
-        .replace('{year}', String(year))
-        .replace('{seq}', String(seq).padStart(4, '0'));
-      setInvoiceNumber(formatted);
+    if (settingsLoading || isEdit || invoiceNumberInitialized.current) return;
+    invoiceNumberInitialized.current = true;
 
-      if (settings.default_discount_percent) setDiscountPercent(settings.default_discount_percent);
-      if (settings.default_discount_days) setDiscountDays(settings.default_discount_days);
-    }
-    if (settings?.default_footer_text && !footerText) {
-      setFooterText(settings.default_footer_text);
-    }
-    if (settings?.default_notes && !notes) {
-      setNotes(settings.default_notes);
-    }
-  }, [settings, isEdit]);
+    const prefix = settings?.invoice_number_prefix || 'RE';
+    const seq = settings?.next_sequence_number || 1;
+    const year = new Date().getFullYear();
+    const formatted = (settings?.invoice_number_format || '{prefix}-{year}-{seq}')
+      .replace('{prefix}', prefix)
+      .replace('{year}', String(year))
+      .replace('{seq}', String(seq).padStart(4, '0'));
+    setInvoiceNumber(formatted);
+
+    if (settings?.default_discount_percent) setDiscountPercent(settings.default_discount_percent);
+    if (settings?.default_discount_days) setDiscountDays(settings.default_discount_days);
+    if (settings?.default_footer_text) setFooterText(settings.default_footer_text);
+    if (settings?.default_notes) setNotes(settings.default_notes);
+  }, [settings, settingsLoading, isEdit]);
 
   // Set due date when customer changes
   useEffect(() => {
