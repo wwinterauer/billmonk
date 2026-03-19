@@ -1428,6 +1428,13 @@ const Expenses = () => {
                   Belege als ZIP
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                {isPlanSufficient(effectivePlan, 'business') && (
+                  <DropdownMenuItem onClick={() => setTaxExportOpen(true)}>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    Steuerberater-Export (DATEV/BMD)
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate('/settings?tab=export')}>
                   <Settings2 className="h-4 w-4 mr-2" />
                   Vorlagen verwalten
