@@ -176,6 +176,7 @@ export function useInvoices() {
         group_name: li.group_name || null,
         is_group_header: li.is_group_header || false,
         show_group_subtotal: li.show_group_subtotal || false,
+        image_path: li.image_path || null,
       }));
 
       const { error: liError } = await supabase
