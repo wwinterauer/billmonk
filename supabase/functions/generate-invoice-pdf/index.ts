@@ -75,19 +75,32 @@ Deno.serve(async (req) => {
       .eq("id", invoice.customer_id)
       .single();
 
-    // Fetch settings
+    // Fetch invoice settings
     const { data: settings } = await supabase
       .from("invoice_settings")
       .select("*")
       .eq("user_id", userId)
       .maybeSingle();
 
-    // Fetch profile for sender info
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("company_name, first_name, last_name, street, zip, city, country, uid_number")
-      .eq("id", userId)
-      .single();
+    // Fetch company settings (new)
+    const { data: company } = await supabase
+      .from("company_settings")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const isSmallBusiness = company?.is_small_business || false;
+    const documentType = invoice.document_type || "invoice";
+    const layoutVariant = settings?.layout_variant || "classic";
+
+    // Document title based on type
+    const docTitleMap: Record<string, string> = {
+      quote: "Angebot",
+      order_confirmation: "Auftragsbestätigung",
+      invoice: "Rechnung",
+      credit_note: "Gutschrift",
+    };
+    const docTitle = docTitleMap[documentType] || "Rechnung";
 
     // Build PDF using pdf-lib
     const { PDFDocument, rgb, StandardFonts } = await import("npm:pdf-lib@1.17.1");
@@ -97,7 +110,7 @@ Deno.serve(async (req) => {
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const fontSize = 9;
-    const { height } = page.getSize();
+    const { width, height } = page.getSize();
     const margin = 50;
 
     let y = height - margin;
@@ -122,16 +135,66 @@ Deno.serve(async (req) => {
       return new Date(d).toLocaleDateString("de-AT");
     };
 
-    // --- HEADER: Sender ---
-    const senderName = profile?.company_name || `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || "–";
+    // --- Try to embed logo ---
+    let logoImage: any = null;
+    if (company?.logo_path) {
+      try {
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const adminClient = createClient(supabaseUrl, serviceRoleKey);
+        const { data: logoData } = await adminClient.storage
+          .from("company-logos")
+          .download(company.logo_path);
+        if (logoData) {
+          const logoBytes = new Uint8Array(await logoData.arrayBuffer());
+          const isPng = company.logo_path.toLowerCase().endsWith(".png");
+          logoImage = isPng
+            ? await pdfDoc.embedPng(logoBytes)
+            : await pdfDoc.embedJpg(logoBytes);
+        }
+      } catch (e) {
+        console.error("Logo embed error:", e);
+      }
+    }
+
+    // --- LAYOUT VARIANTS ---
+    if (layoutVariant === "modern" && logoImage) {
+      // Centered logo
+      const logoDims = logoImage.scaleToFit(120, 50);
+      page.drawImage(logoImage, {
+        x: (width - logoDims.width) / 2,
+        y: y - logoDims.height,
+        width: logoDims.width,
+        height: logoDims.height,
+      });
+      y -= logoDims.height + 20;
+    } else if (logoImage && layoutVariant !== "minimal") {
+      // Classic: logo top-left
+      const logoDims = logoImage.scaleToFit(100, 45);
+      page.drawImage(logoImage, {
+        x: margin,
+        y: y - logoDims.height,
+        width: logoDims.width,
+        height: logoDims.height,
+      });
+      y -= logoDims.height + 10;
+    }
+
+    // --- HEADER: Sender (from company_settings) ---
+    const senderName = company?.company_name || "–";
     drawText(senderName, margin, y, { size: 14, bold: true });
     y -= 14;
-    if (profile?.street) { drawText(profile.street, margin, y); y -= 12; }
-    if (profile?.zip || profile?.city) {
-      drawText(`${profile?.zip || ""} ${profile?.city || ""}`.trim(), margin, y);
+    if (company?.street) { drawText(company.street, margin, y); y -= 12; }
+    if (company?.zip || company?.city) {
+      drawText(`${company?.zip || ""} ${company?.city || ""}`.trim(), margin, y);
       y -= 12;
     }
-    if (profile?.uid_number) { drawText(`UID: ${profile.uid_number}`, margin, y); y -= 12; }
+    if (company?.uid_number) { drawText(`UID: ${company.uid_number}`, margin, y); y -= 12; }
+    if (company?.company_register_number) {
+      drawText(`FN: ${company.company_register_number}${company.company_register_court ? ` (${company.company_register_court})` : ""}`, margin, y);
+      y -= 12;
+    }
+    if (company?.phone) { drawText(`Tel: ${company.phone}`, margin, y); y -= 12; }
+    if (company?.email) { drawText(company.email, margin, y); y -= 12; }
     y -= 10;
 
     // --- RECIPIENT ---
@@ -150,24 +213,40 @@ Deno.serve(async (req) => {
       }
       if (customer.uid_number) { drawText(`UID: ${customer.uid_number}`, margin, y); y -= 12; }
     }
+
+    // Shipping address if different
+    if (invoice.shipping_address_mode && invoice.shipping_address_mode !== "same" && invoice.shipping_street) {
+      y -= 8;
+      drawText("Lieferanschrift:", margin, y, { bold: true, size: 8 });
+      y -= 12;
+      drawText(invoice.shipping_street, margin, y, { size: 8 }); y -= 11;
+      drawText(`${invoice.shipping_zip || ""} ${invoice.shipping_city || ""}`.trim(), margin, y, { size: 8 }); y -= 11;
+    }
+
     y -= 20;
 
-    // --- INVOICE TITLE ---
-    drawText(`Rechnung ${invoice.invoice_number}`, margin, y, { size: 16, bold: true });
+    // --- DOCUMENT TITLE ---
+    const titleText = `${docTitle} ${invoice.invoice_number}${invoice.version || ""}`;
+    drawText(titleText, margin, y, { size: 16, bold: true });
     y -= 20;
 
     // Meta info right-aligned
     const metaX = 380;
-    drawText("Rechnungsdatum:", metaX, y + 20); drawText(fmtDate(invoice.invoice_date), metaX + 100, y + 20);
-    drawText("Fälligkeitsdatum:", metaX, y + 8); drawText(fmtDate(invoice.due_date), metaX + 100, y + 8);
+    drawText(`${docTitle}datum:`, metaX, y + 20); drawText(fmtDate(invoice.invoice_date), metaX + 100, y + 20);
+    if (documentType === "invoice") {
+      drawText("Fälligkeitsdatum:", metaX, y + 8); drawText(fmtDate(invoice.due_date), metaX + 100, y + 8);
+    }
     if (invoice.payment_reference) {
       drawText("Zahlungsreferenz:", metaX, y - 4); drawText(invoice.payment_reference, metaX + 100, y - 4);
     }
     y -= 10;
 
     // --- LINE ITEMS TABLE ---
-    // Header
-    const colX = { pos: margin, desc: margin + 25, qty: 310, unit: 355, price: 400, vat: 455, total: 500 };
+    const showVat = !isSmallBusiness;
+    const colX = showVat
+      ? { pos: margin, desc: margin + 25, qty: 310, unit: 355, price: 400, vat: 455, total: 500 }
+      : { pos: margin, desc: margin + 25, qty: 330, unit: 380, price: 420, vat: 0, total: 490 };
+
     page.drawLine({ start: { x: margin, y }, end: { x: 545, y }, thickness: 0.5, color: rgb(0.7, 0.7, 0.7) });
     y -= 12;
     drawText("Pos", colX.pos, y, { bold: true, size: 8 });
@@ -175,26 +254,69 @@ Deno.serve(async (req) => {
     drawText("Menge", colX.qty, y, { bold: true, size: 8 });
     drawText("Einheit", colX.unit, y, { bold: true, size: 8 });
     drawText("Preis", colX.price, y, { bold: true, size: 8 });
-    drawText("MwSt", colX.vat, y, { bold: true, size: 8 });
+    if (showVat) drawText("MwSt", colX.vat, y, { bold: true, size: 8 });
     drawText("Netto", colX.total, y, { bold: true, size: 8 });
     y -= 4;
     page.drawLine({ start: { x: margin, y }, end: { x: 545, y }, thickness: 0.5, color: rgb(0.7, 0.7, 0.7) });
     y -= 12;
 
     const items = lineItems || [];
-    for (const item of items) {
+    let posCounter = 0;
+    let currentGroupName: string | null = null;
+    let groupSubtotal = 0;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i] as any;
+
+      if (y < 100) break; // Safety
+
+      // Group header
+      if (item.is_group_header) {
+        // Show subtotal of previous group if applicable
+        if (currentGroupName && groupSubtotal > 0) {
+          drawText(`Zwischensumme ${currentGroupName}`, colX.desc, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
+          drawText(fmtNum(groupSubtotal), colX.total, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
+          y -= 16;
+        }
+        currentGroupName = item.group_name || item.description;
+        groupSubtotal = 0;
+
+        // Draw group header
+        page.drawRectangle({
+          x: margin,
+          y: y - 2,
+          width: 495,
+          height: 14,
+          color: rgb(0.95, 0.95, 0.95),
+        });
+        drawText(item.description || item.group_name || "", colX.desc, y, { size: 9, bold: true });
+        y -= 16;
+        continue;
+      }
+
+      posCounter++;
       const lineNet = (item.quantity || 1) * (item.unit_price || 0);
+      if (currentGroupName) groupSubtotal += lineNet;
+
       const desc = (item.description || "").substring(0, 45);
-      drawText(String(item.position || ""), colX.pos, y, { size: 8 });
+      drawText(String(posCounter), colX.pos, y, { size: 8 });
       drawText(desc, colX.desc, y, { size: 8 });
       drawText(fmtNum(item.quantity || 1), colX.qty, y, { size: 8 });
       drawText(item.unit || "Stk", colX.unit, y, { size: 8 });
       drawText(fmtNum(item.unit_price || 0), colX.price, y, { size: 8 });
-      drawText(`${fmtNum(item.vat_rate || 0)} %`, colX.vat, y, { size: 8 });
+      if (showVat) drawText(`${fmtNum(item.vat_rate || 0)} %`, colX.vat, y, { size: 8 });
       drawText(fmtNum(lineNet), colX.total, y, { size: 8 });
       y -= 14;
+    }
 
-      if (y < 120) break; // Safety: don't go off page
+    // Final group subtotal
+    if (currentGroupName && groupSubtotal > 0) {
+      const lastGroupHeader = items.find((it: any) => it.is_group_header && (it.group_name === currentGroupName || it.description === currentGroupName)) as any;
+      if (lastGroupHeader?.show_group_subtotal) {
+        drawText(`Zwischensumme ${currentGroupName}`, colX.desc, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
+        drawText(fmtNum(groupSubtotal), colX.total, y, { size: 8, bold: true, color: rgb(0.3, 0.3, 0.3) });
+        y -= 16;
+      }
     }
 
     y -= 4;
@@ -206,22 +328,42 @@ Deno.serve(async (req) => {
     drawText("Netto:", totalsX, y); drawText(fmtCur(invoice.subtotal || 0), 490, y);
     y -= 14;
 
-    // VAT groups
-    const vatGroups: Record<number, number> = {};
-    for (const item of items) {
-      const lineNet = (item.quantity || 1) * (item.unit_price || 0);
-      const rate = item.vat_rate || 0;
-      vatGroups[rate] = (vatGroups[rate] || 0) + lineNet * (rate / 100);
-    }
-    for (const [rate, amount] of Object.entries(vatGroups)) {
-      drawText(`MwSt ${rate} %:`, totalsX, y); drawText(fmtCur(amount as number), 490, y);
-      y -= 14;
+    if (showVat) {
+      // VAT groups
+      const vatGroups: Record<number, number> = {};
+      for (const item of items) {
+        if ((item as any).is_group_header) continue;
+        const lineNet = ((item as any).quantity || 1) * ((item as any).unit_price || 0);
+        const rate = (item as any).vat_rate || 0;
+        vatGroups[rate] = (vatGroups[rate] || 0) + lineNet * (rate / 100);
+      }
+      for (const [rate, amount] of Object.entries(vatGroups)) {
+        drawText(`MwSt ${rate} %:`, totalsX, y); drawText(fmtCur(amount as number), 490, y);
+        y -= 14;
+      }
     }
 
     page.drawLine({ start: { x: totalsX, y: y + 4 }, end: { x: 545, y: y + 4 }, thickness: 1, color: rgb(0, 0, 0) });
+    const totalAmount = isSmallBusiness ? (invoice.subtotal || 0) : (invoice.total || 0);
     drawText("Gesamt:", totalsX, y, { bold: true, size: 11 });
-    drawText(fmtCur(invoice.total || 0), 490, y, { bold: true, size: 11 });
-    y -= 24;
+    drawText(fmtCur(totalAmount), 490, y, { bold: true, size: 11 });
+    y -= 20;
+
+    // Discount / Skonto
+    if (invoice.discount_percent && invoice.discount_percent > 0) {
+      const discountAmt = totalAmount * (invoice.discount_percent / 100);
+      drawText(
+        `Bei Zahlung innerhalb von ${invoice.discount_days || 0} Tagen: ${fmtNum(invoice.discount_percent)}% Skonto (${fmtCur(totalAmount - discountAmt)})`,
+        margin, y, { size: 8, color: rgb(0.3, 0.3, 0.3) }
+      );
+      y -= 16;
+    }
+
+    // Small business notice
+    if (isSmallBusiness && company?.small_business_text) {
+      drawText(company.small_business_text, margin, y, { size: 8, color: rgb(0.3, 0.3, 0.3) });
+      y -= 16;
+    }
 
     // --- NOTES ---
     if (invoice.notes) {
@@ -231,13 +373,14 @@ Deno.serve(async (req) => {
       y -= 16;
     }
 
-    // --- BANK DETAILS / FOOTER ---
-    if (settings?.iban || settings?.bank_name) {
+    // --- BANK DETAILS (from company_settings) ---
+    if (company?.iban || company?.bank_name) {
       drawText("Bankverbindung:", margin, y, { bold: true, size: 8 });
       y -= 12;
-      if (settings.bank_name) { drawText(settings.bank_name, margin, y, { size: 8 }); y -= 11; }
-      if (settings.iban) { drawText(`IBAN: ${settings.iban}`, margin, y, { size: 8 }); y -= 11; }
-      if (settings.bic) { drawText(`BIC: ${settings.bic}`, margin, y, { size: 8 }); y -= 11; }
+      if (company.bank_name) { drawText(company.bank_name, margin, y, { size: 8 }); y -= 11; }
+      if (company.account_holder) { drawText(`Kontoinhaber: ${company.account_holder}`, margin, y, { size: 8 }); y -= 11; }
+      if (company.iban) { drawText(`IBAN: ${company.iban}`, margin, y, { size: 8 }); y -= 11; }
+      if (company.bic) { drawText(`BIC: ${company.bic}`, margin, y, { size: 8 }); y -= 11; }
       y -= 8;
     }
 
@@ -252,7 +395,7 @@ Deno.serve(async (req) => {
     const pdfBytes = await pdfDoc.save();
 
     // Upload to storage
-    const storagePath = `${userId}/${invoice.invoice_number.replace(/[^a-zA-Z0-9-_]/g, "_")}.pdf`;
+    const storagePath = `${userId}/${invoice.invoice_number.replace(/[^a-zA-Z0-9-_]/g, "_")}${invoice.version || ""}.pdf`;
 
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const adminClient = createClient(supabaseUrl, serviceRoleKey);

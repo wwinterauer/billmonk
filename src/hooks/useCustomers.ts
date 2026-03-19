@@ -21,6 +21,11 @@ export interface Customer {
   default_currency: string | null;
   notes: string | null;
   is_archived: boolean | null;
+  has_different_shipping_address: boolean | null;
+  shipping_street: string | null;
+  shipping_zip: string | null;
+  shipping_city: string | null;
+  shipping_country: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -53,6 +58,8 @@ export function useCustomers() {
 
   const addCustomer = async (customer: Partial<CustomerInsert>) => {
     if (!user) return null;
+
+    // Auto-increment customer number in invoice_settings if we used a generated number
     const { data, error } = await supabase
       .from('customers')
       .insert({ ...customer, user_id: user.id, display_name: customer.display_name || '' } as any)
@@ -62,6 +69,22 @@ export function useCustomers() {
       toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
       return null;
     }
+
+    // Increment next_customer_number (best effort)
+    try {
+      const { data: settings } = await supabase
+        .from('invoice_settings')
+        .select('id, next_customer_number')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (settings) {
+        await supabase
+          .from('invoice_settings')
+          .update({ next_customer_number: (settings.next_customer_number || 1) + 1 } as any)
+          .eq('id', settings.id);
+      }
+    } catch {}
+
     toast({ title: 'Kunde erstellt' });
     await fetchCustomers();
     return data as Customer;
