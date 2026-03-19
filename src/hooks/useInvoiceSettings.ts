@@ -26,6 +26,9 @@ export interface InvoiceSettings {
   customer_number_prefix: string | null;
   customer_number_format: string | null;
   next_customer_number: number | null;
+  default_rabatt_percent: number | null;
+  order_confirmation_prefix: string | null;
+  delivery_note_prefix: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
