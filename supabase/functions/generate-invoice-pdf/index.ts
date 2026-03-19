@@ -289,10 +289,19 @@ Deno.serve(async (req) => {
     y -= 10;
 
     // --- LINE ITEMS TABLE ---
-    const showVat = !isSmallBusiness;
-    const colX = showVat
-      ? { pos: margin, desc: margin + 25, qty: 310, unit: 355, price: 400, vat: 455, total: 500 }
-      : { pos: margin, desc: margin + 25, qty: 330, unit: 380, price: 420, vat: 0, total: 490 };
+    const showVat = !isSmallBusiness && !isDeliveryNote;
+    const showPrices = !isDeliveryNote;
+
+    // Column layout depends on mode
+    let colX: any;
+    if (isDeliveryNote) {
+      // Delivery note: Pos, Beschreibung, Menge, Einheit, Lieferzeit
+      colX = { pos: margin, desc: margin + 25, qty: 340, unit: 390, deliveryTime: 440, price: 0, vat: 0, total: 0 };
+    } else if (showVat) {
+      colX = { pos: margin, desc: margin + 25, qty: 310, unit: 355, price: 400, vat: 455, total: 500, deliveryTime: 0 };
+    } else {
+      colX = { pos: margin, desc: margin + 25, qty: 330, unit: 380, price: 420, vat: 0, total: 490, deliveryTime: 0 };
+    }
 
     page.drawLine({ start: { x: margin, y }, end: { x: 545, y }, thickness: 0.5, color: rgb(0.7, 0.7, 0.7) });
     y -= 12;
@@ -300,9 +309,14 @@ Deno.serve(async (req) => {
     drawText("Beschreibung", colX.desc, y, { bold: true, size: 8 });
     drawText("Menge", colX.qty, y, { bold: true, size: 8 });
     drawText("Einheit", colX.unit, y, { bold: true, size: 8 });
-    drawText("Preis", colX.price, y, { bold: true, size: 8 });
-    if (showVat) drawText("MwSt", colX.vat, y, { bold: true, size: 8 });
-    drawText("Netto", colX.total, y, { bold: true, size: 8 });
+    if (showPrices) {
+      drawText("Preis", colX.price, y, { bold: true, size: 8 });
+      if (showVat) drawText("MwSt", colX.vat, y, { bold: true, size: 8 });
+      drawText("Netto", colX.total, y, { bold: true, size: 8 });
+    }
+    if (isDeliveryNote) {
+      drawText("Lieferzeit", colX.deliveryTime, y, { bold: true, size: 8 });
+    }
     y -= 4;
     page.drawLine({ start: { x: margin, y }, end: { x: 545, y }, thickness: 0.5, color: rgb(0.7, 0.7, 0.7) });
     y -= 12;
