@@ -63,6 +63,7 @@ const newGroupHeader = (name: string): EditorLineItem => ({
   group_name: name,
   is_group_header: true,
   show_group_subtotal: true,
+  image_path: null,
 });
 
 const InvoiceEditor = () => {
