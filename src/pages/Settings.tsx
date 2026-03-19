@@ -991,6 +991,15 @@ const Settings = () => {
         </FeatureGate>
       </TabsContent>
 
+      {/* Company Settings Tab */}
+      <TabsContent value="company">
+        <FeatureGate feature="invoiceModule">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <CompanySettings />
+        </motion.div>
+        </FeatureGate>
+      </TabsContent>
+
       {/* Customer Management Tab */}
       <TabsContent value="customers">
         <FeatureGate feature="invoiceModule">
