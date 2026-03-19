@@ -35,6 +35,7 @@ interface EditorLineItem {
   group_name: string | null;
   is_group_header: boolean;
   show_group_subtotal: boolean;
+  image_path: string | null;
 }
 
 const newLine = (vatRate = 20): EditorLineItem => ({
