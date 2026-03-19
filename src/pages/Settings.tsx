@@ -446,6 +446,7 @@ const Settings = () => {
     { value: 'customers', icon: Building2, label: 'Kunden', requiredFeature: 'invoiceModule' as const },
     { value: 'invoice-items', icon: Package, label: 'Artikel', requiredFeature: 'invoiceModule' as const },
     { value: 'invoice-templates', icon: FileCheck, label: 'Rechnung', requiredFeature: 'invoiceModule' as const },
+    { value: 'quote-templates', icon: FileText, label: 'Angebot', requiredFeature: 'invoiceModule' as const },
     { value: 'invoice-settings', icon: Settings2, label: 'Fakturierung', requiredFeature: 'invoiceModule' as const },
   ];
 
