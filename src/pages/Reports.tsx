@@ -365,7 +365,7 @@ const Reports = () => {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user && !!previousPeriodRange?.from && !!previousPeriodRange?.to && showIncome,
+    enabled: !!user && !!previousPeriodRange?.from && !!previousPeriodRange?.to,
   });
 
   // Calculate KPIs
