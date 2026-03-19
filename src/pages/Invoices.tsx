@@ -31,10 +31,15 @@ const Invoices = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const navigate = useNavigate();
 
+  // Filter only invoices (not quotes/order_confirmations)
+  const invoiceOnly = useMemo(() => {
+    return invoices.filter(inv => !(inv as any).document_type || (inv as any).document_type === 'invoice');
+  }, [invoices]);
+
   const filtered = useMemo(() => {
-    if (statusFilter === 'all') return invoices;
-    return invoices.filter(inv => inv.status === statusFilter);
-  }, [invoices, statusFilter]);
+    if (statusFilter === 'all') return invoiceOnly;
+    return invoiceOnly.filter(inv => inv.status === statusFilter);
+  }, [invoiceOnly, statusFilter]);
 
   const stats = useMemo(() => {
     const open = invoices.filter(i => i.status === 'sent').reduce((s, i) => s + (i.total || 0), 0);
