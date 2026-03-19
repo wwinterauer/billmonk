@@ -2305,8 +2305,7 @@ const Reports = () => {
             </Card>
 
             {/* USt-Übersicht (Umsatzsteuer) */}
-            {incomeStats.byVatRate.length > 0 && (
-              <Card className="border-border/50 mb-6">
+            <Card className="border-border/50 mb-6">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Percent className="h-5 w-5" />
@@ -2315,6 +2314,12 @@ const Reports = () => {
                   <CardDescription>Aufschlüsselung nach effektivem Steuersatz</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {incomeStats.byVatRate.length === 0 ? (
+                    <div className="py-8 text-center text-muted-foreground">
+                      Keine Daten für den gewählten Zeitraum
+                    </div>
+                  ) : (
+                  <>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2346,9 +2351,28 @@ const Reports = () => {
                       </TableRow>
                     </TableFooter>
                   </Table>
+
+                  {/* USt Note */}
+                  <div className="mt-4 p-3 bg-blue-500/10 rounded-lg flex items-start gap-2">
+                    <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-blue-600 dark:text-blue-400">
+                      Die Umsatzsteuer von{' '}
+                      <strong>{formatCurrency(incomeStats.totalVat)}</strong> muss in
+                      der UVA für den Zeitraum{' '}
+                      {dateRange.from
+                        ? format(dateRange.from, 'dd.MM.yyyy', { locale: de })
+                        : ''}{' '}
+                      -{' '}
+                      {dateRange.to
+                        ? format(dateRange.to, 'dd.MM.yyyy', { locale: de })
+                        : ''}{' '}
+                      abgeführt werden.
+                    </p>
+                  </div>
+                  </>
+                  )}
                 </CardContent>
               </Card>
-            )}
 
             {/* Income Time Series */}
             {incomeStats.timeSeries.length > 0 && (
