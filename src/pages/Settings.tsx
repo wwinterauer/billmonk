@@ -65,6 +65,7 @@ import { CustomerManagement } from '@/components/settings/CustomerManagement';
 import { InvoiceItemManagement } from '@/components/settings/InvoiceItemManagement';
 import { InvoiceTemplateSettings } from '@/components/settings/InvoiceTemplateSettings';
 import { InvoiceModuleSettings } from '@/components/settings/InvoiceModuleSettings';
+import { CompanySettings } from '@/components/settings/CompanySettings';
 import { usePlan } from '@/hooks/usePlan';
 import { FEATURE_MIN_PLAN, isPlanSufficient } from '@/lib/planConfig';
 import { FeatureGate } from '@/components/FeatureGate';
