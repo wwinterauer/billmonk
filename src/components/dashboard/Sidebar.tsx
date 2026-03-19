@@ -134,6 +134,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const usagePercent = receiptsLimit > 0 ? Math.min(100, (receiptsUsed / receiptsLimit) * 100) : 0;
   const quotaColor = usagePercent > 95 ? 'text-destructive' : usagePercent > 80 ? 'text-yellow-500' : 'text-primary';
 
+  const docUsagePercent = documentsLimit > 0 ? Math.min(100, (documentsUsed / documentsLimit) * 100) : 0;
+  const docQuotaColor = docUsagePercent > 95 ? 'text-destructive' : docUsagePercent > 80 ? 'text-yellow-500' : 'text-primary';
+
   const userEmail = user?.email || 'user@example.com';
   const userName = user?.user_metadata?.first_name 
     ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`
