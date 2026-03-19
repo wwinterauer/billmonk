@@ -49,6 +49,9 @@ export function InvoiceTemplateSettings() {
         default_notes: settings.default_notes || '',
         default_discount_percent: (settings as any).default_discount_percent || 0,
         default_discount_days: (settings as any).default_discount_days || 0,
+        default_rabatt_percent: settings.default_rabatt_percent || 0,
+        order_confirmation_prefix: settings.order_confirmation_prefix || 'AB',
+        delivery_note_prefix: settings.delivery_note_prefix || 'LS',
         layout_variant: (settings as any).layout_variant || 'classic',
       });
     }
