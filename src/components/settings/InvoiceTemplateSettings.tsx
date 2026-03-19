@@ -29,9 +29,6 @@ export function InvoiceTemplateSettings() {
     default_discount_percent: 0,
     default_discount_days: 0,
     layout_variant: 'classic',
-    customer_number_prefix: 'KD',
-    customer_number_format: '{prefix}-{seq}',
-    next_customer_number: 1,
   });
   const [saving, setSaving] = useState(false);
 
