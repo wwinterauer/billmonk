@@ -6,6 +6,7 @@ interface Props {
   invoiceNumber: string;
   footerText: string;
   logoUrl: string | null;
+  documentTitle?: string;
 }
 
 const SAMPLE_CUSTOMER = {
