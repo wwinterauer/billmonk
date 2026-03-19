@@ -498,11 +498,21 @@ export function useInvoices() {
       show_group_subtotal: li.show_group_subtotal || false,
     }));
 
-    const { data: settings } = await supabase
+    let { data: settings } = await supabase
       .from('invoice_settings')
       .select('*')
       .eq('user_id', user.id)
       .maybeSingle();
+
+    // Auto-create invoice_settings if missing
+    if (!settings) {
+      const { data: newSettings } = await supabase
+        .from('invoice_settings')
+        .insert({ user_id: user.id, next_sequence_number: 1 } as any)
+        .select('*')
+        .single();
+      settings = newSettings;
+    }
 
     const prefix = settings?.invoice_number_prefix || 'RE';
     const seq = settings?.next_sequence_number || 1;
