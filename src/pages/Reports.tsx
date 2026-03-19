@@ -2493,8 +2493,7 @@ const Reports = () => {
             )}
 
             {/* Top 10 Customers Bar Chart */}
-            {incomeStats.byCustomer.length > 0 && (
-              <Card className="border-border/50 mb-6">
+            <Card className="border-border/50 mb-6">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Users className="h-5 w-5" />
@@ -2502,6 +2501,11 @@ const Reports = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {incomeStats.byCustomer.length === 0 ? (
+                    <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+                      Keine Daten für den gewählten Zeitraum
+                    </div>
+                  ) : (
                   <div className="h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={incomeStats.byCustomer.slice(0, 10)} layout="vertical">
@@ -2513,9 +2517,9 @@ const Reports = () => {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
+                  )}
                 </CardContent>
               </Card>
-            )}
 
             {/* All Customers Table with Search */}
             <Card className="border-border/50 mb-6">
