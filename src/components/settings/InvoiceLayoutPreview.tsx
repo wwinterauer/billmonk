@@ -140,12 +140,19 @@ export function InvoiceLayoutPreview({ layoutVariant, companySettings, invoiceNu
           <div className="flex justify-between w-24">
             <span>Netto:</span><span>{subtotal.toFixed(2)} €</span>
           </div>
-          <div className="flex justify-between w-24">
-            <span>20% USt:</span><span>{vat.toFixed(2)} €</span>
-          </div>
+          {!isSmallBusiness && (
+            <div className="flex justify-between w-24">
+              <span>20% USt:</span><span>{vat.toFixed(2)} €</span>
+            </div>
+          )}
           <div className={`flex justify-between w-24 font-bold border-t border-gray-300 mt-[1px] pt-[1px] ${headingSize}`}>
             <span>Gesamt:</span><span>{total.toFixed(2)} €</span>
           </div>
+          {isSmallBusiness && (
+            <div className={`${textSize} text-gray-400 mt-1 max-w-[200px] text-right`}>
+              {companySettings?.small_business_text || 'Umsatzsteuerbefreit gem. § 6 Abs. 1 Z 27 UStG'}
+            </div>
+          )}
         </div>
 
         {/* Bank Info */}
