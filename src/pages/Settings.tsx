@@ -481,49 +481,47 @@ const Settings = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="flex flex-wrap w-full h-auto gap-1 p-1">
-            {expenseTabs.map(tab => {
-              const locked = isTabLocked(tab.requiredFeature);
-              return (
-                <TabsTrigger
-                  key={tab.value}
-                  value={tab.value}
-                  className={cn(
-                    'gap-2 flex-shrink-0',
-                    locked && 'opacity-50'
-                  )}
-                >
-                  <tab.icon className="h-4 w-4" />
+          <div className="space-y-2">
+            <TabsList className="flex flex-wrap w-full h-auto gap-1 p-1">
+              {expenseTabs.map(tab => {
+                const locked = isTabLocked(tab.requiredFeature);
+                return (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    className={cn(
+                      'gap-2 flex-shrink-0',
+                      locked && 'opacity-50'
+                    )}
+                  >
+                    <tab.icon className="h-4 w-4" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+
+            <TabsList className="flex flex-wrap w-full h-auto gap-1 p-1 bg-primary/5 border border-primary/10">
+              {invoiceTabs.map(tab => {
+                const locked = isTabLocked(tab.requiredFeature);
+                return (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    className={cn(
+                      'gap-2 flex-shrink-0',
+                      locked && 'opacity-50'
+                    )}
+                  >
+                    <tab.icon className="h-4 w-4" />
                   <span className="hidden sm:inline">{tab.label}</span>
                   {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
                 </TabsTrigger>
               );
             })}
-
-            {/* Visual separator for invoice group */}
-            <div className="flex items-center px-1">
-              <div className="h-5 w-px bg-border" />
-            </div>
-
-            {invoiceTabs.map(tab => {
-              const locked = isTabLocked(tab.requiredFeature);
-              return (
-                <TabsTrigger
-                  key={tab.value}
-                  value={tab.value}
-                  className={cn(
-                    'gap-2 flex-shrink-0 border-primary/10',
-                    locked && 'opacity-50',
-                    !locked && 'bg-primary/5'
-                  )}
-                >
-                  <tab.icon className="h-4 w-4" />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                  {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
+            </TabsList>
+          </div>
 
           {/* File Naming Tab */}
           <TabsContent value="naming">
