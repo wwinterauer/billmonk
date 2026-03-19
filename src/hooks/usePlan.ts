@@ -12,6 +12,10 @@ export interface PlanData {
   receiptsCredit: number;
   receiptsLimit: number;
   receiptsAvailable: number;
+  documentsUsed: number;
+  documentsCredit: number;
+  documentsLimit: number;
+  documentsAvailable: number;
   features: typeof PLAN_FEATURES[PlanType];
   planName: string;
   loading: boolean;
