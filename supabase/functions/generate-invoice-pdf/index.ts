@@ -432,46 +432,100 @@ Deno.serve(async (req) => {
     page.drawLine({ start: { x: margin, y }, end: { x: 545, y }, thickness: 0.5, color: rgb(0.7, 0.7, 0.7) });
     y -= 16;
 
-    // --- TOTALS ---
-    const totalsX = 400;
-    drawText("Netto:", totalsX, y); drawText(fmtCur(invoice.subtotal || 0), 490, y);
-    y -= 14;
+    // --- TOTALS (skip for delivery notes) ---
+    if (!isDeliveryNote) {
+      const totalsX = 400;
+      const rawSubtotal = invoice.subtotal || 0;
+      const rabattPercent = invoice.rabatt_percent || 0;
 
-    if (showVat) {
-      // VAT groups
-      const vatGroups: Record<number, number> = {};
-      for (const item of items) {
-        if ((item as any).is_group_header) continue;
-        const lineNet = ((item as any).quantity || 1) * ((item as any).unit_price || 0);
-        const rate = (item as any).vat_rate || 0;
-        vatGroups[rate] = (vatGroups[rate] || 0) + lineNet * (rate / 100);
-      }
-      for (const [rate, amount] of Object.entries(vatGroups)) {
-        drawText(`MwSt ${rate} %:`, totalsX, y); drawText(fmtCur(amount as number), 490, y);
+      if (rabattPercent > 0) {
+        // Show subtotal before discount
+        drawText("Netto:", totalsX, y); drawText(fmtCur(rawSubtotal), 490, y);
         y -= 14;
+
+        const rabattAmount = rawSubtotal * (rabattPercent / 100);
+        const nettoNachRabatt = rawSubtotal - rabattAmount;
+
+        drawText(`Rabatt ${fmtNum(rabattPercent)} %:`, totalsX, y);
+        drawText(`-${fmtCur(rabattAmount)}`, 490, y);
+        y -= 14;
+
+        drawText("Netto nach Rabatt:", totalsX, y); drawText(fmtCur(nettoNachRabatt), 490, y);
+        y -= 14;
+
+        if (showVat) {
+          const vatGroups: Record<number, number> = {};
+          for (const item of items) {
+            if ((item as any).is_group_header) continue;
+            const lineNet = ((item as any).quantity || 1) * ((item as any).unit_price || 0);
+            const rate = (item as any).vat_rate || 0;
+            // Apply rabatt proportionally
+            const discountedLineNet = lineNet * (1 - rabattPercent / 100);
+            vatGroups[rate] = (vatGroups[rate] || 0) + discountedLineNet * (rate / 100);
+          }
+          for (const [rate, amount] of Object.entries(vatGroups)) {
+            drawText(`MwSt ${rate} %:`, totalsX, y); drawText(fmtCur(amount as number), 490, y);
+            y -= 14;
+          }
+        }
+
+        page.drawLine({ start: { x: totalsX, y: y + 4 }, end: { x: 545, y: y + 4 }, thickness: 1, color: rgb(0, 0, 0) });
+        const vatOnDiscounted = showVat ? Object.values(
+          items.reduce((acc: Record<number, number>, item: any) => {
+            if (item.is_group_header) return acc;
+            const lineNet = (item.quantity || 1) * (item.unit_price || 0);
+            const rate = item.vat_rate || 0;
+            const discounted = lineNet * (1 - rabattPercent / 100);
+            acc[rate] = (acc[rate] || 0) + discounted * (rate / 100);
+            return acc;
+          }, {})
+        ).reduce((a: number, b: number) => a + b, 0) : 0;
+        const totalAmount = nettoNachRabatt + vatOnDiscounted;
+        drawText("Gesamt:", totalsX, y, { bold: true, size: 11 });
+        drawText(fmtCur(totalAmount), 490, y, { bold: true, size: 11 });
+        y -= 20;
+      } else {
+        // No rabatt - standard totals
+        drawText("Netto:", totalsX, y); drawText(fmtCur(rawSubtotal), 490, y);
+        y -= 14;
+
+        if (showVat) {
+          const vatGroups: Record<number, number> = {};
+          for (const item of items) {
+            if ((item as any).is_group_header) continue;
+            const lineNet = ((item as any).quantity || 1) * ((item as any).unit_price || 0);
+            const rate = (item as any).vat_rate || 0;
+            vatGroups[rate] = (vatGroups[rate] || 0) + lineNet * (rate / 100);
+          }
+          for (const [rate, amount] of Object.entries(vatGroups)) {
+            drawText(`MwSt ${rate} %:`, totalsX, y); drawText(fmtCur(amount as number), 490, y);
+            y -= 14;
+          }
+        }
+
+        page.drawLine({ start: { x: totalsX, y: y + 4 }, end: { x: 545, y: y + 4 }, thickness: 1, color: rgb(0, 0, 0) });
+        const totalAmount = isSmallBusiness ? rawSubtotal : (invoice.total || 0);
+        drawText("Gesamt:", totalsX, y, { bold: true, size: 11 });
+        drawText(fmtCur(totalAmount), 490, y, { bold: true, size: 11 });
+        y -= 20;
       }
-    }
 
-    page.drawLine({ start: { x: totalsX, y: y + 4 }, end: { x: 545, y: y + 4 }, thickness: 1, color: rgb(0, 0, 0) });
-    const totalAmount = isSmallBusiness ? (invoice.subtotal || 0) : (invoice.total || 0);
-    drawText("Gesamt:", totalsX, y, { bold: true, size: 11 });
-    drawText(fmtCur(totalAmount), 490, y, { bold: true, size: 11 });
-    y -= 20;
+      // Discount / Skonto
+      if (invoice.discount_percent && invoice.discount_percent > 0) {
+        const totalForSkonto = invoice.total || invoice.subtotal || 0;
+        const discountAmt = totalForSkonto * (invoice.discount_percent / 100);
+        drawText(
+          `Bei Zahlung innerhalb von ${invoice.discount_days || 0} Tagen: ${fmtNum(invoice.discount_percent)}% Skonto (${fmtCur(totalForSkonto - discountAmt)})`,
+          margin, y, { size: 8, color: rgb(0.3, 0.3, 0.3) }
+        );
+        y -= 16;
+      }
 
-    // Discount / Skonto
-    if (invoice.discount_percent && invoice.discount_percent > 0) {
-      const discountAmt = totalAmount * (invoice.discount_percent / 100);
-      drawText(
-        `Bei Zahlung innerhalb von ${invoice.discount_days || 0} Tagen: ${fmtNum(invoice.discount_percent)}% Skonto (${fmtCur(totalAmount - discountAmt)})`,
-        margin, y, { size: 8, color: rgb(0.3, 0.3, 0.3) }
-      );
-      y -= 16;
-    }
-
-    // Small business notice
-    if (isSmallBusiness && company?.small_business_text) {
-      drawText(company.small_business_text, margin, y, { size: 8, color: rgb(0.3, 0.3, 0.3) });
-      y -= 16;
+      // Small business notice
+      if (isSmallBusiness && company?.small_business_text) {
+        drawText(company.small_business_text, margin, y, { size: 8, color: rgb(0.3, 0.3, 0.3) });
+        y -= 16;
+      }
     }
 
     // --- NOTES ---
@@ -482,8 +536,8 @@ Deno.serve(async (req) => {
       y -= 16;
     }
 
-    // --- BANK DETAILS (from company_settings) ---
-    if (company?.iban || company?.bank_name) {
+    // --- BANK DETAILS (skip for delivery notes) ---
+    if (!isDeliveryNote && (company?.iban || company?.bank_name)) {
       drawText("Bankverbindung:", margin, y, { bold: true, size: 8 });
       y -= 12;
       if (company.bank_name) { drawText(company.bank_name, margin, y, { size: 8 }); y -= 11; }
