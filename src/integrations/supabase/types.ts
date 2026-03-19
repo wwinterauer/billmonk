@@ -502,6 +502,86 @@ export type Database = {
           },
         ]
       }
+      company_settings: {
+        Row: {
+          account_holder: string | null
+          bank_name: string | null
+          bic: string | null
+          city: string | null
+          company_name: string | null
+          company_register_court: string | null
+          company_register_number: string | null
+          country: string | null
+          created_at: string | null
+          email: string | null
+          iban: string | null
+          id: string
+          is_small_business: boolean | null
+          logo_path: string | null
+          phone: string | null
+          small_business_text: string | null
+          street: string | null
+          uid_number: string | null
+          updated_at: string | null
+          user_id: string
+          zip: string | null
+        }
+        Insert: {
+          account_holder?: string | null
+          bank_name?: string | null
+          bic?: string | null
+          city?: string | null
+          company_name?: string | null
+          company_register_court?: string | null
+          company_register_number?: string | null
+          country?: string | null
+          created_at?: string | null
+          email?: string | null
+          iban?: string | null
+          id?: string
+          is_small_business?: boolean | null
+          logo_path?: string | null
+          phone?: string | null
+          small_business_text?: string | null
+          street?: string | null
+          uid_number?: string | null
+          updated_at?: string | null
+          user_id: string
+          zip?: string | null
+        }
+        Update: {
+          account_holder?: string | null
+          bank_name?: string | null
+          bic?: string | null
+          city?: string | null
+          company_name?: string | null
+          company_register_court?: string | null
+          company_register_number?: string | null
+          country?: string | null
+          created_at?: string | null
+          email?: string | null
+          iban?: string | null
+          id?: string
+          is_small_business?: boolean | null
+          logo_path?: string | null
+          phone?: string | null
+          small_business_text?: string | null
+          street?: string | null
+          uid_number?: string | null
+          updated_at?: string | null
+          user_id?: string
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           city: string | null
@@ -513,11 +593,16 @@ export type Database = {
           default_currency: string | null
           display_name: string
           email: string | null
+          has_different_shipping_address: boolean | null
           id: string
           is_archived: boolean | null
           notes: string | null
           payment_terms_days: number | null
           phone: string | null
+          shipping_city: string | null
+          shipping_country: string | null
+          shipping_street: string | null
+          shipping_zip: string | null
           street: string | null
           uid_number: string | null
           updated_at: string | null
@@ -534,11 +619,16 @@ export type Database = {
           default_currency?: string | null
           display_name: string
           email?: string | null
+          has_different_shipping_address?: boolean | null
           id?: string
           is_archived?: boolean | null
           notes?: string | null
           payment_terms_days?: number | null
           phone?: string | null
+          shipping_city?: string | null
+          shipping_country?: string | null
+          shipping_street?: string | null
+          shipping_zip?: string | null
           street?: string | null
           uid_number?: string | null
           updated_at?: string | null
@@ -555,11 +645,16 @@ export type Database = {
           default_currency?: string | null
           display_name?: string
           email?: string | null
+          has_different_shipping_address?: boolean | null
           id?: string
           is_archived?: boolean | null
           notes?: string | null
           payment_terms_days?: number | null
           phone?: string | null
+          shipping_city?: string | null
+          shipping_country?: string | null
+          shipping_street?: string | null
+          shipping_zip?: string | null
           street?: string | null
           uid_number?: string | null
           updated_at?: string | null
@@ -1079,12 +1174,15 @@ export type Database = {
         Row: {
           created_at: string | null
           description: string
+          group_name: string | null
           id: string
           invoice_id: string
           invoice_item_id: string | null
+          is_group_header: boolean | null
           line_total: number | null
           position: number | null
           quantity: number | null
+          show_group_subtotal: boolean | null
           unit: string | null
           unit_price: number | null
           vat_rate: number | null
@@ -1092,12 +1190,15 @@ export type Database = {
         Insert: {
           created_at?: string | null
           description: string
+          group_name?: string | null
           id?: string
           invoice_id: string
           invoice_item_id?: string | null
+          is_group_header?: boolean | null
           line_total?: number | null
           position?: number | null
           quantity?: number | null
+          show_group_subtotal?: boolean | null
           unit?: string | null
           unit_price?: number | null
           vat_rate?: number | null
@@ -1105,12 +1206,15 @@ export type Database = {
         Update: {
           created_at?: string | null
           description?: string
+          group_name?: string | null
           id?: string
           invoice_id?: string
           invoice_item_id?: string | null
+          is_group_header?: boolean | null
           line_total?: number | null
           position?: number | null
           quantity?: number | null
+          show_group_subtotal?: boolean | null
           unit?: string | null
           unit_price?: number | null
           vat_rate?: number | null
@@ -1139,6 +1243,10 @@ export type Database = {
           bic: string | null
           company_logo_path: string | null
           created_at: string | null
+          customer_number_format: string | null
+          customer_number_prefix: string | null
+          default_discount_days: number | null
+          default_discount_percent: number | null
           default_footer_text: string | null
           default_notes: string | null
           default_payment_terms_days: number | null
@@ -1146,6 +1254,8 @@ export type Database = {
           id: string
           invoice_number_format: string | null
           invoice_number_prefix: string | null
+          layout_variant: string | null
+          next_customer_number: number | null
           next_sequence_number: number | null
           overdue_reminder_days: number | null
           overdue_reminder_enabled: boolean | null
@@ -1159,6 +1269,10 @@ export type Database = {
           bic?: string | null
           company_logo_path?: string | null
           created_at?: string | null
+          customer_number_format?: string | null
+          customer_number_prefix?: string | null
+          default_discount_days?: number | null
+          default_discount_percent?: number | null
           default_footer_text?: string | null
           default_notes?: string | null
           default_payment_terms_days?: number | null
@@ -1166,6 +1280,8 @@ export type Database = {
           id?: string
           invoice_number_format?: string | null
           invoice_number_prefix?: string | null
+          layout_variant?: string | null
+          next_customer_number?: number | null
           next_sequence_number?: number | null
           overdue_reminder_days?: number | null
           overdue_reminder_enabled?: boolean | null
@@ -1179,6 +1295,10 @@ export type Database = {
           bic?: string | null
           company_logo_path?: string | null
           created_at?: string | null
+          customer_number_format?: string | null
+          customer_number_prefix?: string | null
+          default_discount_days?: number | null
+          default_discount_percent?: number | null
           default_footer_text?: string | null
           default_notes?: string | null
           default_payment_terms_days?: number | null
@@ -1186,6 +1306,8 @@ export type Database = {
           id?: string
           invoice_number_format?: string | null
           invoice_number_prefix?: string | null
+          layout_variant?: string | null
+          next_customer_number?: number | null
           next_sequence_number?: number | null
           overdue_reminder_days?: number | null
           overdue_reminder_enabled?: boolean | null
@@ -1242,10 +1364,15 @@ export type Database = {
       invoices: {
         Row: {
           category: string | null
+          copied_from_id: string | null
           created_at: string | null
           credit_note_for: string | null
           currency: string | null
           customer_id: string
+          discount_amount: number | null
+          discount_days: number | null
+          discount_percent: number | null
+          document_type: string | null
           due_date: string | null
           footer_text: string | null
           id: string
@@ -1253,24 +1380,36 @@ export type Database = {
           invoice_number: string
           notes: string | null
           paid_at: string | null
+          parent_invoice_id: string | null
           payment_reference: string | null
           pdf_storage_path: string | null
           recurring_invoice_id: string | null
           sent_at: string | null
           sent_to_email: string | null
+          shipping_address_mode: string | null
+          shipping_city: string | null
+          shipping_country: string | null
+          shipping_street: string | null
+          shipping_zip: string | null
           status: string | null
           subtotal: number | null
           total: number | null
           updated_at: string | null
           user_id: string
           vat_total: number | null
+          version: string | null
         }
         Insert: {
           category?: string | null
+          copied_from_id?: string | null
           created_at?: string | null
           credit_note_for?: string | null
           currency?: string | null
           customer_id: string
+          discount_amount?: number | null
+          discount_days?: number | null
+          discount_percent?: number | null
+          document_type?: string | null
           due_date?: string | null
           footer_text?: string | null
           id?: string
@@ -1278,24 +1417,36 @@ export type Database = {
           invoice_number: string
           notes?: string | null
           paid_at?: string | null
+          parent_invoice_id?: string | null
           payment_reference?: string | null
           pdf_storage_path?: string | null
           recurring_invoice_id?: string | null
           sent_at?: string | null
           sent_to_email?: string | null
+          shipping_address_mode?: string | null
+          shipping_city?: string | null
+          shipping_country?: string | null
+          shipping_street?: string | null
+          shipping_zip?: string | null
           status?: string | null
           subtotal?: number | null
           total?: number | null
           updated_at?: string | null
           user_id: string
           vat_total?: number | null
+          version?: string | null
         }
         Update: {
           category?: string | null
+          copied_from_id?: string | null
           created_at?: string | null
           credit_note_for?: string | null
           currency?: string | null
           customer_id?: string
+          discount_amount?: number | null
+          discount_days?: number | null
+          discount_percent?: number | null
+          document_type?: string | null
           due_date?: string | null
           footer_text?: string | null
           id?: string
@@ -1303,17 +1454,24 @@ export type Database = {
           invoice_number?: string
           notes?: string | null
           paid_at?: string | null
+          parent_invoice_id?: string | null
           payment_reference?: string | null
           pdf_storage_path?: string | null
           recurring_invoice_id?: string | null
           sent_at?: string | null
           sent_to_email?: string | null
+          shipping_address_mode?: string | null
+          shipping_city?: string | null
+          shipping_country?: string | null
+          shipping_street?: string | null
+          shipping_zip?: string | null
           status?: string | null
           subtotal?: number | null
           total?: number | null
           updated_at?: string | null
           user_id?: string
           vat_total?: number | null
+          version?: string | null
         }
         Relationships: [
           {
