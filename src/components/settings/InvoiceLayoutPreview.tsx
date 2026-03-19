@@ -38,7 +38,8 @@ export function InvoiceLayoutPreview({ layoutVariant, companySettings, invoiceNu
   };
 
   const subtotal = SAMPLE_ITEMS.reduce((s, i) => s + i.qty * i.price, 0);
-  const vat = subtotal * 0.2;
+  const isSmallBusiness = companySettings?.is_small_business === true;
+  const vat = isSmallBusiness ? 0 : subtotal * 0.2;
   const total = subtotal + vat;
   const today = new Date().toLocaleDateString('de-AT');
 
