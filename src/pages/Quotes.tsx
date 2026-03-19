@@ -131,6 +131,9 @@ const Quotes = () => {
                                 <DropdownMenuItem onClick={() => convertDocument(inv.id, 'order_confirmation')}>
                                   <ArrowRight className="h-4 w-4 mr-2" /> In Auftragsbestätigung
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => convertDocument(inv.id, 'delivery_note')}>
+                                  <ArrowRight className="h-4 w-4 mr-2" /> In Lieferschein
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => convertDocument(inv.id, 'invoice')}>
                                   <ArrowRight className="h-4 w-4 mr-2" /> In Rechnung umwandeln
                                 </DropdownMenuItem>

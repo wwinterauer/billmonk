@@ -216,6 +216,18 @@ const Invoices = () => {
                               <DropdownMenuItem onClick={() => createCorrectionVersion(inv.id)}>
                                 <GitBranch className="h-4 w-4 mr-2" /> Korrektur erstellen
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => convertDocument(inv.id, 'delivery_note')}>
+                                <ArrowRight className="h-4 w-4 mr-2" /> In Lieferschein
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => createPartialInvoice(inv.id, 'deposit')}>
+                                <Receipt className="h-4 w-4 mr-2" /> Anzahlungsrechnung
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => createPartialInvoice(inv.id, 'partial')}>
+                                <Receipt className="h-4 w-4 mr-2" /> Teilrechnung
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => createPartialInvoice(inv.id, 'final')}>
+                                <Receipt className="h-4 w-4 mr-2" /> Schlussrechnung
+                              </DropdownMenuItem>
                               {inv.status === 'draft' && (
                                 <DropdownMenuItem onClick={() => updateInvoiceStatus(inv.id, 'sent')}>
                                   <Send className="h-4 w-4 mr-2" /> Als versendet markieren

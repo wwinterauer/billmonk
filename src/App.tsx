@@ -158,6 +158,14 @@ const App = () => (
               } 
             />
             <Route 
+              path="/delivery-notes" 
+              element={
+                <ProtectedRoute>
+                  <DeliveryNotes />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/account" 
               element={
                 <ProtectedRoute>

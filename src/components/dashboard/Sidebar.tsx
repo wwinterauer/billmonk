@@ -60,6 +60,7 @@ const navigation: NavItem[] = [
   { name: 'Konto-Import', href: '/bank-import', icon: FileUp, requiredFeature: 'bankImport' },
   { name: 'Ausgangsrechnungen', href: '/invoices', icon: FileText, requiredFeature: 'invoiceModule' },
   { name: 'Angebote', href: '/quotes', icon: FileText, requiredFeature: 'invoiceModule' },
+  { name: 'Lieferscheine', href: '/delivery-notes', icon: Truck, requiredFeature: 'invoiceModule' },
   { name: 'Berichte', href: '/reports', icon: BarChart3 },
   { name: 'Checklisten', href: '/checklists', icon: ClipboardList },
   { name: 'Einstellungen', href: '/settings', icon: Settings },
