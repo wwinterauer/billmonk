@@ -67,6 +67,7 @@ import { InvoiceTemplateSettings } from '@/components/settings/InvoiceTemplateSe
 import { QuoteTemplateSettings } from '@/components/settings/QuoteTemplateSettings';
 import { InvoiceModuleSettings } from '@/components/settings/InvoiceModuleSettings';
 import { CompanySettings } from '@/components/settings/CompanySettings';
+import { LiveBankSettings } from '@/components/settings/LiveBankSettings';
 import { usePlan } from '@/hooks/usePlan';
 import { FEATURE_MIN_PLAN, isPlanSufficient } from '@/lib/planConfig';
 import { FeatureGate } from '@/components/FeatureGate';
