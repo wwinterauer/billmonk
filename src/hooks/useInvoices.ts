@@ -115,6 +115,7 @@ export type LineItemInsert = {
 export function useInvoices() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { documentsAvailable, documentsLimit } = usePlan();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
 
