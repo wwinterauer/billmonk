@@ -2375,12 +2375,16 @@ const Reports = () => {
               </Card>
 
             {/* Income Time Series */}
-            {incomeStats.timeSeries.length > 0 && (
-              <Card className="border-border/50 mb-6">
+            <Card className="border-border/50 mb-6">
                 <CardHeader>
                   <CardTitle className="text-lg">Einnahmen im Zeitverlauf</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {incomeStats.timeSeries.length === 0 ? (
+                    <div className="h-[350px] flex items-center justify-center text-muted-foreground">
+                      Keine Daten für den gewählten Zeitraum
+                    </div>
+                  ) : (
                   <div className="h-[350px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={incomeStats.timeSeries}>
@@ -2401,9 +2405,61 @@ const Reports = () => {
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
+                  )}
                 </CardContent>
               </Card>
-            )}
+
+            {/* Income Trend Indicators */}
+            {incomeStats.timeSeries.length > 1 && (() => {
+              const highestIncome = incomeStats.timeSeries.reduce((max, item) => item.amount > max.amount ? item : max, incomeStats.timeSeries[0]);
+              const lowestIncome = incomeStats.timeSeries.reduce((min, item) => item.amount < min.amount ? item : min, incomeStats.timeSeries[0]);
+              const avgIncome = incomeStats.timeSeries.reduce((sum, item) => sum + item.amount, 0) / incomeStats.timeSeries.length;
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <Card className="border-border/50">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-success/10 rounded-lg">
+                          <TrendingUp className="w-5 h-5 text-success" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Höchste Einnahmen</p>
+                          <p className="font-semibold text-foreground">{highestIncome.label}</p>
+                          <p className="text-lg font-bold text-success">{formatCurrency(highestIncome.amount)}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-border/50">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-destructive/10 rounded-lg">
+                          <TrendingDown className="w-5 h-5 text-destructive" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Niedrigste Einnahmen</p>
+                          <p className="font-semibold text-foreground">{lowestIncome.label}</p>
+                          <p className="text-lg font-bold text-destructive">{formatCurrency(lowestIncome.amount)}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-border/50">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-500/10 rounded-lg">
+                          <Activity className="w-5 h-5 text-blue-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Monatsdurchschnitt</p>
+                          <p className="text-lg font-bold text-foreground">{formatCurrency(avgIncome)}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })()}
 
             {/* Income Monthly Comparison */}
             {periodType === 'year' && (
