@@ -1,38 +1,46 @@
 
 
-# Gesamtplan: User-Strecke, Stripe-Bezahlung, Admin & Kontingent
+## Problem
 
-## Status: Phase 1-6 implementiert ✅, Phase 9 vollständig ✅, Integration vollständig ✅
+Die Rechnungsnummer wird im `useEffect` (Zeile 103) nur generiert, wenn `settings` nicht `null` ist. Da `useInvoiceSettings` mit `maybeSingle()` abfragt, ist `settings` gleich `null`, wenn der User noch nie Einstellungen gespeichert hat. In dem Fall wird die Nummer nie erzeugt.
 
-### Umgesetzte Phasen:
-- ✅ Phase 1: DB-Migration (profiles erweitert, user_roles, has_role(), reset_monthly_credits())
-- ✅ Phase 2: Admin-Rolle für w.winterauer@gmail.com gesetzt (Business-Plan)
-- ✅ Phase 3: planConfig.ts + usePlan.ts erstellt
-- ✅ Phase 4: Onboarding-Wizard (3 Steps) + ProtectedRoute mit Onboarding-Check
-- ✅ Phase 5: Sidebar mit Kontingent-Balken, Admin-Plan-Switcher, Feature-Gating
-- ✅ Phase 6: Stripe-Integration komplett
-- ✅ Phase 9: Rechnungsmodul komplett
+Auch bei existierenden Settings: Solange der Hook lädt (`loading: true`), ist `settings` noch `null` — die Nummer erscheint erst nach dem Laden, was zu einem kurzen "leeren Feld" führt.
 
-### Rechnungs-Integration (alle implementiert):
-- ✅ DB: invoices.category, invoice_tags + RLS, export_templates.template_type, cloud_connections.backup_include_invoices
-- ✅ InvoiceEditor: Kategorie-Dropdown + InvoiceTagSelector
-- ✅ Invoices-Liste: Kategorie-Spalte
-- ✅ Dashboard: Einnahmen-KPIs (Einnahmen, Offene Rechnungen, Gewinn/Verlust) in FeatureGate
-- ✅ Reports: Einnahmen-Analyse (KPIs, nach Kunde, nach Kategorie, Gewinn/Verlust) in FeatureGate
-- ✅ Export-Vorlagen: Typ-Umschalter (Belege/Rechnungen) + DEFAULT_INVOICE_COLUMNS + template_type Filter
-- ✅ Cloud-Backup: backup_include_invoices Flag + backup-to-drive lädt Rechnungen + PDFs in eigenen Ordner
+## Lösung
 
-### Offene Phasen:
-- ⬜ Phase 7: Landing Page Pricing Update (4 Pläne, monatlich/jährlich Toggle)
-- ⬜ Phase 8: Plan-Enforcement (Upload-Limits durchsetzen)
+In `src/pages/InvoiceEditor.tsx`, Zeile 103-123: Den `useEffect` so anpassen, dass er auch ohne gespeicherte Settings eine Standardnummer generiert (mit den gleichen Defaults wie im Hook definiert), aber erst nachdem das Laden abgeschlossen ist.
 
----
+### Änderungen
 
-## Bestehende Bugs
+**`src/pages/InvoiceEditor.tsx`**:
 
-| Priorität | Problem | Dateien | Aufwand |
-|-----------|---------|---------|--------|
-| ✅ BEHOBEN | 4x `parseFloat \|\| null` Bug | `ReceiptDetailPanel.tsx` | 4 Zeilen |
-| ✅ BEHOBEN | CorrectionTracking originalVatRate | `useCorrectionTracking.ts` | 1 Zeile |
-| MITTEL | Tote Links `/forgot-password`, `/agb` | `Login.tsx`, `Register.tsx` | 2-50 Zeilen |
-| MITTEL | Badge ohne forwardRef | `badge.tsx` | 5 Zeilen |
+1. `loading` aus `useInvoiceSettings()` destructuren (Zeile 72)
+2. `useRef` importieren und ein `invoiceNumberInitialized`-Flag einführen (verhindert Überschreiben manueller Änderungen)
+3. `useEffect` anpassen:
+
+```typescript
+const invoiceNumberInitialized = useRef(false);
+
+useEffect(() => {
+  if (loading || isEdit || invoiceNumberInitialized.current) return;
+  invoiceNumberInitialized.current = true;
+  
+  const prefix = settings?.invoice_number_prefix || 'RE';
+  const seq = settings?.next_sequence_number || 1;
+  const year = new Date().getFullYear();
+  const formatted = (settings?.invoice_number_format || '{prefix}-{year}-{seq}')
+    .replace('{prefix}', prefix)
+    .replace('{year}', String(year))
+    .replace('{seq}', String(seq).padStart(4, '0'));
+  setInvoiceNumber(formatted);
+  
+  if (settings?.default_discount_percent) setDiscountPercent(settings.default_discount_percent);
+  if (settings?.default_discount_days) setDiscountDays(settings.default_discount_days);
+  if (settings?.default_footer_text) setFooterText(settings.default_footer_text);
+  if (settings?.default_notes) setNotes(settings.default_notes);
+}, [settings, loading, isEdit]);
+```
+
+### Umfang
+- 1 Datei: `src/pages/InvoiceEditor.tsx` — Import erweitern + useEffect-Guard
+
