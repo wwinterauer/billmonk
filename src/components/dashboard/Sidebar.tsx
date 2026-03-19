@@ -259,6 +259,31 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               <span className="text-sidebar-foreground/50">{receiptsAvailable} verfügbar</span>
             </div>
           </div>
+
+          {/* Document Quota Bar */}
+          {documentsLimit > 0 && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-sidebar-foreground/60">Dokumente</span>
+                <span className={cn('font-medium', docQuotaColor)}>
+                  {documentsUsed} / {documentsLimit}
+                </span>
+              </div>
+              <Progress 
+                value={docUsagePercent} 
+                className="h-1.5"
+              />
+              {documentsCredit > 0 && (
+                <p className="text-[10px] text-sidebar-foreground/50">
+                  (+{documentsCredit} Guthaben)
+                </p>
+              )}
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-sidebar-foreground/50">Ausgangsbelege</span>
+                <span className="text-sidebar-foreground/50">{documentsAvailable} verfügbar</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

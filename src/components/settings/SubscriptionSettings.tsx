@@ -90,15 +90,43 @@ export function SubscriptionSettings() {
             </div>
             <div className="text-center p-3 rounded-lg bg-muted/50">
               <p className="text-2xl font-bold text-foreground">{receiptsUsed}</p>
-              <p className="text-xs text-muted-foreground">verwendet</p>
+              <p className="text-xs text-muted-foreground">Belege verwendet</p>
             </div>
             <div className="text-center p-3 rounded-lg bg-muted/50">
               <p className="text-2xl font-bold text-foreground">
                 {Math.max(0, receiptsLimit - receiptsUsed)}
               </p>
-              <p className="text-xs text-muted-foreground">verfügbar</p>
+              <p className="text-xs text-muted-foreground">Belege verfügbar</p>
             </div>
           </div>
+
+          {/* Document quota (only for plans with documents) */}
+          {PLAN_LIMITS[displayPlan].documentsPerMonth > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <p className="text-2xl font-bold text-foreground">
+                  {PLAN_LIMITS[displayPlan].documentsPerMonth}
+                </p>
+                <p className="text-xs text-muted-foreground">Dokumente/Monat</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <p className="text-2xl font-bold text-foreground">{documentsUsed}</p>
+                <p className="text-xs text-muted-foreground">Dokumente verwendet</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <p className="text-2xl font-bold text-foreground">
+                  {Math.max(0, documentsLimit - documentsUsed)}
+                </p>
+                <p className="text-xs text-muted-foreground">Dokumente verfügbar</p>
+              </div>
+              {documentsCredit > 0 && (
+                <div className="text-center p-3 rounded-lg bg-muted/50">
+                  <p className="text-2xl font-bold text-foreground">{documentsCredit}</p>
+                  <p className="text-xs text-muted-foreground">Dokumente Guthaben</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3">

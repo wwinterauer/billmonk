@@ -140,6 +140,16 @@ export function useInvoices() {
   const createInvoice = async (invoice: InvoiceInsert, lineItems: Omit<LineItemInsert, 'invoice_id'>[]) => {
     if (!user) return null;
 
+    // Check document limit
+    if (documentsLimit > 0 && documentsAvailable <= 0) {
+      toast({
+        title: 'Dokumenten-Limit erreicht',
+        description: 'Du hast dein monatliches Kontingent aufgebraucht. Upgrade deinen Plan für mehr Dokumente.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+
     let subtotal = 0;
     let vatTotal = 0;
     for (const item of lineItems) {
