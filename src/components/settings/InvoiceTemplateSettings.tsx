@@ -96,6 +96,15 @@ export function InvoiceTemplateSettings() {
             </div>
             <p className="text-xs text-muted-foreground">Vorschau: <span className="font-mono font-medium text-foreground">{previewInvoiceNumber}</span></p>
             <p className="text-xs text-muted-foreground">Platzhalter: {'{prefix}'}, {'{year}'}, {'{seq}'}</p>
+
+            <Separator className="my-2" />
+            <h3 className="text-sm font-medium">Dokumenten-Präfixe</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div><Label>AB-Präfix</Label><Input value={form.order_confirmation_prefix} onChange={e => setForm(f => ({ ...f, order_confirmation_prefix: e.target.value }))} /></div>
+              <div><Label>LS-Präfix</Label><Input value={form.delivery_note_prefix} onChange={e => setForm(f => ({ ...f, delivery_note_prefix: e.target.value }))} /></div>
+              <div />
+            </div>
+            <p className="text-xs text-muted-foreground">Präfixe für Auftragsbestätigungen und Lieferscheine. Alle nutzen den gemeinsamen Nummernkreis.</p>
           </div>
 
 
