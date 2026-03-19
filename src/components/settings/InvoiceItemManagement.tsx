@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Plus, Pencil, Trash2, Search, Package, FolderPlus, ChevronDown, ChevronRight, Upload, X, Image as ImageIcon,
   Wrench, Paintbrush, Truck, Monitor, Hammer, Scissors, Coffee, ShoppingCart, FileText, Briefcase, Star,
   Zap, Heart, Settings, Globe, Phone, Camera, Printer, Layers, Box } from 'lucide-react';
