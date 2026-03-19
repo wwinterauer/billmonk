@@ -30,6 +30,7 @@ const Invoices = () => {
   const { invoices, loading, updateInvoiceStatus, deleteInvoice, copyInvoice, createCorrectionVersion, convertDocument, createPartialInvoice } = useInvoices();
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [taxExportOpen, setTaxExportOpen] = useState(false);
   const navigate = useNavigate();
 
   // Filter only invoices (not quotes/order_confirmations)
