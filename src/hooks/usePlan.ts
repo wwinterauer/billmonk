@@ -29,6 +29,8 @@ export function usePlan(): PlanData {
   const [isAdmin, setIsAdmin] = useState(false);
   const [receiptsUsed, setReceiptsUsed] = useState(0);
   const [receiptsCredit, setReceiptsCredit] = useState(0);
+  const [documentsUsed, setDocumentsUsed] = useState(0);
+  const [documentsCredit, setDocumentsCredit] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async () => {
