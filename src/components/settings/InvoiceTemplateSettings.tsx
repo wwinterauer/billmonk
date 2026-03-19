@@ -59,9 +59,6 @@ export function InvoiceTemplateSettings() {
     .replace('{year}', new Date().getFullYear().toString())
     .replace('{seq}', String(form.next_sequence_number).padStart(4, '0'));
 
-  const previewCustomerNumber = form.customer_number_format
-    .replace('{prefix}', form.customer_number_prefix)
-    .replace('{seq}', String(form.next_customer_number).padStart(4, '0'));
 
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
