@@ -257,9 +257,29 @@ Deno.serve(async (req) => {
     drawText(titleText, margin, y, { size: 16, bold: true });
     y -= 20;
 
+    // Partial invoice reference
+    if (relatedOrderNumber) {
+      drawText(`Zu Auftrag: ${relatedOrderNumber}`, margin, y, { size: 9, color: rgb(0.3, 0.3, 0.3) });
+      y -= 14;
+    }
+
+    // Delivery time (document level)
+    if (invoice.delivery_time && ["quote", "order_confirmation", "delivery_note"].includes(documentType)) {
+      drawText(`Lieferzeit: ${invoice.delivery_time}`, margin, y, { size: 9 });
+      y -= 14;
+    }
+
     // Meta info right-aligned
     const metaX = 380;
-    drawText(`${docTitle}datum:`, metaX, y + 20); drawText(fmtDate(invoice.invoice_date), metaX + 100, y + 20);
+    const metaLabelMap: Record<string, string> = {
+      quote: "Angebotsdatum",
+      order_confirmation: "Auftragsdatum",
+      delivery_note: "Lieferdatum",
+      invoice: "Rechnungsdatum",
+      credit_note: "Gutschriftsdatum",
+    };
+    const metaLabel = metaLabelMap[documentType] || "Datum";
+    drawText(`${metaLabel}:`, metaX, y + 20); drawText(fmtDate(invoice.invoice_date), metaX + 100, y + 20);
     if (documentType === "invoice") {
       drawText("Fälligkeitsdatum:", metaX, y + 8); drawText(fmtDate(invoice.due_date), metaX + 100, y + 8);
     }
