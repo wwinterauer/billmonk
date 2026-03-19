@@ -407,9 +407,14 @@ Deno.serve(async (req) => {
 
       drawText(fmtNum(item.quantity || 1), colX.qty, textY, { size: 8 });
       drawText(item.unit || "Stk", colX.unit, textY, { size: 8 });
-      drawText(fmtNum(item.unit_price || 0), colX.price, textY, { size: 8 });
-      if (showVat) drawText(`${fmtNum(item.vat_rate || 0)} %`, colX.vat, textY, { size: 8 });
-      drawText(fmtNum(lineNet), colX.total, textY, { size: 8 });
+      if (showPrices) {
+        drawText(fmtNum(item.unit_price || 0), colX.price, textY, { size: 8 });
+        if (showVat) drawText(`${fmtNum(item.vat_rate || 0)} %`, colX.vat, textY, { size: 8 });
+        drawText(fmtNum(lineNet), colX.total, textY, { size: 8 });
+      }
+      if (isDeliveryNote && item.delivery_time) {
+        drawText(item.delivery_time, colX.deliveryTime, textY, { size: 8 });
+      }
       y -= rowHeight;
     }
 
