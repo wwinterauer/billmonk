@@ -120,6 +120,9 @@ export function CustomerManagement() {
       shipping_zip: c.shipping_zip || '',
       shipping_city: c.shipping_city || '',
       shipping_country: c.shipping_country || 'AT',
+      default_discount_percent: c.default_discount_percent || 0,
+      default_skonto_percent: c.default_skonto_percent || 0,
+      default_skonto_days: c.default_skonto_days || 0,
     });
     setDialogOpen(true);
   };
