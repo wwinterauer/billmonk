@@ -36,13 +36,40 @@ const EMPTY_FORM = {
 
 export function CustomerManagement() {
   const { customers, loading, addCustomer, updateCustomer, deleteCustomer } = useCustomers();
-  const { settings: invoiceSettings } = useInvoiceSettings();
+  const { settings: invoiceSettings, saveSettings } = useInvoiceSettings();
   const [search, setSearch] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [customerNumberPrefix, setCustomerNumberPrefix] = useState('KD');
+  const [customerNumberFormat, setCustomerNumberFormat] = useState('{prefix}-{seq}');
+  const [nextCustomerNumber, setNextCustomerNumber] = useState(1);
+  const [savingNumberSettings, setSavingNumberSettings] = useState(false);
+  const [numberSettingsLoaded, setNumberSettingsLoaded] = useState(false);
+
+  // Sync number settings from invoiceSettings
+  if (invoiceSettings && !numberSettingsLoaded) {
+    setCustomerNumberPrefix((invoiceSettings as any).customer_number_prefix || 'KD');
+    setCustomerNumberFormat((invoiceSettings as any).customer_number_format || '{prefix}-{seq}');
+    setNextCustomerNumber((invoiceSettings as any).next_customer_number || 1);
+    setNumberSettingsLoaded(true);
+  }
+
+  const previewCustomerNumber = customerNumberFormat
+    .replace('{prefix}', customerNumberPrefix)
+    .replace('{seq}', String(nextCustomerNumber).padStart(4, '0'));
+
+  const handleSaveNumberSettings = async () => {
+    setSavingNumberSettings(true);
+    await saveSettings({
+      customer_number_prefix: customerNumberPrefix,
+      customer_number_format: customerNumberFormat,
+      next_customer_number: nextCustomerNumber,
+    } as any);
+    setSavingNumberSettings(false);
+  };
 
   const filtered = customers.filter(c => {
     if (!showArchived && c.is_archived) return false;
