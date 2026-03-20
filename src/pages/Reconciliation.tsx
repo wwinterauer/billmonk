@@ -219,6 +219,7 @@ export default function Reconciliation() {
           amount,
           status,
           receipt_id,
+          source,
           receipts:receipt_id (
             id,
             vendor,
@@ -664,6 +665,7 @@ export default function Reconciliation() {
                                 {sortField === 'amount' && <ArrowUpDown className="h-3 w-3" />}
                               </div>
                             </TableHead>
+                            <TableHead>Quelle</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Zugeordneter Beleg</TableHead>
                             <TableHead className="text-right">Aktionen</TableHead>
@@ -680,6 +682,11 @@ export default function Reconciliation() {
                               </TableCell>
                               <TableCell className={cn('text-right font-mono whitespace-nowrap', transaction.amount && transaction.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400')}>
                                 {formatAmount(transaction.amount)}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="text-xs">
+                                  {(transaction as any).source === 'live' ? 'Live-Bank' : 'CSV-Import'}
+                                </Badge>
                               </TableCell>
                               <TableCell>{getStatusBadge(transaction.status)}</TableCell>
                               <TableCell>
