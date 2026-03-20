@@ -219,10 +219,9 @@ export function LiveBankSettings() {
     i.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const activeConnections = connections.filter((c) => c.status === 'active');
   const maxConnections = PLAN_LIMITS[effectivePlan].maxBankConnections;
   const limitReached = activeConnections.length >= maxConnections;
-
-  const activeConnections2 = connections.filter((c) => c.status === 'active');
 
   return (
     <div className="space-y-6">
