@@ -55,6 +55,7 @@ const plans: PlanInfo[] = [
       `${PLAN_LIMITS.pro.receiptsPerMonth} Belege/Monat`,
       'Alles aus Starter',
       'Cloud-Backup',
+      'Live-Bankanbindung (1 Konto)',
       'Priority Support',
     ],
     cta: 'Pro wählen',
