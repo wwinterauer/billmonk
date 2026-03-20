@@ -122,6 +122,26 @@ serve(async (req) => {
         throw new Error("institution_id and redirect_url required");
       }
 
+      // Server-side plan limit check
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .single();
+      const plan = profile?.plan || "free";
+      const maxConnections: Record<string, number> = { free: 0, starter: 0, pro: 1, business: 3 };
+      const limit = maxConnections[plan] ?? 0;
+
+      const { count } = await supabase
+        .from("bank_connections_live")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("status", "active");
+
+      if ((count ?? 0) >= limit) {
+        throw new Error(`Dein Plan erlaubt maximal ${limit} aktive Bankverbindung(en). Bitte upgrade deinen Plan.`);
+      }
+
       // Parse institution_id back to name + country
       const [aspspName, aspspCountry] = institution_id.split("__");
       const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
