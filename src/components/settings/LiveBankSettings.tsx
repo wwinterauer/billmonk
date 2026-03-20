@@ -47,6 +47,7 @@ interface Institution {
 
 export function LiveBankSettings() {
   const { user } = useAuth();
+  const { effectivePlan } = usePlan();
   const { toast } = useToast();
   const [connections, setConnections] = useState<BankConnection[]>([]);
   const [loading, setLoading] = useState(true);
