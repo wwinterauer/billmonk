@@ -110,7 +110,7 @@ export function LiveBankSettings() {
   const handleStartConnection = async (institutionId: string) => {
     setConnecting(true);
     try {
-      const redirectUrl = `${window.location.origin}/settings?tab=bank-live&eb_callback=true`;
+      const redirectUrl = `${window.location.origin}/settings/bank-callback`;
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bank-connect?action=create-requisition`,
         {
