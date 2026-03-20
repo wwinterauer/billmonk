@@ -130,9 +130,12 @@ export function Pricing() {
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
             Einfache Preise
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-4">
             Wähle den Plan, der zu dir passt. Jederzeit kündbar.
           </p>
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary font-medium text-sm px-4 py-2 rounded-full mb-4">
+            🎉 30 Tage kostenlos testen — alle Bezahlpläne inkl. Testphase
+          </div>
 
           {/* Monthly/Yearly Toggle */}
           <div className="flex items-center justify-center gap-3">
