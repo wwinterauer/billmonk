@@ -235,7 +235,7 @@ export function Pricing() {
                       {loadingPlan === plan.plan ? 'Wird geladen...' : `30 Tage gratis testen`}
                     </Button>
                     <p className="text-xs text-center text-muted-foreground">
-                      danach €{PLAN_PRICES[plan.plan].monthly.toFixed(2).replace('.', ',')}/Monat
+                      danach €{(PLAN_PRICES[plan.plan].monthly * 0.5).toFixed(2).replace('.', ',')}/Monat für 12 Monate
                     </p>
                     </div>
                   )}
