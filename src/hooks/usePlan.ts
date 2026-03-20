@@ -8,6 +8,7 @@ export interface PlanData {
   effectivePlan: PlanType;
   isAdmin: boolean;
   adminViewPlan: PlanType | null;
+  hasStripeCustomer: boolean;
   receiptsUsed: number;
   receiptsCredit: number;
   receiptsLimit: number;
