@@ -217,7 +217,7 @@ export function SubscriptionSettings() {
                 
 
                 return (
-                  <Card key={item.plan} className={`relative ${isCurrentPlan ? 'border-primary border-2' : 'border-border/50'}`}>
+                  <Card key={item.plan} className="relative border-border/50">
                     {item.plan === 'pro' && (
                       <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                         <span className="bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full">
