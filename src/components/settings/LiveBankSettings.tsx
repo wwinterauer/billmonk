@@ -110,7 +110,7 @@ export function LiveBankSettings() {
   const handleStartConnection = async (institutionId: string) => {
     setConnecting(true);
     try {
-      const redirectUrl = `${window.location.origin}/settings?tab=bank-live&eb_callback=true`;
+      const redirectUrl = `${window.location.origin}/settings/bank-callback`;
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bank-connect?action=create-requisition`,
         {
@@ -140,8 +140,9 @@ export function LiveBankSettings() {
 
   // Handle callback from Enable Banking
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('eb_callback') === 'true') {
+    const isCallback = window.location.pathname.includes('/settings/bank-callback');
+    if (isCallback) {
+      const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
       const finalize = async () => {
         if (code) {
