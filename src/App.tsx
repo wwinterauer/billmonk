@@ -111,6 +111,14 @@ const App = () => (
               } 
             />
             <Route 
+              path="/settings/bank-callback" 
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/checklists" 
               element={
                 <ProtectedRoute>

@@ -140,8 +140,9 @@ export function LiveBankSettings() {
 
   // Handle callback from Enable Banking
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('eb_callback') === 'true') {
+    const isCallback = window.location.pathname.includes('/settings/bank-callback');
+    if (isCallback) {
+      const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
       const finalize = async () => {
         if (code) {
