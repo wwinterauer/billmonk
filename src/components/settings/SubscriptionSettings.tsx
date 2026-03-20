@@ -231,10 +231,19 @@ export function SubscriptionSettings() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="text-center">
-                        <span className="text-3xl font-bold">€{price.toFixed(2).replace('.', ',')}</span>
+                        <span className="text-sm text-muted-foreground line-through">
+                          €{price.toFixed(2).replace('.', ',')}
+                        </span>
+                        <br />
+                        <span className="text-3xl font-bold">€{(price * 0.5).toFixed(2).replace('.', ',')}</span>
                         <span className="text-muted-foreground text-sm">
                           {yearly ? '/Jahr' : '/Monat'}
                         </span>
+                        <div className="mt-1">
+                          <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-0">
+                            -50% Beta
+                          </Badge>
+                        </div>
                       </div>
                       <ul className="space-y-2">
                         {item.features.map((f) => (
