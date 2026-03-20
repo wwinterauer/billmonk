@@ -205,6 +205,7 @@ export function Pricing() {
                       </Button>
                     </Link>
                   ) : (
+                    <div className="space-y-2">
                     <Button
                       className={`w-full ${plan.featured ? 'gradient-primary hover:opacity-90' : ''}`}
                       variant={plan.featured ? 'default' : 'outline'}
