@@ -174,7 +174,7 @@ export function SubscriptionSettings() {
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
-            {isPaid && (
+            {isPaid && hasStripeCustomer && (
               <Button onClick={openPortal} disabled={portalLoading} variant="outline">
                 {portalLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ExternalLink className="h-4 w-4 mr-2" />}
                 Abo verwalten
