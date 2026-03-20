@@ -56,7 +56,6 @@ const plans: PlanInfo[] = [
       'Alles aus Starter',
       'Cloud-Backup',
       'Live-Bankanbindung (1 Konto)',
-      'Priority Support',
     ],
     cta: 'Pro wählen',
     featured: true,
