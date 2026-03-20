@@ -5,6 +5,7 @@ export interface PlanLimits {
   documentsPerMonth: number;
   maxTotal: number | null;
   retentionYears: number | null;
+  maxBankConnections: number;
 }
 
 export interface PlanFeatures {
