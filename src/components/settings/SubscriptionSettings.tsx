@@ -27,7 +27,7 @@ const UPGRADE_PLANS: { plan: Exclude<PlanType, 'free'>; features: string[] }[] =
 ];
 
 export function SubscriptionSettings() {
-  const { plan, effectivePlan, isAdmin, receiptsUsed, receiptsLimit, receiptsCredit, documentsUsed, documentsLimit, documentsCredit, loading: planLoading } = usePlan();
+  const { plan, effectivePlan, isAdmin, hasStripeCustomer, receiptsUsed, receiptsLimit, receiptsCredit, documentsUsed, documentsLimit, documentsCredit, loading: planLoading } = usePlan();
   const { toast } = useToast();
   const [portalLoading, setPortalLoading] = useState(false);
   const [checkLoading, setCheckLoading] = useState(false);
