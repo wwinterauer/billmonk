@@ -247,7 +247,7 @@ export function SubscriptionSettings() {
                         className="w-full"
                         variant={item.plan === 'pro' ? 'default' : 'outline'}
                         onClick={() => handleCheckout(item.plan)}
-                        disabled={loadingPlan === item.plan || isCurrentPlan}
+                        disabled={loadingPlan === item.plan}
                       >
                         {loadingPlan === item.plan ? 'Wird geladen...' : `${PLAN_NAMES[item.plan]} wählen`}
                       </Button>
