@@ -43,13 +43,19 @@ export function Header() {
           >
             So funktioniert's
           </button>
+          <Link
+            to="/pricing"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Preise
+          </Link>
           <Link to="/login">
             <Button variant="ghost" size="sm">
               Login
             </Button>
           </Link>
           <Link to="/register">
-            <Button size="sm" className="gradient-primary shadow-primary hover:opacity-90 transition-opacity">
+            <Button size="sm" className="gradient-primary shadow-primary hover:opacity-90 transition-opacity active:scale-[0.97]">
               Kostenlos testen
             </Button>
           </Link>
@@ -86,6 +92,9 @@ export function Header() {
               >
                 So funktioniert's
               </button>
+              <Link to="/pricing" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                Preise
+              </Link>
               <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
                 <Button variant="ghost" className="w-full justify-start">
                   Login

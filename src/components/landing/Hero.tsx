@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, ArrowRight, Sparkles, Brain, FileText, Receipt } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Sparkles, Brain, FileText, Receipt, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function Hero() {
@@ -25,25 +25,25 @@ export function Hero() {
               🚀 Beta Version – Jetzt kostenlos testen
             </Badge>
             
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-6">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-6" style={{ lineHeight: '1.08' }}>
               Belege scannen.{' '}
               <span className="text-primary">KI erledigt den Rest.</span>
             </h1>
-            <p className="text-xl text-muted-foreground mb-8 max-w-xl mx-auto lg:mx-0">
-              Die intelligente Belegverwaltung für Kleinunternehmer, Freelancer und Vermieter. 
+            <p className="text-xl text-muted-foreground mb-8 max-w-xl mx-auto lg:mx-0" style={{ textWrap: 'pretty' }}>
+              Die intelligente Belegverwaltung für Kleinunternehmer, Freelancer und Vermieter in Österreich & Deutschland. 
               Fotografiere deine Belege – unsere KI extrahiert automatisch alle wichtigen Daten.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-6">
               <Link to="/register">
-                <Button size="lg" className="gradient-primary shadow-primary hover:opacity-90 transition-opacity text-lg px-8 group">
+                <Button size="lg" className="gradient-primary shadow-primary hover:opacity-90 transition-opacity text-lg px-8 group active:scale-[0.97]">
                   Kostenlos testen
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
             </div>
 
-            <div className="flex flex-wrap gap-4 justify-center lg:justify-start text-sm text-muted-foreground">
+            <div className="flex flex-wrap gap-4 justify-center lg:justify-start text-sm text-muted-foreground mb-8">
               <span className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-success" />
                 Keine Kreditkarte nötig
@@ -57,6 +57,33 @@ export function Hero() {
                 Made in Austria
               </span>
             </div>
+
+            {/* Social Proof */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="flex items-center gap-3 justify-center lg:justify-start"
+            >
+              <div className="flex -space-x-2">
+                {['MK', 'TS', 'SM', 'JR'].map((initials, i) => (
+                  <div
+                    key={initials}
+                    className="w-8 h-8 rounded-full border-2 border-background bg-primary/10 flex items-center justify-center text-[10px] font-semibold text-primary"
+                  >
+                    {initials}
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star key={s} className="h-3.5 w-3.5 fill-warning text-warning" />
+                ))}
+              </div>
+              <span className="text-sm text-muted-foreground">
+                Vertraut von Nutzern in AT & DE
+              </span>
+            </motion.div>
           </motion.div>
 
           <motion.div
@@ -86,14 +113,14 @@ export function Hero() {
                         <Receipt className="h-4 w-4 text-primary" />
                         <span className="text-xs text-muted-foreground">Belege</span>
                       </div>
-                      <p className="text-lg font-bold text-foreground">247</p>
+                      <p className="text-lg font-bold text-foreground tabular-nums">247</p>
                     </div>
                     <div className="p-3 rounded-lg bg-muted/50 border border-border">
                       <div className="flex items-center gap-2 mb-1">
                         <Brain className="h-4 w-4 text-success" />
                         <span className="text-xs text-muted-foreground">KI-Genauigkeit</span>
                       </div>
-                      <p className="text-lg font-bold text-success">94%</p>
+                      <p className="text-lg font-bold text-success tabular-nums">94%</p>
                     </div>
                   </div>
 
@@ -104,7 +131,7 @@ export function Hero() {
                         <p className="text-sm font-medium text-foreground truncate">Amazon - Büromaterial</p>
                         <p className="text-xs text-muted-foreground">Automatisch erkannt</p>
                       </div>
-                      <span className="text-sm font-semibold text-foreground">€ 89,99</span>
+                      <span className="text-sm font-semibold text-foreground tabular-nums">€ 89,99</span>
                     </div>
                     <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 border border-border">
                       <FileText className="h-4 w-4 text-muted-foreground" />
@@ -112,7 +139,7 @@ export function Hero() {
                         <p className="text-sm font-medium text-foreground truncate">A1 Telekom - Mobilfunk</p>
                         <p className="text-xs text-muted-foreground">Zur Prüfung</p>
                       </div>
-                      <span className="text-sm font-semibold text-foreground">€ 29,90</span>
+                      <span className="text-sm font-semibold text-foreground tabular-nums">€ 29,90</span>
                     </div>
                   </div>
                 </div>

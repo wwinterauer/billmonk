@@ -10,7 +10,10 @@ import {
   Tags,
   FileCheck,
   Users,
-  Zap
+  Zap,
+  Landmark,
+  FileText,
+  ClipboardList
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,7 +36,7 @@ const mainFeatures = [
     icon: Mail,
     title: 'E-Mail Import',
     description: 'Verbinde Gmail oder Outlook – Rechnungen aus E-Mail-Anhängen werden automatisch importiert und verarbeitet.',
-    badge: 'Automatisierung',
+    badge: 'ab Starter',
   },
 ];
 
@@ -42,6 +45,24 @@ const additionalFeatures = [
     icon: Building2,
     title: 'Bank-Abgleich',
     description: 'Importiere Kontoauszüge und matche Belege automatisch mit Bankbuchungen.',
+  },
+  {
+    icon: Landmark,
+    title: 'Live-Bankanbindung',
+    description: 'Verbinde dein Bankkonto direkt und gleiche Buchungen in Echtzeit ab.',
+    planBadge: 'Pro',
+  },
+  {
+    icon: FileText,
+    title: 'Rechnungsmodul',
+    description: 'Erstelle professionelle Ausgangsrechnungen mit automatischer Nummerierung und PDF-Versand.',
+    planBadge: 'Business',
+  },
+  {
+    icon: ClipboardList,
+    title: 'Angebote & Lieferscheine',
+    description: 'Erstelle Angebote, Auftragsbestätigungen und Lieferscheine aus einer Oberfläche.',
+    planBadge: 'Business',
   },
   {
     icon: Tags,
@@ -87,20 +108,20 @@ const additionalFeatures = [
 
 export function Features() {
   return (
-    <section id="features" className="py-20 bg-secondary/30">
+    <section id="features" className="py-20 lg:py-28 bg-secondary/30">
       <div className="container">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="text-center mb-16"
         >
           <Badge variant="secondary" className="mb-4">Features</Badge>
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4" style={{ textWrap: 'balance' }}>
             Alles für deine Belegverwaltung
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto" style={{ textWrap: 'pretty' }}>
             Von der automatischen Erkennung bis zum Export – XpenzAi nimmt dir die lästige Arbeit ab
           </p>
         </motion.div>
@@ -110,10 +131,10 @@ export function Features() {
           {mainFeatures.map((feature, index) => (
             <motion.div
               key={feature.title}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
+              transition={{ duration: 0.6, delay: index * 0.08, ease: [0.16, 1, 0.3, 1] }}
             >
               <Card className="h-full border-primary/20 bg-gradient-to-br from-primary/5 to-transparent hover:shadow-lg hover:border-primary/40 transition-all duration-300 group">
                 <CardContent className="p-6">
@@ -140,10 +161,10 @@ export function Features() {
           {additionalFeatures.map((feature, index) => (
             <motion.div
               key={feature.title}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: index * 0.05 }}
+              transition={{ duration: 0.5, delay: index * 0.04, ease: [0.16, 1, 0.3, 1] }}
             >
               <Card className="h-full border-border/50 bg-card hover:shadow-md hover:border-primary/20 transition-all duration-300 group">
                 <CardContent className="p-4">
@@ -151,10 +172,17 @@ export function Features() {
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
                       <feature.icon className="h-5 w-5 text-primary" />
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground mb-1">
-                        {feature.title}
-                      </h3>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-foreground">
+                          {feature.title}
+                        </h3>
+                        {'planBadge' in feature && feature.planBadge && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary shrink-0">
+                            {feature.planBadge}
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground">
                         {feature.description}
                       </p>
