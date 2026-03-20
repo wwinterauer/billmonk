@@ -32,6 +32,7 @@ export function usePlan(): PlanData {
   const [receiptsCredit, setReceiptsCredit] = useState(0);
   const [documentsUsed, setDocumentsUsed] = useState(0);
   const [documentsCredit, setDocumentsCredit] = useState(0);
+  const [hasStripeCustomer, setHasStripeCustomer] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async () => {
