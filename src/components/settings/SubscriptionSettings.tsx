@@ -196,6 +196,7 @@ export function SubscriptionSettings() {
               <CreditCard className="h-5 w-5" />
               Plan upgraden
             </CardTitle>
+            <p className="text-sm text-primary font-medium mt-1">🎉 30 Tage kostenlos testen — danach Monatsabo</p>
             <CardDescription>
               <div className="flex items-center gap-3 mt-2">
                 <Label className={!yearly ? 'text-foreground font-medium' : 'text-muted-foreground'}>
@@ -249,8 +250,11 @@ export function SubscriptionSettings() {
                         onClick={() => handleCheckout(item.plan)}
                         disabled={loadingPlan === item.plan}
                       >
-                        {loadingPlan === item.plan ? 'Wird geladen...' : `${PLAN_NAMES[item.plan]} wählen`}
+                        {loadingPlan === item.plan ? 'Wird geladen...' : '30 Tage gratis testen'}
                       </Button>
+                      <p className="text-xs text-center text-muted-foreground">
+                        danach €{PLAN_PRICES[item.plan].monthly.toFixed(2).replace('.', ',')}/Monat
+                      </p>
                     </CardContent>
                   </Card>
                 );

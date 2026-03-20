@@ -130,9 +130,12 @@ export function Pricing() {
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
             Einfache Preise
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-4">
             Wähle den Plan, der zu dir passt. Jederzeit kündbar.
           </p>
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary font-medium text-sm px-4 py-2 rounded-full mb-4">
+            🎉 30 Tage kostenlos testen — alle Bezahlpläne inkl. Testphase
+          </div>
 
           {/* Monthly/Yearly Toggle */}
           <div className="flex items-center justify-center gap-3">
@@ -202,14 +205,19 @@ export function Pricing() {
                       </Button>
                     </Link>
                   ) : (
+                    <div className="space-y-2">
                     <Button
                       className={`w-full ${plan.featured ? 'gradient-primary hover:opacity-90' : ''}`}
                       variant={plan.featured ? 'default' : 'outline'}
                       onClick={() => handleCheckout(plan.plan)}
                       disabled={loadingPlan === plan.plan}
                     >
-                      {loadingPlan === plan.plan ? 'Wird geladen...' : plan.cta}
+                      {loadingPlan === plan.plan ? 'Wird geladen...' : `30 Tage gratis testen`}
                     </Button>
+                    <p className="text-xs text-center text-muted-foreground">
+                      danach €{PLAN_PRICES[plan.plan].monthly.toFixed(2).replace('.', ',')}/Monat
+                    </p>
+                    </div>
                   )}
                 </CardContent>
               </Card>
