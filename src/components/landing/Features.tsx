@@ -3,7 +3,7 @@ import {
   Landmark, FileText, ClipboardList, Tags, Users, Zap, Building2, Search,
   CloudUpload, Keyboard, ReceiptText, UserCheck, Repeat, CreditCard, ArrowRightLeft,
   Scissors, CheckCheck, Filter, Ban, BarChart3, PenLine, Hash, Palette,
-  Percent, Package, Image, Briefcase, Timer, Download, Wifi, BookOpen,
+  Percent, Package, Briefcase, Timer, Download, Wifi, BookOpen,
   Inbox, Globe, FileDown
 } from 'lucide-react';
 import { motion } from 'framer-motion';
