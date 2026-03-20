@@ -5,6 +5,7 @@ export interface PlanLimits {
   documentsPerMonth: number;
   maxTotal: number | null;
   retentionYears: number | null;
+  maxBankConnections: number;
 }
 
 export interface PlanFeatures {
@@ -17,16 +18,16 @@ export interface PlanFeatures {
 }
 
 export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
-  free: { receiptsPerMonth: 10, documentsPerMonth: 0, maxTotal: 100, retentionYears: null },
-  starter: { receiptsPerMonth: 30, documentsPerMonth: 0, maxTotal: null, retentionYears: 7 },
-  pro: { receiptsPerMonth: 100, documentsPerMonth: 0, maxTotal: null, retentionYears: 10 },
-  business: { receiptsPerMonth: 250, documentsPerMonth: 250, maxTotal: null, retentionYears: 10 },
+  free: { receiptsPerMonth: 10, documentsPerMonth: 0, maxTotal: 100, retentionYears: null, maxBankConnections: 0 },
+  starter: { receiptsPerMonth: 30, documentsPerMonth: 0, maxTotal: null, retentionYears: 7, maxBankConnections: 0 },
+  pro: { receiptsPerMonth: 100, documentsPerMonth: 0, maxTotal: null, retentionYears: 10, maxBankConnections: 1 },
+  business: { receiptsPerMonth: 250, documentsPerMonth: 250, maxTotal: null, retentionYears: 10, maxBankConnections: 3 },
 };
 
 export const PLAN_FEATURES: Record<PlanType, PlanFeatures> = {
   free: { invoiceModule: false, bankImport: false, emailImport: false, cloudBackup: false, reconciliation: false, liveBankConnection: false },
   starter: { invoiceModule: false, bankImport: true, emailImport: true, cloudBackup: false, reconciliation: true, liveBankConnection: false },
-  pro: { invoiceModule: false, bankImport: true, emailImport: true, cloudBackup: true, reconciliation: true, liveBankConnection: false },
+  pro: { invoiceModule: false, bankImport: true, emailImport: true, cloudBackup: true, reconciliation: true, liveBankConnection: true },
   business: { invoiceModule: true, bankImport: true, emailImport: true, cloudBackup: true, reconciliation: true, liveBankConnection: true },
 };
 
@@ -40,8 +41,8 @@ export const PLAN_NAMES: Record<PlanType, string> = {
 export const PLAN_PRICES: Record<PlanType, { monthly: number; yearly: number }> = {
   free: { monthly: 0, yearly: 0 },
   starter: { monthly: 1.99, yearly: 19.90 },
-  pro: { monthly: 4.99, yearly: 47.90 },
-  business: { monthly: 14.99, yearly: 143.90 },
+  pro: { monthly: 5.99, yearly: 57.50 },
+  business: { monthly: 15.99, yearly: 153.50 },
 };
 
 // Minimum plan required per feature key
@@ -52,7 +53,7 @@ export const FEATURE_MIN_PLAN: Record<string, PlanType> = {
   cloudBackup: 'pro',
   invoiceModule: 'business',
   taxExport: 'business',
-  liveBankConnection: 'business',
+  liveBankConnection: 'pro',
 };
 
 // Human-readable feature descriptions for upgrade cards

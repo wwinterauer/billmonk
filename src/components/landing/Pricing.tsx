@@ -55,6 +55,7 @@ const plans: PlanInfo[] = [
       `${PLAN_LIMITS.pro.receiptsPerMonth} Belege/Monat`,
       'Alles aus Starter',
       'Cloud-Backup',
+      'Live-Bankanbindung (1 Konto)',
       'Priority Support',
     ],
     cta: 'Pro wählen',
@@ -67,6 +68,7 @@ const plans: PlanInfo[] = [
     features: [
       `${PLAN_LIMITS.business.receiptsPerMonth} Belege/Monat`,
       'Alles aus Pro',
+      'Bis zu 3 Bankkonten',
       'Angebote, AB & Lieferscheine',
       'Rechnungsmodul',
       'DATEV/BMD Export',

@@ -5,9 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePlan } from '@/hooks/usePlan';
+import { PLAN_LIMITS } from '@/lib/planConfig';
 import { Building2, Plus, RefreshCw, Trash2, Search, Loader2, CheckCircle, AlertTriangle, Landmark } from 'lucide-react';
 import {
   AlertDialog,
@@ -44,6 +47,7 @@ interface Institution {
 
 export function LiveBankSettings() {
   const { user } = useAuth();
+  const { effectivePlan } = usePlan();
   const { toast } = useToast();
   const [connections, setConnections] = useState<BankConnection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,6 +220,8 @@ export function LiveBankSettings() {
   );
 
   const activeConnections = connections.filter((c) => c.status === 'active');
+  const maxConnections = PLAN_LIMITS[effectivePlan].maxBankConnections;
+  const limitReached = activeConnections.length >= maxConnections;
 
   return (
     <div className="space-y-6">
@@ -318,7 +324,11 @@ export function LiveBankSettings() {
             </div>
           )}
 
-          {!showSearch ? (
+          {limitReached ? (
+            <p className="text-sm text-muted-foreground">
+              Du hast das Maximum von {maxConnections} Bankverbindung{maxConnections !== 1 ? 'en' : ''} für deinen Plan erreicht.
+            </p>
+          ) : !showSearch ? (
             <Button onClick={() => { setShowSearch(true); searchInstitutions(); }}>
               <Plus className="h-4 w-4 mr-2" />
               Bankkonto verbinden
