@@ -1,7 +1,10 @@
 import { 
-  Brain, Mail, Camera, RefreshCw, FileCheck, FileSpreadsheet, Shield, Smartphone,
+  Brain, Mail, Camera, RefreshCw, FileSpreadsheet, Shield, Smartphone,
   Landmark, FileText, ClipboardList, Tags, Users, Zap, Building2, Search,
-  CloudUpload, Keyboard, ReceiptText, UserCheck, Repeat, CreditCard, ArrowRightLeft
+  CloudUpload, Keyboard, ReceiptText, UserCheck, Repeat, CreditCard, ArrowRightLeft,
+  Scissors, CheckCheck, Filter, Ban, BarChart3, PenLine, Hash, Palette,
+  Percent, Package, Briefcase, Timer, Download, Wifi, BookOpen,
+  Inbox, Globe, FileDown
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
@@ -28,18 +31,37 @@ const featureBlocks: FeatureBlock[] = [
   {
     label: 'Kernfunktion',
     title: 'Intelligente Belegverwaltung',
-    subtitle: 'Von der Erkennung bis zum Steuerberater-Export — vollautomatisch.',
+    subtitle: 'Von der Erkennung bis zum Export — KI-gestützt und lernfähig.',
     accent: 'text-primary',
     iconBg: 'bg-primary/10 group-hover:bg-primary/20',
     borderAccent: 'border-primary/20',
     features: [
-      { icon: Brain, title: 'Lernende KI-Erkennung', description: 'Extrahiert Lieferant, Betrag, MwSt und Datum — wird mit jeder Korrektur besser.' },
-      { icon: Camera, title: 'Multi-Upload', description: 'PDFs, Fotos oder Kamera. Mehrseitige PDFs werden automatisch aufgeteilt.' },
-      { icon: Mail, title: 'E-Mail Import', description: 'Gmail oder Outlook verbinden — Rechnungen aus Anhängen automatisch importiert.', planBadge: 'Starter' },
-      { icon: RefreshCw, title: 'Duplikaterkennung', description: 'Automatische Warnung vor doppelt hochgeladenen Belegen.' },
-      { icon: Keyboard, title: 'Review-Workflow', description: 'Effiziente Prüfung mit Tastatur-Navigation und direkter Korrektur.' },
-      { icon: FileSpreadsheet, title: 'Flexible Exporte', description: 'CSV, Excel, PDF — mit anpassbaren Vorlagen für DATEV, BMD oder deinen Steuerberater.' },
-      { icon: CloudUpload, title: 'Cloud-Backup', description: 'Automatische Sicherung nach Google Drive mit konfigurierbarem Zeitplan.', planBadge: 'Starter' },
+      { icon: Brain, title: 'Lernende KI-Erkennung', description: 'Extrahiert Lieferant, Betrag, MwSt und Datum — wird mit jeder Korrektur besser (Vendor-Learning).' },
+      { icon: Camera, title: 'Multi-Upload & Kamera', description: 'PDFs, Fotos oder Kamera-Scan direkt per PWA. Mehrseitige PDFs werden erkannt.' },
+      { icon: Scissors, title: 'PDF-Splitting', description: 'Mehrseitige PDFs automatisch in einzelne Belege aufteilen — mit Vorschau.' },
+      { icon: RefreshCw, title: 'Duplikaterkennung', description: 'Automatische Warnung vor doppelt hochgeladenen Belegen per File-Hash.' },
+      { icon: Keyboard, title: 'Review-Workflow', description: 'Effiziente Prüfung mit Tastatur-Navigation, Inline-Korrektur und Status-System.' },
+      { icon: CheckCheck, title: 'Auto-Approval', description: 'Belege mit hohem Confidence-Score werden automatisch freigegeben.' },
+      { icon: PenLine, title: 'Manuelle Einträge', description: 'Barbelege und Ausgaben ohne Beleg als "Kein-Beleg"-Eintrag erfassen.' },
+      { icon: FileDown, title: 'Dateinamen & Beschreibungen', description: 'Individuelle Dateinamen-Muster und Beschreibungsvorlagen pro Beleg.' },
+      { icon: Tags, title: 'Tags & Kategorien', description: 'Farbige Tags und Kategorien für flexible Organisation deiner Belege.' },
+    ],
+  },
+  {
+    label: 'ab Starter',
+    title: 'Import-Kanäle',
+    subtitle: 'Belege kommen automatisch rein — per E-Mail, Bank oder direkt vom Konto.',
+    accent: 'text-chart-2',
+    iconBg: 'bg-chart-2/10 group-hover:bg-chart-2/20',
+    borderAccent: 'border-chart-2/20',
+    features: [
+      { icon: Inbox, title: 'E-Mail-Import (Webhook)', description: 'Eigene Import-Adresse generieren — Belege per Weiterleitung empfangen.' },
+      { icon: Mail, title: 'Gmail & Outlook Sync', description: 'OAuth-basierte Anbindung an Gmail und Microsoft 365 für automatischen Abruf.' },
+      { icon: Wifi, title: 'IMAP-Import', description: 'Beliebigen E-Mail-Provider per IMAP verbinden — mit Ordner- und Intervall-Konfiguration.' },
+      { icon: Building2, title: 'CSV-Bankimport', description: 'Kontoauszüge als CSV importieren und Buchungen mit Belegen matchen.' },
+      { icon: Landmark, title: 'Live-Bankanbindung', description: 'Open-Banking-Anbindung für Echtzeit-Synchronisation deiner Konten.', planBadge: 'Pro' },
+      { icon: Filter, title: 'Absender-Filter', description: 'Nur Belege von bestimmten Absendern importieren — mit Stichwort-Filtern.' },
+      { icon: Ban, title: 'Absender-Blockierung', description: 'Unerwünschte Absender blockieren — keine Werbe-Mails mehr im System.' },
     ],
   },
   {
@@ -50,36 +72,55 @@ const featureBlocks: FeatureBlock[] = [
     iconBg: 'bg-success/10 group-hover:bg-success/20',
     borderAccent: 'border-success/20',
     features: [
-      { icon: Building2, title: 'Bank-Import (CSV)', description: 'Kontoauszüge als CSV importieren und mit vorhandenen Belegen matchen.' },
-      { icon: Search, title: 'Schlagwort-Automatisierung', description: 'Regelmäßige Ausgaben automatisch kategorisieren und MwSt zuordnen.' },
-      { icon: Landmark, title: 'Live-Bankanbindung', description: 'Open-Banking-Anbindung für Echtzeit-Synchronisation deiner Buchungen.', planBadge: 'Pro' },
-      { icon: ArrowRightLeft, title: 'Auto-Reconciliation', description: 'Belege und Bankbuchungen werden automatisch gematcht — weniger Handarbeit.' },
+      { icon: ArrowRightLeft, title: 'Automatisches Matching', description: 'Beleg-↔-Bank Zuordnung per Betrag, Datum und Lieferantenname.' },
+      { icon: Zap, title: 'Auto-Reconciliation', description: 'KI-basiertes Matching — weniger manuelle Zuordnung, mehr Übersicht.' },
+      { icon: Search, title: 'Bank-Schlagwörter', description: 'Regelmäßige Ausgaben per Schlagwort automatisch kategorisieren und MwSt zuordnen.' },
+      { icon: BarChart3, title: 'KPI-Dashboard', description: 'Ausgaben nach Monat, Kategorie und Status — mit Diagrammen und Trends.' },
     ],
   },
   {
     label: 'Business',
-    title: 'Rechnungen & Geschäftsdokumente',
-    subtitle: 'Vom Angebot bis zur bezahlten Rechnung — der komplette Verkaufs-Workflow.',
+    title: 'Rechnungen & Verkaufs-Workflow',
+    subtitle: 'Vom Angebot bis zur bezahlten Rechnung — der komplette Dokumenten-Kreislauf.',
     accent: 'text-warning',
     iconBg: 'bg-warning/10 group-hover:bg-warning/20',
     borderAccent: 'border-warning/20',
     features: [
-      { icon: FileText, title: 'Ausgangsrechnungen', description: 'Professionelle Rechnungen erstellen mit automatischer Nummerierung und PDF-Versand.' },
-      { icon: ClipboardList, title: 'Angebote, AB & Lieferscheine', description: 'Angebote, Auftragsbestätigungen und Lieferscheine — nahtlos ineinander umwandelbar.' },
-      { icon: UserCheck, title: 'CRM & Kundenverwaltung', description: 'Kundenstammdaten, Nummernkreise, Zahlungsbedingungen und Lieferadressen.' },
-      { icon: Repeat, title: 'Wiederkehrende Rechnungen', description: 'Abo-Rechnungen automatisch generieren lassen — monatlich, quartalsweise oder jährlich.' },
-      { icon: CreditCard, title: 'Anzahlungs- & Teilrechnungen', description: 'Anzahlungen, Teilrechnungen und Schlussrechnungen mit automatischer Verrechnung.' },
-      { icon: ReceiptText, title: 'Gutschriften & Mahnwesen', description: 'Stornobelege erstellen und überfällige Rechnungen automatisch erinnern.' },
+      { icon: FileText, title: 'Ausgangsrechnungen', description: 'Professionelle Rechnungen mit automatischer Nummerierung und PDF-Generierung.' },
+      { icon: ClipboardList, title: 'AG → AB → LS → RE', description: 'Angebote, Auftragsbestätigungen und Lieferscheine — nahtlos ineinander umwandelbar.' },
+      { icon: CreditCard, title: 'Teilrechnungen', description: 'Anzahlungs-, Teil- und Schlussrechnungen mit automatischer Verrechnung.' },
+      { icon: Repeat, title: 'Wiederkehrende Rechnungen', description: 'Abo-Rechnungen automatisch generieren — monatlich, quartalsweise oder jährlich.' },
+      { icon: ReceiptText, title: 'Gutschriften', description: 'Stornobelege mit Referenz zur Originalrechnung erstellen.' },
+      { icon: Hash, title: 'Nummernkreise', description: 'Konfigurierbare Präfixe und Formate für Rechnungs-, Angebots- und Kundennummern.' },
+      { icon: Palette, title: 'PDF-Layout & Logo', description: 'Eigenes Logo, Layout-Varianten und Fußzeilen für professionelle Dokumente.' },
+      { icon: Percent, title: 'Skonto & Rabatt', description: 'Skonto-Tage, Rabatt-Prozent und individuelle Zahlungsbedingungen pro Kunde.' },
+      { icon: Package, title: 'Artikelgruppen', description: 'Positionen in Gruppen organisieren — mit Zwischensummen und optionalen Bildern.' },
+    ],
+  },
+  {
+    label: 'Business',
+    title: 'CRM & Stammdaten',
+    subtitle: 'Kunden, Artikel und Firmendaten zentral verwalten.',
+    accent: 'text-chart-4',
+    iconBg: 'bg-chart-4/10 group-hover:bg-chart-4/20',
+    borderAccent: 'border-chart-4/20',
+    features: [
+      { icon: UserCheck, title: 'Kundenverwaltung', description: 'Kontaktdaten, UID-Nummer, Zahlungsbedingungen und abweichende Lieferadressen.' },
+      { icon: BookOpen, title: 'Artikelvorlagen', description: 'Wiederverwendbare Artikel mit Preis, Einheit, USt-Satz und optionalem Bild.' },
+      { icon: Briefcase, title: 'Firmendaten', description: 'Eigene Firmendaten für Rechnungskopf, Bankverbindung und Kleinunternehmer-Regelung.' },
     ],
   },
 ];
 
 const crossFeatures: Feature[] = [
-  { icon: Users, title: 'Lieferanten-Lernen', description: 'Die KI merkt sich Korrekturen pro Lieferant und wendet sie bei neuen Belegen an.' },
-  { icon: Tags, title: 'Kategorien & Tags', description: 'Organisiere Belege und Rechnungen mit eigenen Kategorien und farbigen Tags.' },
-  { icon: Smartphone, title: 'Mobile-Ready', description: 'Responsive Design für Desktop, Tablet und Smartphone — auch als PWA installierbar.' },
-  { icon: Shield, title: 'DSGVO-konform', description: 'Daten sicher in der EU gespeichert, verschlüsselt übertragen, 7 Jahre archiviert.' },
-  { icon: Zap, title: 'Schnelle Verarbeitung', description: 'KI-Analyse in Sekunden — keine Wartezeiten, sofortige Ergebnisse.' },
+  { icon: Users, title: 'Lieferanten-Lernen', description: 'Korrekturen merken und bei neuen Belegen anwenden.' },
+  { icon: Shield, title: 'DSGVO-konform', description: 'EU-Hosting, verschlüsselt, 7–10 Jahre archiviert.' },
+  { icon: Smartphone, title: 'PWA-App', description: 'Installierbar auf Handy & Desktop, offline-fähig.' },
+  { icon: Globe, title: 'Responsive Design', description: 'Optimiert für Desktop, Tablet und Smartphone.' },
+  { icon: FileSpreadsheet, title: 'Flexible Exporte', description: 'CSV, Excel, PDF und ZIP-Download.' },
+  { icon: Download, title: 'DATEV / BMD Export', description: 'Steuerberater-kompatible Formate.', planBadge: 'Business' },
+  { icon: CloudUpload, title: 'Cloud-Backup', description: 'Google Drive mit konfigurierbarem Zeitplan.', planBadge: 'Pro' },
+  { icon: Timer, title: 'Onboarding-Assistent', description: 'Geführte Einrichtung für schnellen Start.' },
 ];
 
 function FeatureBlockSection({ block, index }: { block: FeatureBlock; index: number }) {
@@ -92,7 +133,7 @@ function FeatureBlockSection({ block, index }: { block: FeatureBlock; index: num
       className="mb-16 last:mb-0"
     >
       <div className="flex items-center gap-3 mb-2">
-        <h3 className={`text-2xl font-bold text-foreground`}>{block.title}</h3>
+        <h3 className="text-2xl font-bold text-foreground">{block.title}</h3>
         <Badge variant="outline" className={`${block.borderAccent} ${block.accent} text-xs`}>
           {block.label}
         </Badge>
@@ -151,7 +192,7 @@ export function Features() {
             Alles für deine Belegverwaltung — und darüber hinaus
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto" style={{ textWrap: 'pretty' }}>
-            Von der automatischen Erkennung über Bankabgleich bis zum kompletten Rechnungsmodul — XpenzAi wächst mit deinem Unternehmen.
+            Von der KI-Erkennung über Bankabgleich und CRM bis zum kompletten Rechnungsmodul — XpenzAi wächst mit deinem Unternehmen.
           </p>
         </motion.div>
 
@@ -168,7 +209,7 @@ export function Features() {
           className="mt-16"
         >
           <h3 className="text-xl font-bold text-foreground mb-6 text-center">In allen Tarifen enthalten</h3>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {crossFeatures.map((feature, i) => (
               <motion.div
                 key={feature.title}
@@ -182,7 +223,14 @@ export function Features() {
                     <div className="w-10 h-10 rounded-lg bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center mb-3 transition-colors">
                       <feature.icon className="h-5 w-5 text-primary" />
                     </div>
-                    <h4 className="font-semibold text-foreground text-sm mb-1">{feature.title}</h4>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <h4 className="font-semibold text-foreground text-sm">{feature.title}</h4>
+                      {feature.planBadge && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary">
+                          {feature.planBadge}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">{feature.description}</p>
                   </CardContent>
                 </Card>

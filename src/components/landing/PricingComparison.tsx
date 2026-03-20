@@ -1,3 +1,4 @@
+import React from 'react';
 import { Check, X, Minus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
@@ -17,38 +18,72 @@ const featureGroups: { group: string; features: FeatureRow[] }[] = [
     group: 'Belege & Erkennung',
     features: [
       { label: 'Belege pro Monat', free: '10', starter: '30', pro: '100', business: '250' },
-      { label: 'Dokumente pro Monat', free: '–', starter: '–', pro: '–', business: '250' },
-      { label: 'KI-Erkennung', free: true, starter: true, pro: true, business: true },
+      { label: 'KI-Erkennung (OCR)', free: true, starter: true, pro: true, business: true },
       { label: 'Lieferanten-Lernen', free: true, starter: true, pro: true, business: true },
       { label: 'Dublikaterkennung', free: true, starter: true, pro: true, business: true },
-      { label: 'Multi-Upload & PDF-Split', free: true, starter: true, pro: true, business: true },
+      { label: 'Multi-Upload & Kamera', free: true, starter: true, pro: true, business: true },
+      { label: 'PDF-Splitting', free: true, starter: true, pro: true, business: true },
+      { label: 'Auto-Approval', free: true, starter: true, pro: true, business: true },
+      { label: 'Manuelle Einträge (Barbelege)', free: true, starter: true, pro: true, business: true },
+      { label: 'Dateinamen & Beschreibungsvorlagen', free: true, starter: true, pro: true, business: true },
+      { label: 'Tags & Kategorien', free: true, starter: true, pro: true, business: true },
+      { label: 'Review-Workflow', free: true, starter: true, pro: true, business: true },
     ],
   },
   {
-    group: 'Import & Abgleich',
+    group: 'Import-Kanäle',
     features: [
-      { label: 'E-Mail Import (Gmail, Outlook, IMAP)', free: false, starter: true, pro: true, business: true },
+      { label: 'E-Mail Import (Webhook)', free: false, starter: true, pro: true, business: true },
+      { label: 'Gmail & Outlook OAuth-Sync', free: false, starter: true, pro: true, business: true },
+      { label: 'IMAP-Import (beliebiger Provider)', free: false, starter: true, pro: true, business: true },
+      { label: 'Absender-Filter & Blockierung', free: false, starter: true, pro: true, business: true },
+    ],
+  },
+  {
+    group: 'Banking & Abgleich',
+    features: [
       { label: 'Bank-Import (CSV)', free: false, starter: true, pro: true, business: true },
-      { label: 'Kontoabgleich', free: false, starter: true, pro: true, business: true },
+      { label: 'Automatisches Matching', free: false, starter: true, pro: true, business: true },
+      { label: 'Bank-Schlagwörter', free: false, starter: true, pro: true, business: true },
+      { label: 'KPI-Dashboard & Berichte', free: false, starter: true, pro: true, business: true },
       { label: 'Live-Bankanbindung', free: false, starter: false, pro: '1 Konto', business: '1 Konto' },
+      { label: 'Auto-Reconciliation', free: false, starter: false, pro: true, business: true },
     ],
   },
   {
     group: 'Export & Backup',
     features: [
       { label: 'CSV / Excel / PDF Export', free: true, starter: true, pro: true, business: true },
+      { label: 'ZIP-Download', free: true, starter: true, pro: true, business: true },
       { label: 'Anpassbare Export-Vorlagen', free: false, starter: true, pro: true, business: true },
       { label: 'Cloud-Backup (Google Drive)', free: false, starter: false, pro: true, business: true },
       { label: 'DATEV / BMD Export', free: false, starter: false, pro: false, business: true },
     ],
   },
   {
-    group: 'Rechnungen & Dokumente',
+    group: 'Rechnungen & Verkauf',
     features: [
+      { label: 'Dokumente pro Monat', free: '–', starter: '–', pro: '–', business: '250' },
       { label: 'Ausgangsrechnungen', free: false, starter: false, pro: false, business: true },
-      { label: 'Angebote', free: false, starter: false, pro: false, business: true },
-      { label: 'Auftragsbestätigungen', free: false, starter: false, pro: false, business: true },
-      { label: 'Lieferscheine', free: false, starter: false, pro: false, business: true },
+      { label: 'Angebote (AG)', free: false, starter: false, pro: false, business: true },
+      { label: 'Auftragsbestätigungen (AB)', free: false, starter: false, pro: false, business: true },
+      { label: 'Lieferscheine (LS)', free: false, starter: false, pro: false, business: true },
+      { label: 'Dokumenten-Umwandlung (AG→RE)', free: false, starter: false, pro: false, business: true },
+      { label: 'Teilrechnungen (Anzahlung/Schluss)', free: false, starter: false, pro: false, business: true },
+      { label: 'Gutschriften', free: false, starter: false, pro: false, business: true },
+      { label: 'Wiederkehrende Rechnungen', free: false, starter: false, pro: false, business: true },
+      { label: 'Skonto & Rabatt', free: false, starter: false, pro: false, business: true },
+      { label: 'Artikelgruppen & Bilder', free: false, starter: false, pro: false, business: true },
+      { label: 'PDF mit Logo & Layout', free: false, starter: false, pro: false, business: true },
+      { label: 'Nummernkreise (konfigurierbar)', free: false, starter: false, pro: false, business: true },
+    ],
+  },
+  {
+    group: 'CRM & Stammdaten',
+    features: [
+      { label: 'Kundenverwaltung', free: false, starter: false, pro: false, business: true },
+      { label: 'Artikelvorlagen', free: false, starter: false, pro: false, business: true },
+      { label: 'Firmendaten & Bankverbindung', free: false, starter: false, pro: false, business: true },
     ],
   },
   {
@@ -57,6 +92,7 @@ const featureGroups: { group: string; features: FeatureRow[] }[] = [
       { label: 'Aufbewahrung', free: '–', starter: '7 Jahre', pro: '10 Jahre', business: '10 Jahre' },
       { label: 'Rollover-Guthaben', free: false, starter: true, pro: true, business: true },
       { label: 'Mobile App (PWA)', free: true, starter: true, pro: true, business: true },
+      { label: 'Onboarding-Assistent', free: true, starter: true, pro: true, business: true },
     ],
   },
 ];
@@ -115,8 +151,8 @@ export function PricingComparison() {
             </thead>
             <tbody>
               {featureGroups.map((group) => (
-                <>
-                  <tr key={group.group}>
+                <React.Fragment key={group.group}>
+                  <tr>
                     <td colSpan={5} className="pt-6 pb-2 font-semibold text-foreground text-xs uppercase tracking-wider">
                       {group.group}
                     </td>
@@ -131,7 +167,7 @@ export function PricingComparison() {
                       ))}
                     </tr>
                   ))}
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>
