@@ -1,47 +1,29 @@
 
 
-## EPC QR-Code (GiroCode) auf Ausgangsrechnungen
+## Problem
 
-### Zusammenfassung
-Auf jeder generierten Rechnung wird ein EPC QR-Code (GiroCode) eingefügt, der SEPA-Zahlungsdaten enthält. Kunden können den Code mit ihrer Banking-App scannen und die Zahlung direkt ausführen.
+Dein `profiles.plan` steht auf `"free"` in der Datenbank. Der Admin-Override (`admin_view_plan`) wirkt nur im Frontend (usePlan Hook), aber serverseitig (Edge Functions wie `bank-connect`) wird direkt `profiles.plan` gelesen. Die `check-subscription` Function setzt den Plan nicht zurueck wenn kein Stripe-Abo existiert, also ist eine manuelle Zuweisung persistent.
 
-### EPC QR-Code Format
-Der europäische Standard (EPC069-12) codiert folgende Daten:
-```text
-BCD
-002
-1
-SCT
-[BIC]
-[Empfänger-Name]
-[IBAN]
-EUR[Betrag]
+## Loesung (2 Schritte)
 
+### 1. Dein Profil auf Business setzen
 
-[Verwendungszweck/Rechnungsnummer]
-```
+Direkt in der Datenbank dein `profiles.plan` auf `'business'` setzen. Da `check-subscription` manuell gesetzte Plaene nicht ueberschreibt (Zeile 77: "Don't reset plan"), bleibt das persistent.
 
-### Technische Umsetzung
+### 2. Edge Function `bank-connect` absichern
 
-**1. Edge Function erweitern (`supabase/functions/generate-invoice-pdf/index.ts`)**
+Zusaetzlich die Plan-Pruefung in `bank-connect/index.ts` (Zeilen 126-133) erweitern, damit Admin-User mit `admin_view_plan` auch serverseitig den richtigen effectivePlan bekommen:
 
-- QR-Code-Bibliothek importieren: `npm:qrcode-generator` (leichtgewichtig, Deno-kompatibel, kein Canvas nötig)
-- EPC-Payload aus Firmendaten (IBAN, BIC, Name) und Rechnungsdaten (Betrag, Rechnungsnummer) zusammenbauen
-- QR-Code als PNG-Bytes generieren und via `pdfDoc.embedPng()` einbetten
-- Platzierung: rechts neben den Bankverbindungsdaten (ca. 80x80pt), nur wenn IBAN vorhanden und kein Lieferschein
-- Beschriftung unter dem QR-Code: "Jetzt scannen & bezahlen" (klein, grau)
+- `admin_view_plan` mit aus dem Profil selektieren
+- `user_roles` auf Admin-Rolle pruefen
+- `effectivePlan` berechnen (wie im Frontend-Hook)
 
-**2. Bedingungen**
-- Nur bei Rechnungen/Gutschriften (nicht bei Angeboten, AB, Lieferscheinen)
-- Nur wenn IBAN in den Firmendaten hinterlegt ist
-- Betrag muss > 0 sein
+So funktioniert auch der Plan-Switcher serverseitig korrekt fuer Tests.
 
-**3. Vorschau aktualisieren (`InvoiceLayoutPreview.tsx`)**
-- Kleinen QR-Code-Platzhalter in der Mini-Vorschau neben der Bankverbindung anzeigen
+### Betroffene Dateien
 
-### Dateien
-| Datei | Änderung |
-|-------|----------|
-| `supabase/functions/generate-invoice-pdf/index.ts` | QR-Code generieren und im PDF platzieren |
-| `src/components/settings/InvoiceLayoutPreview.tsx` | QR-Platzhalter in der Vorschau |
+| Datei | Aenderung |
+|-------|-----------|
+| DB: `profiles` | `plan = 'business'` fuer deinen User |
+| `supabase/functions/bank-connect/index.ts` | Admin-aware Plan-Check |
 
