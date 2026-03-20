@@ -28,6 +28,7 @@ export const STRIPE_TIERS: Record<Exclude<PlanType, 'free'>, StripeTier> = {
 export const PRODUCT_TO_PLAN: Record<string, PlanType> = {
   'prod_UAKsQZUmnXhFJi': 'starter',
   'prod_UAKtEUTzqyQ44I': 'pro',
+  'prod_UBNbFH4F60Dh7H': 'pro',
   'prod_UAKwFsOsukVbz4': 'business',
   // Yearly products map to same plans
   'prod_UAKzP7PQ5abo5z': 'starter',
