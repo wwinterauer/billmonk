@@ -66,7 +66,7 @@ export function Hero() {
               className="flex items-center gap-3 justify-center lg:justify-start"
             >
               <div className="flex -space-x-2">
-                {['MK', 'TS', 'SM', 'JR'].map((initials, i) => (
+                {['MK', 'TS', 'SM', 'JR'].map((initials) => (
                   <div
                     key={initials}
                     className="w-8 h-8 rounded-full border-2 border-background bg-primary/10 flex items-center justify-center text-[10px] font-semibold text-primary"
