@@ -1,22 +1,44 @@
 
 
-## Plan: Feature-Übersicht als .md Datei erstellen
+# Plan: Stripe-Preise synchronisieren und neuen Pro-Monatspreis erstellen
 
-Erstelle eine umfassende Markdown-Datei (`/mnt/documents/Platform_Feature_Overview.md`) mit allen Funktionen der Plattform, gegliedert nach Modulen und Zielgruppen, inklusive Plan-Zuordnung. Die Datei dient als Grundlage für die Namensfindung.
+## Ist-Zustand (Stripe Dashboard vs. Code)
 
-### Inhalt der Datei
+| Plan | Stripe monatlich | Code monatlich | Stripe jährlich | Code jährlich |
+|------|-----------------|----------------|-----------------|---------------|
+| Starter | 2,99 € | 1,99 € | 28,70 € | 19,90 € |
+| Pro | 5,99 € | 5,99 € | 76,70 € | 57,50 € |
+| Business | 15,99 € | 15,99 € | 153,50 € | 153,50 € |
 
-1. **Beleg-Management** — KI-Erkennung, Multi-Upload, PDF-Splitting, Dublikaterkennung, Review-Workflow, Kamera-Scan, Vendor-Learning
-2. **Import-Kanäle** — E-Mail (Gmail/Outlook/IMAP), CSV-Bankimport, Live-Bankanbindung (Open Banking)
-3. **Finanz-Abgleich** — Kontoabgleich (Auto-Reconciliation), KPI-Dashboard, Berichte & Analysen (Ausgaben + Einnahmen)
-4. **Verkaufs-Workflow** — Angebote → Auftragsbestätigungen → Lieferscheine → Rechnungen, Teilrechnungen, wiederkehrende Rechnungen, PDF-Generierung
-5. **CRM & Stammdaten** — Kunden, Lieferanten, Artikelvorlagen, Kategorien, Tags
-6. **Export & Archivierung** — CSV/Excel/PDF, DATEV/BMD, Cloud-Backup (Google Drive), anpassbare Dateinamen-Vorlagen
-7. **Plattform** — PWA/Mobile-Ready, DSGVO-konform, Onboarding, Subscription (Trial + Beta-Rabatt)
-8. **Plan-Matrix** — Welche Features in welchem Plan (Free/Starter/Pro/Business)
-9. **Zielgruppen-Mapping** — Privatanwender, Kleinstunternehmer/Vermieter, EPUs, Kleinunternehmen
+Pro monatlich soll von 5,99 € auf 7,99 € geändert werden. Alle anderen Preise müssen mit den aktuellen Dashboard-Werten synchronisiert werden.
 
-### Umsetzung
+## Schritte
 
-Ein Schritt: Script schreibt die .md Datei nach `/mnt/documents/` und liefert sie als Artifact.
+### 1. Neuen Stripe-Preis erstellen
+- Neuer monatlicher Preis für Pro-Produkt (`prod_UAKtEUTzqyQ44I`): **7,99 €/Monat** (recurring, monthly)
+- Alter Preis (`price_1TC0DU1lIffwSHcf2hFtyWbQ` = 5,99 €) bleibt bestehen für Grandfathering
+
+### 2. `src/lib/planConfig.ts` aktualisieren
+Alle `PLAN_PRICES` auf die aktuellen Stripe-Werte setzen:
+- Starter: 2,99 €/Monat, 28,70 €/Jahr
+- Pro: **7,99 €/Monat**, 76,70 €/Jahr
+- Business: 15,99 €/Monat, 153,50 €/Jahr
+
+### 3. `src/lib/stripeConfig.ts` aktualisieren
+- Pro `monthlyPriceId` auf die neue Price-ID setzen (wird beim Erstellen in Schritt 1 generiert)
+
+### 4. UI-Stellen (keine Code-Änderungen nötig)
+Beide UI-Komponenten lesen bereits aus `PLAN_PRICES` und `STRIPE_TIERS`:
+- **Landing Page** (`src/components/landing/Pricing.tsx`) — zeigt `getPrice()` und `getBetaPrice()` aus `PLAN_PRICES`
+- **Abo-Einstellungen** (`src/components/settings/SubscriptionSettings.tsx`) — nutzt `PLAN_PRICES` und `STRIPE_TIERS`
+
+Durch die Aktualisierung der zentralen Config-Dateien werden alle UI-Stellen automatisch korrekt.
+
+### 5. Dokumentation aktualisieren
+`/mnt/documents/Platform_Feature_Overview.md` mit den neuen Preisen synchronisieren.
+
+## Betroffene Dateien
+- `src/lib/planConfig.ts` (Preise)
+- `src/lib/stripeConfig.ts` (neue Price-ID für Pro monthly)
+- Stripe: neuer Preis wird via API erstellt
 
