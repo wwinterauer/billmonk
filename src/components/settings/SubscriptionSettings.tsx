@@ -262,7 +262,7 @@ export function SubscriptionSettings() {
                         {loadingPlan === item.plan ? 'Wird geladen...' : '30 Tage gratis testen'}
                       </Button>
                       <p className="text-xs text-center text-muted-foreground">
-                        danach €{PLAN_PRICES[item.plan].monthly.toFixed(2).replace('.', ',')}/Monat
+                        danach €{(PLAN_PRICES[item.plan].monthly * 0.5).toFixed(2).replace('.', ',')}/Monat für 12 Monate
                       </p>
                     </CardContent>
                   </Card>
