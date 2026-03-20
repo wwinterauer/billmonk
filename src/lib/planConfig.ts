@@ -41,8 +41,8 @@ export const PLAN_NAMES: Record<PlanType, string> = {
 export const PLAN_PRICES: Record<PlanType, { monthly: number; yearly: number }> = {
   free: { monthly: 0, yearly: 0 },
   starter: { monthly: 1.99, yearly: 19.90 },
-  pro: { monthly: 4.99, yearly: 47.90 },
-  business: { monthly: 14.99, yearly: 143.90 },
+  pro: { monthly: 5.99, yearly: 57.50 },
+  business: { monthly: 15.99, yearly: 153.50 },
 };
 
 // Minimum plan required per feature key
