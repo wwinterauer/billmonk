@@ -68,7 +68,7 @@ const plans: PlanInfo[] = [
     features: [
       `${PLAN_LIMITS.business.receiptsPerMonth} Belege/Monat`,
       'Alles aus Pro',
-      'Bis zu 3 Bankkonten',
+      'Live-Bankanbindung (1 Konto)',
       'Angebote, AB & Lieferscheine',
       'Rechnungsmodul',
       'DATEV/BMD Export',

@@ -21,7 +21,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
   free: { receiptsPerMonth: 10, documentsPerMonth: 0, maxTotal: 100, retentionYears: null, maxBankConnections: 0 },
   starter: { receiptsPerMonth: 30, documentsPerMonth: 0, maxTotal: null, retentionYears: 7, maxBankConnections: 0 },
   pro: { receiptsPerMonth: 100, documentsPerMonth: 0, maxTotal: null, retentionYears: 10, maxBankConnections: 1 },
-  business: { receiptsPerMonth: 250, documentsPerMonth: 250, maxTotal: null, retentionYears: 10, maxBankConnections: 3 },
+  business: { receiptsPerMonth: 250, documentsPerMonth: 250, maxTotal: null, retentionYears: 10, maxBankConnections: 1 },
 };
 
 export const PLAN_FEATURES: Record<PlanType, PlanFeatures> = {
