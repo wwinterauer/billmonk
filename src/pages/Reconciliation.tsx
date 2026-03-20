@@ -665,6 +665,7 @@ export default function Reconciliation() {
                                 {sortField === 'amount' && <ArrowUpDown className="h-3 w-3" />}
                               </div>
                             </TableHead>
+                            <TableHead>Quelle</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Zugeordneter Beleg</TableHead>
                             <TableHead className="text-right">Aktionen</TableHead>
