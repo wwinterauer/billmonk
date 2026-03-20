@@ -249,8 +249,11 @@ export function SubscriptionSettings() {
                         onClick={() => handleCheckout(item.plan)}
                         disabled={loadingPlan === item.plan}
                       >
-                        {loadingPlan === item.plan ? 'Wird geladen...' : `${PLAN_NAMES[item.plan]} wählen`}
+                        {loadingPlan === item.plan ? 'Wird geladen...' : '30 Tage gratis testen'}
                       </Button>
+                      <p className="text-xs text-center text-muted-foreground">
+                        danach €{PLAN_PRICES[item.plan].monthly.toFixed(2).replace('.', ',')}/Monat
+                      </p>
                     </CardContent>
                   </Card>
                 );
