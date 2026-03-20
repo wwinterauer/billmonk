@@ -140,8 +140,8 @@ export function Pricing() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-4">
             Wähle den Plan, der zu dir passt. Jederzeit kündbar.
           </p>
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary font-medium text-sm px-4 py-2 rounded-full mb-4">
-            🎉 30 Tage kostenlos testen — alle Bezahlpläne inkl. Testphase
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary font-medium text-sm px-4 py-2 rounded-full mb-2">
+            🎉 Beta-Aktion: 50% Rabatt für 12 Monate + 30 Tage gratis testen
           </div>
 
           {/* Monthly/Yearly Toggle */}
