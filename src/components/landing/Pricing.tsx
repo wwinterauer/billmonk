@@ -90,6 +90,13 @@ export function Pricing() {
     return `€${prices.monthly.toFixed(2).replace('.', ',')}`;
   };
 
+  const getBetaPrice = (plan: PlanType) => {
+    const prices = PLAN_PRICES[plan];
+    const base = yearly ? prices.yearly : prices.monthly;
+    const discounted = base * 0.5;
+    return `€${discounted.toFixed(2).replace('.', ',')}`;
+  };
+
   const handleCheckout = async (plan: PlanType) => {
     if (plan === 'free') return;
 
