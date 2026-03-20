@@ -1,0 +1,1 @@
+ALTER TABLE public.bank_connections_live ALTER COLUMN provider SET DEFAULT 'enablebanking';

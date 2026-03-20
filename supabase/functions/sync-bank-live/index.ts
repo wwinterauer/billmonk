@@ -7,24 +7,60 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GC_BASE = "https://bankaccountdata.gocardless.com/api/v2";
+const EB_BASE = "https://api.enablebanking.com";
 
-async function getGCToken(): Promise<string> {
-  const secretId = Deno.env.get("GOCARDLESS_SECRET_ID");
-  const secretKey = Deno.env.get("GOCARDLESS_SECRET_KEY");
-  if (!secretId || !secretKey) throw new Error("GoCardless credentials not configured");
+function base64url(data: Uint8Array): string {
+  return btoa(String.fromCharCode(...data))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
 
-  const res = await fetch(`${GC_BASE}/token/new/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ secret_id: secretId, secret_key: secretKey }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`GoCardless token error [${res.status}]: ${body}`);
+function base64urlEncode(str: string): string {
+  return base64url(new TextEncoder().encode(str));
+}
+
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  const lines = pem
+    .replace(/-----BEGIN [\w\s]+-----/, "")
+    .replace(/-----END [\w\s]+-----/, "")
+    .replace(/\s/g, "");
+  const binary = atob(lines);
+  const buf = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    buf[i] = binary.charCodeAt(i);
   }
-  const data = await res.json();
-  return data.access;
+  return buf.buffer;
+}
+
+async function generateJWT(): Promise<string> {
+  const appId = Deno.env.get("ENABLE_BANKING_APP_ID");
+  const privateKeyPem = Deno.env.get("ENABLE_BANKING_PRIVATE_KEY");
+  if (!appId || !privateKeyPem) throw new Error("Enable Banking credentials not configured");
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64urlEncode(JSON.stringify({ alg: "RS256", typ: "JWT", kid: appId }));
+  const payload = base64urlEncode(JSON.stringify({
+    iss: "enablebanking.com",
+    aud: "api.enablebanking.com",
+    iat: now,
+    exp: now + 3600,
+  }));
+
+  const keyData = pemToArrayBuffer(privateKeyPem);
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    keyData,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const signatureData = new TextEncoder().encode(`${header}.${payload}`);
+  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", cryptoKey, signatureData);
+  const sig = base64url(new Uint8Array(signature));
+
+  return `${header}.${payload}.${sig}`;
 }
 
 serve(async (req) => {
@@ -37,7 +73,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Authenticate user
     const authHeader = req.headers.get("authorization");
     if (!authHeader) throw new Error("Missing authorization header");
     const { data: { user }, error: authError } = await supabase.auth.getUser(
@@ -48,7 +83,6 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const connectionId = body.connection_id;
 
-    // Get active connections to sync
     let query = supabase
       .from("bank_connections_live")
       .select("*")
@@ -66,9 +100,9 @@ serve(async (req) => {
       });
     }
 
-    const gcToken = await getGCToken();
-    const gcHeaders = {
-      Authorization: `Bearer ${gcToken}`,
+    const jwt = await generateJWT();
+    const ebHeaders = {
+      Authorization: `Bearer ${jwt}`,
       "Content-Type": "application/json",
     };
 
@@ -78,14 +112,13 @@ serve(async (req) => {
       if (!conn.account_id) continue;
 
       try {
-        // Fetch transactions from GoCardless (last 90 days)
         const dateFrom = new Date();
         dateFrom.setDate(dateFrom.getDate() - 90);
         const dateFromStr = dateFrom.toISOString().split("T")[0];
 
         const res = await fetch(
-          `${GC_BASE}/accounts/${conn.account_id}/transactions/?date_from=${dateFromStr}`,
-          { headers: gcHeaders }
+          `${EB_BASE}/accounts/${conn.account_id}/transactions?date_from=${dateFromStr}`,
+          { headers: ebHeaders }
         );
 
         if (!res.ok) {
@@ -98,11 +131,9 @@ serve(async (req) => {
         }
 
         const data = await res.json();
-        const transactions = [
-          ...(data.transactions?.booked || []),
-        ];
+        const transactions = [...(data.transactions?.booked || [])];
 
-        // Find existing bank account or create mapping
+        // Find or create bank account
         let bankAccountId: string | null = null;
         if (conn.iban) {
           const { data: bankAcc } = await supabase
@@ -115,14 +146,13 @@ serve(async (req) => {
           if (bankAcc) {
             bankAccountId = bankAcc.id;
           } else {
-            // Auto-create bank account
             const { data: newAcc } = await supabase
               .from("bank_accounts")
               .insert({
                 user_id: user.id,
                 iban: conn.iban,
                 account_name: conn.institution_name || "Live-Konto",
-                bank_name: conn.institution_name || "GoCardless",
+                bank_name: conn.institution_name || "Enable Banking",
               })
               .select("id")
               .single();
@@ -131,27 +161,25 @@ serve(async (req) => {
         }
 
         for (const tx of transactions) {
-          const externalId = tx.transactionId || tx.internalTransactionId || `${tx.bookingDate}_${tx.transactionAmount?.amount}`;
-          const amount = parseFloat(tx.transactionAmount?.amount || "0");
+          const externalId = tx.transaction_id || tx.entry_reference || `${tx.booking_date}_${tx.transaction_amount?.amount}`;
+          const amount = parseFloat(tx.transaction_amount?.amount || "0");
           const isExpense = amount < 0;
 
-          // Build description from available fields
           const descParts = [
-            tx.remittanceInformationUnstructured,
-            tx.creditorName,
-            tx.debtorName,
+            tx.remittance_information_unstructured,
+            tx.creditor_name,
+            tx.debtor_name,
           ].filter(Boolean);
           const description = descParts.join(" | ") || "Keine Beschreibung";
 
-          // Upsert using external_id for deduplication
           const { error: insertError } = await supabase
             .from("bank_transactions")
             .upsert(
               {
                 user_id: user.id,
                 bank_account_id: bankAccountId,
-                transaction_date: tx.bookingDate || null,
-                value_date: tx.valueDate || null,
+                transaction_date: tx.booking_date || null,
+                value_date: tx.value_date || null,
                 description,
                 amount: Math.abs(amount),
                 is_expense: isExpense,
@@ -168,7 +196,6 @@ serve(async (req) => {
           }
         }
 
-        // Update sync timestamp
         await supabase
           .from("bank_connections_live")
           .update({ last_sync_at: new Date().toISOString(), sync_error: null })
