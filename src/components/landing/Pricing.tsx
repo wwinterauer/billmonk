@@ -71,7 +71,6 @@ const plans: PlanInfo[] = [
       'Angebote, AB & Lieferscheine',
       'Rechnungsmodul',
       'DATEV/BMD Export',
-      'Dedicated Support',
     ],
     cta: 'Business wählen',
     featured: false,
