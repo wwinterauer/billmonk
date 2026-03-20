@@ -122,15 +122,26 @@ serve(async (req) => {
         throw new Error("institution_id and redirect_url required");
       }
 
-      // Server-side plan limit check
+      // Server-side plan limit check (admin-aware)
       const { data: profile } = await supabase
         .from("profiles")
-        .select("plan")
+        .select("plan, admin_view_plan")
         .eq("id", user.id)
         .single();
-      const plan = profile?.plan || "free";
+
+      const { data: adminRole } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+
+      const isAdmin = !!adminRole;
+      const effectivePlan = isAdmin
+        ? (profile?.admin_view_plan || profile?.plan || "business")
+        : (profile?.plan || "free");
       const maxConnections: Record<string, number> = { free: 0, starter: 0, pro: 1, business: 1 };
-      const limit = maxConnections[plan] ?? 0;
+      const limit = maxConnections[effectivePlan] ?? 0;
 
       const { count } = await supabase
         .from("bank_connections_live")
