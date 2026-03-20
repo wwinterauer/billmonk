@@ -1,29 +1,60 @@
 
 
-## Problem
+# Umsetzungsplan: Bankanbindung-Tab + Finanz-Dashboard
 
-Dein `profiles.plan` steht auf `"free"` in der Datenbank. Der Admin-Override (`admin_view_plan`) wirkt nur im Frontend (usePlan Hook), aber serverseitig (Edge Functions wie `bank-connect`) wird direkt `profiles.plan` gelesen. Die `check-subscription` Function setzt den Plan nicht zurueck wenn kein Stripe-Abo existiert, also ist eine manuelle Zuweisung persistent.
+## Überblick
 
-## Loesung (2 Schritte)
+Zwei Änderungen: (1) "Bankanbindung"-Tab in die zweite Zeile der Einstellungen verschieben, (2) Reconciliation-Seite um KPI-Karten und zwei neue Tabs erweitern.
 
-### 1. Dein Profil auf Business setzen
+---
 
-Direkt in der Datenbank dein `profiles.plan` auf `'business'` setzen. Da `check-subscription` manuell gesetzte Plaene nicht ueberschreibt (Zeile 77: "Don't reset plan"), bleibt das persistent.
+## Teil 1: Settings — Bankanbindung in 2. Zeile
 
-### 2. Edge Function `bank-connect` absichern
+**Datei:** `src/pages/Settings.tsx` (Zeile 463-464)
 
-Zusaetzlich die Plan-Pruefung in `bank-connect/index.ts` (Zeilen 126-133) erweitern, damit Admin-User mit `admin_view_plan` auch serverseitig den richtigen effectivePlan bekommen:
+`bank-live` wird in die `invoiceTabs`-Gruppe aufgenommen, damit der Tab in der zweiten Zeile erscheint.
 
-- `admin_view_plan` mit aus dem Profil selektieren
-- `user_roles` auf Admin-Rolle pruefen
-- `effectivePlan` berechnen (wie im Frontend-Hook)
+---
 
-So funktioniert auch der Plan-Switcher serverseitig korrekt fuer Tests.
+## Teil 2: Reconciliation-Seite erweitern
 
-### Betroffene Dateien
+**Datei:** `src/pages/Reconciliation.tsx` — kompletter Umbau der Seite.
 
-| Datei | Aenderung |
-|-------|-----------|
-| DB: `profiles` | `plan = 'business'` fuer deinen User |
-| `supabase/functions/bank-connect/index.ts` | Admin-aware Plan-Check |
+### Neue KPI-Karten (oberhalb der Tabs)
+
+Drei Zusammenfassungskarten mit eigenen `useQuery`-Aufrufen:
+
+1. **Offene Rechnungen** — `invoices` mit `status IN ('sent', 'overdue')` und `paid_at IS NULL` → Anzahl + Gesamtbetrag
+2. **Belege ohne Zahlung** — `receipts` mit `status IN ('approved', 'completed')` und `bank_transaction_id IS NULL` → Anzahl + Gesamtbetrag
+3. **Zahlungen ohne Beleg** — `bank_transactions` mit `status = 'unmatched'` → Anzahl + Gesamtbetrag (bereits als Query vorhanden)
+
+### Tab-Struktur
+
+Bestehende Transaktionsliste bleibt, wird in Tabs eingebettet:
+
+| Tab | Inhalt |
+|-----|--------|
+| **Transaktionen** | Bestehende Tabelle (unmatched/matched/ignored) |
+| **Offene Rechnungen** | Unbezahlte Ausgangsrechnungen mit Nummer, Kunde, Betrag, Fälligkeitsdatum, Überfällig-Badge. Klick navigiert zu `/invoices/:id/edit`. Feature-gated auf `invoiceModule`. |
+| **Fehlende Belege** | Ausgaben-Transaktionen (`is_expense = true`, `status = 'unmatched'`, `receipt_id IS NULL`) ohne Beleg. Zeigt Datum, Beschreibung, Betrag. Button "Beleg zuordnen" öffnet bestehendes Assignment-Modal. |
+
+### Imports hinzufügen
+
+- `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent` aus `@/components/ui/tabs`
+- `Wallet`, `Receipt`, `FileWarning` Icons aus Lucide
+- `FeatureGate` für Rechnungs-Tab
+- `usePlan` Hook für Feature-Check
+
+### Keine DB-Migration nötig
+
+Alle Daten kommen aus bestehenden Tabellen (`bank_transactions`, `invoices`, `receipts`).
+
+---
+
+## Betroffene Dateien
+
+| Datei | Änderung |
+|-------|----------|
+| `src/pages/Settings.tsx` | 1 Zeile: `bank-live` in invoiceTabs-Filter |
+| `src/pages/Reconciliation.tsx` | KPI-Karten, Tab-Struktur, neue Queries für Rechnungen + fehlende Belege |
 
