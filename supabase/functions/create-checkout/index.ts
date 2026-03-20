@@ -7,6 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const TRIAL_DAYS = 30;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -33,11 +35,24 @@ serve(async (req) => {
 
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId: string | undefined;
+    let hasHadSubscription = false;
+
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
+      // Check if customer ever had a subscription (no trial for returning customers)
+      const subs = await stripe.subscriptions.list({
+        customer: customerId,
+        limit: 1,
+      });
+      hasHadSubscription = subs.data.length > 0;
     }
 
     const origin = req.headers.get("origin") || "https://receipt-ai-pal.lovable.app";
+
+    // Only offer trial to new customers who never had a subscription
+    const trialConfig = !hasHadSubscription
+      ? { subscription_data: { trial_period_days: TRIAL_DAYS } }
+      : {};
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -47,6 +62,8 @@ serve(async (req) => {
       success_url: `${origin}/settings?tab=subscription&checkout=success`,
       cancel_url: `${origin}/settings?tab=subscription&checkout=cancel`,
       allow_promotion_codes: true,
+      payment_method_collection: 'always',
+      ...trialConfig,
     });
 
     return new Response(JSON.stringify({ url: session.url }), {
