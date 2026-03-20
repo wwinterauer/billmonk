@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlan } from '@/hooks/usePlan';
 import { PLAN_LIMITS } from '@/lib/planConfig';
-import { Building2, Plus, RefreshCw, Trash2, Search, Loader2, CheckCircle, AlertTriangle, Landmark, Info } from 'lucide-react';
+import { Building2, Plus, RefreshCw, Trash2, Search, Loader2, CheckCircle, AlertTriangle, Landmark } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
