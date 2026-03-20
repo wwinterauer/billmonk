@@ -32,6 +32,7 @@ import Account from "./pages/Account";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import PricingPage from "./pages/PricingPage";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/pricing" element={<PricingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route 
