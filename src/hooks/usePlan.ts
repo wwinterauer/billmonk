@@ -123,6 +123,7 @@ export function usePlan(): PlanData {
     effectivePlan,
     isAdmin,
     adminViewPlan,
+    hasStripeCustomer,
     receiptsUsed,
     receiptsCredit,
     receiptsLimit,
