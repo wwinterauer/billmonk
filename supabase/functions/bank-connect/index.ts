@@ -129,7 +129,7 @@ serve(async (req) => {
         .eq("id", user.id)
         .single();
       const plan = profile?.plan || "free";
-      const maxConnections: Record<string, number> = { free: 0, starter: 0, pro: 1, business: 3 };
+      const maxConnections: Record<string, number> = { free: 0, starter: 0, pro: 1, business: 1 };
       const limit = maxConnections[plan] ?? 0;
 
       const { count } = await supabase
