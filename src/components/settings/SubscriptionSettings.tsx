@@ -14,15 +14,15 @@ import { Label } from '@/components/ui/label';
 const UPGRADE_PLANS: { plan: Exclude<PlanType, 'free'>; features: string[] }[] = [
   {
     plan: 'starter',
-    features: ['30 Belege/Monat', 'Kontoabgleich', 'E-Mail Import', 'Rollover-Guthaben'],
+    features: ['30 Belege/Monat', 'Kontoabgleich', 'Bank-Import (CSV)', 'E-Mail Import', 'Rollover-Guthaben'],
   },
   {
     plan: 'pro',
-    features: ['100 Belege/Monat', 'Alles aus Starter', 'Cloud-Backup', 'Live-Bankanbindung', 'Priority Support'],
+    features: ['100 Belege/Monat', 'Alles aus Starter', 'Cloud-Backup', 'Live-Bankanbindung (1 Konto)'],
   },
   {
     plan: 'business',
-    features: ['250 Belege/Monat', 'Alles aus Pro', 'Rechnungsmodul', 'DATEV/BMD Export', 'Dedicated Support'],
+    features: ['250 Belege/Monat', '250 Dokumente/Monat', 'Alles aus Pro', 'Rechnungsmodul', 'Angebote, AB & Lieferscheine', 'DATEV/BMD Export'],
   },
 ];
 

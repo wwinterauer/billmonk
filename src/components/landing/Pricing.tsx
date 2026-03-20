@@ -42,6 +42,7 @@ const plans: PlanInfo[] = [
     features: [
       `${PLAN_LIMITS.starter.receiptsPerMonth} Belege/Monat`,
       'Kontoabgleich',
+      'Bank-Import (CSV)',
       'E-Mail Import',
       'Rollover-Guthaben',
     ],
@@ -67,10 +68,10 @@ const plans: PlanInfo[] = [
     description: 'Für Teams & Unternehmen',
     features: [
       `${PLAN_LIMITS.business.receiptsPerMonth} Belege/Monat`,
+      '250 Dokumente/Monat',
       'Alles aus Pro',
-      'Live-Bankanbindung (1 Konto)',
-      'Angebote, AB & Lieferscheine',
       'Rechnungsmodul',
+      'Angebote, AB & Lieferscheine',
       'DATEV/BMD Export',
     ],
     cta: 'Business wählen',
