@@ -49,7 +49,6 @@ export function LiveBankSettings() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
 
-  // Institution search
   const [showSearch, setShowSearch] = useState(false);
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -81,11 +80,6 @@ export function LiveBankSettings() {
   const searchInstitutions = async () => {
     setLoadingInstitutions(true);
     try {
-      const { data, error } = await supabase.functions.invoke('bank-connect', {
-        body: {},
-        headers: {},
-      });
-      // Use query parameter approach
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bank-connect?action=list-institutions&country=${country}`,
         {
@@ -101,7 +95,7 @@ export function LiveBankSettings() {
     } catch (err) {
       toast({
         title: 'Fehler',
-        description: 'Banken konnten nicht geladen werden. Prüfe die GoCardless-Konfiguration.',
+        description: 'Banken konnten nicht geladen werden. Prüfe die Enable Banking-Konfiguration.',
         variant: 'destructive',
       });
     } finally {
@@ -112,7 +106,7 @@ export function LiveBankSettings() {
   const handleStartConnection = async (institutionId: string) => {
     setConnecting(true);
     try {
-      const redirectUrl = `${window.location.origin}/settings?tab=bank-live&gc_callback=true`;
+      const redirectUrl = `${window.location.origin}/settings?tab=bank-live&eb_callback=true`;
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bank-connect?action=create-requisition`,
         {
@@ -140,22 +134,13 @@ export function LiveBankSettings() {
     }
   };
 
-  // Handle callback from GoCardless
+  // Handle callback from Enable Banking
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('gc_callback') === 'true') {
-      // Find pending connection and finalize
+    if (params.get('eb_callback') === 'true') {
+      const code = params.get('code');
       const finalize = async () => {
-        const { data: pending } = await supabase
-          .from('bank_connections_live')
-          .select('requisition_id')
-          .eq('user_id', user?.id || '')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (pending?.requisition_id) {
+        if (code) {
           const response = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bank-connect?action=callback`,
             {
@@ -164,7 +149,7 @@ export function LiveBankSettings() {
                 Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ requisition_id: pending.requisition_id }),
+              body: JSON.stringify({ code }),
             }
           );
           const result = await response.json();
@@ -173,7 +158,6 @@ export function LiveBankSettings() {
           }
         }
         fetchConnections();
-        // Clean URL
         window.history.replaceState({}, '', '/settings?tab=bank-live');
       };
       finalize();
@@ -209,7 +193,7 @@ export function LiveBankSettings() {
 
   const handleDelete = async (connectionId: string) => {
     try {
-      const response = await fetch(
+      await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bank-connect?action=delete-connection`,
         {
           method: 'POST',
@@ -247,7 +231,6 @@ export function LiveBankSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Existing connections */}
           {loading ? (
             <div className="space-y-2">
               <Skeleton className="h-16 w-full" />
@@ -262,18 +245,12 @@ export function LiveBankSettings() {
                 >
                   <div className="flex items-center gap-3">
                     {conn.institution_logo ? (
-                      <img
-                        src={conn.institution_logo}
-                        alt=""
-                        className="h-8 w-8 rounded"
-                      />
+                      <img src={conn.institution_logo} alt="" className="h-8 w-8 rounded" />
                     ) : (
                       <Building2 className="h-8 w-8 text-muted-foreground" />
                     )}
                     <div>
-                      <p className="font-medium">
-                        {conn.institution_name || 'Bankkonto'}
-                      </p>
+                      <p className="font-medium">{conn.institution_name || 'Bankkonto'}</p>
                       {conn.iban && (
                         <p className="text-sm text-muted-foreground">
                           {conn.iban.replace(/(.{4})/g, '$1 ').trim()}
@@ -293,9 +270,7 @@ export function LiveBankSettings() {
                         Fehler
                       </Badge>
                     )}
-                    <Badge
-                      className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0"
-                    >
+                    <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0">
                       <CheckCircle className="h-3 w-3 mr-1" />
                       Aktiv
                     </Badge>
@@ -343,7 +318,6 @@ export function LiveBankSettings() {
             </div>
           )}
 
-          {/* Add new connection */}
           {!showSearch ? (
             <Button onClick={() => { setShowSearch(true); searchInstitutions(); }}>
               <Plus className="h-4 w-4 mr-2" />

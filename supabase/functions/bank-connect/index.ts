@@ -7,24 +7,68 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GC_BASE = "https://bankaccountdata.gocardless.com/api/v2";
+const EB_BASE = "https://api.enablebanking.com";
 
-async function getGCToken(): Promise<string> {
-  const secretId = Deno.env.get("GOCARDLESS_SECRET_ID");
-  const secretKey = Deno.env.get("GOCARDLESS_SECRET_KEY");
-  if (!secretId || !secretKey) throw new Error("GoCardless credentials not configured");
+function base64url(data: Uint8Array): string {
+  return btoa(String.fromCharCode(...data))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
 
-  const res = await fetch(`${GC_BASE}/token/new/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ secret_id: secretId, secret_key: secretKey }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`GoCardless token error [${res.status}]: ${body}`);
+function base64urlEncode(str: string): string {
+  return base64url(new TextEncoder().encode(str));
+}
+
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  const lines = pem
+    .replace(/-----BEGIN [\w\s]+-----/, "")
+    .replace(/-----END [\w\s]+-----/, "")
+    .replace(/\s/g, "");
+  const binary = atob(lines);
+  const buf = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    buf[i] = binary.charCodeAt(i);
   }
-  const data = await res.json();
-  return data.access;
+  return buf.buffer;
+}
+
+async function generateJWT(): Promise<string> {
+  const appId = Deno.env.get("ENABLE_BANKING_APP_ID");
+  const privateKeyPem = Deno.env.get("ENABLE_BANKING_PRIVATE_KEY");
+  if (!appId || !privateKeyPem) throw new Error("Enable Banking credentials not configured");
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64urlEncode(JSON.stringify({ alg: "RS256", typ: "JWT", kid: appId }));
+  const payload = base64urlEncode(JSON.stringify({
+    iss: "enablebanking.com",
+    aud: "api.enablebanking.com",
+    iat: now,
+    exp: now + 3600,
+  }));
+
+  const keyData = pemToArrayBuffer(privateKeyPem);
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    keyData,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const signatureData = new TextEncoder().encode(`${header}.${payload}`);
+  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", cryptoKey, signatureData);
+  const sig = base64url(new Uint8Array(signature));
+
+  return `${header}.${payload}.${sig}`;
+}
+
+async function ebHeaders(): Promise<Record<string, string>> {
+  const jwt = await generateJWT();
+  return {
+    Authorization: `Bearer ${jwt}`,
+    "Content-Type": "application/json",
+  };
 }
 
 serve(async (req) => {
@@ -37,7 +81,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Authenticate user
     const authHeader = req.headers.get("authorization");
     if (!authHeader) throw new Error("Missing authorization header");
     const { data: { user }, error: authError } = await supabase.auth.getUser(
@@ -48,26 +91,30 @@ serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
-    const gcToken = await getGCToken();
-    const gcHeaders = {
-      Authorization: `Bearer ${gcToken}`,
-      "Content-Type": "application/json",
-    };
-
-    // List institutions (banks) for a given country
+    // List ASPSPs (institutions/banks)
     if (action === "list-institutions") {
       const country = url.searchParams.get("country") || "AT";
-      const res = await fetch(
-        `${GC_BASE}/institutions/?country=${country}`,
-        { headers: gcHeaders }
-      );
+      const headers = await ebHeaders();
+      const res = await fetch(`${EB_BASE}/aspsps?country=${country}`, { headers });
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`ASPSP list error [${res.status}]: ${errBody}`);
+      }
       const data = await res.json();
-      return new Response(JSON.stringify(data), {
+      // Map to simplified format for frontend
+      const mapped = (data.aspsps || data || []).map((a: any) => ({
+        id: `${a.name}__${a.country}`,
+        name: a.name,
+        country: a.country,
+        logo: a.logo || "",
+        countries: [a.country],
+      }));
+      return new Response(JSON.stringify(mapped), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Create a requisition (start bank authorization)
+    // Start authorization (create auth session)
     if (action === "create-requisition") {
       const body = await req.json();
       const { institution_id, redirect_url } = body;
@@ -75,90 +122,79 @@ serve(async (req) => {
         throw new Error("institution_id and redirect_url required");
       }
 
-      const res = await fetch(`${GC_BASE}/requisitions/`, {
+      // Parse institution_id back to name + country
+      const [aspspName, aspspCountry] = institution_id.split("__");
+      const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+
+      const headers = await ebHeaders();
+      const res = await fetch(`${EB_BASE}/auth`, {
         method: "POST",
-        headers: gcHeaders,
+        headers,
         body: JSON.stringify({
-          redirect: redirect_url,
-          institution_id,
-          user_language: "DE",
+          access: { valid_until: validUntil },
+          aspsp: { name: aspspName, country: aspspCountry || "AT" },
+          state: crypto.randomUUID(),
+          redirect_url,
+          psu_type: "personal",
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(`Requisition error [${res.status}]: ${JSON.stringify(data)}`);
+      if (!res.ok) throw new Error(`Auth error [${res.status}]: ${JSON.stringify(data)}`);
 
-      // Store the requisition
+      // Store pending connection
       await supabase.from("bank_connections_live").insert({
         user_id: user.id,
-        provider: "gocardless",
-        institution_id,
-        requisition_id: data.id,
+        provider: "enablebanking",
+        institution_id: institution_id,
+        institution_name: aspspName,
         status: "pending",
       });
 
-      return new Response(JSON.stringify({ link: data.link, requisition_id: data.id }), {
+      return new Response(JSON.stringify({ link: data.url }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Callback: finalize the requisition and get accounts
+    // Callback: exchange code for session
     if (action === "callback") {
       const body = await req.json();
-      const { requisition_id } = body;
-      if (!requisition_id) throw new Error("requisition_id required");
+      const { code } = body;
+      if (!code) throw new Error("code required");
 
-      // Fetch requisition details
-      const res = await fetch(`${GC_BASE}/requisitions/${requisition_id}/`, {
-        headers: gcHeaders,
+      const headers = await ebHeaders();
+      const res = await fetch(`${EB_BASE}/sessions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ code }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(`Requisition fetch error [${res.status}]: ${JSON.stringify(data)}`);
+      if (!res.ok) throw new Error(`Session error [${res.status}]: ${JSON.stringify(data)}`);
 
-      if (data.status !== "LN") {
-        // Not yet linked
-        return new Response(JSON.stringify({ status: data.status, message: "Not yet authorized" }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      const sessionId = data.session_id;
+      const accounts = data.accounts || [];
 
-      // Get account details for each account
-      const accounts = [];
-      for (const accountId of data.accounts || []) {
-        const accRes = await fetch(`${GC_BASE}/accounts/${accountId}/`, {
-          headers: gcHeaders,
-        });
-        const accData = await accRes.json();
+      // Update pending connection with session and first account
+      const firstAccount = accounts[0];
+      await supabase
+        .from("bank_connections_live")
+        .update({
+          requisition_id: sessionId,
+          account_id: firstAccount?.uid || null,
+          iban: firstAccount?.iban || null,
+          institution_name: firstAccount?.aspsp_name || null,
+          status: "active",
+        })
+        .eq("user_id", user.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1);
 
-        const detailRes = await fetch(`${GC_BASE}/accounts/${accountId}/details/`, {
-          headers: gcHeaders,
-        });
-        const detailData = await detailRes.json();
-
-        accounts.push({
-          account_id: accountId,
-          iban: detailData?.account?.iban || accData?.iban || null,
-          institution_id: data.institution_id,
-        });
-
-        // Upsert connection record
-        await supabase
-          .from("bank_connections_live")
-          .update({
-            account_id: accountId,
-            iban: detailData?.account?.iban || accData?.iban || null,
-            institution_name: data.institution_id,
-            status: "active",
-          })
-          .eq("requisition_id", requisition_id)
-          .eq("user_id", user.id);
-      }
-
-      return new Response(JSON.stringify({ status: "active", accounts }), {
+      return new Response(JSON.stringify({ status: "active", accounts, session_id: sessionId }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // List user's active bank connections
+    // List user's bank connections
     if (action === "list-accounts") {
       const { data: connections } = await supabase
         .from("bank_connections_live")
@@ -176,7 +212,7 @@ serve(async (req) => {
       const body = await req.json();
       const { connection_id } = body;
 
-      // Also delete the requisition on GoCardless side if possible
+      // Try to delete session on Enable Banking side
       const { data: conn } = await supabase
         .from("bank_connections_live")
         .select("requisition_id")
@@ -186,9 +222,10 @@ serve(async (req) => {
 
       if (conn?.requisition_id) {
         try {
-          await fetch(`${GC_BASE}/requisitions/${conn.requisition_id}/`, {
+          const headers = await ebHeaders();
+          await fetch(`${EB_BASE}/sessions/${conn.requisition_id}`, {
             method: "DELETE",
-            headers: gcHeaders,
+            headers,
           });
         } catch {
           // Best effort
