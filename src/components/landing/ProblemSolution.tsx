@@ -1,4 +1,4 @@
-import { X, Check, Clock, AlertTriangle, FileWarning, FolderSearch, Brain, Zap, Shield, TrendingUp } from 'lucide-react';
+import { X, Check, Clock, AlertTriangle, FileWarning, FolderSearch, Brain, Zap, Shield, TrendingUp, FileX, Unplug } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const problems = [
@@ -6,6 +6,8 @@ const problems = [
   { icon: FileWarning, text: 'Belege verloren oder unleserlich' },
   { icon: FolderSearch, text: 'Keine Übersicht über Ausgaben' },
   { icon: AlertTriangle, text: 'Steuerberater-Panik vor dem Jahresende' },
+  { icon: FileX, text: 'Angebote in Word, Rechnungen in Excel' },
+  { icon: Unplug, text: 'Kein Zusammenhang zwischen Bank und Belegen' },
 ];
 
 const solutions = [
@@ -13,6 +15,8 @@ const solutions = [
   { icon: Shield, text: 'Sicher archiviert in der Cloud' },
   { icon: TrendingUp, text: 'Echtzeit-Überblick über alle Ausgaben' },
   { icon: Brain, text: 'Export-fertig für den Steuerberater' },
+  { icon: Check, text: 'Kompletter Verkaufs-Workflow in einer Plattform' },
+  { icon: Check, text: 'Bankabgleich und Auto-Reconciliation' },
 ];
 
 export function ProblemSolution() {
@@ -30,7 +34,7 @@ export function ProblemSolution() {
             Schluss mit dem Belegchaos
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto" style={{ textWrap: 'pretty' }}>
-            Manuelle Belegverwaltung kostet Zeit und Nerven. XpenzAi automatisiert den gesamten Prozess.
+            Manuelle Belegverwaltung und Insellösungen kosten Zeit und Nerven. XpenzAi bringt alles in eine Plattform.
           </p>
         </motion.div>
 
@@ -56,7 +60,7 @@ export function ProblemSolution() {
                   initial={{ opacity: 0, x: -12 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: 0.1 + i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{ duration: 0.5, delay: 0.1 + i * 0.07, ease: [0.16, 1, 0.3, 1] }}
                   className="flex items-start gap-3"
                 >
                   <item.icon className="h-5 w-5 text-destructive/70 mt-0.5 shrink-0" />
@@ -87,7 +91,7 @@ export function ProblemSolution() {
                   initial={{ opacity: 0, x: 12 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: 0.1 + i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{ duration: 0.5, delay: 0.1 + i * 0.07, ease: [0.16, 1, 0.3, 1] }}
                   className="flex items-start gap-3"
                 >
                   <item.icon className="h-5 w-5 text-success mt-0.5 shrink-0" />
