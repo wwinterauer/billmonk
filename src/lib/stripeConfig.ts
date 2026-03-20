@@ -13,8 +13,8 @@ export const STRIPE_TIERS: Record<Exclude<PlanType, 'free'>, StripeTier> = {
     yearlyPriceId: 'price_1TC0JQ1lIffwSHcfQJV16UzW',
   },
   pro: {
-    productId: 'prod_UAKtEUTzqyQ44I',
-    monthlyPriceId: 'price_1TC0DU1lIffwSHcf2hFtyWbQ',
+    productId: 'prod_UBNbFH4F60Dh7H',
+    monthlyPriceId: 'price_1TD0qD1lIffwSHcfJS4eRofs',
     yearlyPriceId: 'price_1TC0Oj1lIffwSHcfpURB4LEk',
   },
   business: {
