@@ -190,10 +190,22 @@ export function Pricing() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="text-center">
-                    <span className="text-4xl font-bold">{getPrice(plan.plan)}</span>
+                    {plan.plan !== 'free' && (
+                      <span className="text-sm text-muted-foreground line-through mr-2">{getPrice(plan.plan)}</span>
+                    )}
+                    <span className="text-4xl font-bold">
+                      {plan.plan === 'free' ? getPrice(plan.plan) : getBetaPrice(plan.plan)}
+                    </span>
                     <span className="text-muted-foreground">
                       {yearly ? '/Jahr' : '/Monat'}
                     </span>
+                    {plan.plan !== 'free' && (
+                      <div className="mt-1">
+                        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-0">
+                          -50% Beta
+                        </Badge>
+                      </div>
+                    )}
                   </div>
 
                   <ul className="space-y-3">

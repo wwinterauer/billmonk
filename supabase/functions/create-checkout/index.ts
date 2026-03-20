@@ -8,6 +8,24 @@ const corsHeaders = {
 };
 
 const TRIAL_DAYS = 30;
+const BETA_COUPON_ID = "BETA50";
+
+// Ensure the beta coupon exists in Stripe (idempotent)
+async function ensureBetaCoupon(stripe: Stripe) {
+  try {
+    await stripe.coupons.retrieve(BETA_COUPON_ID);
+  } catch {
+    // Coupon doesn't exist, create it
+    await stripe.coupons.create({
+      id: BETA_COUPON_ID,
+      percent_off: 50,
+      duration: "repeating",
+      duration_in_months: 12,
+      name: "Beta-Rabatt 50%",
+    });
+    console.log("[CREATE-CHECKOUT] Beta coupon created");
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -47,6 +65,9 @@ serve(async (req) => {
       hasHadSubscription = subs.data.length > 0;
     }
 
+    // Ensure beta coupon exists
+    await ensureBetaCoupon(stripe);
+
     const origin = req.headers.get("origin") || "https://receipt-ai-pal.lovable.app";
 
     // Only offer trial to new customers who never had a subscription
@@ -61,7 +82,8 @@ serve(async (req) => {
       mode: "subscription",
       success_url: `${origin}/settings?tab=subscription&checkout=success`,
       cancel_url: `${origin}/settings?tab=subscription&checkout=cancel`,
-      allow_promotion_codes: true,
+      // Apply beta coupon automatically instead of allow_promotion_codes
+      discounts: [{ coupon: BETA_COUPON_ID }],
       payment_method_collection: 'always',
       ...trialConfig,
     });
