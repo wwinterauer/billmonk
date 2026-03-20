@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -90,6 +91,13 @@ export function Pricing() {
     return `€${prices.monthly.toFixed(2).replace('.', ',')}`;
   };
 
+  const getBetaPrice = (plan: PlanType) => {
+    const prices = PLAN_PRICES[plan];
+    const base = yearly ? prices.yearly : prices.monthly;
+    const discounted = base * 0.5;
+    return `€${discounted.toFixed(2).replace('.', ',')}`;
+  };
+
   const handleCheckout = async (plan: PlanType) => {
     if (plan === 'free') return;
 
@@ -133,8 +141,8 @@ export function Pricing() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-4">
             Wähle den Plan, der zu dir passt. Jederzeit kündbar.
           </p>
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary font-medium text-sm px-4 py-2 rounded-full mb-4">
-            🎉 30 Tage kostenlos testen — alle Bezahlpläne inkl. Testphase
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary font-medium text-sm px-4 py-2 rounded-full mb-2">
+            🎉 Beta-Aktion: 50% Rabatt für 12 Monate + 30 Tage gratis testen
           </div>
 
           {/* Monthly/Yearly Toggle */}
@@ -183,10 +191,22 @@ export function Pricing() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="text-center">
-                    <span className="text-4xl font-bold">{getPrice(plan.plan)}</span>
+                    {plan.plan !== 'free' && (
+                      <span className="text-sm text-muted-foreground line-through mr-2">{getPrice(plan.plan)}</span>
+                    )}
+                    <span className="text-4xl font-bold">
+                      {plan.plan === 'free' ? getPrice(plan.plan) : getBetaPrice(plan.plan)}
+                    </span>
                     <span className="text-muted-foreground">
                       {yearly ? '/Jahr' : '/Monat'}
                     </span>
+                    {plan.plan !== 'free' && (
+                      <div className="mt-1">
+                        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-0">
+                          -50% Beta
+                        </Badge>
+                      </div>
+                    )}
                   </div>
 
                   <ul className="space-y-3">
@@ -215,7 +235,7 @@ export function Pricing() {
                       {loadingPlan === plan.plan ? 'Wird geladen...' : `30 Tage gratis testen`}
                     </Button>
                     <p className="text-xs text-center text-muted-foreground">
-                      danach €{PLAN_PRICES[plan.plan].monthly.toFixed(2).replace('.', ',')}/Monat
+                      danach €{(PLAN_PRICES[plan.plan].monthly * 0.5).toFixed(2).replace('.', ',')}/Monat für 12 Monate
                     </p>
                     </div>
                   )}

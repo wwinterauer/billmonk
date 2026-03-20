@@ -196,7 +196,7 @@ export function SubscriptionSettings() {
               <CreditCard className="h-5 w-5" />
               Plan upgraden
             </CardTitle>
-            <p className="text-sm text-primary font-medium mt-1">🎉 30 Tage kostenlos testen — danach Monatsabo</p>
+            <p className="text-sm text-primary font-medium mt-1">🎉 Beta-Aktion: 50% Rabatt für 12 Monate + 30 Tage gratis testen</p>
             <CardDescription>
               <div className="flex items-center gap-3 mt-2">
                 <Label className={!yearly ? 'text-foreground font-medium' : 'text-muted-foreground'}>
@@ -231,10 +231,19 @@ export function SubscriptionSettings() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="text-center">
-                        <span className="text-3xl font-bold">€{price.toFixed(2).replace('.', ',')}</span>
+                        <span className="text-sm text-muted-foreground line-through">
+                          €{price.toFixed(2).replace('.', ',')}
+                        </span>
+                        <br />
+                        <span className="text-3xl font-bold">€{(price * 0.5).toFixed(2).replace('.', ',')}</span>
                         <span className="text-muted-foreground text-sm">
                           {yearly ? '/Jahr' : '/Monat'}
                         </span>
+                        <div className="mt-1">
+                          <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-0">
+                            -50% Beta
+                          </Badge>
+                        </div>
                       </div>
                       <ul className="space-y-2">
                         {item.features.map((f) => (
@@ -253,7 +262,7 @@ export function SubscriptionSettings() {
                         {loadingPlan === item.plan ? 'Wird geladen...' : '30 Tage gratis testen'}
                       </Button>
                       <p className="text-xs text-center text-muted-foreground">
-                        danach €{PLAN_PRICES[item.plan].monthly.toFixed(2).replace('.', ',')}/Monat
+                        danach €{(PLAN_PRICES[item.plan].monthly * 0.5).toFixed(2).replace('.', ',')}/Monat für 12 Monate
                       </p>
                     </CardContent>
                   </Card>
