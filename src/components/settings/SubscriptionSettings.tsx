@@ -249,7 +249,7 @@ export function SubscriptionSettings() {
                         onClick={() => handleCheckout(item.plan)}
                         disabled={loadingPlan === item.plan || isCurrentPlan}
                       >
-                        {loadingPlan === item.plan ? 'Wird geladen...' : isCurrentPlan ? 'Aktueller Plan' : `${PLAN_NAMES[item.plan]} wählen`}
+                        {loadingPlan === item.plan ? 'Wird geladen...' : `${PLAN_NAMES[item.plan]} wählen`}
                       </Button>
                     </CardContent>
                   </Card>
