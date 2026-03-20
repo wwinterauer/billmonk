@@ -324,7 +324,11 @@ export function LiveBankSettings() {
             </div>
           )}
 
-          {!showSearch ? (
+          {limitReached ? (
+            <p className="text-sm text-muted-foreground">
+              Du hast das Maximum von {maxConnections} Bankverbindung{maxConnections !== 1 ? 'en' : ''} für deinen Plan erreicht.
+            </p>
+          ) : !showSearch ? (
             <Button onClick={() => { setShowSearch(true); searchInstitutions(); }}>
               <Plus className="h-4 w-4 mr-2" />
               Bankkonto verbinden
