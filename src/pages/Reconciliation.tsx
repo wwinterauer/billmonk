@@ -683,6 +683,11 @@ export default function Reconciliation() {
                               <TableCell className={cn('text-right font-mono whitespace-nowrap', transaction.amount && transaction.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400')}>
                                 {formatAmount(transaction.amount)}
                               </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="text-xs">
+                                  {(transaction as any).source === 'live' ? 'Live-Bank' : 'CSV-Import'}
+                                </Badge>
+                              </TableCell>
                               <TableCell>{getStatusBadge(transaction.status)}</TableCell>
                               <TableCell>
                                 {transaction.status === 'matched' && transaction.receipt ? (
