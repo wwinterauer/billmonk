@@ -27,7 +27,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
 export const PLAN_FEATURES: Record<PlanType, PlanFeatures> = {
   free: { invoiceModule: false, bankImport: false, emailImport: false, cloudBackup: false, reconciliation: false, liveBankConnection: false },
   starter: { invoiceModule: false, bankImport: true, emailImport: true, cloudBackup: false, reconciliation: true, liveBankConnection: false },
-  pro: { invoiceModule: false, bankImport: true, emailImport: true, cloudBackup: true, reconciliation: true, liveBankConnection: false },
+  pro: { invoiceModule: false, bankImport: true, emailImport: true, cloudBackup: true, reconciliation: true, liveBankConnection: true },
   business: { invoiceModule: true, bankImport: true, emailImport: true, cloudBackup: true, reconciliation: true, liveBankConnection: true },
 };
 
