@@ -39,7 +39,7 @@ export function usePlan(): PlanData {
     if (!user) return;
     const { data } = await supabase
       .from('profiles')
-      .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan, monthly_document_count, document_credit')
+      .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan, monthly_document_count, document_credit, stripe_customer_id')
       .eq('id', user.id)
       .single();
 
