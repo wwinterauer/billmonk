@@ -50,6 +50,7 @@ export function usePlan(): PlanData {
       setDocumentsUsed((data as any).monthly_document_count || 0);
       setDocumentsCredit((data as any).document_credit || 0);
       setAdminViewPlanState((data.admin_view_plan as PlanType) || null);
+      setHasStripeCustomer(!!data.stripe_customer_id);
     }
   }, [user]);
 
