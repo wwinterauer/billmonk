@@ -53,7 +53,7 @@ export const FEATURE_MIN_PLAN: Record<string, PlanType> = {
   cloudBackup: 'pro',
   invoiceModule: 'business',
   taxExport: 'business',
-  liveBankConnection: 'business',
+  liveBankConnection: 'pro',
 };
 
 // Human-readable feature descriptions for upgrade cards
