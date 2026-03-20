@@ -27,7 +27,7 @@ const UPGRADE_PLANS: { plan: Exclude<PlanType, 'free'>; features: string[] }[] =
 ];
 
 export function SubscriptionSettings() {
-  const { plan, effectivePlan, isAdmin, receiptsUsed, receiptsLimit, receiptsCredit, documentsUsed, documentsLimit, documentsCredit, loading: planLoading } = usePlan();
+  const { plan, effectivePlan, isAdmin, hasStripeCustomer, receiptsUsed, receiptsLimit, receiptsCredit, documentsUsed, documentsLimit, documentsCredit, loading: planLoading } = usePlan();
   const { toast } = useToast();
   const [portalLoading, setPortalLoading] = useState(false);
   const [checkLoading, setCheckLoading] = useState(false);
@@ -174,7 +174,7 @@ export function SubscriptionSettings() {
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
-            {isPaid && (
+            {isPaid && hasStripeCustomer && (
               <Button onClick={openPortal} disabled={portalLoading} variant="outline">
                 {portalLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ExternalLink className="h-4 w-4 mr-2" />}
                 Abo verwalten

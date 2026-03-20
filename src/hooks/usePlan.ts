@@ -8,6 +8,7 @@ export interface PlanData {
   effectivePlan: PlanType;
   isAdmin: boolean;
   adminViewPlan: PlanType | null;
+  hasStripeCustomer: boolean;
   receiptsUsed: number;
   receiptsCredit: number;
   receiptsLimit: number;
@@ -31,13 +32,14 @@ export function usePlan(): PlanData {
   const [receiptsCredit, setReceiptsCredit] = useState(0);
   const [documentsUsed, setDocumentsUsed] = useState(0);
   const [documentsCredit, setDocumentsCredit] = useState(0);
+  const [hasStripeCustomer, setHasStripeCustomer] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
       .from('profiles')
-      .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan, monthly_document_count, document_credit')
+      .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan, monthly_document_count, document_credit, stripe_customer_id')
       .eq('id', user.id)
       .single();
 
@@ -48,6 +50,7 @@ export function usePlan(): PlanData {
       setDocumentsUsed((data as any).monthly_document_count || 0);
       setDocumentsCredit((data as any).document_credit || 0);
       setAdminViewPlanState((data.admin_view_plan as PlanType) || null);
+      setHasStripeCustomer(!!data.stripe_customer_id);
     }
   }, [user]);
 
@@ -120,6 +123,7 @@ export function usePlan(): PlanData {
     effectivePlan,
     isAdmin,
     adminViewPlan,
+    hasStripeCustomer,
     receiptsUsed,
     receiptsCredit,
     receiptsLimit,
