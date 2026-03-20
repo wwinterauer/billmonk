@@ -1,52 +1,47 @@
 
 
-## Plan: Live-Bankanbindung ab Pro, Preisanpassung
+## EPC QR-Code (GiroCode) auf Ausgangsrechnungen
 
 ### Zusammenfassung
-Live-Bankanbindung wird von "nur Business" auf "ab Pro" heruntergestuft. Pro und Business erhalten jeweils +1€/Monat. Limit: 1 Bankverbindung für Pro, 3 für Business.
+Auf jeder generierten Rechnung wird ein EPC QR-Code (GiroCode) eingefügt, der SEPA-Zahlungsdaten enthält. Kunden können den Code mit ihrer Banking-App scannen und die Zahlung direkt ausführen.
 
-### Änderungen
-
-**1. `src/lib/planConfig.ts`**
-- `PLAN_FEATURES.pro.liveBankConnection` → `true`
-- `PLAN_PRICES.pro` → 5.99€/Monat, 57.50€/Jahr
-- `PLAN_PRICES.business` → 15.99€/Monat, 153.50€/Jahr
-- `FEATURE_MIN_PLAN.liveBankConnection` → `'pro'` (statt `'business'`)
-- `PLAN_LIMITS` erweitern um `maxBankConnections`: free=0, starter=0, pro=1, business=3
-
-**2. `src/lib/stripeConfig.ts`**
-- Neue Stripe Price IDs für Pro und Business nötig (müssen in Stripe Dashboard erstellt werden)
-- Alternativ: Preise im Dashboard anpassen, dann bleiben die IDs gleich
-
-**3. `src/components/landing/Pricing.tsx`**
-- Pro-Features um "Live-Bankanbindung (1 Konto)" ergänzen
-- Business-Features um "Bis zu 3 Bankkonten" ergänzen
-
-**4. `src/components/settings/LiveBankSettings.tsx`**
-- Limit-Prüfung: Anzahl bestehender Verbindungen gegen `PLAN_LIMITS[effectivePlan].maxBankConnections` prüfen
-- Wenn Limit erreicht → Hinweis anzeigen statt "Neue Verbindung"
-
-**5. Edge Function `bank-connect/index.ts`**
-- Server-seitige Limit-Prüfung: Vor `create-requisition` die Anzahl aktiver Verbindungen zählen und gegen Plan-Limit validieren
-
-### Stripe-Hinweis
-Du musst die Preise in deinem Stripe Dashboard anpassen (Pro: 5.99€/Monat bzw. Jahrespreis, Business: 15.99€/Monat). Wenn du neue Price-IDs bekommst, müssen diese in `stripeConfig.ts` aktualisiert werden. Wenn du die bestehenden Prices nur editierst, bleiben die IDs gleich.
-
-### Technische Details
-
-Neues Feld in `PlanLimits`:
+### EPC QR-Code Format
+Der europäische Standard (EPC069-12) codiert folgende Daten:
 ```text
-interface PlanLimits {
-  ...existing fields...
-  maxBankConnections: number;
-}
+BCD
+002
+1
+SCT
+[BIC]
+[Empfänger-Name]
+[IBAN]
+EUR[Betrag]
+
+
+[Verwendungszweck/Rechnungsnummer]
 ```
 
-Limit-Werte:
-```text
-free:     0 Verbindungen
-starter:  0 Verbindungen  
-pro:      1 Verbindung
-business: 3 Verbindungen
-```
+### Technische Umsetzung
+
+**1. Edge Function erweitern (`supabase/functions/generate-invoice-pdf/index.ts`)**
+
+- QR-Code-Bibliothek importieren: `npm:qrcode-generator` (leichtgewichtig, Deno-kompatibel, kein Canvas nötig)
+- EPC-Payload aus Firmendaten (IBAN, BIC, Name) und Rechnungsdaten (Betrag, Rechnungsnummer) zusammenbauen
+- QR-Code als PNG-Bytes generieren und via `pdfDoc.embedPng()` einbetten
+- Platzierung: rechts neben den Bankverbindungsdaten (ca. 80x80pt), nur wenn IBAN vorhanden und kein Lieferschein
+- Beschriftung unter dem QR-Code: "Jetzt scannen & bezahlen" (klein, grau)
+
+**2. Bedingungen**
+- Nur bei Rechnungen/Gutschriften (nicht bei Angeboten, AB, Lieferscheinen)
+- Nur wenn IBAN in den Firmendaten hinterlegt ist
+- Betrag muss > 0 sein
+
+**3. Vorschau aktualisieren (`InvoiceLayoutPreview.tsx`)**
+- Kleinen QR-Code-Platzhalter in der Mini-Vorschau neben der Bankverbindung anzeigen
+
+### Dateien
+| Datei | Änderung |
+|-------|----------|
+| `supabase/functions/generate-invoice-pdf/index.ts` | QR-Code generieren und im PDF platzieren |
+| `src/components/settings/InvoiceLayoutPreview.tsx` | QR-Platzhalter in der Vorschau |
 
