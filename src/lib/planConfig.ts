@@ -40,8 +40,8 @@ export const PLAN_NAMES: Record<PlanType, string> = {
 
 export const PLAN_PRICES: Record<PlanType, { monthly: number; yearly: number }> = {
   free: { monthly: 0, yearly: 0 },
-  starter: { monthly: 1.99, yearly: 19.90 },
-  pro: { monthly: 5.99, yearly: 57.50 },
+  starter: { monthly: 2.99, yearly: 28.70 },
+  pro: { monthly: 7.99, yearly: 76.70 },
   business: { monthly: 15.99, yearly: 153.50 },
 };
 
