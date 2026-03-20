@@ -214,7 +214,7 @@ export function SubscriptionSettings() {
               {UPGRADE_PLANS.map((item) => {
                 const prices = PLAN_PRICES[item.plan];
                 const price = yearly ? prices.yearly : prices.monthly;
-                const isCurrentPlan = displayPlan === item.plan;
+                
 
                 return (
                   <Card key={item.plan} className={`relative ${isCurrentPlan ? 'border-primary border-2' : 'border-border/50'}`}>
