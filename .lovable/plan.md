@@ -1,44 +1,30 @@
 
 
-# Plan: Stripe-Preise synchronisieren und neuen Pro-Monatspreis erstellen
+# Feature-Listen synchronisieren
 
-## Ist-Zustand (Stripe Dashboard vs. Code)
+## Änderungen
 
-| Plan | Stripe monatlich | Code monatlich | Stripe jährlich | Code jährlich |
-|------|-----------------|----------------|-----------------|---------------|
-| Starter | 2,99 € | 1,99 € | 28,70 € | 19,90 € |
-| Pro | 5,99 € | 5,99 € | 76,70 € | 57,50 € |
-| Business | 15,99 € | 15,99 € | 153,50 € | 153,50 € |
+### 1. `src/components/landing/Pricing.tsx` — Feature-Listen aktualisieren
+- **Starter**: "Bank-Import (CSV)" hinzufügen
+- **Business**: "250 Dokumente/Monat" ergänzen, redundante "Live-Bankanbindung" entfernen (bereits in "Alles aus Pro")
 
-Pro monatlich soll von 5,99 € auf 7,99 € geändert werden. Alle anderen Preise müssen mit den aktuellen Dashboard-Werten synchronisiert werden.
+### 2. `src/components/settings/SubscriptionSettings.tsx` — UPGRADE_PLANS aktualisieren
+- **Starter**: "Bank-Import (CSV)" hinzufügen
+- **Pro**: "Priority Support" entfernen, "Live-Bankanbindung (1 Konto)" präzisieren
+- **Business**: "Dedicated Support" entfernen, "250 Dokumente/Monat" und "Angebote, AB & Lieferscheine" hinzufügen
 
-## Schritte
+### Finale Feature-Listen (beide Dateien konsistent)
 
-### 1. Neuen Stripe-Preis erstellen
-- Neuer monatlicher Preis für Pro-Produkt (`prod_UAKtEUTzqyQ44I`): **7,99 €/Monat** (recurring, monthly)
-- Alter Preis (`price_1TC0DU1lIffwSHcf2hFtyWbQ` = 5,99 €) bleibt bestehen für Grandfathering
+| Free | Starter | Pro | Business |
+|------|---------|-----|----------|
+| 10 Belege/Monat | 30 Belege/Monat | 100 Belege/Monat | 250 Belege/Monat |
+| KI-Erkennung | Kontoabgleich | Alles aus Starter | 250 Dokumente/Monat |
+| Beleg-Umbenennung | Bank-Import (CSV) | Cloud-Backup | Alles aus Pro |
+| E-Mail Support | E-Mail Import | Live-Bankanbindung (1 Konto) | Rechnungsmodul |
+| | Rollover-Guthaben | | Angebote, AB & Lieferscheine |
+| | | | DATEV/BMD Export |
 
-### 2. `src/lib/planConfig.ts` aktualisieren
-Alle `PLAN_PRICES` auf die aktuellen Stripe-Werte setzen:
-- Starter: 2,99 €/Monat, 28,70 €/Jahr
-- Pro: **7,99 €/Monat**, 76,70 €/Jahr
-- Business: 15,99 €/Monat, 153,50 €/Jahr
-
-### 3. `src/lib/stripeConfig.ts` aktualisieren
-- Pro `monthlyPriceId` auf die neue Price-ID setzen (wird beim Erstellen in Schritt 1 generiert)
-
-### 4. UI-Stellen (keine Code-Änderungen nötig)
-Beide UI-Komponenten lesen bereits aus `PLAN_PRICES` und `STRIPE_TIERS`:
-- **Landing Page** (`src/components/landing/Pricing.tsx`) — zeigt `getPrice()` und `getBetaPrice()` aus `PLAN_PRICES`
-- **Abo-Einstellungen** (`src/components/settings/SubscriptionSettings.tsx`) — nutzt `PLAN_PRICES` und `STRIPE_TIERS`
-
-Durch die Aktualisierung der zentralen Config-Dateien werden alle UI-Stellen automatisch korrekt.
-
-### 5. Dokumentation aktualisieren
-`/mnt/documents/Platform_Feature_Overview.md` mit den neuen Preisen synchronisieren.
-
-## Betroffene Dateien
-- `src/lib/planConfig.ts` (Preise)
-- `src/lib/stripeConfig.ts` (neue Price-ID für Pro monthly)
-- Stripe: neuer Preis wird via API erstellt
+### Betroffene Dateien
+- `src/components/landing/Pricing.tsx`
+- `src/components/settings/SubscriptionSettings.tsx`
 
