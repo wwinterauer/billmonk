@@ -155,9 +155,28 @@ export function InvoiceLayoutPreview({ layoutVariant, companySettings, invoiceNu
           )}
         </div>
 
-        {/* Bank Info */}
-        <div className={`${textSize} text-gray-500 mb-1`}>
-          <span className="font-medium">Bankverbindung:</span> {company.bank} · IBAN: {company.iban} · BIC: {company.bic}
+        {/* Bank Info + QR */}
+        <div className="flex items-start justify-between mb-1">
+          <div className={`${textSize} text-gray-500`}>
+            <span className="font-medium">Bankverbindung:</span> {company.bank} · IBAN: {company.iban} · BIC: {company.bic}
+          </div>
+          <div className="flex flex-col items-center ml-1 flex-shrink-0">
+            <div
+              className="border border-gray-300 rounded-sm flex items-center justify-center bg-white"
+              style={{ width: 28, height: 28 }}
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-400">
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="3" height="3" />
+                <rect x="18" y="18" width="3" height="3" />
+                <rect x="14" y="18" width="3" height="3" />
+                <rect x="18" y="14" width="3" height="3" />
+              </svg>
+            </div>
+            <span className="text-gray-400 mt-[1px]" style={{ fontSize: 3 }}>Scannen &amp; bezahlen</span>
+          </div>
         </div>
 
         {/* Footer */}

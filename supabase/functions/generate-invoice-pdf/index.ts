@@ -536,14 +536,73 @@ Deno.serve(async (req) => {
       y -= 16;
     }
 
-    // --- BANK DETAILS (skip for delivery notes) ---
+    // --- BANK DETAILS + QR CODE (skip for delivery notes) ---
     if (!isDeliveryNote && (company?.iban || company?.bank_name)) {
+      const bankStartY = y;
       drawText("Bankverbindung:", margin, y, { bold: true, size: 8 });
       y -= 12;
       if (company.bank_name) { drawText(company.bank_name, margin, y, { size: 8 }); y -= 11; }
       if (company.account_holder) { drawText(`Kontoinhaber: ${company.account_holder}`, margin, y, { size: 8 }); y -= 11; }
       if (company.iban) { drawText(`IBAN: ${company.iban}`, margin, y, { size: 8 }); y -= 11; }
       if (company.bic) { drawText(`BIC: ${company.bic}`, margin, y, { size: 8 }); y -= 11; }
+
+      // --- EPC QR CODE (GiroCode) ---
+      const totalAmount = invoice.total || 0;
+      const isPayableDoc = ["invoice", "credit_note"].includes(documentType);
+      if (isPayableDoc && company.iban && totalAmount > 0) {
+        try {
+          const qrGen = (await import("npm:qrcode-generator@1.4.4")).default;
+          const cleanIban = (company.iban || "").replace(/\s/g, "");
+          const cleanBic = (company.bic || "").replace(/\s/g, "");
+          const recipientName = (company.company_name || "").substring(0, 70);
+          const amountStr = `EUR${totalAmount.toFixed(2)}`;
+          const reference = (invoice.invoice_number || "").substring(0, 140);
+
+          const epcPayload = [
+            "BCD",
+            "002",
+            "1",
+            "SCT",
+            cleanBic,
+            recipientName,
+            cleanIban,
+            amountStr,
+            "",
+            "",
+            reference,
+            "",
+          ].join("\n");
+
+          const qr = qrGen(0, "M");
+          qr.addData(epcPayload);
+          qr.make();
+
+          const qrSize = 70;
+          const moduleCount = qr.getModuleCount();
+          const cellSize = qrSize / moduleCount;
+          const qrX = 480;
+          const qrY = bankStartY - 5;
+
+          for (let row = 0; row < moduleCount; row++) {
+            for (let col = 0; col < moduleCount; col++) {
+              if (qr.isDark(row, col)) {
+                page.drawRectangle({
+                  x: qrX + col * cellSize,
+                  y: qrY - row * cellSize,
+                  width: cellSize,
+                  height: cellSize,
+                  color: rgb(0, 0, 0),
+                });
+              }
+            }
+          }
+
+          drawText("Scannen & bezahlen", qrX, qrY - qrSize - 8, { size: 5, color: rgb(0.4, 0.4, 0.4) });
+        } catch (qrErr) {
+          console.error("QR code generation error:", qrErr);
+        }
+      }
+
       y -= 8;
     }
 
