@@ -219,6 +219,7 @@ export default function Reconciliation() {
           amount,
           status,
           receipt_id,
+          source,
           receipts:receipt_id (
             id,
             vendor,
