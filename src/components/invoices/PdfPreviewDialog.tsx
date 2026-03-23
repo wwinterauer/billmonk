@@ -15,7 +15,7 @@ interface PdfPreviewDialogProps {
   onSend?: () => void;
 }
 
-export function PdfPreviewDialog({ open, onOpenChange, pdfStoragePath, pdfUrl: directPdfUrl, invoiceNumber, title }: PdfPreviewDialogProps) {
+export function PdfPreviewDialog({ open, onOpenChange, pdfStoragePath, pdfUrl: directPdfUrl, invoiceNumber, title, onSend }: PdfPreviewDialogProps) {
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
