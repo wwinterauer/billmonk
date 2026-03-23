@@ -141,6 +141,14 @@ const Quotes = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                                <DropdownMenuItem onClick={async () => {
+                                  toast({ title: 'PDF wird erstellt…' });
+                                  const { error } = await supabase.functions.invoke('generate-invoice-pdf', { body: { invoice_id: inv.id } });
+                                  if (error) toast({ title: 'Fehler', description: 'PDF konnte nicht erstellt werden', variant: 'destructive' });
+                                  else toast({ title: 'PDF erstellt' });
+                                }}>
+                                  <ArrowRight className="h-4 w-4 mr-2" /> PDF generieren
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => convertDocument(inv.id, 'order_confirmation')}>
                                   <ArrowRight className="h-4 w-4 mr-2" /> In Auftragsbestätigung
                                 </DropdownMenuItem>
