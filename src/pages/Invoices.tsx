@@ -231,7 +231,7 @@ const Invoices = () => {
                             <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                               <DropdownMenuItem onClick={async () => {
                                 toast({ title: 'PDF wird erstellt…' });
-                                const { data, error } = await supabase.functions.invoke('generate-invoice-pdf', {
+                                const { error } = await supabase.functions.invoke('generate-invoice-pdf', {
                                   body: { invoice_id: inv.id },
                                 });
                                 if (error) {
