@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { motion } from 'framer-motion';
 import { PLAN_PRICES, PLAN_LIMITS, PlanType } from '@/lib/planConfig';
 import { STRIPE_TIERS } from '@/lib/stripeConfig';
 import { supabase } from '@/integrations/supabase/client';
@@ -129,9 +128,7 @@ export function Pricing() {
   return (
     <section id="pricing" className="py-20 bg-background">
       <div className="container">
-        <div
-          className="text-center mb-16"
-        >
+        <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
             Einfache Preise
           </h2>
@@ -160,14 +157,8 @@ export function Pricing() {
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-          {plans.map((plan, index) => (
-            <motion.div
-              key={plan.name}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
-            >
+          {plans.map((plan) => (
+            <div key={plan.name}>
               <Card
                 className={`h-full relative ${
                   plan.featured
@@ -238,7 +229,7 @@ export function Pricing() {
                   )}
                 </CardContent>
               </Card>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>

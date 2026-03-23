@@ -1,5 +1,4 @@
 import { Upload, Sparkles, CheckCircle, FileCheck } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 
 const steps = [
@@ -33,9 +32,7 @@ export function HowItWorks() {
   return (
     <section id="how-it-works" className="py-20 bg-background">
       <div className="container">
-        <div
-          className="text-center mb-16"
-        >
+        <div className="text-center mb-16">
           <Badge variant="secondary" className="mb-4">Workflow</Badge>
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
             So einfach funktioniert's
@@ -47,14 +44,7 @@ export function HowItWorks() {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {steps.map((step, index) => (
-            <motion.div
-              key={step.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
-              className="relative text-center group"
-            >
+            <div key={step.title} className="relative text-center group">
               {/* Step number */}
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center z-10">
                 {index + 1}
@@ -83,7 +73,7 @@ export function HowItWorks() {
                   </Badge>
                 ))}
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>

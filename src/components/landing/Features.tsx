@@ -6,7 +6,6 @@ import {
   Percent, Package, Briefcase, Timer, Download, Wifi, BookOpen,
   Inbox, Globe, FileDown
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
@@ -125,9 +124,7 @@ const crossFeatures: Feature[] = [
 
 function FeatureBlockSection({ block, index }: { block: FeatureBlock; index: number }) {
   return (
-    <div
-      className="mb-16 last:mb-0"
-    >
+    <div className="mb-16 last:mb-0">
       <div className="flex items-center gap-3 mb-2">
         <h3 className="text-2xl font-bold text-foreground">{block.title}</h3>
         <Badge variant="outline" className={`${block.borderAccent} ${block.accent} text-xs`}>
@@ -137,35 +134,27 @@ function FeatureBlockSection({ block, index }: { block: FeatureBlock; index: num
       <p className="text-muted-foreground mb-6 max-w-2xl">{block.subtitle}</p>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {block.features.map((feature, fi) => (
-          <motion.div
-            key={feature.title}
-            initial={{ opacity: 0, y: 14 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.45, delay: fi * 0.05, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <Card className="h-full border-border/50 bg-card hover:shadow-md hover:border-primary/15 transition-[box-shadow,border-color] duration-300 group">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className={`w-10 h-10 rounded-lg ${block.iconBg} flex items-center justify-center shrink-0 transition-colors`}>
-                    <feature.icon className={`h-5 w-5 ${block.accent}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold text-foreground">{feature.title}</h4>
-                      {feature.planBadge && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary shrink-0">
-                          {feature.planBadge}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">{feature.description}</p>
-                  </div>
+        {block.features.map((feature) => (
+          <Card key={feature.title} className="h-full border-border/50 bg-card hover:shadow-md hover:border-primary/15 transition-[box-shadow,border-color] duration-300 group">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className={`w-10 h-10 rounded-lg ${block.iconBg} flex items-center justify-center shrink-0 transition-colors`}>
+                  <feature.icon className={`h-5 w-5 ${block.accent}`} />
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="font-semibold text-foreground">{feature.title}</h4>
+                    {feature.planBadge && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary shrink-0">
+                        {feature.planBadge}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">{feature.description}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
     </div>
@@ -176,9 +165,7 @@ export function Features() {
   return (
     <section id="features" className="py-20 lg:py-28 bg-secondary/30">
       <div className="container">
-        <div
-          className="text-center mb-16"
-        >
+        <div className="text-center mb-16">
           <Badge variant="secondary" className="mb-4">Features</Badge>
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4" style={{ textWrap: 'balance' }}>
             Alles für deine Belegverwaltung — und darüber hinaus
@@ -193,36 +180,26 @@ export function Features() {
         ))}
 
         {/* Cross-cutting features */}
-        <div
-          className="mt-16"
-        >
+        <div className="mt-16">
           <h3 className="text-xl font-bold text-foreground mb-6 text-center">In allen Tarifen enthalten</h3>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {crossFeatures.map((feature, i) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 12 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.45, delay: i * 0.06, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <Card className="h-full border-border/50 bg-card hover:shadow-md transition-[box-shadow] duration-300 text-center group">
-                  <CardContent className="p-4 flex flex-col items-center">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center mb-3 transition-colors">
-                      <feature.icon className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <h4 className="font-semibold text-foreground text-sm">{feature.title}</h4>
-                      {feature.planBadge && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary">
-                          {feature.planBadge}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{feature.description}</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
+            {crossFeatures.map((feature) => (
+              <Card key={feature.title} className="h-full border-border/50 bg-card hover:shadow-md transition-[box-shadow] duration-300 text-center group">
+                <CardContent className="p-4 flex flex-col items-center">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center mb-3 transition-colors">
+                    <feature.icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <h4 className="font-semibold text-foreground text-sm">{feature.title}</h4>
+                    {feature.planBadge && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary">
+                        {feature.planBadge}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{feature.description}</p>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>

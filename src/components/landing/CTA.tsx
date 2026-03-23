@@ -2,19 +2,12 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 export function CTA() {
   return (
     <section className="py-20 gradient-cta">
       <div className="container">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="text-center max-w-2xl mx-auto"
-        >
+        <div className="text-center max-w-2xl mx-auto">
           <Badge variant="secondary" className="mb-4 bg-primary-foreground/20 text-primary-foreground border-primary-foreground/30">
             Beta-Phase
           </Badge>
@@ -51,7 +44,7 @@ export function CTA() {
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
           </Link>
-        </motion.div>
+        </div>
       </div>
     </section>
   );
