@@ -254,6 +254,7 @@ export function UserManagement() {
                       <TableCell>{u.onboarding_completed ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-muted-foreground" />}</TableCell>
                       <TableCell className="text-right">{u.total_receipts}</TableCell>
                       <TableCell className="text-right text-sm">{formatEur(u.total_receipt_amount)}</TableCell>
+                      <TableCell className="text-right text-sm font-medium">{formatEur(u.stripe_revenue)}</TableCell>
                       <TableCell className="text-sm">{u.created_at ? format(new Date(u.created_at), 'dd.MM.yyyy') : '—'}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" onClick={e => { e.stopPropagation(); setSelectedUser(u); }}>
