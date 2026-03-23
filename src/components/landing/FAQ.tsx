@@ -69,7 +69,7 @@ export function FAQ() {
               </AccordionItem>
             ))}
           </Accordion>
-        </motion.div>
+        </div>
       </div>
     </section>
   );

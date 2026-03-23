@@ -43,7 +43,7 @@ export function HowItWorks() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             In vier Schritten von der Papierrechnung zur fertigen Buchhaltung
           </p>
-        </motion.div>
+        </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {steps.map((step, index) => (

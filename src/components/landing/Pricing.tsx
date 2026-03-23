@@ -157,7 +157,7 @@ export function Pricing() {
               <span className="ml-1.5 text-xs text-primary font-semibold">-17%</span>
             </Label>
           </div>
-        </motion.div>
+        </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {plans.map((plan, index) => (

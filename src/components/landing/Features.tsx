@@ -225,7 +225,7 @@ export function Features() {
               </motion.div>
             ))}
           </div>
-        </motion.div>
+        </div>
       </div>
     </section>
   );

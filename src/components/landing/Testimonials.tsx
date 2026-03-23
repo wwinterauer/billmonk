@@ -46,7 +46,7 @@ export function Testimonials() {
             Was unsere Nutzer sagen
           </h2>
           <p className="text-lg text-muted-foreground">Freelancer, Vermieter und KMUs vertrauen auf XpenzAi.</p>
-        </motion.div>
+        </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {testimonials.map((testimonial, index) => (

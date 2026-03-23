@@ -32,7 +32,7 @@ export function ProblemSolution() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto" style={{ textWrap: 'pretty' }}>
             Manuelle Belegverwaltung und Insellösungen kosten Zeit und Nerven. XpenzAi bringt alles in eine Plattform.
           </p>
-        </motion.div>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto">
           {/* Problems */}

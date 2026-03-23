@@ -113,7 +113,7 @@ export function BusinessWorkflow() {
           <p className="text-sm text-muted-foreground max-w-lg mx-auto">
             Inklusive Anzahlungs-, Teil- und Schlussrechnungen, automatischem Mahnwesen und wiederkehrenden Rechnungen.
           </p>
-        </motion.div>
+        </div>
       </div>
     </section>
   );
