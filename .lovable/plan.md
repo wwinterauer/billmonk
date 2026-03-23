@@ -1,70 +1,58 @@
 
 
-# Split-View Editor mit PDF-Vorschau, Versand & Druck — Aktualisierter Plan
+## Plan: E-Mail-Versand mit PDF-Anhang über Gmail/IMAP
 
-## Überblick
+### Übersicht
+Dokumente werden direkt über das hinterlegte E-Mail-Konto des Users versendet — mit dem PDF als echtem Anhang. Kein Download-Link, kein externer E-Mail-Dienst.
 
-Der `InvoiceEditor` wird für alle Dokumenttypen (Angebot, Auftragsbestätigung, Lieferschein, Rechnung) um ein Side-by-Side-Layout mit PDF-Vorschau erweitert. Zusätzlich wird in allen Übersichtsseiten ein PDF-Viewer-Dialog eingebaut.
+### Schritte
 
-## Status-Workflow
+1. **Gmail-Scope erweitern**
+   - `gmail.send` Scope zu `oauth-start` und `src/types/email.ts` hinzufügen
+   - Bereits verbundene Gmail-User müssen sich einmalig neu verbinden (Hinweis im UI)
 
-| Aktion | Neuer Status |
-|---|---|
-| Speichern | `draft` (Entwurf) |
-| Vorschau generieren | Bleibt `draft`, PDF wird erzeugt |
-| **Freigeben** | `approved` (Freigegeben) — neuer Status |
-| **Versenden** | `sent` (Versendet) |
-| Bezahlt markieren | `paid` |
+2. **Neue Edge Function `send-document-email`**
+   - Empfängt: `accountId`, `recipientEmail`, `subject`, `body`, `pdfStoragePath`, `invoiceId`
+   - Lädt PDF aus Supabase Storage (`invoices` Bucket) via Service Role
+   - Baut MIME-Nachricht (`multipart/mixed`): Text-Body + Base64-kodiertes PDF als Anhang
+   - **Gmail**: Sendet via `POST gmail.googleapis.com/gmail/v1/users/me/messages/send` (Base64url-kodierte MIME-Nachricht)
+   - **SMTP**: Verbindet via TLS (Port 587), `EHLO → STARTTLS → AUTH LOGIN → DATA` mit der fertigen MIME-Nachricht
+   - Setzt Invoice-Status auf `sent` und `sent_at`
+   - Token-Refresh für Gmail wird aus `sync-gmail` übernommen
 
-**Neuer Status `approved`** wird in alle `STATUS_CONFIG`-Maps eingefügt (Label: "Freigegeben", Variant: `outline` mit grünem Akzent).
+3. **SendDocumentDialog erweitern**
+   - Dropdown "Senden über" mit den hinterlegten E-Mail-Konten des Users (Query auf `email_accounts`)
+   - Neuer primärer Button "Direkt versenden"
+   - Ladeindikator + Erfolgsmeldung
+   - Bisheriger "In Mail-App öffnen" bleibt als Fallback
 
-## Neue Komponenten
+4. **DocumentPreviewPanel & InvoiceEditor anpassen**
+   - `pdfStoragePath` an SendDocumentDialog durchreichen
 
-### `src/components/invoices/DocumentPreviewPanel.tsx`
-- Zeigt PDF inline via `PdfViewer` (bereits vorhanden)
-- Aktionsleiste: Vorschau generieren, Freigeben, Versenden, Drucken, Herunterladen
-- Status-Badge zeigt aktuellen Dokumentstatus
-- "Freigeben" setzt Status auf `approved`, "Versenden" öffnet SendDocumentDialog und setzt auf `sent`
+5. **Config aktualisieren**
+   - `send-document-email` mit `verify_jwt = false` in `supabase/config.toml`
 
-### `src/components/invoices/SendDocumentDialog.tsx`
-- Modal mit vorausgefüllter E-Mail (aus `customer.email`), Betreff, Nachrichtentext
-- "In Mail-App öffnen" → `mailto:` Link + automatischer PDF-Download
-- "Link kopieren" → Signed URL
+### Technische Details
 
-### `src/components/invoices/PdfPreviewDialog.tsx`
-- Einfacher Dialog mit `PdfViewer` zum Öffnen von PDFs aus den Übersichtsseiten
-- Wird in allen vier Übersichtsseiten verwendet
+**MIME-Aufbau:**
+```text
+Content-Type: multipart/mixed; boundary="boundary123"
 
-## Geänderte Dateien
+--boundary123
+Content-Type: text/plain; charset=utf-8
 
-### `src/pages/InvoiceEditor.tsx`
-- Layout: `max-w-5xl` → Grid mit zwei Spalten (links Formular ~60%, rechts `DocumentPreviewPanel` ~40%)
-- Mobil: Vorschau unterhalb als aufklappbares Panel
-- `handleSave` speichert als `draft`, bleibt im Editor (navigiert nicht weg)
-- Neue States: `previewPdfUrl`, `currentStatus`, `savedInvoiceId`
-- Bisherige Action-Buttons ("Als Entwurf speichern" / "Speichern & Versenden") werden ersetzt durch: Speichern, Vorschau, Freigeben, Versenden, Drucken
+[Nachrichtentext]
 
-### `src/pages/Invoices.tsx`, `Quotes.tsx`, `OrderConfirmations.tsx`, `DeliveryNotes.tsx`
-- `approved` Status zu `STATUS_CONFIG` hinzufügen (Label: "Freigegeben")
-- PDF-Icon-Button in Tabellenzeile wenn `pdf_storage_path` vorhanden → öffnet `PdfPreviewDialog`
-- Bestehende "PDF generieren" Dropdown-Aktion bleibt erhalten
+--boundary123
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="RE-2024-001.pdf"
+Content-Transfer-Encoding: base64
 
-### `src/hooks/useInvoices.ts`
-- `updateInvoiceStatus` unterstützt bereits beliebige Status-Strings, kein Umbau nötig
+[Base64-kodiertes PDF]
+--boundary123--
+```
 
-## Keine DB-Migration nötig
-Alle Felder (`pdf_storage_path`, `status`, `sent_at`, `sent_to_email`) existieren bereits. Der Status ist ein `text`-Feld, `approved` kann direkt verwendet werden.
+**Gmail API:** Die fertige MIME-Nachricht wird Base64url-kodiert und als `{ raw: "..." }` an die Gmail API gesendet.
 
-## Zusammenfassung der Änderungen
-
-| Datei | Änderung |
-|---|---|
-| `src/components/invoices/DocumentPreviewPanel.tsx` | **Neu** — PDF-Vorschau + Aktionen |
-| `src/components/invoices/SendDocumentDialog.tsx` | **Neu** — Mail-Versand-Dialog |
-| `src/components/invoices/PdfPreviewDialog.tsx` | **Neu** — PDF-Viewer-Dialog für Übersichten |
-| `src/pages/InvoiceEditor.tsx` | Split-Layout, neue Workflow-Buttons |
-| `src/pages/Invoices.tsx` | `approved` Status, PDF-Preview in Tabelle |
-| `src/pages/Quotes.tsx` | `approved` Status, PDF-Preview in Tabelle |
-| `src/pages/OrderConfirmations.tsx` | `approved` Status, PDF-Preview in Tabelle |
-| `src/pages/DeliveryNotes.tsx` | `approved` Status, PDF-Preview in Tabelle |
+**SMTP:** Gleicher MIME-Body, gesendet über eine TLS-Verbindung mit den gespeicherten IMAP-Zugangsdaten (Host/Port werden auf SMTP-Äquivalent umgemappt, z.B. `imap.gmail.com` → `smtp.gmail.com`).
 
