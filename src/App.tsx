@@ -197,8 +197,17 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/datenschutz" element={<Datenschutz />} />
+            <Route 
+              path="/admin" 
+              element={
+                <AdminRoute>
+                  <Admin />
+                </AdminRoute>
+              } 
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <PageTracker />
           <InstallPrompt />
           <CameraButton />
           <CookieBanner />
