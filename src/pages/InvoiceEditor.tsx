@@ -234,6 +234,7 @@ const InvoiceEditor = () => {
           }
           // Load existing PDF
           if (inv.pdf_storage_path) {
+            setPdfStoragePath(inv.pdf_storage_path);
             const { data: signedData } = await supabase.storage
               .from('invoices')
               .createSignedUrl(inv.pdf_storage_path, 3600);
