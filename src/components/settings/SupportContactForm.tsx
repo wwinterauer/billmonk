@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, Send, Loader2, CheckCircle, Clock } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { MessageSquare, Send, Loader2, HelpCircle, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +19,7 @@ export function SupportContactForm() {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [faqSearch, setFaqSearch] = useState('');
 
   const { data: tickets, refetch } = useQuery({
     queryKey: ['support-tickets', user?.id],
@@ -27,6 +29,20 @@ export function SupportContactForm() {
         .select('*')
         .order('created_at', { ascending: false })
         .limit(10);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const { data: faqs } = useQuery({
+    queryKey: ['public-faqs'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('faqs')
+        .select('*')
+        .eq('is_published', true)
+        .order('sort_order', { ascending: true });
       if (error) throw error;
       return data;
     },
@@ -61,15 +77,88 @@ export function SupportContactForm() {
     closed: { label: 'Geschlossen', variant: 'outline' },
   };
 
+  // Filter FAQs by search term
+  const searchLower = faqSearch.toLowerCase().trim();
+  const filteredFaqs = searchLower
+    ? (faqs || []).filter(
+        (f: any) =>
+          f.question.toLowerCase().includes(searchLower) ||
+          f.answer.toLowerCase().includes(searchLower) ||
+          (f.category && f.category.toLowerCase().includes(searchLower))
+      )
+    : (faqs || []);
+
+  // Group FAQs by category
+  const groupedFaqs: Record<string, any[]> = {};
+  for (const faq of filteredFaqs) {
+    const cat = (faq as any).category || 'Allgemein';
+    if (!groupedFaqs[cat]) groupedFaqs[cat] = [];
+    groupedFaqs[cat].push(faq);
+  }
+
   return (
     <div className="space-y-6">
+      {/* FAQ Section */}
+      {faqs && faqs.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <HelpCircle className="h-4 w-4" />
+              Häufig gestellte Fragen
+            </CardTitle>
+            <CardDescription>Finde schnell Antworten auf deine Fragen</CardDescription>
+            <div className="relative mt-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={faqSearch}
+                onChange={(e) => setFaqSearch(e.target.value)}
+                placeholder="FAQs durchsuchen..."
+                className="pl-9"
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {filteredFaqs.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Keine FAQs gefunden für &quot;{faqSearch}&quot;
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {Object.entries(groupedFaqs).map(([category, items]) => (
+                  <div key={category}>
+                    {Object.keys(groupedFaqs).length > 1 && (
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                        {category}
+                      </p>
+                    )}
+                    <Accordion type="multiple" className="space-y-1">
+                      {items.map((faq: any) => (
+                        <AccordionItem key={faq.id} value={faq.id} className="border rounded-lg px-3">
+                          <AccordionTrigger className="text-sm font-medium hover:no-underline py-3">
+                            {faq.question}
+                          </AccordionTrigger>
+                          <AccordionContent className="text-sm text-muted-foreground whitespace-pre-wrap pb-3">
+                            {faq.answer}
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Contact Form */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
             Kontakt & Support
           </CardTitle>
-          <CardDescription>Hast du eine Frage oder ein Problem? Schreib uns!</CardDescription>
+          <CardDescription>Keine Antwort gefunden? Schreib uns direkt!</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -98,6 +187,7 @@ export function SupportContactForm() {
         </CardContent>
       </Card>
 
+      {/* Previous Tickets */}
       {tickets && tickets.length > 0 && (
         <Card>
           <CardHeader>
