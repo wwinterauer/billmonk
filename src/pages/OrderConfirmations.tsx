@@ -77,11 +77,12 @@ const OrderConfirmations = () => {
                   <SelectValue placeholder="Status filtern" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Alle Status</SelectItem>
-                  <SelectItem value="draft">Entwurf</SelectItem>
-                  <SelectItem value="sent">Versendet</SelectItem>
-                  <SelectItem value="confirmed">Bestätigt</SelectItem>
-                  <SelectItem value="cancelled">Storniert</SelectItem>
+                   <SelectItem value="all">Alle Status</SelectItem>
+                   <SelectItem value="draft">Entwurf</SelectItem>
+                   <SelectItem value="approved">Freigegeben</SelectItem>
+                   <SelectItem value="sent">Versendet</SelectItem>
+                   <SelectItem value="confirmed">Bestätigt</SelectItem>
+                   <SelectItem value="cancelled">Storniert</SelectItem>
                 </SelectContent>
               </Select>
             </CardHeader>
