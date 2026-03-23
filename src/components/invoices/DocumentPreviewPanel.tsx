@@ -193,6 +193,21 @@ export function DocumentPreviewPanel({
         )}
       </div>
 
+      {/* Vergrößern button */}
+      {pdfUrl && (
+        <div className="pt-2 border-t mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => setFullscreenOpen(true)}
+          >
+            <Maximize2 className="h-4 w-4 mr-2" />
+            Vergrößern
+          </Button>
+        </div>
+      )}
+
       {/* Send dialog */}
       <SendDocumentDialog
         open={sendDialogOpen}
