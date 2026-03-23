@@ -45,6 +45,9 @@ interface UserData {
   total_invoices: number;
   total_invoice_amount: number;
   open_tickets: number;
+  stripe_revenue: number;
+  stripe_payment_count: number;
+  stripe_last_payment_at: string | null;
 }
 
 export function UserManagement() {
@@ -93,7 +96,7 @@ export function UserManagement() {
   });
 
   const exportCSV = () => {
-    const headers = ['E-Mail', 'Vorname', 'Nachname', 'Kontotyp', 'Firma', 'Plan', 'Abo-Status', 'Registriert', 'Onboarding', 'Belege/Monat', 'Belege gesamt', 'Umsatz', 'Rechnungen', 'Rechnungsumsatz', 'Credits', 'Stripe', 'Newsletter'];
+    const headers = ['E-Mail', 'Vorname', 'Nachname', 'Kontotyp', 'Firma', 'Plan', 'Abo-Status', 'Registriert', 'Onboarding', 'Belege/Monat', 'Belege gesamt', 'Ausgaben', 'Rechnungen', 'Rechnungsumsatz', 'Abo-Umsatz', 'Zahlungen', 'Credits', 'Stripe', 'Newsletter'];
     const rows = filteredUsers.map(u => [
       u.email,
       u.first_name || '',
@@ -109,6 +112,8 @@ export function UserManagement() {
       u.total_receipt_amount.toFixed(2),
       String(u.total_invoices),
       u.total_invoice_amount.toFixed(2),
+      u.stripe_revenue.toFixed(2),
+      String(u.stripe_payment_count),
       String(u.receipt_credit || 0),
       u.stripe_customer_id ? 'Ja' : 'Nein',
       u.newsletter_opt_in ? 'Ja' : 'Nein',
@@ -231,10 +236,11 @@ export function UserManagement() {
                     <TableHead>Plan</TableHead>
                     <TableHead>Abo</TableHead>
                     <TableHead>Onb.</TableHead>
-                    <TableHead className="text-right">Belege</TableHead>
-                    <TableHead className="text-right">Umsatz</TableHead>
-                    <TableHead>Registriert</TableHead>
-                    <TableHead></TableHead>
+                     <TableHead className="text-right">Belege</TableHead>
+                     <TableHead className="text-right">Ausgaben</TableHead>
+                     <TableHead className="text-right">Abo-Umsatz</TableHead>
+                     <TableHead>Registriert</TableHead>
+                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -248,6 +254,7 @@ export function UserManagement() {
                       <TableCell>{u.onboarding_completed ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-muted-foreground" />}</TableCell>
                       <TableCell className="text-right">{u.total_receipts}</TableCell>
                       <TableCell className="text-right text-sm">{formatEur(u.total_receipt_amount)}</TableCell>
+                      <TableCell className="text-right text-sm font-medium">{formatEur(u.stripe_revenue)}</TableCell>
                       <TableCell className="text-sm">{u.created_at ? format(new Date(u.created_at), 'dd.MM.yyyy') : '—'}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" onClick={e => { e.stopPropagation(); setSelectedUser(u); }}>
@@ -349,6 +356,15 @@ function UserDetailDialog({ user, onClose, onUpdatePlan }: { user: UserData | nu
             <InfoRow label="Rechnungsumsatz" value={formatEur(user.total_invoice_amount)} />
             <InfoRow label="Dokumente/Monat" value={user.monthly_document_count || 0} />
             <InfoRow label="Dokument-Credits" value={user.document_credit || 0} />
+          </section>
+
+          {/* Abo-Umsatz */}
+          <section>
+            <h4 className="text-sm font-semibold mb-1">Abo-Umsatz</h4>
+            <Separator className="mb-2" />
+            <InfoRow label="Gesamtumsatz" value={<span className="font-semibold text-primary">{formatEur(user.stripe_revenue)}</span>} />
+            <InfoRow label="Anzahl Zahlungen" value={user.stripe_payment_count} />
+            <InfoRow label="Letzte Zahlung" value={user.stripe_last_payment_at ? format(new Date(user.stripe_last_payment_at), 'dd.MM.yyyy') : null} />
           </section>
 
           {/* Sonstiges */}
