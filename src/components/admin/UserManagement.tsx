@@ -45,6 +45,9 @@ interface UserData {
   total_invoices: number;
   total_invoice_amount: number;
   open_tickets: number;
+  stripe_revenue: number;
+  stripe_payment_count: number;
+  stripe_last_payment_at: string | null;
 }
 
 export function UserManagement() {
