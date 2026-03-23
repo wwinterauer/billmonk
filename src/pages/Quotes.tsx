@@ -8,13 +8,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { FileText, Plus, MoreHorizontal, CheckCircle, Send, Trash2, ArrowRight, Copy } from 'lucide-react';
+import { FileText, Plus, MoreHorizontal, CheckCircle, Send, Trash2, ArrowRight, Copy, Eye } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useInvoices, type Invoice } from '@/hooks/useInvoices';
 import { useToast } from '@/hooks/use-toast';
+import { PdfPreviewDialog } from '@/components/invoices/PdfPreviewDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Entwurf', variant: 'secondary' },
+  approved: { label: 'Freigegeben', variant: 'outline' },
   sent: { label: 'Versendet', variant: 'default' },
   accepted: { label: 'Angenommen', variant: 'outline' },
   rejected: { label: 'Abgelehnt', variant: 'destructive' },
