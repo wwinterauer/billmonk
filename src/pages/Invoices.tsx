@@ -9,15 +9,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { FileText, Plus, MoreHorizontal, CheckCircle, Send, XCircle, Trash2, Euro, Clock, AlertTriangle, Download, Copy, GitBranch, ArrowRight, Receipt, Landmark } from 'lucide-react';
+import { FileText, Plus, MoreHorizontal, CheckCircle, Send, XCircle, Trash2, Euro, Clock, AlertTriangle, Download, Copy, GitBranch, ArrowRight, Receipt, Landmark, Eye } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useInvoices, type Invoice } from '@/hooks/useInvoices';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { TaxExportDialog } from '@/components/exports/TaxExportDialog';
+import { PdfPreviewDialog } from '@/components/invoices/PdfPreviewDialog';
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Entwurf', variant: 'secondary' },
+  approved: { label: 'Freigegeben', variant: 'outline' },
   sent: { label: 'Versendet', variant: 'default' },
   paid: { label: 'Bezahlt', variant: 'outline' },
   overdue: { label: 'Überfällig', variant: 'destructive' },

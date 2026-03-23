@@ -55,7 +55,7 @@ export function DocumentPreviewPanel({
     if (!invoiceId) return;
     setGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-invoice-pdf', {
+      const { error } = await supabase.functions.invoke('generate-invoice-pdf', {
         body: { invoice_id: invoiceId },
       });
       if (error) throw error;
