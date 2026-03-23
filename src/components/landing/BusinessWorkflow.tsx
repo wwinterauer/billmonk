@@ -43,7 +43,7 @@ export function BusinessWorkflow() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto" style={{ textWrap: 'pretty' }}>
             Der komplette Verkaufs-Workflow in einer Oberfläche — Dokumente nahtlos ineinander umwandeln, nichts doppelt eintippen.
           </p>
-        </motion.div>
+        </div>
 
         {/* Desktop: horizontal flow */}
         <div className="hidden md:flex items-start justify-center gap-0 max-w-5xl mx-auto">
