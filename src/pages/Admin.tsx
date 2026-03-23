@@ -123,6 +123,9 @@ export default function Admin() {
           <TabsContent value="support">
             <SupportManagement />
           </TabsContent>
+          <TabsContent value="faq">
+            <FAQManagement />
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
