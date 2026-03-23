@@ -186,7 +186,7 @@ export function Features() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto" style={{ textWrap: 'pretty' }}>
             Von der KI-Erkennung über Bankabgleich und CRM bis zum kompletten Rechnungsmodul — XpenzAi wächst mit deinem Unternehmen.
           </p>
-        </motion.div>
+        </div>
 
         {featureBlocks.map((block, index) => (
           <FeatureBlockSection key={block.title} block={block} index={index} />
