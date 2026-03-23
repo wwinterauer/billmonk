@@ -143,8 +143,30 @@ export function SupportContactForm() {
                           <AccordionTrigger className="text-sm font-medium hover:no-underline py-3">
                             {faq.question}
                           </AccordionTrigger>
-                          <AccordionContent className="text-sm text-muted-foreground whitespace-pre-wrap pb-3">
-                            {faq.answer}
+                          <AccordionContent className="text-sm text-muted-foreground whitespace-pre-wrap pb-3 space-y-3">
+                            <p>{faq.answer}</p>
+                            {faq.images && faq.images.length > 0 && (
+                              <div className="grid grid-cols-2 gap-2 mt-2">
+                                {faq.images.map((imgPath: string, idx: number) => (
+                                  <button
+                                    key={imgPath}
+                                    type="button"
+                                    onClick={() => setLightboxImage(getPublicUrl(imgPath))}
+                                    className="relative group rounded-lg overflow-hidden border cursor-pointer"
+                                  >
+                                    <img
+                                      src={getPublicUrl(imgPath)}
+                                      alt={`${faq.question} - Bild ${idx + 1}`}
+                                      className="w-full h-32 object-cover"
+                                      loading="lazy"
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                      <ZoomIn className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </AccordionContent>
                         </AccordionItem>
                       ))}
