@@ -81,6 +81,7 @@ const Quotes = () => {
                 <SelectContent>
                   <SelectItem value="all">Alle Status</SelectItem>
                   <SelectItem value="draft">Entwurf</SelectItem>
+                  <SelectItem value="approved">Freigegeben</SelectItem>
                   <SelectItem value="sent">Versendet</SelectItem>
                   <SelectItem value="accepted">Angenommen</SelectItem>
                   <SelectItem value="rejected">Abgelehnt</SelectItem>
