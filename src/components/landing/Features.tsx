@@ -168,7 +168,7 @@ function FeatureBlockSection({ block, index }: { block: FeatureBlock; index: num
           </motion.div>
         ))}
       </div>
-    </motion.div>
+    </div>
   );
 }
 
