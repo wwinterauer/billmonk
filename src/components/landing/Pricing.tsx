@@ -129,11 +129,7 @@ export function Pricing() {
   return (
     <section id="pricing" className="py-20 bg-background">
       <div className="container">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+        <div
           className="text-center mb-16"
         >
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
@@ -161,7 +157,7 @@ export function Pricing() {
               <span className="ml-1.5 text-xs text-primary font-semibold">-17%</span>
             </Label>
           </div>
-        </motion.div>
+        </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {plans.map((plan, index) => (

@@ -39,18 +39,14 @@ export function Testimonials() {
   return (
     <section className="py-20 lg:py-28 bg-secondary/30">
       <div className="container">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        <div
           className="text-center mb-16"
         >
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4" style={{ textWrap: 'balance' }}>
             Was unsere Nutzer sagen
           </h2>
           <p className="text-lg text-muted-foreground">Freelancer, Vermieter und KMUs vertrauen auf XpenzAi.</p>
-        </motion.div>
+        </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {testimonials.map((testimonial, index) => (

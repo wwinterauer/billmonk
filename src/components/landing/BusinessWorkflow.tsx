@@ -33,11 +33,7 @@ export function BusinessWorkflow() {
   return (
     <section className="py-20 lg:py-28 bg-background overflow-hidden">
       <div className="container">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        <div
           className="text-center mb-14"
         >
           <Badge variant="outline" className="mb-4 border-warning/40 text-warning">Business-Tarif</Badge>
@@ -47,7 +43,7 @@ export function BusinessWorkflow() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto" style={{ textWrap: 'pretty' }}>
             Der komplette Verkaufs-Workflow in einer Oberfläche — Dokumente nahtlos ineinander umwandeln, nichts doppelt eintippen.
           </p>
-        </motion.div>
+        </div>
 
         {/* Desktop: horizontal flow */}
         <div className="hidden md:flex items-start justify-center gap-0 max-w-5xl mx-auto">
@@ -111,17 +107,13 @@ export function BusinessWorkflow() {
         </div>
 
         {/* Extra info */}
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        <div
           className="mt-12 text-center"
         >
           <p className="text-sm text-muted-foreground max-w-lg mx-auto">
             Inklusive Anzahlungs-, Teil- und Schlussrechnungen, automatischem Mahnwesen und wiederkehrenden Rechnungen.
           </p>
-        </motion.div>
+        </div>
       </div>
     </section>
   );

@@ -33,11 +33,7 @@ export function HowItWorks() {
   return (
     <section id="how-it-works" className="py-20 bg-background">
       <div className="container">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+        <div
           className="text-center mb-16"
         >
           <Badge variant="secondary" className="mb-4">Workflow</Badge>
@@ -47,7 +43,7 @@ export function HowItWorks() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             In vier Schritten von der Papierrechnung zur fertigen Buchhaltung
           </p>
-        </motion.div>
+        </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {steps.map((step, index) => (

@@ -125,11 +125,7 @@ const crossFeatures: Feature[] = [
 
 function FeatureBlockSection({ block, index }: { block: FeatureBlock; index: number }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.15 }}
-      transition={{ duration: 0.6, delay: index * 0.1, ease: [0.16, 1, 0.3, 1] }}
+    <div
       className="mb-16 last:mb-0"
     >
       <div className="flex items-center gap-3 mb-2">
@@ -172,7 +168,7 @@ function FeatureBlockSection({ block, index }: { block: FeatureBlock; index: num
           </motion.div>
         ))}
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -180,11 +176,7 @@ export function Features() {
   return (
     <section id="features" className="py-20 lg:py-28 bg-secondary/30">
       <div className="container">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        <div
           className="text-center mb-16"
         >
           <Badge variant="secondary" className="mb-4">Features</Badge>
@@ -194,18 +186,14 @@ export function Features() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto" style={{ textWrap: 'pretty' }}>
             Von der KI-Erkennung über Bankabgleich und CRM bis zum kompletten Rechnungsmodul — XpenzAi wächst mit deinem Unternehmen.
           </p>
-        </motion.div>
+        </div>
 
         {featureBlocks.map((block, index) => (
           <FeatureBlockSection key={block.title} block={block} index={index} />
         ))}
 
         {/* Cross-cutting features */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        <div
           className="mt-16"
         >
           <h3 className="text-xl font-bold text-foreground mb-6 text-center">In allen Tarifen enthalten</h3>
@@ -237,7 +225,7 @@ export function Features() {
               </motion.div>
             ))}
           </div>
-        </motion.div>
+        </div>
       </div>
     </section>
   );
