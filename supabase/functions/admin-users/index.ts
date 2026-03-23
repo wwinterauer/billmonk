@@ -18,7 +18,6 @@ serve(async (req) => {
   );
 
   try {
-    // Verify caller is admin
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Unauthorized");
 
@@ -35,7 +34,6 @@ serve(async (req) => {
 
     if (!roleData) throw new Error("Forbidden: Admin role required");
 
-    // Check if this is an action request
     let body = null;
     try { body = await req.json(); } catch { /* no body */ }
 
@@ -51,15 +49,71 @@ serve(async (req) => {
       });
     }
 
-    // Fetch all profiles
+    // Fetch all profile fields
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from("profiles")
-      .select("id, email, first_name, last_name, plan, created_at, monthly_receipt_count, stripe_customer_id, subscription_status, newsletter_opt_in")
+      .select("id, email, first_name, last_name, plan, created_at, monthly_receipt_count, stripe_customer_id, subscription_status, newsletter_opt_in, street, zip, city, country, phone, account_type, company_name, uid_number, onboarding_completed, subscription_end_date, stripe_product_id, avatar_url, receipt_credit, monthly_document_count, document_credit, admin_view_plan")
       .order("created_at", { ascending: false });
 
     if (profilesError) throw profilesError;
 
-    return new Response(JSON.stringify({ users: profiles || [] }), {
+    // Aggregate receipt stats per user
+    const { data: receiptStats } = await supabaseAdmin
+      .rpc("admin_receipt_stats_placeholder") // fallback to manual
+      .maybeSingle();
+    // Since no RPC exists, query receipts grouped manually
+    // We'll do a simpler approach: fetch counts per user
+    const { data: allReceipts } = await supabaseAdmin
+      .from("receipts")
+      .select("user_id, amount_gross");
+
+    const receiptMap: Record<string, { count: number; total: number }> = {};
+    if (allReceipts) {
+      for (const r of allReceipts) {
+        if (!receiptMap[r.user_id]) receiptMap[r.user_id] = { count: 0, total: 0 };
+        receiptMap[r.user_id].count++;
+        receiptMap[r.user_id].total += Number(r.amount_gross || 0);
+      }
+    }
+
+    // Aggregate invoice stats
+    const { data: allInvoices } = await supabaseAdmin
+      .from("invoices")
+      .select("user_id, total");
+
+    const invoiceMap: Record<string, { count: number; total: number }> = {};
+    if (allInvoices) {
+      for (const inv of allInvoices) {
+        if (!invoiceMap[inv.user_id]) invoiceMap[inv.user_id] = { count: 0, total: 0 };
+        invoiceMap[inv.user_id].count++;
+        invoiceMap[inv.user_id].total += Number(inv.total || 0);
+      }
+    }
+
+    // Support ticket counts (open)
+    const { data: openTickets } = await supabaseAdmin
+      .from("support_tickets")
+      .select("user_id")
+      .eq("status", "open");
+
+    const ticketMap: Record<string, number> = {};
+    if (openTickets) {
+      for (const t of openTickets) {
+        ticketMap[t.user_id] = (ticketMap[t.user_id] || 0) + 1;
+      }
+    }
+
+    // Merge data
+    const users = (profiles || []).map((p: any) => ({
+      ...p,
+      total_receipts: receiptMap[p.id]?.count || 0,
+      total_receipt_amount: receiptMap[p.id]?.total || 0,
+      total_invoices: invoiceMap[p.id]?.count || 0,
+      total_invoice_amount: invoiceMap[p.id]?.total || 0,
+      open_tickets: ticketMap[p.id] || 0,
+    }));
+
+    return new Response(JSON.stringify({ users }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
