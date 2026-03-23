@@ -96,7 +96,7 @@ export function UserManagement() {
   });
 
   const exportCSV = () => {
-    const headers = ['E-Mail', 'Vorname', 'Nachname', 'Kontotyp', 'Firma', 'Plan', 'Abo-Status', 'Registriert', 'Onboarding', 'Belege/Monat', 'Belege gesamt', 'Umsatz', 'Rechnungen', 'Rechnungsumsatz', 'Credits', 'Stripe', 'Newsletter'];
+    const headers = ['E-Mail', 'Vorname', 'Nachname', 'Kontotyp', 'Firma', 'Plan', 'Abo-Status', 'Registriert', 'Onboarding', 'Belege/Monat', 'Belege gesamt', 'Ausgaben', 'Rechnungen', 'Rechnungsumsatz', 'Abo-Umsatz', 'Zahlungen', 'Credits', 'Stripe', 'Newsletter'];
     const rows = filteredUsers.map(u => [
       u.email,
       u.first_name || '',
@@ -112,6 +112,8 @@ export function UserManagement() {
       u.total_receipt_amount.toFixed(2),
       String(u.total_invoices),
       u.total_invoice_amount.toFixed(2),
+      u.stripe_revenue.toFixed(2),
+      String(u.stripe_payment_count),
       String(u.receipt_credit || 0),
       u.stripe_customer_id ? 'Ja' : 'Nein',
       u.newsletter_opt_in ? 'Ja' : 'Nein',
