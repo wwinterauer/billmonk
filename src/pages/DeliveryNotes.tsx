@@ -177,6 +177,12 @@ const DeliveryNotes = () => {
           </Card>
         </div>
       </FeatureGate>
+      <PdfPreviewDialog
+        open={pdfPreview.open}
+        onOpenChange={(open) => setPdfPreview(p => ({ ...p, open }))}
+        pdfStoragePath={pdfPreview.path}
+        invoiceNumber={pdfPreview.number}
+      />
     </DashboardLayout>
   );
 };
