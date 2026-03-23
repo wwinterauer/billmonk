@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ArrowLeft, Plus, Trash2, Save, FolderPlus, Check } from 'lucide-react';
+import { DocumentPreviewPanel } from '@/components/invoices/DocumentPreviewPanel';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useInvoiceItems, type InvoiceItem } from '@/hooks/useInvoiceItems';
 import { useItemGroups } from '@/hooks/useItemGroups';
@@ -24,6 +25,7 @@ import { useInvoiceTags } from '@/hooks/useInvoiceTags';
 import { InvoiceTagSelector } from '@/components/invoices/InvoiceTagSelector';
 import { useQuoteSettings } from '@/hooks/useQuoteSettings';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface EditorLineItem {
   tempId: string;
@@ -94,6 +96,7 @@ const InvoiceEditor = () => {
   const { settings: companySettings } = useCompanySettings();
   const { activeTags } = useTags();
   const { assignTag } = useInvoiceTags();
+  const { toast } = useToast();
 
   const isSmallBusiness = companySettings?.is_small_business || false;
   const defaultVatRate = isSmallBusiness ? 0 : 20;
@@ -109,6 +112,8 @@ const InvoiceEditor = () => {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [category, setCategory] = useState('');
   const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(id && id !== 'new' ? id : null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [currentStatus, setCurrentStatus] = useState('draft');
 
   // Shipping address
   const [shippingMode, setShippingMode] = useState<'same' | 'customer' | 'custom'>('same');
@@ -217,6 +222,7 @@ const InvoiceEditor = () => {
           setDiscountDays(inv.discount_days || 0);
           setRabattPercent(inv.rabatt_percent || 0);
           setDeliveryTime(inv.delivery_time || '');
+          setCurrentStatus(inv.status || 'draft');
           if (inv.shipping_address_mode === 'custom') {
             setCustomShipping({
               street: inv.shipping_street || '',
@@ -224,6 +230,15 @@ const InvoiceEditor = () => {
               city: inv.shipping_city || '',
               country: inv.shipping_country || 'AT',
             });
+          }
+          // Load existing PDF
+          if (inv.pdf_storage_path) {
+            const { data: signedData } = await supabase.storage
+              .from('invoices')
+              .createSignedUrl(inv.pdf_storage_path, 3600);
+            if (signedData?.signedUrl) {
+              setPreviewPdfUrl(signedData.signedUrl);
+            }
           }
         }
 
@@ -353,7 +368,7 @@ const InvoiceEditor = () => {
 
   const backPath = documentType === 'quote' ? '/quotes' : documentType === 'delivery_note' ? '/delivery-notes' : '/invoices';
 
-  const handleSave = async (asDraft = true) => {
+  const handleSave = async () => {
     if (!customerId) return;
     setSaving(true);
 
@@ -361,7 +376,7 @@ const InvoiceEditor = () => {
       {
         customer_id: customerId,
         invoice_number: invoiceNumber,
-        status: asDraft ? 'draft' : 'sent',
+        status: 'draft',
         invoice_date: invoiceDate,
         due_date: dueDate || undefined,
         notes: notes || undefined,
@@ -395,7 +410,8 @@ const InvoiceEditor = () => {
         try { await assignTag(result.id, tagId); } catch {}
       }
       setSavedInvoiceId(result.id);
-      navigate(backPath);
+      setCurrentStatus('draft');
+      toast({ title: `${docLabel} gespeichert` });
     }
   };
 
@@ -403,9 +419,9 @@ const InvoiceEditor = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6 lg:p-8 space-y-6 max-w-5xl">
+      <div className="p-6 lg:p-8">
         {/* Header */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 mb-6">
           <Button variant="ghost" size="icon" onClick={() => navigate(backPath)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -422,6 +438,10 @@ const InvoiceEditor = () => {
             <Badge variant="outline">{docLabel}</Badge>
           </div>
         </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-6">
+          {/* Left: Form */}
+          <div className="space-y-6">
 
         {/* Meta */}
         <Card>
@@ -871,20 +891,33 @@ const InvoiceEditor = () => {
         <div className="flex justify-end gap-3">
           <Button variant="outline" onClick={() => navigate(backPath)}>Abbrechen</Button>
           <Button
-            variant="secondary"
             disabled={!customerId || saving || lines.every(l => !l.description)}
-            onClick={() => handleSave(true)}
+            onClick={() => handleSave()}
           >
             <Save className="h-4 w-4 mr-2" />
-            Als Entwurf speichern
+            Speichern
           </Button>
-          <Button
-            disabled={!customerId || saving || lines.every(l => !l.description)}
-            onClick={() => handleSave(false)}
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Speichern & Versenden
-          </Button>
+        </div>
+          </div>
+
+          {/* Right: Preview Panel */}
+          <div className="hidden xl:block sticky top-6 h-[calc(100vh-120px)]">
+            <Card className="h-full">
+              <CardContent className="h-full p-4">
+                <DocumentPreviewPanel
+                  invoiceId={savedInvoiceId}
+                  invoiceNumber={invoiceNumber}
+                  documentType={documentType}
+                  currentStatus={currentStatus}
+                  pdfUrl={previewPdfUrl}
+                  customerEmail={(selectedCustomer as any)?.email}
+                  onStatusChange={setCurrentStatus}
+                  onPdfGenerated={setPreviewPdfUrl}
+                  disabled={saving}
+                />
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </DashboardLayout>

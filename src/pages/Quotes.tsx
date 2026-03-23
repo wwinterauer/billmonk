@@ -8,13 +8,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { FileText, Plus, MoreHorizontal, CheckCircle, Send, Trash2, ArrowRight, Copy } from 'lucide-react';
+import { FileText, Plus, MoreHorizontal, CheckCircle, Send, Trash2, ArrowRight, Copy, Eye } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useInvoices, type Invoice } from '@/hooks/useInvoices';
 import { useToast } from '@/hooks/use-toast';
+import { PdfPreviewDialog } from '@/components/invoices/PdfPreviewDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Entwurf', variant: 'secondary' },
+  approved: { label: 'Freigegeben', variant: 'outline' },
   sent: { label: 'Versendet', variant: 'default' },
   accepted: { label: 'Angenommen', variant: 'outline' },
   rejected: { label: 'Abgelehnt', variant: 'destructive' },
@@ -25,6 +28,7 @@ const Quotes = () => {
   const { invoices, loading, updateInvoiceStatus, deleteInvoice, copyInvoice, convertDocument } = useInvoices();
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [pdfPreview, setPdfPreview] = useState<{ open: boolean; path: string | null; number: string }>({ open: false, path: null, number: '' });
   const navigate = useNavigate();
 
   // Filter only quotes
@@ -77,6 +81,7 @@ const Quotes = () => {
                 <SelectContent>
                   <SelectItem value="all">Alle Status</SelectItem>
                   <SelectItem value="draft">Entwurf</SelectItem>
+                  <SelectItem value="approved">Freigegeben</SelectItem>
                   <SelectItem value="sent">Versendet</SelectItem>
                   <SelectItem value="accepted">Angenommen</SelectItem>
                   <SelectItem value="rejected">Abgelehnt</SelectItem>
@@ -103,8 +108,9 @@ const Quotes = () => {
                       <TableHead>Datum</TableHead>
                       <TableHead>Gültig bis</TableHead>
                       <TableHead className="text-right">Betrag</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-10" />
+                       <TableHead>Status</TableHead>
+                       <TableHead className="w-10" />
+                       <TableHead className="w-10" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -118,7 +124,14 @@ const Quotes = () => {
                           <TableCell>{fmtDate(inv.due_date)}</TableCell>
                           <TableCell className="text-right font-medium">{fmt(inv.total || 0)}</TableCell>
                           <TableCell>
-                            <Badge variant={sc.variant}>{sc.label}</Badge>
+                          <Badge variant={sc.variant}>{sc.label}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {inv.pdf_storage_path && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={e => { e.stopPropagation(); setPdfPreview({ open: true, path: inv.pdf_storage_path, number: inv.invoice_number }); }}>
+                                <Eye className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            )}
                           </TableCell>
                           <TableCell>
                             <DropdownMenu>
@@ -128,6 +141,14 @@ const Quotes = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                                <DropdownMenuItem onClick={async () => {
+                                  toast({ title: 'PDF wird erstellt…' });
+                                  const { error } = await supabase.functions.invoke('generate-invoice-pdf', { body: { invoice_id: inv.id } });
+                                  if (error) toast({ title: 'Fehler', description: 'PDF konnte nicht erstellt werden', variant: 'destructive' });
+                                  else toast({ title: 'PDF erstellt' });
+                                }}>
+                                  <ArrowRight className="h-4 w-4 mr-2" /> PDF generieren
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => convertDocument(inv.id, 'order_confirmation')}>
                                   <ArrowRight className="h-4 w-4 mr-2" /> In Auftragsbestätigung
                                 </DropdownMenuItem>
@@ -182,6 +203,12 @@ const Quotes = () => {
           </Card>
         </div>
       </FeatureGate>
+      <PdfPreviewDialog
+        open={pdfPreview.open}
+        onOpenChange={(open) => setPdfPreview(p => ({ ...p, open }))}
+        pdfStoragePath={pdfPreview.path}
+        invoiceNumber={pdfPreview.number}
+      />
     </DashboardLayout>
   );
 };

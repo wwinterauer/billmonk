@@ -8,12 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Truck, Plus, MoreHorizontal, Send, Trash2, ArrowRight, Copy, CheckCircle } from 'lucide-react';
+import { Truck, Plus, MoreHorizontal, Send, Trash2, ArrowRight, Copy, CheckCircle, Eye } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useInvoices, type Invoice } from '@/hooks/useInvoices';
+import { PdfPreviewDialog } from '@/components/invoices/PdfPreviewDialog';
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Entwurf', variant: 'secondary' },
+  approved: { label: 'Freigegeben', variant: 'outline' },
   sent: { label: 'Versendet', variant: 'default' },
   delivered: { label: 'Zugestellt', variant: 'outline' },
 };
@@ -21,6 +23,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
 const DeliveryNotes = () => {
   const { invoices, loading, updateInvoiceStatus, deleteInvoice, copyInvoice, convertDocument } = useInvoices();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [pdfPreview, setPdfPreview] = useState<{ open: boolean; path: string | null; number: string }>({ open: false, path: null, number: '' });
   const navigate = useNavigate();
 
   const deliveryNotes = useMemo(() => {
@@ -67,10 +70,11 @@ const DeliveryNotes = () => {
                   <SelectValue placeholder="Status filtern" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Alle Status</SelectItem>
-                  <SelectItem value="draft">Entwurf</SelectItem>
-                  <SelectItem value="sent">Versendet</SelectItem>
-                  <SelectItem value="delivered">Zugestellt</SelectItem>
+                   <SelectItem value="all">Alle Status</SelectItem>
+                   <SelectItem value="draft">Entwurf</SelectItem>
+                   <SelectItem value="approved">Freigegeben</SelectItem>
+                   <SelectItem value="sent">Versendet</SelectItem>
+                   <SelectItem value="delivered">Zugestellt</SelectItem>
                 </SelectContent>
               </Select>
             </CardHeader>
@@ -93,8 +97,9 @@ const DeliveryNotes = () => {
                       <TableHead>Kunde</TableHead>
                       <TableHead>Datum</TableHead>
                       <TableHead>Lieferzeit</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-10" />
+                       <TableHead>Status</TableHead>
+                       <TableHead className="w-10" />
+                       <TableHead className="w-10" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -108,7 +113,14 @@ const DeliveryNotes = () => {
                           <TableCell className="text-sm text-muted-foreground">{(inv as any).delivery_time || '–'}</TableCell>
                           <TableCell>
                             <Badge variant={sc.variant}>{sc.label}</Badge>
-                          </TableCell>
+                           </TableCell>
+                           <TableCell>
+                             {inv.pdf_storage_path && (
+                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={e => { e.stopPropagation(); setPdfPreview({ open: true, path: inv.pdf_storage_path, number: inv.invoice_number }); }}>
+                                 <Eye className="h-4 w-4 text-muted-foreground" />
+                               </Button>
+                             )}
+                           </TableCell>
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
@@ -165,6 +177,12 @@ const DeliveryNotes = () => {
           </Card>
         </div>
       </FeatureGate>
+      <PdfPreviewDialog
+        open={pdfPreview.open}
+        onOpenChange={(open) => setPdfPreview(p => ({ ...p, open }))}
+        pdfStoragePath={pdfPreview.path}
+        invoiceNumber={pdfPreview.number}
+      />
     </DashboardLayout>
   );
 };
