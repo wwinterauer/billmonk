@@ -48,6 +48,7 @@ export function DocumentPreviewPanel({
   const { toast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
 
   const docLabel = DOC_LABELS[documentType] || 'Dokument';
   const statusInfo = STATUS_LABELS[currentStatus] || STATUS_LABELS.draft;
