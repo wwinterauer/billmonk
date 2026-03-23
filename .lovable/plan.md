@@ -1,79 +1,45 @@
 
 
-# Features-Sektion basierend auf Feature-Overview aktualisieren
+# Landing Page Sektionen nicht sichtbar — Diagnose & Fix
 
 ## Problem
 
-Die Feature-Overview listet 60+ Features in 7 Kategorien. Aktuell zeigt die Landing Page nur ~22 davon. Fehlende Highlights: PDF-Splitting, Auto-Approval, Absender-Filter, KPI-Dashboard, Gutschriften, Nummernkreise, Skonto/Rabatt, Artikelgruppen, ZIP-Download, DATEV/BMD-Details, PWA-Installation, Onboarding.
+Alle Landing-Page-Sektionen zwischen Hero und CTA (ProblemSolution, HowItWorks, Features, BusinessWorkflow, Testimonials, Pricing, FAQ) sind im DOM vorhanden, aber **unsichtbar**. Die framer-motion `whileInView` Animationen (die mit `initial={{ opacity: 0 }}` starten) triggern nicht korrekt.
 
-## Ansatz
+Das betrifft sowohl die Browser-Automation als auch potenziell echte Nutzer mit langsamen Verbindungen oder bestimmten Browser-Konfigurationen, bei denen der IntersectionObserver nicht sofort feuert.
 
-Die bestehende 3-Block-Struktur bleibt, wird aber auf **5 Blöcke** erweitert (analog zur Overview-Struktur). Jeder Block bekommt mehr Features. Die Cross-Features werden ebenfalls erweitert.
+## Ursache
 
-## Neue Block-Struktur
-
+Jede Sektion nutzt `motion.div` mit:
 ```text
-Block 1: "Intelligente Belegverwaltung" (Free+)
-  - KI-Erkennung (OCR) mit Vendor-Learning
-  - Multi-Upload & Kamera-Scan (PWA)
-  - PDF-Splitting (mehrseitige PDFs aufteilen)
-  - Duplikat-Erkennung
-  - Review-Workflow & Auto-Approval
-  - Manuelle Einträge (Barbelege)
-  - Individuelle Dateinamen & Beschreibungsvorlagen
-  - Tags & Kategorien
-
-Block 2: "Import-Kanäle" (ab Starter)
-  - E-Mail-Import (Webhook-Adresse)
-  - Gmail & Outlook OAuth-Sync
-  - IMAP-Import (beliebiger Provider)
-  - CSV-Bankimport
-  - Live-Bankanbindung (Open Banking) [Pro]
-  - Absender-Filter & Blockierung
-
-Block 3: "Banking & Kontoabgleich" (ab Starter)
-  - Automatisches Beleg-↔-Bank Matching
-  - Auto-Reconciliation (KI-basiert)
-  - Bank-Schlagwörter (Regelbasierte Zuordnung)
-  - KPI-Dashboard & Berichte
-
-Block 4: "Rechnungen & Verkaufs-Workflow" (Business)
-  - Angebote → AB → Lieferschein → Rechnung
-  - Teilrechnungen (Anzahlung/Teil/Schluss)
-  - Wiederkehrende Rechnungen (Cron)
-  - Gutschriften mit Referenz
-  - Konfigurierbare Nummernkreise
-  - PDF-Generierung mit Logo & Layout
-  - Skonto, Rabatt & Lieferzeiten
-  - Artikelgruppen mit Zwischensummen & Bildern
-
-Block 5: "CRM & Stammdaten" (Business)
-  - Kundenverwaltung (Kontakt, UID, Lieferadresse)
-  - Artikelvorlagen (Preis, Einheit, USt)
-  - Firmendaten für Rechnungskopf
-
-Cross-Features (alle Tarife):
-  - DSGVO-konform (EU-Hosting)
-  - PWA (installierbar, offline-fähig)
-  - Responsive Design
-  - Flexible Exporte (CSV/Excel/PDF/ZIP)
-  - DATEV/BMD Export [Business Badge]
-  - Cloud-Backup mit Zeitplan [Pro Badge]
-  - Onboarding-Assistent
+initial={{ opacity: 0, y: 16 }}
+whileInView={{ opacity: 1, y: 0 }}
+viewport={{ once: true, amount: 0.2 }}
 ```
+
+Wenn der IntersectionObserver nicht triggert (z.B. bei schnellem Scroll, SSR-ähnlichen Bedingungen, oder bestimmten Browser-Konfigurationen), bleiben die Elemente permanent bei `opacity: 0`.
+
+## Lösung
+
+Die äußersten `motion.div` Wrapper jeder Sektion sollten **keine opacity-Animation auf Sektionsebene** haben, sondern nur auf den inneren Content-Elementen. Alternativ: den Sektions-Headern und Content-Blöcken einen CSS-Fallback geben, damit sie auch ohne JS/IntersectionObserver sichtbar sind.
+
+**Konkreter Ansatz**: In jeder Landing-Komponente die äußere `<section>` oder den Container-`div` NICHT mit `initial={{ opacity: 0 }}` animieren. Stattdessen nur die Kinder-Elemente (Überschriften, Cards, Listen) animieren. Oder alternativ einen `style={{ opacity: 1 }}` Fallback setzen und die Animation nur als Enhancement nutzen.
 
 ## Betroffene Dateien
 
-| Datei | Aktion |
-|-------|--------|
-| `src/components/landing/Features.tsx` | Komplett überarbeiten: 5 Blöcke statt 3, Features aus Overview |
-| `src/components/landing/PricingComparison.tsx` | Fehlende Features ergänzen (PDF-Split, Auto-Approval, etc.) |
+| Datei | Änderung |
+|-------|----------|
+| `src/components/landing/ProblemSolution.tsx` | Äußeren motion-Wrapper opacity-safe machen |
+| `src/components/landing/HowItWorks.tsx` | Äußeren motion-Wrapper opacity-safe machen |
+| `src/components/landing/Features.tsx` | Äußeren motion-Wrapper opacity-safe machen |
+| `src/components/landing/BusinessWorkflow.tsx` | Äußeren motion-Wrapper opacity-safe machen |
+| `src/components/landing/Testimonials.tsx` | Äußeren motion-Wrapper opacity-safe machen |
+| `src/components/landing/Pricing.tsx` | Äußeren motion-Wrapper opacity-safe machen |
+| `src/components/landing/FAQ.tsx` | Äußeren motion-Wrapper opacity-safe machen |
 
-## Technische Details
+## Technischer Ansatz
 
-- `featureBlocks` Array wird von 3 auf 5 Einträge erweitert
-- Neue Icons importieren: `Scissors` (PDF-Split), `CheckCheck` (Auto-Approval), `Filter` (Absender-Filter), `Ban` (Blockierung), `BarChart3` (Dashboard), `PenLine` (Gutschriften), `Hash` (Nummernkreise), `Palette` (Layout), `Percent` (Skonto), `Package` (Artikelgruppen), `Image` (Artikelbilder), `UserPlus` (Kundenverwaltung), `Briefcase` (Firmendaten), `Timer` (Wiederkehrend), `Download` (ZIP), `Wifi` (IMAP)
-- Plan-Badges korrekt setzen: Starter, Pro, Business
-- `crossFeatures` erweitert um Export-Details, Onboarding, PWA
-- PricingComparison-Tabelle um fehlende Zeilen ergänzen
+In jeder Komponente: Die `<section>`-Level bleibt ein normales `<section>` (kein `motion`). Nur die inneren Elemente (Header-Text, Cards, einzelne Items) behalten ihre `whileInView`-Animation. So ist die Sektion immer sichtbar, aber die Inhalte animieren elegant rein.
+
+Nach dem Fix können alle Screenshots korrekt erfasst werden.
 
