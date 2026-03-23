@@ -236,10 +236,11 @@ export function UserManagement() {
                     <TableHead>Plan</TableHead>
                     <TableHead>Abo</TableHead>
                     <TableHead>Onb.</TableHead>
-                    <TableHead className="text-right">Belege</TableHead>
-                    <TableHead className="text-right">Umsatz</TableHead>
-                    <TableHead>Registriert</TableHead>
-                    <TableHead></TableHead>
+                     <TableHead className="text-right">Belege</TableHead>
+                     <TableHead className="text-right">Ausgaben</TableHead>
+                     <TableHead className="text-right">Abo-Umsatz</TableHead>
+                     <TableHead>Registriert</TableHead>
+                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
