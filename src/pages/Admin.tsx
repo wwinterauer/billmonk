@@ -9,7 +9,8 @@ import { SystemHealth } from '@/components/admin/SystemHealth';
 import { FeatureUsage } from '@/components/admin/FeatureUsage';
 import { ActivityFeed } from '@/components/admin/ActivityFeed';
 import { AnnouncementManager } from '@/components/admin/AnnouncementManager';
-import { Shield, Users, CreditCard, BarChart3, Mail, HeartPulse, Blocks, Activity, Megaphone } from 'lucide-react';
+import { SupportManagement } from '@/components/admin/SupportManagement';
+import { Shield, Users, CreditCard, BarChart3, Mail, HeartPulse, Blocks, Activity, Megaphone, MessageSquare } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Admin() {
@@ -84,6 +85,10 @@ export default function Admin() {
               <Megaphone className="h-4 w-4" />
               Announcements
             </TabsTrigger>
+            <TabsTrigger value="support" className="gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Support
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -109,6 +114,9 @@ export default function Admin() {
           </TabsContent>
           <TabsContent value="announcements">
             <AnnouncementManager />
+          </TabsContent>
+          <TabsContent value="support">
+            <SupportManagement />
           </TabsContent>
         </Tabs>
       </div>

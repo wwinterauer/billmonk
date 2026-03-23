@@ -13,6 +13,7 @@ import {
   EyeOff,
   Check,
   XCircle,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { SubscriptionSettings } from '@/components/settings/SubscriptionSettings';
+import { SupportContactForm } from '@/components/settings/SupportContactForm';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -79,7 +81,7 @@ const Account = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['profile', 'address', 'security', 'subscription'];
+  const validTabs = ['profile', 'address', 'security', 'subscription', 'support'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'profile';
 
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -302,6 +304,10 @@ const Account = () => {
             <TabsTrigger value="subscription" className="gap-2">
               <Crown className="h-4 w-4" />
               <span className="hidden sm:inline">Abo</span>
+            </TabsTrigger>
+            <TabsTrigger value="support" className="gap-2">
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline">Support</span>
             </TabsTrigger>
           </TabsList>
 
@@ -637,6 +643,13 @@ const Account = () => {
           <TabsContent value="subscription">
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
               <SubscriptionSettings />
+            </motion.div>
+          </TabsContent>
+
+          {/* Support Tab */}
+          <TabsContent value="support">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+              <SupportContactForm />
             </motion.div>
           </TabsContent>
         </Tabs>
