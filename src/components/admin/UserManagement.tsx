@@ -358,6 +358,15 @@ function UserDetailDialog({ user, onClose, onUpdatePlan }: { user: UserData | nu
             <InfoRow label="Dokument-Credits" value={user.document_credit || 0} />
           </section>
 
+          {/* Abo-Umsatz */}
+          <section>
+            <h4 className="text-sm font-semibold mb-1">Abo-Umsatz</h4>
+            <Separator className="mb-2" />
+            <InfoRow label="Gesamtumsatz" value={<span className="font-semibold text-primary">{formatEur(user.stripe_revenue)}</span>} />
+            <InfoRow label="Anzahl Zahlungen" value={user.stripe_payment_count} />
+            <InfoRow label="Letzte Zahlung" value={user.stripe_last_payment_at ? format(new Date(user.stripe_last_payment_at), 'dd.MM.yyyy') : null} />
+          </section>
+
           {/* Sonstiges */}
           <section>
             <h4 className="text-sm font-semibold mb-1">Sonstiges</h4>
