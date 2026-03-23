@@ -113,7 +113,14 @@ const DeliveryNotes = () => {
                           <TableCell className="text-sm text-muted-foreground">{(inv as any).delivery_time || '–'}</TableCell>
                           <TableCell>
                             <Badge variant={sc.variant}>{sc.label}</Badge>
-                          </TableCell>
+                           </TableCell>
+                           <TableCell>
+                             {inv.pdf_storage_path && (
+                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={e => { e.stopPropagation(); setPdfPreview({ open: true, path: inv.pdf_storage_path, number: inv.invoice_number }); }}>
+                                 <Eye className="h-4 w-4 text-muted-foreground" />
+                               </Button>
+                             )}
+                           </TableCell>
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
