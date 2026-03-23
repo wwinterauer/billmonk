@@ -164,10 +164,13 @@ export function DocumentPreviewPanel({
 
         {pdfUrl && (
           <>
-            <Button size="sm" variant="ghost" onClick={handlePrint}>
+            <Button size="sm" variant="ghost" onClick={() => setFullscreenOpen(true)} title="Vollbild">
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="ghost" onClick={handlePrint} title="Drucken">
               <Printer className="h-4 w-4" />
             </Button>
-            <Button size="sm" variant="ghost" onClick={handleDownload}>
+            <Button size="sm" variant="ghost" onClick={handleDownload} title="Herunterladen">
               <Download className="h-4 w-4" />
             </Button>
           </>
