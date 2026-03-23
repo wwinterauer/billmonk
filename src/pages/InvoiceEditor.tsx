@@ -25,6 +25,7 @@ import { useInvoiceTags } from '@/hooks/useInvoiceTags';
 import { InvoiceTagSelector } from '@/components/invoices/InvoiceTagSelector';
 import { useQuoteSettings } from '@/hooks/useQuoteSettings';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface EditorLineItem {
   tempId: string;
