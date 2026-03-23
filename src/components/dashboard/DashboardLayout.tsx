@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Sidebar } from '@/components/dashboard/Sidebar';
+import { AnnouncementBanner } from '@/components/AnnouncementBanner';
 import { cn } from '@/lib/utils';
 
 interface DashboardLayoutProps {
@@ -17,10 +18,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       />
       <main
         className={cn(
-          'transition-all duration-300',
+          'transition-all duration-300 p-6',
           sidebarCollapsed ? 'ml-16' : 'ml-64'
         )}
       >
+        <AnnouncementBanner />
         {children}
       </main>
     </div>
