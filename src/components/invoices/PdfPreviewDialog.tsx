@@ -76,6 +76,12 @@ export function PdfPreviewDialog({ open, onOpenChange, pdfStoragePath, pdfUrl: d
               {displayTitle}
             </DialogTitle>
             <div className="flex items-center gap-2 flex-shrink-0">
+              {onSend && (
+                <Button variant="default" size="sm" onClick={onSend} disabled={!resolvedUrl}>
+                  <Send className="h-4 w-4 mr-2" />
+                  Versenden
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={handlePrint} disabled={!resolvedUrl}>
                 <Printer className="h-4 w-4 mr-2" />
                 Drucken
