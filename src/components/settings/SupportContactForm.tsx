@@ -250,6 +250,19 @@ export function SupportContactForm() {
           </CardContent>
         </Card>
       )}
+
+      {/* Image Lightbox */}
+      <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
+        <DialogContent className="sm:max-w-3xl p-2">
+          {lightboxImage && (
+            <img
+              src={lightboxImage}
+              alt="FAQ Screenshot"
+              className="w-full h-auto rounded-lg"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
