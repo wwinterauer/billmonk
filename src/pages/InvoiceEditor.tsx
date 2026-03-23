@@ -366,7 +366,7 @@ const InvoiceEditor = () => {
 
   const backPath = documentType === 'quote' ? '/quotes' : documentType === 'delivery_note' ? '/delivery-notes' : '/invoices';
 
-  const handleSave = async (asDraft = true) => {
+  const handleSave = async () => {
     if (!customerId) return;
     setSaving(true);
 
@@ -374,7 +374,7 @@ const InvoiceEditor = () => {
       {
         customer_id: customerId,
         invoice_number: invoiceNumber,
-        status: asDraft ? 'draft' : 'sent',
+        status: 'draft',
         invoice_date: invoiceDate,
         due_date: dueDate || undefined,
         notes: notes || undefined,
@@ -408,7 +408,8 @@ const InvoiceEditor = () => {
         try { await assignTag(result.id, tagId); } catch {}
       }
       setSavedInvoiceId(result.id);
-      navigate(backPath);
+      setCurrentStatus('draft');
+      toast({ title: `${docLabel} gespeichert` });
     }
   };
 
