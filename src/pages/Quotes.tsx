@@ -108,8 +108,9 @@ const Quotes = () => {
                       <TableHead>Datum</TableHead>
                       <TableHead>Gültig bis</TableHead>
                       <TableHead className="text-right">Betrag</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-10" />
+                       <TableHead>Status</TableHead>
+                       <TableHead className="w-10" />
+                       <TableHead className="w-10" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
