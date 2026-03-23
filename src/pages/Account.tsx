@@ -303,6 +303,10 @@ const Account = () => {
               <Crown className="h-4 w-4" />
               <span className="hidden sm:inline">Abo</span>
             </TabsTrigger>
+            <TabsTrigger value="support" className="gap-2">
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline">Support</span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Profile Tab */}
