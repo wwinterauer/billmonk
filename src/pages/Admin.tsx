@@ -115,6 +115,9 @@ export default function Admin() {
           <TabsContent value="announcements">
             <AnnouncementManager />
           </TabsContent>
+          <TabsContent value="support">
+            <SupportManagement />
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>

@@ -93,6 +93,9 @@ export function ActivityFeed({ data, loading }: ActivityFeedProps) {
                       <p className="text-sm text-muted-foreground truncate">
                         {event.user_email || 'Unbekannt'}
                         {event.details?.plan && ` — Plan: ${event.details.plan}`}
+                        {event.details?.old_plan && event.details?.new_plan && ` — ${event.details.old_plan} → ${event.details.new_plan}`}
+                        {event.details?.file_name && ` — ${event.details.file_name}`}
+                        {event.details?.source && event.details.source !== 'upload' && ` (${event.details.source})`}
                       </p>
                     </div>
                   </div>
