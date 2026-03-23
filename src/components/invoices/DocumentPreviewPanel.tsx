@@ -42,9 +42,11 @@ export function DocumentPreviewPanel({
   documentType,
   currentStatus,
   pdfUrl,
+  pdfStoragePath,
   customerEmail,
   onStatusChange,
   onPdfGenerated,
+  onPdfStoragePathChange,
   disabled,
 }: DocumentPreviewPanelProps) {
   const { toast } = useToast();
