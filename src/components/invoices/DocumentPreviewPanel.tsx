@@ -74,6 +74,7 @@ export function DocumentPreviewPanel({
         .single();
 
       if (inv?.pdf_storage_path) {
+        onPdfStoragePathChange?.(inv.pdf_storage_path);
         const { data: signedData } = await supabase.storage
           .from('invoices')
           .createSignedUrl(inv.pdf_storage_path, 3600);
