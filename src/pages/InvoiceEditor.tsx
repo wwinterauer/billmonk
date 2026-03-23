@@ -912,9 +912,11 @@ const InvoiceEditor = () => {
                   documentType={documentType}
                   currentStatus={currentStatus}
                   pdfUrl={previewPdfUrl}
+                  pdfStoragePath={pdfStoragePath}
                   customerEmail={(selectedCustomer as any)?.email}
                   onStatusChange={setCurrentStatus}
-                  onPdfGenerated={setPreviewPdfUrl}
+                  onPdfGenerated={(url) => setPreviewPdfUrl(url)}
+                  onPdfStoragePathChange={setPdfStoragePath}
                   disabled={saving}
                 />
               </CardContent>
