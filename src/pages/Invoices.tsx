@@ -164,12 +164,13 @@ const Invoices = () => {
                   <TableRow>
                     <TableHead>Nr.</TableHead>
                     <TableHead>Kunde</TableHead>
-                    <TableHead>Datum</TableHead>
-                    <TableHead>Fällig</TableHead>
-                    <TableHead>Kategorie</TableHead>
-                    <TableHead className="text-right">Betrag</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-10" />
+                     <TableHead>Datum</TableHead>
+                     <TableHead>Fällig</TableHead>
+                     <TableHead>Kategorie</TableHead>
+                     <TableHead className="text-right">Betrag</TableHead>
+                     <TableHead>Status</TableHead>
+                     <TableHead className="w-10" />
+                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
