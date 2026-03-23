@@ -224,6 +224,10 @@ export function DocumentPreviewPanel({
         onOpenChange={setFullscreenOpen}
         pdfUrl={pdfUrl || ''}
         title={`${docLabel} ${invoiceNumber}`}
+        onSend={(currentStatus === 'approved' || currentStatus === 'sent') ? () => {
+          setFullscreenOpen(false);
+          setSendDialogOpen(true);
+        } : undefined}
       />
     </div>
   );

@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { PdfViewer } from '@/components/receipts/PdfViewer';
 import { supabase } from '@/integrations/supabase/client';
-import { Download, ExternalLink, Loader2, Printer } from 'lucide-react';
+import { Download, ExternalLink, Loader2, Printer, Send } from 'lucide-react';
 
 interface PdfPreviewDialogProps {
   open: boolean;
@@ -12,9 +12,10 @@ interface PdfPreviewDialogProps {
   pdfUrl?: string | null;
   invoiceNumber?: string;
   title?: string;
+  onSend?: () => void;
 }
 
-export function PdfPreviewDialog({ open, onOpenChange, pdfStoragePath, pdfUrl: directPdfUrl, invoiceNumber, title }: PdfPreviewDialogProps) {
+export function PdfPreviewDialog({ open, onOpenChange, pdfStoragePath, pdfUrl: directPdfUrl, invoiceNumber, title, onSend }: PdfPreviewDialogProps) {
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -75,6 +76,12 @@ export function PdfPreviewDialog({ open, onOpenChange, pdfStoragePath, pdfUrl: d
               {displayTitle}
             </DialogTitle>
             <div className="flex items-center gap-2 flex-shrink-0">
+              {onSend && (
+                <Button variant="default" size="sm" onClick={onSend} disabled={!resolvedUrl}>
+                  <Send className="h-4 w-4 mr-2" />
+                  Versenden
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={handlePrint} disabled={!resolvedUrl}>
                 <Printer className="h-4 w-4 mr-2" />
                 Drucken
