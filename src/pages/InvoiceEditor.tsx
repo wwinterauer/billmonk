@@ -442,22 +442,6 @@ const InvoiceEditor = () => {
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-6">
           {/* Left: Form */}
           <div className="space-y-6">
-          <Button variant="ghost" size="icon" onClick={() => navigate(backPath)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              {isEdit ? `${docLabel} bearbeiten` : `Neue${documentType === 'invoice' ? ' Rechnung' : documentType === 'quote' ? 's Angebot' : documentType === 'order_confirmation' ? ' Auftragsbestätigung' : documentType === 'delivery_note' ? 'r Lieferschein' : ' ' + docLabel}`}
-            </h1>
-            <p className="text-muted-foreground">{invoiceNumber || '–'}</p>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            {isSmallBusiness && (
-              <Badge variant="secondary">Kleinunternehmer</Badge>
-            )}
-            <Badge variant="outline">{docLabel}</Badge>
-          </div>
-        </div>
 
         {/* Meta */}
         <Card>
