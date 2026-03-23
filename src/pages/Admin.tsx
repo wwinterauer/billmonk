@@ -85,6 +85,10 @@ export default function Admin() {
               <Megaphone className="h-4 w-4" />
               Announcements
             </TabsTrigger>
+            <TabsTrigger value="support" className="gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Support
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
