@@ -110,6 +110,8 @@ const InvoiceEditor = () => {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [category, setCategory] = useState('');
   const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(id && id !== 'new' ? id : null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [currentStatus, setCurrentStatus] = useState('draft');
 
   // Shipping address
   const [shippingMode, setShippingMode] = useState<'same' | 'customer' | 'custom'>('same');
