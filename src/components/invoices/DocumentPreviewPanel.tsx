@@ -218,9 +218,11 @@ export function DocumentPreviewPanel({
         open={sendDialogOpen}
         onOpenChange={setSendDialogOpen}
         invoiceNumber={invoiceNumber}
+        invoiceId={invoiceId}
         documentType={documentType}
         customerEmail={customerEmail || ''}
         pdfUrl={pdfUrl || ''}
+        pdfStoragePath={pdfStoragePath}
         onSent={handleSendComplete}
       />
       {/* Fullscreen PDF dialog */}
