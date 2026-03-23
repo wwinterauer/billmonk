@@ -79,7 +79,7 @@ const Account = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['profile', 'address', 'security', 'subscription'];
+  const validTabs = ['profile', 'address', 'security', 'subscription', 'support'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'profile';
 
   const [activeTab, setActiveTab] = useState(initialTab);
