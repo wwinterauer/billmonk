@@ -14,9 +14,11 @@ interface DocumentPreviewPanelProps {
   documentType: string;
   currentStatus: string;
   pdfUrl: string | null;
+  pdfStoragePath?: string | null;
   customerEmail?: string | null;
   onStatusChange: (status: string) => void;
   onPdfGenerated: (url: string) => void;
+  onPdfStoragePathChange?: (path: string) => void;
   disabled?: boolean;
 }
 
