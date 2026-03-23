@@ -6,12 +6,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { MessageSquare, Send, Loader2, HelpCircle, Search } from 'lucide-react';
+import { MessageSquare, Send, Loader2, HelpCircle, Search, ZoomIn } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 export function SupportContactForm() {
   const { user } = useAuth();
@@ -20,7 +21,12 @@ export function SupportContactForm() {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [faqSearch, setFaqSearch] = useState('');
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
+  const getPublicUrl = (path: string) => {
+    const { data } = supabase.storage.from('faq-images').getPublicUrl(path);
+    return data.publicUrl;
+  };
   const { data: tickets, refetch } = useQuery({
     queryKey: ['support-tickets', user?.id],
     queryFn: async () => {
@@ -137,8 +143,30 @@ export function SupportContactForm() {
                           <AccordionTrigger className="text-sm font-medium hover:no-underline py-3">
                             {faq.question}
                           </AccordionTrigger>
-                          <AccordionContent className="text-sm text-muted-foreground whitespace-pre-wrap pb-3">
-                            {faq.answer}
+                          <AccordionContent className="text-sm text-muted-foreground whitespace-pre-wrap pb-3 space-y-3">
+                            <p>{faq.answer}</p>
+                            {faq.images && faq.images.length > 0 && (
+                              <div className="grid grid-cols-2 gap-2 mt-2">
+                                {faq.images.map((imgPath: string, idx: number) => (
+                                  <button
+                                    key={imgPath}
+                                    type="button"
+                                    onClick={() => setLightboxImage(getPublicUrl(imgPath))}
+                                    className="relative group rounded-lg overflow-hidden border cursor-pointer"
+                                  >
+                                    <img
+                                      src={getPublicUrl(imgPath)}
+                                      alt={`${faq.question} - Bild ${idx + 1}`}
+                                      className="w-full h-32 object-cover"
+                                      loading="lazy"
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                      <ZoomIn className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </AccordionContent>
                         </AccordionItem>
                       ))}
@@ -222,6 +250,19 @@ export function SupportContactForm() {
           </CardContent>
         </Card>
       )}
+
+      {/* Image Lightbox */}
+      <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
+        <DialogContent className="sm:max-w-3xl p-2">
+          {lightboxImage && (
+            <img
+              src={lightboxImage}
+              alt="FAQ Screenshot"
+              className="w-full h-auto rounded-lg"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

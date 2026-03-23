@@ -1207,6 +1207,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          images: string[] | null
           is_published: boolean
           question: string
           sort_order: number | null
@@ -1218,6 +1219,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          images?: string[] | null
           is_published?: boolean
           question: string
           sort_order?: number | null
@@ -1229,6 +1231,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          images?: string[] | null
           is_published?: boolean
           question?: string
           sort_order?: number | null
