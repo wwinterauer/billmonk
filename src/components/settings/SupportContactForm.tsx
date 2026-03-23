@@ -21,7 +21,12 @@ export function SupportContactForm() {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [faqSearch, setFaqSearch] = useState('');
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
+  const getPublicUrl = (path: string) => {
+    const { data } = supabase.storage.from('faq-images').getPublicUrl(path);
+    return data.publicUrl;
+  };
   const { data: tickets, refetch } = useQuery({
     queryKey: ['support-tickets', user?.id],
     queryFn: async () => {
