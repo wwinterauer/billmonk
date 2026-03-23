@@ -1,89 +1,60 @@
 
 
-# Admin Dashboard Erweiterungen — Plan
+# User-Detail-Ansicht im Admin Dashboard
 
 ## Überblick
 
-Vier neue Tabs im Admin Dashboard, die schrittweise implementiert werden:
+Die User-Tabelle wird erweitert um mehr Spalten, Filter und eine klickbare Detail-Ansicht (Dialog) pro User. Der Admin sieht auf einen Blick alle relevanten Infos und kann per Klick auf eine Zeile das vollständige Profil öffnen.
 
-1. **System Health** — Fehler-Monitor für fehlgeschlagene Extraktionen und E-Mail-Syncs
-2. **Feature-Nutzung** — Welche Features wie stark genutzt werden (pro User)
-3. **Aktivitäts-Feed** — Chronologischer Feed der letzten Plattform-Ereignisse
-4. **Announcements** — Banner-Nachrichten an alle Nutzer
+## Backend: Edge Function `admin-users` erweitern
 
-## Schritt 1: System Health Tab
+Die bestehende SELECT-Query wird erweitert um alle Profil-Felder + aggregierte Daten:
 
-**Neue Komponente:** `src/components/admin/SystemHealth.tsx`
+**Zusätzliche Profil-Felder laden:**
+- `street, zip, city, country, phone, account_type, company_name, uid_number, onboarding_completed, newsletter_opt_in, subscription_status, subscription_end_date, stripe_product_id, avatar_url, receipt_credit, monthly_document_count, document_credit, admin_view_plan`
 
-- KPI-Karten: Fehlgeschlagene Extraktionen (receipts mit `status = 'error'`), E-Mail-Sync-Fehler (email_accounts mit `last_sync_status = 'error'`)
-- Tabelle der letzten fehlgeschlagenen Belege (Datum, User, Dateiname, Fehlerstatus)
-- Tabelle der E-Mail-Accounts mit Sync-Fehlern
+**Aggregierte Daten pro User** (separate Queries mit Service Role):
+- `receipts`: Gesamtanzahl Belege + Summe `amount_gross` (= Umsatz/Ausgaben)
+- `invoices`: Gesamtanzahl Rechnungen + Summe `total`
+- `support_tickets`: Offene Tickets count
 
-**Backend:** Neue Edge Function `admin-system-health` die mit Service Role diese Daten aggregiert (da RLS user-scoped ist)
+Diese werden als zusätzliche Maps zurückgegeben und im Frontend zusammengeführt.
 
-## Schritt 2: Feature-Nutzung Tab
+## Frontend: `UserManagement.tsx` überarbeiten
 
-**Neue Komponente:** `src/components/admin/FeatureUsage.tsx`
+### Tabelle erweitern
+Neue sichtbare Spalten:
+- **Kontotyp** (Privat/Firma/Verein)
+- **Abo-Status** (active/trialing/canceled/—)
+- **Onboarding** (✓/✗)
+- **Belege gesamt** (Gesamtanzahl, nicht nur monatlich)
+- **Umsatz** (Summe aller Beleg-Beträge, formatiert als EUR)
 
-- Aggregierte Statistiken aus bestehenden Tabellen:
-  - Belege insgesamt (receipts count)
-  - Bank-Import aktiv (bank_connections_live count)
-  - E-Mail-Import aktiv (email_accounts count)
-  - Cloud-Backup aktiv (cloud_connections count)
-  - Rechnungsmodul (invoices count)
-- KPI-Karten + Balkendiagramm
+Neue Filter:
+- **Abo-Status** (alle/aktiv/trial/gekündigt/keins)
+- **Kontotyp** (alle/privat/firma/verein)
+- **Onboarding** (alle/abgeschlossen/offen)
 
-**Backend:** Erweitere `admin-system-health` Edge Function um Feature-Nutzungsdaten
+### User-Detail-Dialog
+Klick auf eine Tabellenzeile öffnet einen `Dialog` mit allen Informationen in Sektionen:
 
-## Schritt 3: Aktivitäts-Feed
+1. **Persönliche Daten**: Name, E-Mail, Telefon, Avatar, Adresse (Straße, PLZ, Stadt, Land)
+2. **Unternehmen**: Kontotyp, Firmenname, UID-Nummer
+3. **Abonnement**: Plan, Abo-Status, Stripe-ID, Abo-Ende, Produkt-ID
+4. **Nutzung**: Belege diesen Monat, Belege gesamt, Beleg-Credits, Dokumente, Umsatz gesamt
+5. **Sonstiges**: Registriert am, Onboarding abgeschlossen, Newsletter, Offene Support-Tickets
 
-**Neue DB-Tabelle:** `admin_activity_log`
-- `id`, `event_type` (registration, upload, plan_change, cancellation), `user_id`, `user_email`, `details` (jsonb), `created_at`
-- RLS: SELECT nur für Admins via `has_role`
-- INSERT via Service Role (Edge Functions + DB Triggers)
+Innerhalb des Dialogs kann der Plan weiterhin per Select geändert werden.
 
-**Neue Komponente:** `src/components/admin/ActivityFeed.tsx`
-- Chronologische Liste der letzten 50 Events mit Icons pro Typ
-- Filter nach Event-Typ
+### CSV-Export erweitern
+Alle neuen Felder werden im CSV-Export berücksichtigt.
 
-**DB Trigger:** Bei `INSERT` auf `profiles` → loggt "registration" Event
+## Änderungen
 
-## Schritt 4: Announcement-Banner
+| Datei | Änderung |
+|---|---|
+| `supabase/functions/admin-users/index.ts` | Erweiterte SELECT + Aggregations-Queries |
+| `src/components/admin/UserManagement.tsx` | Neue Spalten, Filter, Detail-Dialog |
 
-**Neue DB-Tabelle:** `announcements`
-- `id`, `title`, `message`, `type` (info/warning/maintenance), `is_active`, `expires_at`, `created_at`, `created_by`
-- RLS: SELECT für alle authentifizierten User, INSERT/UPDATE/DELETE nur für Admins
-
-**Neue Komponenten:**
-- `src/components/admin/AnnouncementManager.tsx` — CRUD im Admin Dashboard
-- `src/components/AnnouncementBanner.tsx` — Banner oben in der App (in DashboardLayout)
-
-## Änderungen an bestehenden Dateien
-
-- **`src/pages/Admin.tsx`** — 4 neue Tabs hinzufügen (System Health, Features, Aktivität, Announcements)
-- **`src/components/dashboard/DashboardLayout.tsx`** — AnnouncementBanner einbinden
-
-## DB-Migrationen
-
-```text
-1. Tabelle admin_activity_log + RLS (admin-only SELECT, service-role INSERT)
-2. Tabelle announcements + RLS (auth SELECT, admin INSERT/UPDATE/DELETE)  
-3. Trigger auf profiles für Registration-Events
-```
-
-## Neue Edge Function
-
-`admin-system-health/index.ts`:
-- Prüft Admin-Rolle (wie admin-users)
-- Queries: receipts mit status='error', email_accounts mit sync-errors, counts für Features
-- Returnt aggregierte Health + Usage Daten
-
-## Implementierungsreihenfolge
-
-1. DB-Migration (beide Tabellen + Trigger)
-2. Edge Function `admin-system-health`
-3. SystemHealth + FeatureUsage Komponenten
-4. ActivityFeed Komponente
-5. AnnouncementManager + AnnouncementBanner
-6. Admin.tsx + DashboardLayout updaten
+Keine DB-Migration nötig — alle Felder existieren bereits.
 
