@@ -643,6 +643,13 @@ const Account = () => {
               <SubscriptionSettings />
             </motion.div>
           </TabsContent>
+
+          {/* Support Tab */}
+          <TabsContent value="support">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+              <SupportContactForm />
+            </motion.div>
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
