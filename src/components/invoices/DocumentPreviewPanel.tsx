@@ -203,6 +203,13 @@ export function DocumentPreviewPanel({
         pdfUrl={pdfUrl || ''}
         onSent={handleSendComplete}
       />
+      {/* Fullscreen PDF dialog */}
+      <PdfPreviewDialog
+        open={fullscreenOpen}
+        onOpenChange={setFullscreenOpen}
+        pdfUrl={pdfUrl || ''}
+        title={`${docLabel} ${invoiceNumber}`}
+      />
     </div>
   );
 }
