@@ -87,7 +87,7 @@ export function SendDocumentDialog({
         <DialogHeader>
           <DialogTitle>{docLabel} versenden</DialogTitle>
           <DialogDescription>
-            Das PDF wird automatisch heruntergeladen. Hängen Sie es manuell an die E-Mail an.
+            Das PDF wird automatisch heruntergeladen. Bitte hängen Sie die heruntergeladene Datei manuell an die E-Mail an — automatisches Anhängen ist aus Sicherheitsgründen im Browser nicht möglich.
           </DialogDescription>
         </DialogHeader>
 
