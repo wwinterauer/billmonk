@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { PdfViewer } from '@/components/receipts/PdfViewer';
 import { supabase } from '@/integrations/supabase/client';
-import { Download, ExternalLink, Loader2, Printer } from 'lucide-react';
+import { Download, ExternalLink, Loader2, Printer, Send } from 'lucide-react';
 
 interface PdfPreviewDialogProps {
   open: boolean;
@@ -12,6 +12,7 @@ interface PdfPreviewDialogProps {
   pdfUrl?: string | null;
   invoiceNumber?: string;
   title?: string;
+  onSend?: () => void;
 }
 
 export function PdfPreviewDialog({ open, onOpenChange, pdfStoragePath, pdfUrl: directPdfUrl, invoiceNumber, title }: PdfPreviewDialogProps) {
