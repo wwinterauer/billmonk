@@ -891,20 +891,33 @@ const InvoiceEditor = () => {
         <div className="flex justify-end gap-3">
           <Button variant="outline" onClick={() => navigate(backPath)}>Abbrechen</Button>
           <Button
-            variant="secondary"
             disabled={!customerId || saving || lines.every(l => !l.description)}
-            onClick={() => handleSave(true)}
+            onClick={() => handleSave()}
           >
             <Save className="h-4 w-4 mr-2" />
-            Als Entwurf speichern
+            Speichern
           </Button>
-          <Button
-            disabled={!customerId || saving || lines.every(l => !l.description)}
-            onClick={() => handleSave(false)}
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Speichern & Versenden
-          </Button>
+        </div>
+          </div>
+
+          {/* Right: Preview Panel */}
+          <div className="hidden xl:block sticky top-6 h-[calc(100vh-120px)]">
+            <Card className="h-full">
+              <CardContent className="h-full p-4">
+                <DocumentPreviewPanel
+                  invoiceId={savedInvoiceId}
+                  invoiceNumber={invoiceNumber}
+                  documentType={documentType}
+                  currentStatus={currentStatus}
+                  pdfUrl={previewPdfUrl}
+                  customerEmail={(selectedCustomer as any)?.email}
+                  onStatusChange={setCurrentStatus}
+                  onPdfGenerated={setPreviewPdfUrl}
+                  disabled={saving}
+                />
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </DashboardLayout>
