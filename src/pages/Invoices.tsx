@@ -33,6 +33,7 @@ const Invoices = () => {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [taxExportOpen, setTaxExportOpen] = useState(false);
+  const [pdfPreview, setPdfPreview] = useState<{ open: boolean; path: string | null; number: string }>({ open: false, path: null, number: '' });
   const navigate = useNavigate();
 
   // Filter only invoices (not quotes/order_confirmations)
