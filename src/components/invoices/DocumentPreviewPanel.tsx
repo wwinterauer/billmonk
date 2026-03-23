@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PdfViewer } from '@/components/receipts/PdfViewer';
+import { PdfPreviewDialog } from './PdfPreviewDialog';
 import { SendDocumentDialog } from './SendDocumentDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, CheckCircle, Send, Printer, Download, Loader2, FileText } from 'lucide-react';
+import { Eye, CheckCircle, Send, Printer, Download, Loader2, FileText, Maximize2 } from 'lucide-react';
 
 interface DocumentPreviewPanelProps {
   invoiceId: string | null;
