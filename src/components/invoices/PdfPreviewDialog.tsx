@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { PdfViewer } from '@/components/receipts/PdfViewer';
 import { supabase } from '@/integrations/supabase/client';
-import { Printer, Download, Loader2 } from 'lucide-react';
+import { Download, ExternalLink, Loader2, Printer } from 'lucide-react';
 
 interface PdfPreviewDialogProps {
   open: boolean;
@@ -56,29 +56,61 @@ export function PdfPreviewDialog({ open, onOpenChange, pdfStoragePath, pdfUrl: d
     a.click();
   };
 
+  const handleOpenInNewTab = () => {
+    if (resolvedUrl) {
+      window.open(resolvedUrl, '_blank');
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl h-[80vh] flex flex-col">
-        <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle>{displayTitle}</DialogTitle>
-          <div className="flex gap-1">
-            <Button size="sm" variant="ghost" onClick={handlePrint} disabled={!resolvedUrl}>
-              <Printer className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={handleDownload} disabled={!resolvedUrl}>
-              <Download className="h-4 w-4" />
-            </Button>
+      <DialogContent
+        className="max-w-[98vw] w-[98vw] h-[98vh] max-h-[98vh] p-0 gap-0 flex flex-col overflow-hidden"
+        style={{ maxWidth: '98vw', width: '98vw', height: '98vh', maxHeight: '98vh' }}
+      >
+        {/* Header */}
+        <DialogHeader className="px-6 py-3 border-b flex-shrink-0 pr-14">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-lg font-semibold truncate mr-4">
+              {displayTitle}
+            </DialogTitle>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button variant="outline" size="sm" onClick={handlePrint} disabled={!resolvedUrl}>
+                <Printer className="h-4 w-4 mr-2" />
+                Drucken
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDownload} disabled={!resolvedUrl}>
+                <Download className="h-4 w-4 mr-2" />
+                Herunterladen
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleOpenInNewTab} disabled={!resolvedUrl}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                In neuem Tab
+              </Button>
+            </div>
           </div>
         </DialogHeader>
-        <div className="flex-1 min-h-0">
+
+        {/* Content */}
+        <div className="flex-1 bg-muted/50 flex flex-col overflow-hidden">
           {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="flex-1 flex items-center justify-center">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
             </div>
           ) : resolvedUrl ? (
-            <PdfViewer url={resolvedUrl} className="h-full" />
+            <div className="flex-1 p-4 overflow-auto flex items-center justify-center">
+              <div className="w-full h-full" style={{ minHeight: 'calc(98vh - 80px)' }}>
+                <PdfViewer
+                  url={resolvedUrl}
+                  fileName={`${downloadName}.pdf`}
+                  className="h-full"
+                />
+              </div>
+            </div>
           ) : (
-            <p className="text-center text-muted-foreground py-12">Kein PDF verfügbar</p>
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-muted-foreground">Kein PDF verfügbar</p>
+            </div>
           )}
         </div>
       </DialogContent>
