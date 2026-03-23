@@ -14,9 +14,11 @@ interface DocumentPreviewPanelProps {
   documentType: string;
   currentStatus: string;
   pdfUrl: string | null;
+  pdfStoragePath?: string | null;
   customerEmail?: string | null;
   onStatusChange: (status: string) => void;
   onPdfGenerated: (url: string) => void;
+  onPdfStoragePathChange?: (path: string) => void;
   disabled?: boolean;
 }
 
@@ -40,9 +42,11 @@ export function DocumentPreviewPanel({
   documentType,
   currentStatus,
   pdfUrl,
+  pdfStoragePath,
   customerEmail,
   onStatusChange,
   onPdfGenerated,
+  onPdfStoragePathChange,
   disabled,
 }: DocumentPreviewPanelProps) {
   const { toast } = useToast();
@@ -70,6 +74,7 @@ export function DocumentPreviewPanel({
         .single();
 
       if (inv?.pdf_storage_path) {
+        onPdfStoragePathChange?.(inv.pdf_storage_path);
         const { data: signedData } = await supabase.storage
           .from('invoices')
           .createSignedUrl(inv.pdf_storage_path, 3600);
@@ -213,9 +218,11 @@ export function DocumentPreviewPanel({
         open={sendDialogOpen}
         onOpenChange={setSendDialogOpen}
         invoiceNumber={invoiceNumber}
+        invoiceId={invoiceId}
         documentType={documentType}
         customerEmail={customerEmail || ''}
         pdfUrl={pdfUrl || ''}
+        pdfStoragePath={pdfStoragePath}
         onSent={handleSendComplete}
       />
       {/* Fullscreen PDF dialog */}

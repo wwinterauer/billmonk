@@ -113,6 +113,7 @@ const InvoiceEditor = () => {
   const [category, setCategory] = useState('');
   const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(id && id !== 'new' ? id : null);
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [pdfStoragePath, setPdfStoragePath] = useState<string | null>(null);
   const [currentStatus, setCurrentStatus] = useState('draft');
 
   // Shipping address
@@ -233,6 +234,7 @@ const InvoiceEditor = () => {
           }
           // Load existing PDF
           if (inv.pdf_storage_path) {
+            setPdfStoragePath(inv.pdf_storage_path);
             const { data: signedData } = await supabase.storage
               .from('invoices')
               .createSignedUrl(inv.pdf_storage_path, 3600);
@@ -910,9 +912,11 @@ const InvoiceEditor = () => {
                   documentType={documentType}
                   currentStatus={currentStatus}
                   pdfUrl={previewPdfUrl}
+                  pdfStoragePath={pdfStoragePath}
                   customerEmail={(selectedCustomer as any)?.email}
                   onStatusChange={setCurrentStatus}
-                  onPdfGenerated={setPreviewPdfUrl}
+                  onPdfGenerated={(url) => setPreviewPdfUrl(url)}
+                  onPdfStoragePathChange={setPdfStoragePath}
                   disabled={saving}
                 />
               </CardContent>

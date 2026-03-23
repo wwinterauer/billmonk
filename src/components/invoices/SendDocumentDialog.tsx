@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Mail, Link2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Mail, Link2, Send, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const DOC_LABELS: Record<string, string> = {
   invoice: 'Rechnung',
@@ -14,13 +17,23 @@ const DOC_LABELS: Record<string, string> = {
   delivery_note: 'Lieferschein',
 };
 
+interface EmailAccount {
+  id: string;
+  email_address: string;
+  display_name: string | null;
+  oauth_provider: string | null;
+  provider: string | null;
+}
+
 interface SendDocumentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   invoiceNumber: string;
+  invoiceId?: string | null;
   documentType: string;
   customerEmail: string;
   pdfUrl: string;
+  pdfStoragePath?: string | null;
   onSent: () => void;
 }
 
@@ -28,9 +41,11 @@ export function SendDocumentDialog({
   open,
   onOpenChange,
   invoiceNumber,
+  invoiceId,
   documentType,
   customerEmail,
   pdfUrl,
+  pdfStoragePath,
   onSent,
 }: SendDocumentDialogProps) {
   const { toast } = useToast();
@@ -41,6 +56,34 @@ export function SendDocumentDialog({
   const [body, setBody] = useState(
     `Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie ${docLabel === 'Rechnung' ? 'unsere' : documentType === 'quote' ? 'unser' : 'unsere'} ${docLabel} Nr. ${invoiceNumber}.\n\nMit freundlichen Grüßen`
   );
+  const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [sending, setSending] = useState(false);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+
+  // Load email accounts
+  useEffect(() => {
+    if (!open) return;
+    
+    const loadAccounts = async () => {
+      setLoadingAccounts(true);
+      const { data } = await supabase
+        .from('email_accounts')
+        .select('id, email_address, display_name, oauth_provider, provider')
+        .eq('is_active', true);
+      
+      if (data && data.length > 0) {
+        setAccounts(data);
+        setSelectedAccountId(data[0].id);
+      } else {
+        setAccounts([]);
+        setSelectedAccountId('');
+      }
+      setLoadingAccounts(false);
+    };
+
+    loadAccounts();
+  }, [open]);
 
   // Reset fields when dialog opens
   const handleOpenChange = (newOpen: boolean) => {
@@ -54,8 +97,37 @@ export function SendDocumentDialog({
     onOpenChange(newOpen);
   };
 
+  const handleDirectSend = async () => {
+    if (!selectedAccountId || !email || !pdfStoragePath) return;
+
+    setSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-document-email', {
+        body: {
+          accountId: selectedAccountId,
+          recipientEmail: email,
+          subject,
+          body,
+          pdfStoragePath,
+          invoiceId,
+          fileName: `${invoiceNumber}.pdf`,
+        },
+      });
+
+      if (error) throw error;
+      if (data && !data.success) throw new Error(data.error);
+
+      toast({ title: 'E-Mail versendet', description: `${docLabel} wurde erfolgreich an ${email} gesendet.` });
+      onSent();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: 'Fehler beim Versand', description: err.message || 'E-Mail konnte nicht gesendet werden.', variant: 'destructive' });
+    } finally {
+      setSending(false);
+    }
+  };
+
   const handleOpenMailClient = () => {
-    // Trigger download and mail client directly from the user click
     if (pdfUrl) {
       const a = document.createElement('a');
       a.href = pdfUrl;
@@ -84,17 +156,50 @@ export function SendDocumentDialog({
     }
   };
 
+  const canDirectSend = accounts.length > 0 && selectedAccountId && pdfStoragePath;
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{docLabel} versenden</DialogTitle>
           <DialogDescription>
-            Das PDF wird automatisch heruntergeladen. Bitte hängen Sie die heruntergeladene Datei manuell an die E-Mail an — automatisches Anhängen ist aus Sicherheitsgründen im Browser nicht möglich.
+            {canDirectSend
+              ? `${docLabel} wird mit dem PDF als Anhang direkt über Ihr E-Mail-Konto gesendet.`
+              : 'Das PDF wird heruntergeladen. Bitte hängen Sie es manuell an die E-Mail an.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Account selector */}
+          {accounts.length > 0 && pdfStoragePath && (
+            <div className="space-y-2">
+              <Label>Senden über</Label>
+              <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="E-Mail-Konto wählen" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map(acc => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.email_address}
+                      {acc.oauth_provider === 'gmail' ? ' (Gmail)' : acc.provider ? ` (${acc.provider})` : ' (IMAP)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {!pdfStoragePath && accounts.length > 0 && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Bitte generieren Sie zuerst die PDF-Vorschau, um direkt versenden zu können.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-2">
             <Label>Empfänger</Label>
             <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="E-Mail-Adresse" />
@@ -115,10 +220,16 @@ export function SendDocumentDialog({
               <Link2 className="h-4 w-4 mr-1" />
               Link kopieren
             </Button>
-            <Button onClick={handleOpenMailClient} disabled={!email}>
+            <Button variant="outline" onClick={handleOpenMailClient} disabled={!email}>
               <Mail className="h-4 w-4 mr-2" />
-              In Mail-App öffnen
+              Mail-App
             </Button>
+            {canDirectSend && (
+              <Button onClick={handleDirectSend} disabled={!email || sending}>
+                {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                Direkt versenden
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
