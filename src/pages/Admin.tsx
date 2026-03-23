@@ -90,6 +90,10 @@ export default function Admin() {
               <MessageSquare className="h-4 w-4" />
               Support
             </TabsTrigger>
+            <TabsTrigger value="faq" className="gap-2">
+              <HelpCircle className="h-4 w-4" />
+              FAQ
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
