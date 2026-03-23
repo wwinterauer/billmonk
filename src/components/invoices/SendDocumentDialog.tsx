@@ -55,7 +55,7 @@ export function SendDocumentDialog({
   };
 
   const handleOpenMailClient = () => {
-    // Download PDF FIRST, then open mail client after a short delay
+    // Trigger download and mail client directly from the user click
     if (pdfUrl) {
       const a = document.createElement('a');
       a.href = pdfUrl;
@@ -65,13 +65,16 @@ export function SendDocumentDialog({
       document.body.removeChild(a);
     }
 
-    // Small delay so download starts before navigation
-    setTimeout(() => {
-      const mailtoUrl = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      window.open(mailtoUrl, '_blank');
-      onSent();
-      onOpenChange(false);
-    }, 500);
+    const mailtoUrl = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const mailLink = document.createElement('a');
+    mailLink.href = mailtoUrl;
+    mailLink.style.display = 'none';
+    document.body.appendChild(mailLink);
+    mailLink.click();
+    document.body.removeChild(mailLink);
+
+    onSent();
+    onOpenChange(false);
   };
 
   const handleCopyLink = async () => {
