@@ -9,7 +9,8 @@ import { SystemHealth } from '@/components/admin/SystemHealth';
 import { FeatureUsage } from '@/components/admin/FeatureUsage';
 import { ActivityFeed } from '@/components/admin/ActivityFeed';
 import { AnnouncementManager } from '@/components/admin/AnnouncementManager';
-import { Shield, Users, CreditCard, BarChart3, Mail, HeartPulse, Blocks, Activity, Megaphone } from 'lucide-react';
+import { SupportManagement } from '@/components/admin/SupportManagement';
+import { Shield, Users, CreditCard, BarChart3, Mail, HeartPulse, Blocks, Activity, Megaphone, MessageSquare } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Admin() {
