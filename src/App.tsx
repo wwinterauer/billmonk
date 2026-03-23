@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/admin/AdminRoute";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { CameraButton } from "@/components/camera/CameraButton";
 import { CookieBanner } from "@/components/CookieBanner";
