@@ -55,10 +55,7 @@ export function SendDocumentDialog({
   };
 
   const handleOpenMailClient = () => {
-    const mailtoUrl = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.open(mailtoUrl, '_self');
-
-    // Auto-download PDF so user can attach it
+    // Download PDF FIRST, then open mail client after a short delay
     if (pdfUrl) {
       const a = document.createElement('a');
       a.href = pdfUrl;
@@ -68,8 +65,13 @@ export function SendDocumentDialog({
       document.body.removeChild(a);
     }
 
-    onSent();
-    onOpenChange(false);
+    // Small delay so download starts before navigation
+    setTimeout(() => {
+      const mailtoUrl = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.open(mailtoUrl, '_blank');
+      onSent();
+      onOpenChange(false);
+    }, 500);
   };
 
   const handleCopyLink = async () => {
