@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/admin/AdminRoute";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { CameraButton } from "@/components/camera/CameraButton";
 import { CookieBanner } from "@/components/CookieBanner";
@@ -33,6 +34,8 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import PricingPage from "./pages/PricingPage";
+import Admin from "./pages/Admin";
+import { PageTracker } from "./components/PageTracker";
 
 const queryClient = new QueryClient();
 
@@ -196,8 +199,17 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/datenschutz" element={<Datenschutz />} />
+            <Route 
+              path="/admin" 
+              element={
+                <AdminRoute>
+                  <Admin />
+                </AdminRoute>
+              } 
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <PageTracker />
           <InstallPrompt />
           <CameraButton />
           <CookieBanner />
