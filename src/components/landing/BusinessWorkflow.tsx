@@ -107,11 +107,7 @@ export function BusinessWorkflow() {
         </div>
 
         {/* Extra info */}
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        <div
           className="mt-12 text-center"
         >
           <p className="text-sm text-muted-foreground max-w-lg mx-auto">
