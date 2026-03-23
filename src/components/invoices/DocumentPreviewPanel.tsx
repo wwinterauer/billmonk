@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PdfViewer } from '@/components/receipts/PdfViewer';
+import { PdfPreviewDialog } from './PdfPreviewDialog';
 import { SendDocumentDialog } from './SendDocumentDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, CheckCircle, Send, Printer, Download, Loader2, FileText } from 'lucide-react';
+import { Eye, CheckCircle, Send, Printer, Download, Loader2, FileText, Maximize2 } from 'lucide-react';
 
 interface DocumentPreviewPanelProps {
   invoiceId: string | null;
@@ -47,6 +48,7 @@ export function DocumentPreviewPanel({
   const { toast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
 
   const docLabel = DOC_LABELS[documentType] || 'Dokument';
   const statusInfo = STATUS_LABELS[currentStatus] || STATUS_LABELS.draft;
@@ -162,10 +164,13 @@ export function DocumentPreviewPanel({
 
         {pdfUrl && (
           <>
-            <Button size="sm" variant="ghost" onClick={handlePrint}>
+            <Button size="sm" variant="ghost" onClick={() => setFullscreenOpen(true)} title="Vollbild">
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="ghost" onClick={handlePrint} title="Drucken">
               <Printer className="h-4 w-4" />
             </Button>
-            <Button size="sm" variant="ghost" onClick={handleDownload}>
+            <Button size="sm" variant="ghost" onClick={handleDownload} title="Herunterladen">
               <Download className="h-4 w-4" />
             </Button>
           </>
@@ -197,6 +202,13 @@ export function DocumentPreviewPanel({
         customerEmail={customerEmail || ''}
         pdfUrl={pdfUrl || ''}
         onSent={handleSendComplete}
+      />
+      {/* Fullscreen PDF dialog */}
+      <PdfPreviewDialog
+        open={fullscreenOpen}
+        onOpenChange={setFullscreenOpen}
+        pdfUrl={pdfUrl || ''}
+        title={`${docLabel} ${invoiceNumber}`}
       />
     </div>
   );
