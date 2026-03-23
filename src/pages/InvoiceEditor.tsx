@@ -220,6 +220,7 @@ const InvoiceEditor = () => {
           setDiscountDays(inv.discount_days || 0);
           setRabattPercent(inv.rabatt_percent || 0);
           setDeliveryTime(inv.delivery_time || '');
+          setCurrentStatus(inv.status || 'draft');
           if (inv.shipping_address_mode === 'custom') {
             setCustomShipping({
               street: inv.shipping_street || '',
@@ -227,6 +228,15 @@ const InvoiceEditor = () => {
               city: inv.shipping_city || '',
               country: inv.shipping_country || 'AT',
             });
+          }
+          // Load existing PDF
+          if (inv.pdf_storage_path) {
+            const { data: signedData } = await supabase.storage
+              .from('invoices')
+              .createSignedUrl(inv.pdf_storage_path, 3600);
+            if (signedData?.signedUrl) {
+              setPreviewPdfUrl(signedData.signedUrl);
+            }
           }
         }
 
