@@ -10,7 +10,8 @@ import { FeatureUsage } from '@/components/admin/FeatureUsage';
 import { ActivityFeed } from '@/components/admin/ActivityFeed';
 import { AnnouncementManager } from '@/components/admin/AnnouncementManager';
 import { SupportManagement } from '@/components/admin/SupportManagement';
-import { Shield, Users, CreditCard, BarChart3, Mail, HeartPulse, Blocks, Activity, Megaphone, MessageSquare } from 'lucide-react';
+import { FAQManagement } from '@/components/admin/FAQManagement';
+import { Shield, Users, CreditCard, BarChart3, Mail, HeartPulse, Blocks, Activity, Megaphone, MessageSquare, HelpCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Admin() {
