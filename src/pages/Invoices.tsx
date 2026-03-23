@@ -314,6 +314,12 @@ const Invoices = () => {
         onOpenChange={setTaxExportOpen}
         defaultBookingType="income"
       />
+      <PdfPreviewDialog
+        open={pdfPreview.open}
+        onOpenChange={(open) => setPdfPreview(p => ({ ...p, open }))}
+        pdfStoragePath={pdfPreview.path}
+        invoiceNumber={pdfPreview.number}
+      />
     </DashboardLayout>
   );
 };
