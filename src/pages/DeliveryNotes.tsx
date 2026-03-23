@@ -97,8 +97,9 @@ const DeliveryNotes = () => {
                       <TableHead>Kunde</TableHead>
                       <TableHead>Datum</TableHead>
                       <TableHead>Lieferzeit</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-10" />
+                       <TableHead>Status</TableHead>
+                       <TableHead className="w-10" />
+                       <TableHead className="w-10" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
