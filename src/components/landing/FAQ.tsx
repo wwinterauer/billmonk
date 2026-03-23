@@ -50,7 +50,7 @@ export function FAQ() {
           <p className="text-lg text-muted-foreground">
             Alles was du wissen musst – kurz und ehrlich
           </p>
-        </motion.div>
+        </div>
 
         <motion.div
           initial={{ opacity: 0, y: 16 }}
