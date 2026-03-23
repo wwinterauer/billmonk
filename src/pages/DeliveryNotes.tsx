@@ -23,6 +23,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
 const DeliveryNotes = () => {
   const { invoices, loading, updateInvoiceStatus, deleteInvoice, copyInvoice, convertDocument } = useInvoices();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [pdfPreview, setPdfPreview] = useState<{ open: boolean; path: string | null; number: string }>({ open: false, path: null, number: '' });
   const navigate = useNavigate();
 
   const deliveryNotes = useMemo(() => {
