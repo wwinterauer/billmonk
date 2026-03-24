@@ -4,12 +4,48 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, Send, Loader2, Trash2, Bug, Lightbulb, CheckCircle2, XCircle, Gift } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { MessageSquare, Send, Loader2, Trash2, Bug, Lightbulb, CheckCircle2, XCircle, Gift, ZoomIn } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
+
+function TicketImages({ images, onImageClick }: { images: string[]; onImageClick: (url: string) => void }) {
+  const [urls, setUrls] = useState<Record<string, string>>({});
+
+  useState(() => {
+    images.forEach(async (path) => {
+      const { data } = await supabase.storage.from('support-images').createSignedUrl(path, 3600);
+      if (data?.signedUrl) {
+        setUrls(prev => ({ ...prev, [path]: data.signedUrl }));
+      }
+    });
+  });
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {images.map((path) => (
+        urls[path] ? (
+          <button
+            key={path}
+            type="button"
+            onClick={() => onImageClick(urls[path])}
+            className="relative group w-16 h-16 rounded-lg overflow-hidden border cursor-pointer"
+          >
+            <img src={urls[path]} alt="Screenshot" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+              <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+            </div>
+          </button>
+        ) : (
+          <div key={path} className="w-16 h-16 rounded-lg border bg-muted animate-pulse" />
+        )
+      ))}
+    </div>
+  );
+}
 
 export function SupportManagement() {
   const { user } = useAuth();
@@ -21,6 +57,7 @@ export function SupportManagement() {
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [rewardingId, setRewardingId] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const { data: tickets, isLoading } = useQuery({
     queryKey: ['admin-support-tickets'],
@@ -166,12 +203,12 @@ export function SupportManagement() {
                         <span className="text-sm font-medium">{ticket.subject}</span>
                         <span className="text-xs text-muted-foreground">von {ticket.user_email}</span>
                         {ticket.ticket_type === 'bug' && (
-                          <Badge variant="outline" className="text-xs gap-1 border-red-300 text-red-600">
+                          <Badge variant="outline" className="text-xs gap-1 border-destructive/30 text-destructive">
                             <Bug className="h-3 w-3" /> Bug
                           </Badge>
                         )}
                         {ticket.ticket_type === 'feature' && (
-                          <Badge variant="outline" className="text-xs gap-1 border-blue-300 text-blue-600">
+                          <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">
                             <Lightbulb className="h-3 w-3" /> Feature
                           </Badge>
                         )}
@@ -196,6 +233,11 @@ export function SupportManagement() {
                     </div>
 
                     <p className="text-sm">{ticket.message}</p>
+
+                    {/* Ticket Images */}
+                    {ticket.images && ticket.images.length > 0 && (
+                      <TicketImages images={ticket.images} onImageClick={setLightboxImage} />
+                    )}
 
                     {ticket.admin_reply && (
                       <div className="p-2 rounded bg-muted text-sm">
@@ -233,13 +275,12 @@ export function SupportManagement() {
                         </>
                       )}
 
-                      {/* Reward buttons */}
                       {canReward && (
                         <>
                           <Button
                             size="sm"
                             variant="outline"
-                            className="text-green-600 border-green-300 hover:bg-green-50"
+                            className="border-green-500/30 text-green-600 hover:bg-green-500/10"
                             onClick={() => handleReward(ticket.id, 'approve')}
                             disabled={rewardingId === ticket.id}
                           >
@@ -279,6 +320,19 @@ export function SupportManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Image Lightbox */}
+      <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
+        <DialogContent className="sm:max-w-3xl p-2">
+          {lightboxImage && (
+            <img
+              src={lightboxImage}
+              alt="Support Screenshot"
+              className="w-full h-auto rounded-lg"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

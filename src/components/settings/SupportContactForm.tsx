@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, Send, Loader2, HelpCircle, Search, ZoomIn, Gift, Bug, Lightbulb } from 'lucide-react';
+import { MessageSquare, Send, Loader2, HelpCircle, Search, ZoomIn, Gift, Bug, Lightbulb, ImagePlus, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -40,11 +40,20 @@ export function SupportContactForm() {
   const [sending, setSending] = useState(false);
   const [faqSearch, setFaqSearch] = useState('');
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getPublicUrl = (path: string) => {
     const { data } = supabase.storage.from('faq-images').getPublicUrl(path);
     return data.publicUrl;
   };
+
+  const getSupportImageUrl = (path: string) => {
+    const { data } = supabase.storage.from('support-images').createSignedUrl(path, 3600);
+    return data?.signedUrl || '';
+  };
+
   const { data: tickets, refetch } = useQuery({
     queryKey: ['support-tickets', user?.id],
     queryFn: async () => {
@@ -73,10 +82,44 @@ export function SupportContactForm() {
     enabled: !!user,
   });
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const imageFiles = files.filter(f => f.type.startsWith('image/'));
+    if (imageFiles.length + selectedFiles.length > 5) {
+      toast({ title: 'Maximal 5 Bilder', variant: 'destructive' });
+      return;
+    }
+    const newFiles = [...selectedFiles, ...imageFiles].slice(0, 5);
+    setSelectedFiles(newFiles);
+    setPreviewUrls(newFiles.map(f => URL.createObjectURL(f)));
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    URL.revokeObjectURL(previewUrls[index]);
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
+    setSelectedFiles(newFiles);
+    setPreviewUrls(newFiles.map(f => URL.createObjectURL(f)));
+  };
+
+  const uploadImages = async (): Promise<string[]> => {
+    if (!user || selectedFiles.length === 0) return [];
+    const paths: string[] = [];
+    for (const file of selectedFiles) {
+      const ext = file.name.split('.').pop() || 'png';
+      const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error } = await supabase.storage.from('support-images').upload(path, file);
+      if (error) throw error;
+      paths.push(path);
+    }
+    return paths;
+  };
+
   const handleSubmit = async () => {
     if (!user || !subject.trim() || !message.trim() || !area) return;
     setSending(true);
     try {
+      const imagePaths = await uploadImages();
       const { error } = await supabase.from('support_tickets').insert({
         user_id: user.id,
         user_email: user.email || '',
@@ -84,12 +127,16 @@ export function SupportContactForm() {
         message: message.trim(),
         ticket_type: ticketType,
         area,
+        images: imagePaths,
       });
       if (error) throw error;
       setSubject('');
       setMessage('');
       setTicketType('bug');
       setArea('');
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+      setSelectedFiles([]);
+      setPreviewUrls([]);
       refetch();
       toast({ title: 'Nachricht gesendet', description: 'Wir melden uns so schnell wie möglich.' });
     } catch {
@@ -105,7 +152,6 @@ export function SupportContactForm() {
     closed: { label: 'Geschlossen', variant: 'outline' },
   };
 
-  // Filter FAQs by search term
   const searchLower = faqSearch.toLowerCase().trim();
   const filteredFaqs = searchLower
     ? (faqs || []).filter(
@@ -116,7 +162,6 @@ export function SupportContactForm() {
       )
     : (faqs || []);
 
-  // Group FAQs by category
   const groupedFaqs: Record<string, any[]> = {};
   for (const faq of filteredFaqs) {
     const cat = (faq as any).category || 'Allgemein';
@@ -274,13 +319,51 @@ export function SupportContactForm() {
               id="support-message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder={ticketType === 'bug' 
+              placeholder={ticketType === 'bug'
                 ? "Beschreibe den Fehler so genau wie möglich. Was hast du gemacht? Was ist passiert?"
                 : "Beschreibe deine Feature-Idee. Was soll die Funktion können?"
               }
               rows={5}
             />
           </div>
+
+          {/* Image Upload */}
+          <div className="space-y-2">
+            <Label>Screenshots (optional, max. 5)</Label>
+            <div className="flex flex-wrap gap-2">
+              {previewUrls.map((url, idx) => (
+                <div key={idx} className="relative group w-20 h-20 rounded-lg overflow-hidden border">
+                  <img src={url} alt={`Screenshot ${idx + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeFile(idx)}
+                    className="absolute top-0.5 right-0.5 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {selectedFiles.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-20 h-20 rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
+                >
+                  <ImagePlus className="h-5 w-5" />
+                  <span className="text-[10px]">Bild</span>
+                </button>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+          </div>
+
           <Button onClick={handleSubmit} disabled={sending || !subject.trim() || !message.trim() || !area}>
             {sending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
             Nachricht senden
@@ -333,6 +416,9 @@ export function SupportContactForm() {
                       <p className="text-xs text-muted-foreground">Bereich: {ticket.area}</p>
                     )}
                     <p className="text-sm text-muted-foreground">{ticket.message}</p>
+                    {ticket.images && ticket.images.length > 0 && (
+                      <TicketImages images={ticket.images} onImageClick={setLightboxImage} />
+                    )}
                     {ticket.admin_reply && (
                       <div className="mt-2 p-2 rounded bg-muted text-sm">
                         <p className="text-xs font-medium text-primary mb-1">Antwort vom Support:</p>
@@ -353,12 +439,47 @@ export function SupportContactForm() {
           {lightboxImage && (
             <img
               src={lightboxImage}
-              alt="FAQ Screenshot"
+              alt="Screenshot"
               className="w-full h-auto rounded-lg"
             />
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function TicketImages({ images, onImageClick }: { images: string[]; onImageClick: (url: string) => void }) {
+  const [urls, setUrls] = useState<Record<string, string>>({});
+
+  useState(() => {
+    images.forEach(async (path) => {
+      const { data } = await supabase.storage.from('support-images').createSignedUrl(path, 3600);
+      if (data?.signedUrl) {
+        setUrls(prev => ({ ...prev, [path]: data.signedUrl }));
+      }
+    });
+  });
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {images.map((path) => (
+        urls[path] ? (
+          <button
+            key={path}
+            type="button"
+            onClick={() => onImageClick(urls[path])}
+            className="relative group w-16 h-16 rounded-lg overflow-hidden border cursor-pointer"
+          >
+            <img src={urls[path]} alt="Screenshot" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+              <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+            </div>
+          </button>
+        ) : (
+          <div key={path} className="w-16 h-16 rounded-lg border bg-muted animate-pulse" />
+        )
+      ))}
     </div>
   );
 }
