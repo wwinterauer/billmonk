@@ -49,11 +49,6 @@ export function SupportContactForm() {
     return data.publicUrl;
   };
 
-  const getSupportImageUrl = (path: string) => {
-    const { data } = supabase.storage.from('support-images').createSignedUrl(path, 3600);
-    return data?.signedUrl || '';
-  };
-
   const { data: tickets, refetch } = useQuery({
     queryKey: ['support-tickets', user?.id],
     queryFn: async () => {
