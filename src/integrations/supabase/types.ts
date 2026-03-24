@@ -2303,6 +2303,7 @@ export type Database = {
           area: string | null
           created_at: string
           id: string
+          images: string[] | null
           message: string
           replied_at: string | null
           replied_by: string | null
@@ -2320,6 +2321,7 @@ export type Database = {
           area?: string | null
           created_at?: string
           id?: string
+          images?: string[] | null
           message: string
           replied_at?: string | null
           replied_by?: string | null
@@ -2337,6 +2339,7 @@ export type Database = {
           area?: string | null
           created_at?: string
           id?: string
+          images?: string[] | null
           message?: string
           replied_at?: string | null
           replied_by?: string | null
