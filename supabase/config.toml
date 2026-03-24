@@ -59,3 +59,6 @@ verify_jwt = false
 
 [functions.send-document-email]
 verify_jwt = false
+
+[functions.reward-support-credit]
+verify_jwt = false

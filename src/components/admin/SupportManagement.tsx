@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, Send, Loader2, Trash2 } from 'lucide-react';
+import { MessageSquare, Send, Loader2, Trash2, Bug, Lightbulb, CheckCircle2, XCircle, Gift } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -16,9 +16,11 @@ export function SupportManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
+  const [rewardingId, setRewardingId] = useState<string | null>(null);
 
   const { data: tickets, isLoading } = useQuery({
     queryKey: ['admin-support-tickets'],
@@ -32,9 +34,9 @@ export function SupportManagement() {
     },
   });
 
-  const filteredTickets = filter === 'all'
-    ? (tickets || [])
-    : (tickets || []).filter((t: any) => t.status === filter);
+  const filteredTickets = (tickets || [])
+    .filter((t: any) => filter === 'all' || t.status === filter)
+    .filter((t: any) => typeFilter === 'all' || t.ticket_type === typeFilter);
 
   const handleReply = async (ticketId: string) => {
     if (!replyText.trim() || !user) return;
@@ -77,6 +79,32 @@ export function SupportManagement() {
     if (!error) queryClient.invalidateQueries({ queryKey: ['admin-support-tickets'] });
   };
 
+  const handleReward = async (ticketId: string, action: 'approve' | 'reject') => {
+    setRewardingId(ticketId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase.functions.invoke('reward-support-credit', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: { ticketId, action },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      queryClient.invalidateQueries({ queryKey: ['admin-support-tickets'] });
+      toast({
+        title: action === 'approve' ? 'Anerkannt' : 'Abgelehnt',
+        description: data?.message || (action === 'approve' ? 'Gutschrift wurde angewendet' : 'Ticket wurde abgelehnt'),
+      });
+    } catch (err: any) {
+      toast({ title: 'Fehler', description: err.message, variant: 'destructive' });
+    } finally {
+      setRewardingId(null);
+    }
+  };
+
   const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
     open: { label: 'Offen', variant: 'secondary' },
     replied: { label: 'Beantwortet', variant: 'default' },
@@ -89,16 +117,26 @@ export function SupportManagement() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-[180px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Alle Tickets</SelectItem>
+            <SelectItem value="all">Alle Status</SelectItem>
             <SelectItem value="open">Offen</SelectItem>
             <SelectItem value="replied">Beantwortet</SelectItem>
             <SelectItem value="closed">Geschlossen</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle Typen</SelectItem>
+            <SelectItem value="bug">Bugs</SelectItem>
+            <SelectItem value="feature">Features</SelectItem>
           </SelectContent>
         </Select>
         {openCount > 0 && (
@@ -120,16 +158,36 @@ export function SupportManagement() {
             <div className="space-y-4">
               {filteredTickets.map((ticket: any) => {
                 const sc = statusConfig[ticket.status] || statusConfig.open;
+                const canReward = !ticket.reward_status && (ticket.status === 'open' || ticket.status === 'replied');
                 return (
                   <div key={ticket.id} className="p-4 rounded-lg border bg-card space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium">{ticket.subject}</span>
-                        <span className="text-xs text-muted-foreground ml-2">
-                          von {ticket.user_email}
-                        </span>
+                        <span className="text-xs text-muted-foreground">von {ticket.user_email}</span>
+                        {ticket.ticket_type === 'bug' && (
+                          <Badge variant="outline" className="text-xs gap-1 border-red-300 text-red-600">
+                            <Bug className="h-3 w-3" /> Bug
+                          </Badge>
+                        )}
+                        {ticket.ticket_type === 'feature' && (
+                          <Badge variant="outline" className="text-xs gap-1 border-blue-300 text-blue-600">
+                            <Lightbulb className="h-3 w-3" /> Feature
+                          </Badge>
+                        )}
+                        {ticket.area && (
+                          <Badge variant="secondary" className="text-xs">{ticket.area}</Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
+                        {ticket.reward_status === 'approved' && (
+                          <Badge className="bg-green-500/10 text-green-600 border-green-500/20 gap-1">
+                            <Gift className="h-3 w-3" /> Gutschrift
+                          </Badge>
+                        )}
+                        {ticket.reward_status === 'rejected' && (
+                          <Badge variant="outline" className="text-xs text-muted-foreground">Abgelehnt</Badge>
+                        )}
                         <Badge variant={sc.variant}>{sc.label}</Badge>
                         <span className="text-xs text-muted-foreground">
                           {format(new Date(ticket.created_at), 'dd.MM.yyyy HH:mm')}
@@ -146,11 +204,11 @@ export function SupportManagement() {
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {ticket.status === 'open' && (
                         <>
                           {replyingTo === ticket.id ? (
-                            <div className="flex-1 space-y-2">
+                            <div className="flex-1 space-y-2 w-full">
                               <Textarea
                                 value={replyText}
                                 onChange={(e) => setReplyText(e.target.value)}
@@ -174,6 +232,37 @@ export function SupportManagement() {
                           )}
                         </>
                       )}
+
+                      {/* Reward buttons */}
+                      {canReward && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-green-600 border-green-300 hover:bg-green-50"
+                            onClick={() => handleReward(ticket.id, 'approve')}
+                            disabled={rewardingId === ticket.id}
+                          >
+                            {rewardingId === ticket.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            ) : (
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                            )}
+                            Anerkennen
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-muted-foreground"
+                            onClick={() => handleReward(ticket.id, 'reject')}
+                            disabled={rewardingId === ticket.id}
+                          >
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Ablehnen
+                          </Button>
+                        </>
+                      )}
+
                       {ticket.status !== 'closed' && (
                         <Button size="sm" variant="outline" onClick={() => handleClose(ticket.id)}>
                           Schließen
