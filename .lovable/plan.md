@@ -1,33 +1,43 @@
 
 
-## Plan: Komplette Screenshot-Sammlung fertigstellen
+## Plan: Logos einsetzen + Build-Error beheben
 
-### Bereits erfasst (22 Screenshots)
-Dashboard, Upload, Review, Expenses, Reconciliation, Bank Import, Reports, Checklists, Quotes, Order Confirmations, Delivery Notes, Invoices, Account (5 Tabs), Settings (5 Tabs)
+### 1. Logo-Asset kopieren
+- `user-uploads://logo_BM_white_transparent_1200-2.png` → `src/assets/logo-billmonk.png`
+- Das bisherige `_600.png` wird nicht verwendet — nur dieses hochaufgeloeste Bild
 
-### Noch fehlend (~25 Screenshots)
+### 2. Logo an 8 Stellen einsetzen (CSS-skaliert)
+Ueberall wird das aktuelle Platzhalter-Logo (gradient-div + Search-Icon + "BillMonk"-Text) durch ein `<img>` ersetzt:
 
-**Landing Page (6)**
-- Hero/Header, Features, How It Works, Pricing, FAQ, Footer
+| Datei | Hoehe | Kontext |
+|---|---|---|
+| `Header.tsx` | `h-8` (32px) | Navbar, inkl. Beta-Badge daneben |
+| `Footer.tsx` | `h-7` (28px) | Footer-Branding, inkl. Beta-Badge |
+| `Sidebar.tsx` | `h-8` / collapsed: `h-8 w-8 object-contain` | Dashboard-Sidebar |
+| `Login.tsx` | `h-12` (48px) | Auth-Karte |
+| `Register.tsx` | `h-12` | Auth-Karte |
+| `ForgotPassword.tsx` | `h-12` | Auth-Karte |
+| `ResetPassword.tsx` | `h-12` | Auth-Karte |
+| `Hero.tsx` | `h-6` (24px) | Mock-Dashboard-Preview |
 
-**Auth (4)**
-- Login, Register, Forgot Password, Reset Password
+Import-Pattern:
+```tsx
+import logoBillmonk from "@/assets/logo-billmonk.png";
+// ...
+<img src={logoBillmonk} alt="BillMonk" className="h-8" />
+```
 
-**Settings – restliche Tabs (8)**
-- Tags, KI-Training, Cloud-Backup, Bank-Live, Rechnungsmodul, Rechnungsvorlage, Angebotsvorlage, Kundenverwaltung
+Bei collapsed Sidebar: Logo wird auf Icon-Groesse beschnitten (`w-9 h-9 object-cover object-left`), sodass nur das Haekchen-Symbol sichtbar ist.
 
-**Admin Dashboard (10 Tabs)**
-- Benutzer, Abo-Metriken, System Health, Features, Aktivität, Analytics, Newsletter, Announcements, Support, FAQ
+Beta-Badge bleibt neben dem Logo erhalten wo vorhanden.
 
-**Weitere (3)**
-- Invoice Editor, Pricing Page, Onboarding
+### 3. Build-Error beheben
+- `supabase/functions/admin-metrics/index.ts` Zeile 2:
+  - Von: `import { createClient } from "npm:@supabase/supabase-js@2.57.2"`
+  - Zu: `import { createClient } from "https://esm.sh/@supabase/supabase-js@2"` (wie alle anderen Edge Functions)
 
-### Vorgehen
-1. Alle fehlenden Routen per Browser ansteuern und Screenshots aufnehmen
-2. Einheitliche Benennung: `01_landing_hero.png`, `02_landing_features.png`, etc.
-3. Alles in `/mnt/documents/screenshots/` speichern
-4. Übersichts-Index als Markdown-Datei erstellen
-
-### Ergebnis
-~47 Screenshots als komplettes visuelles Archiv der gesamten Plattform.
+### Aenderungen gesamt
+- 1 Asset-Datei kopiert
+- 8 TSX-Dateien aktualisiert (Logo-Ersetzung)
+- 1 Edge-Function-Import korrigiert
 
