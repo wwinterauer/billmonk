@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, ArrowRight, Brain, FileText, Receipt, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
-import logoBillmonk from '@/assets/logo-billmonk.png';
+import logoTeal from '@/assets/logo-teal.png';
 
 export function Hero() {
   return (
@@ -99,7 +99,7 @@ export function Hero() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <img src={logoBillmonk} alt="BillMonk" className="h-6" />
+                      <img src={logoTeal} alt="BillMonk" className="h-6" />
                     </div>
                     <Badge variant="secondary" className="text-xs">Dashboard</Badge>
                   </div>

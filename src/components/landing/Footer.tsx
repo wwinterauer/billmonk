@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Mail, MapPin, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import logoBillmonk from '@/assets/logo-billmonk.png';
+import logoTeal from '@/assets/logo-teal.png';
 
 export function Footer() {
   return (
@@ -12,7 +12,7 @@ export function Footer() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <img src={logoBillmonk} alt="BillMonk" className="h-7" />
+              <img src={logoTeal} alt="BillMonk" className="h-7" />
               <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
                 Beta
               </Badge>
