@@ -2,7 +2,7 @@ import {
   Brain, Mail, Camera, RefreshCw, FileSpreadsheet, Shield, Smartphone,
   Landmark, FileText, ClipboardList, Tags, Users, Zap, Building2, Search,
   CloudUpload, Keyboard, ReceiptText, UserCheck, Repeat, CreditCard, ArrowRightLeft,
-  Scissors, CheckCheck, Filter, Ban, BarChart3, PenLine, Hash, Palette,
+  Scissors, CheckCheck, Filter, BarChart3, PenLine, Hash, Palette,
   Percent, Package, Briefcase, Timer, Download, Wifi, BookOpen,
   Inbox, Globe, FileDown
 } from 'lucide-react';
