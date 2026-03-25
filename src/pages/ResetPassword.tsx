@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Loader2, Eye, EyeOff, CheckCircle2, XCircle, Check } from 'lucide-react';
-import logoBillmonk from '@/assets/logo-billmonk.png';
+import logoTeal from '@/assets/logo-teal.png';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -115,7 +115,7 @@ const ResetPassword = () => {
         <Card className="border-border/50 shadow-xl">
           <CardHeader className="text-center pb-2">
             <Link to="/" className="inline-flex items-center justify-center mb-6">
-              <img src={logoBillmonk} alt="BillMonk" className="h-12" />
+              <img src={logoTeal} alt="BillMonk" className="h-12" />
             </Link>
             <h1 className="text-2xl font-bold text-foreground">Neues Passwort setzen</h1>
             <p className="text-muted-foreground">Wähle ein sicheres Passwort für dein Konto</p>

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, ArrowLeft, Mail, CheckCircle2 } from 'lucide-react';
-import logoBillmonk from '@/assets/logo-billmonk.png';
+import logoTeal from '@/assets/logo-teal.png';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -41,7 +41,7 @@ const ForgotPassword = () => {
         <Card className="border-border/50 shadow-xl">
           <CardHeader className="text-center pb-2">
             <Link to="/" className="inline-flex items-center justify-center mb-6">
-              <img src={logoBillmonk} alt="BillMonk" className="h-12" />
+              <img src={logoTeal} alt="BillMonk" className="h-12" />
             </Link>
             <h1 className="text-2xl font-bold text-foreground">Passwort vergessen</h1>
             <p className="text-muted-foreground">

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import logoBillmonk from '@/assets/logo-billmonk.png';
+import logoTeal from '@/assets/logo-teal.png';
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -21,7 +21,7 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-lg">
       <div className="container flex h-16 items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
-          <img src={logoBillmonk} alt="BillMonk" className="h-8" />
+          <img src={logoTeal} alt="BillMonk" className="h-8" />
           <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
             Beta
           </Badge>
