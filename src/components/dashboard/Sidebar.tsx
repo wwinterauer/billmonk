@@ -8,7 +8,7 @@ import {
   Building2,
   BarChart3,
   Settings,
-  Search,
+  
   ChevronLeft,
   ChevronRight,
   LogOut,
