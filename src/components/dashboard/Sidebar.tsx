@@ -22,6 +22,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import logoBillmonk from '@/assets/logo-billmonk.png';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -152,11 +153,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     )}>
       {/* Logo */}
       <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
-        <Link to="/dashboard" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-primary flex-shrink-0">
-            <Search className="h-5 w-5 text-primary-foreground" />
-          </div>
-          {!collapsed && <span className="text-xl font-bold text-sidebar-foreground">BillMonk</span>}
+        <Link to="/dashboard" className="flex items-center gap-2 overflow-hidden">
+          {collapsed ? (
+            <div className="flex h-9 w-9 items-center justify-center flex-shrink-0 overflow-hidden">
+              <img src={logoBillmonk} alt="BillMonk" className="h-9 w-auto max-w-none object-left" style={{ objectFit: 'cover', objectPosition: 'left' }} />
+            </div>
+          ) : (
+            <img src={logoBillmonk} alt="BillMonk" className="h-8" />
+          )}
         </Link>
         <Button variant="ghost" size="icon" onClick={onToggle} className="text-sidebar-foreground hover:bg-sidebar-accent h-8 w-8">
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}

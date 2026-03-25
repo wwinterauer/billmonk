@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Search, Loader2, ArrowLeft, Mail, CheckCircle2 } from 'lucide-react';
+import { Loader2, ArrowLeft, Mail, CheckCircle2 } from 'lucide-react';
+import logoBillmonk from '@/assets/logo-billmonk.png';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -39,11 +40,8 @@ const ForgotPassword = () => {
       <div className="w-full max-w-md">
         <Card className="border-border/50 shadow-xl">
           <CardHeader className="text-center pb-2">
-            <Link to="/" className="inline-flex items-center justify-center gap-2 mb-6">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg gradient-primary">
-                <Search className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="text-2xl font-bold text-foreground">BillMonk</span>
+            <Link to="/" className="inline-flex items-center justify-center mb-6">
+              <img src={logoBillmonk} alt="BillMonk" className="h-12" />
             </Link>
             <h1 className="text-2xl font-bold text-foreground">Passwort vergessen</h1>
             <p className="text-muted-foreground">
