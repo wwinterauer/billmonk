@@ -246,7 +246,7 @@ serve(async (req) => {
             backup_schedule_type: "weekly",
             backup_weekday: 1,
             backup_time: "02:00",
-            backup_file_prefix: "XpenzAI-Backup",
+            backup_file_prefix: "BillMonk-Backup",
             backup_include_files: true,
             backup_status_filter: ["review"],
           });

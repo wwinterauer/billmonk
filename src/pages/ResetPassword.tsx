@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Sparkles, Loader2, Eye, EyeOff, CheckCircle2, XCircle, Check } from 'lucide-react';
+import { Search, Loader2, Eye, EyeOff, CheckCircle2, XCircle, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -115,9 +115,9 @@ const ResetPassword = () => {
           <CardHeader className="text-center pb-2">
             <Link to="/" className="inline-flex items-center justify-center gap-2 mb-6">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg gradient-primary">
-                <Sparkles className="h-5 w-5 text-primary-foreground" />
+                <Search className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="text-2xl font-bold text-foreground">XpenzAi</span>
+              <span className="text-2xl font-bold text-foreground">BillMonk</span>
             </Link>
             <h1 className="text-2xl font-bold text-foreground">Neues Passwort setzen</h1>
             <p className="text-muted-foreground">Wähle ein sicheres Passwort für dein Konto</p>

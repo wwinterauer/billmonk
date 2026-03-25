@@ -4,7 +4,7 @@ import { X, Cookie, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const COOKIE_CONSENT_KEY = 'xpenzai_cookie_consent';
+const COOKIE_CONSENT_KEY = 'billmonk_cookie_consent';
 
 export function CookieBanner() {
   const [isVisible, setIsVisible] = useState(false);

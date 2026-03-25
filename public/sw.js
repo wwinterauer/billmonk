@@ -1,4 +1,4 @@
-const CACHE_NAME = 'xpenzai-v2';
+const CACHE_NAME = 'billmonk-v1';
 const SHARE_CACHE = 'shared-files';
 const STATIC_ASSETS = [
   '/',

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Sparkles, Mail, MapPin, User } from 'lucide-react';
+import { Search, Mail, MapPin, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
@@ -12,15 +12,15 @@ export function Footer() {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary">
-                <Sparkles className="h-4 w-4 text-primary-foreground" />
+                <Search className="h-4 w-4 text-primary-foreground" />
               </div>
-              <span className="text-lg font-bold text-foreground">XpenzAi</span>
+              <span className="text-lg font-bold text-foreground">BillMonk</span>
               <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
                 Beta
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground max-w-xs">
-              KI-gestützte Belegverwaltung für Kleinunternehmer, Freelancer und Vermieter. Made in Austria.
+              KI-gestützte Einnahmen-Ausgaben-Verwaltung für Kleinunternehmer, Freelancer und Vermieter. Made in Austria.
             </p>
           </div>
 
@@ -71,7 +71,7 @@ export function Footer() {
         <Separator className="my-6" />
 
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-          <p>© 2025 XpenzAi. Alle Rechte vorbehalten.</p>
+          <p>© 2026 BillMonk. Alle Rechte vorbehalten.</p>
           <div className="flex items-center gap-4">
             <Link to="/datenschutz" className="hover:text-foreground transition-colors">
               Datenschutz

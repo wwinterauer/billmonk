@@ -42,7 +42,7 @@ export function Testimonials() {
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4" style={{ textWrap: 'balance' }}>
             Was unsere Nutzer sagen
           </h2>
-          <p className="text-lg text-muted-foreground">Freelancer, Vermieter und KMUs vertrauen auf XpenzAi.</p>
+          <p className="text-lg text-muted-foreground">Freelancer, Vermieter und KMUs vertrauen auf BillMonk.</p>
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">

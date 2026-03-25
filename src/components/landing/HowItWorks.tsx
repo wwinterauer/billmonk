@@ -35,7 +35,7 @@ export function HowItWorks() {
         <div className="text-center mb-16">
           <Badge variant="secondary" className="mb-4">Workflow</Badge>
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
-            So einfach funktioniert's
+            So löst Monk deinen Fall.
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             In vier Schritten von der Papierrechnung zur fertigen Buchhaltung

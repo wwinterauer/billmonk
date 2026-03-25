@@ -1,13 +1,13 @@
 import { useState, useCallback } from 'react';
 import { FeatureGate } from '@/components/FeatureGate';
 import { motion } from 'framer-motion';
-import { 
-  FileSpreadsheet, 
-  X, 
-  Download, 
-  Upload, 
-  Sparkles, 
-  Link, 
+import {
+  FileSpreadsheet,
+  X,
+  Download,
+  Upload,
+  Search,
+  Link,
   Info,
   Building2,
   Calendar,
@@ -57,7 +57,7 @@ const steps = [
   { icon: Download, text: 'Lade den Kontoauszug als CSV aus deinem Online-Banking' },
   { icon: Upload, text: 'Wähle die CSV-Datei hier aus' },
   { icon: Building2, text: 'Wähle deine Bank für korrektes Format' },
-  { icon: Sparkles, text: 'XpenzAi analysiert die Buchungen' },
+  { icon: Search, text: 'BillMonk analysiert die Buchungen' },
   { icon: Link, text: 'Gleiche Buchungen mit Belegen ab' },
 ];
 
@@ -714,7 +714,7 @@ export default function BankImport() {
                   </ul>
                   <p className="text-sm text-muted-foreground mt-4">
                     Deine Bank fehlt?{' '}
-                    <a href="mailto:support@xpenzai.com" className="text-primary hover:underline">
+                    <a href="mailto:support@billmonk.ai" className="text-primary hover:underline">
                       Kontaktiere uns
                     </a>
                   </p>

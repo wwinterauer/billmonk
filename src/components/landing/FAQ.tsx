@@ -29,11 +29,11 @@ const faqs = [
   },
   {
     q: 'Welche Belegformate werden unterstützt?',
-    a: 'XpenzAi verarbeitet PDF-Dateien, Fotos (JPG, PNG) und mehrseitige Scans. Du kannst Belege per Upload, E-Mail-Import oder direkt mit der Kamera erfassen.',
+    a: 'BillMonk verarbeitet PDF-Dateien, Fotos (JPG, PNG) und mehrseitige Scans. Du kannst Belege per Upload, E-Mail-Import oder direkt mit der Kamera erfassen.',
   },
   {
     q: 'Muss ich eine Software installieren?',
-    a: 'Nein. XpenzAi ist eine Web-App und läuft direkt im Browser – auf Desktop, Tablet und Smartphone. Optional kannst du die App als PWA auf deinem Gerät installieren.',
+    a: 'Nein. BillMonk ist eine Web-App und läuft direkt im Browser – auf Desktop, Tablet und Smartphone. Optional kannst du die App als PWA auf deinem Gerät installieren.',
   },
 ];
 

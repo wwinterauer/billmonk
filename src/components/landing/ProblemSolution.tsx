@@ -27,7 +27,7 @@ export function ProblemSolution() {
             Schluss mit dem Belegchaos
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto" style={{ textWrap: 'pretty' }}>
-            Manuelle Belegverwaltung und Insellösungen kosten Zeit und Nerven. XpenzAi bringt alles in eine Plattform.
+            Manuelle Belegverwaltung und Insellösungen kosten Zeit und Nerven. BillMonk bringt alles in eine Plattform.
           </p>
         </div>
 
@@ -38,7 +38,7 @@ export function ProblemSolution() {
               <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
                 <X className="h-5 w-5 text-destructive" />
               </div>
-              <h3 className="text-lg font-semibold text-foreground">Ohne XpenzAi</h3>
+              <h3 className="text-lg font-semibold text-foreground">Ohne BillMonk</h3>
             </div>
             <ul className="space-y-4">
               {problems.map((item) => (
@@ -56,7 +56,7 @@ export function ProblemSolution() {
               <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
                 <Check className="h-5 w-5 text-success" />
               </div>
-              <h3 className="text-lg font-semibold text-foreground">Mit XpenzAi</h3>
+              <h3 className="text-lg font-semibold text-foreground">Mit BillMonk</h3>
             </div>
             <ul className="space-y-4">
               {solutions.map((item) => (

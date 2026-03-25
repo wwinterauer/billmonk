@@ -445,7 +445,7 @@ serve(async (req) => {
     const includeFiles = connection.backup_include_files ?? true;
     const zipPattern = connection.backup_zip_pattern || "{prefix}_{datum}_{zeit}";
     const folderStructure = connection.backup_folder_structure || "flat";
-    const prefix = connection.backup_file_prefix || "XpenzAI-Backup";
+    const prefix = connection.backup_file_prefix || "BillMonk-Backup";
 
     // Determine target folder
     let targetFolderId = connection.backup_folder_id || undefined;

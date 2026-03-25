@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, ArrowRight, Sparkles, Brain, FileText, Receipt, Star } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Search, Brain, FileText, Receipt, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function Hero() {
@@ -21,17 +21,16 @@ export function Hero() {
             transition={{ duration: 0.6 }}
             className="text-center lg:text-left"
           >
-            <Badge variant="secondary" className="mb-4 bg-amber-100 text-amber-800 border-amber-300">
-              🚀 Beta Version – Jetzt kostenlos testen
+            <Badge variant="secondary" className="mb-4 bg-teal-50 text-teal-800 border-teal-200">
+              Neuer Fall? Keine Sorge — Monk übernimmt.
             </Badge>
             
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-6" style={{ lineHeight: '1.08' }}>
-              Belege scannen.{' '}
-              <span className="text-primary">KI erledigt den Rest.</span>
+              Rechnungen & Belege.{' '}
+              <span className="text-primary">Erfasst, organisiert, wiedergefunden.</span>
             </h1>
             <p className="text-xl text-muted-foreground mb-8 max-w-xl mx-auto lg:mx-0" style={{ textWrap: 'pretty' }}>
-              Die intelligente Belegverwaltung für Kleinunternehmer, Freelancer und Vermieter in Österreich & Deutschland. 
-              Fotografiere deine Belege – unsere KI extrahiert automatisch alle wichtigen Daten.
+              Ob privat oder geschäftlich — BillMonk erkennt deine Belege per KI, organisiert sie automatisch und macht sie jederzeit durchsuchbar. Nie wieder Rechnungen suchen.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-6">
@@ -100,9 +99,9 @@ export function Hero() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-                        <Sparkles className="h-4 w-4 text-primary-foreground" />
+                        <Search className="h-4 w-4 text-primary-foreground" />
                       </div>
-                      <span className="font-semibold text-foreground">XpenzAi</span>
+                      <span className="font-semibold text-foreground">BillMonk</span>
                     </div>
                     <Badge variant="secondary" className="text-xs">Dashboard</Badge>
                   </div>

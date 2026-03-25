@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 
 const STEPS = [
   { title: 'Persönliche Daten', description: 'Vervollständige dein Profil' },
-  { title: 'Kontotyp', description: 'Wie nutzt du XpenzAi?' },
+  { title: 'Kontotyp', description: 'Wie nutzt du BillMonk?' },
   { title: 'Abschluss', description: 'Fast geschafft!' },
 ];
 
@@ -72,7 +72,7 @@ export default function Onboarding() {
 
       if (error) throw error;
 
-      toast({ title: 'Willkommen bei XpenzAi!', description: 'Dein Profil wurde eingerichtet.' });
+      toast({ title: 'Willkommen bei BillMonk!', description: 'Dein Profil wurde eingerichtet.' });
       navigate('/dashboard', { replace: true });
     } catch (_err) {
       toast({ title: 'Fehler', description: 'Profil konnte nicht gespeichert werden.', variant: 'destructive' });
@@ -220,7 +220,7 @@ export default function Onboarding() {
                     onCheckedChange={v => updateField('newsletter_opt_in', !!v)}
                   />
                   <Label htmlFor="newsletter" className="text-sm leading-relaxed cursor-pointer">
-                    Ich möchte den XpenzAi Newsletter erhalten (Tipps, Updates, Angebote). Jederzeit abbestellbar.
+                    Ich möchte den BillMonk Newsletter erhalten (Tipps, Updates, Angebote). Jederzeit abbestellbar.
                   </Label>
                 </div>
 

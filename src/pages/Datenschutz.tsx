@@ -113,7 +113,7 @@ export default function Datenschutz() {
                 <div>
                   <h4 className="font-medium text-foreground mb-2">Hauptzwecke</h4>
                   <ul className="list-disc list-inside space-y-1">
-                    <li>Bereitstellung der Belegverwaltungs-Dienste</li>
+                    <li>Bereitstellung der Einnahmen-Ausgaben-Verwaltungs-Dienste</li>
                     <li>KI-gestützte Extraktion von Belegdaten</li>
                     <li>Erstellung von Auswertungen und Exporten</li>
                     <li>Abgleich mit Bankumsätzen</li>
@@ -368,11 +368,11 @@ export default function Datenschutz() {
               <CardContent className="space-y-4 text-sm text-muted-foreground">
                 <div>
                   <h3 className="font-semibold text-foreground mb-1">1. Geltungsbereich</h3>
-                  <p>Diese AGB gelten für die Nutzung der BelegPilot-Plattform. Mit der Registrierung akzeptieren Sie diese Bedingungen.</p>
+                  <p>Diese AGB gelten für die Nutzung der BillMonk-Plattform. Mit der Registrierung akzeptieren Sie diese Bedingungen.</p>
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground mb-1">2. Leistungsbeschreibung</h3>
-                  <p>BelegPilot bietet eine KI-gestützte Belegverwaltung mit verschiedenen Abo-Modellen (Free, Starter, Pro, Business). Der Funktionsumfang richtet sich nach dem gewählten Tarif.</p>
+                  <p>BillMonk bietet eine KI-gestützte Einnahmen-Ausgaben-Verwaltung mit verschiedenen Abo-Modellen (Free, Starter, Pro, Business). Der Funktionsumfang richtet sich nach dem gewählten Tarif.</p>
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground mb-1">3. Vertragsschluss & Kündigung</h3>
@@ -384,7 +384,7 @@ export default function Datenschutz() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground mb-1">5. Haftung</h3>
-                  <p>BelegPilot ersetzt keine steuerliche Beratung. Die KI-Erkennung erfolgt nach bestem Wissen, eine Garantie für die Richtigkeit der extrahierten Daten wird nicht übernommen.</p>
+                  <p>BillMonk ersetzt keine steuerliche Beratung. Die KI-Erkennung erfolgt nach bestem Wissen, eine Garantie für die Richtigkeit der extrahierten Daten wird nicht übernommen.</p>
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground mb-1">6. Anwendbares Recht</h3>

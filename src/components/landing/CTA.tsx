@@ -13,10 +13,10 @@ export function CTA() {
           </Badge>
           
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-foreground mb-4">
-            Bereit, das Belegchaos zu beenden?
+            Bereit, Ordnung zu schaffen?
           </h2>
           <p className="text-lg text-primary-foreground/80 mb-6">
-            Teste XpenzAi kostenlos in der Beta-Phase und gestalte die Zukunft der Belegverwaltung mit.
+            Lass Monk deine Einnahmen und Ausgaben organisieren. Akribisch, automatisch, und immer bereit für den Steuerberater.
           </p>
           
           <div className="flex flex-wrap gap-4 justify-center mb-8 text-sm text-primary-foreground/80">

@@ -65,7 +65,7 @@ export function InstallPrompt() {
                 App installieren
               </p>
               <p className="text-sm text-muted-foreground">
-                Installiere XpenzAI für schnellen Zugriff und Offline-Nutzung
+                Installiere BillMonk für schnellen Zugriff und Offline-Nutzung
               </p>
 
               <div className="flex gap-2 pt-1">

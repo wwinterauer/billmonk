@@ -2,12 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-/* XpenzAi Design System - German AI Expense Management */
+/* BillMonk Design System — Detective Slate */
 
 @layer base {
   :root {
-    /* Core Brand Colors */
-    --background: 0 0% 100%;
+    /* Core Neutrals */
+    --background: 210 40% 98%;
     --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
@@ -16,83 +16,84 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* Primary - Vibrant Violet */
-    --primary: 263 70% 58%;
+    /* Primary — Teal */
+    --primary: 175 84% 26%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary - Cool Slate */
-    --secondary: 215 20% 96%;
+    /* Secondary — Cool Slate */
+    --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
 
-    --muted: 215 20% 96%;
+    --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 215 20% 96%;
-    --accent-foreground: 222 47% 11%;
+    /* Accent — Lighter Teal */
+    --accent: 168 76% 42%;
+    --accent-foreground: 0 0% 100%;
 
-    /* Success - Fresh Green */
-    --success: 158 64% 52%;
+    /* Semantic */
+    --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
 
-    /* Warning - Warm Orange */
+    /* Warning — Warm Amber */
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 20% 91%;
-    --input: 215 20% 91%;
-    --ring: 263 70% 58%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 175 84% 26%;
 
-    --radius: 0.625rem;
+    --radius: 0.75rem;
 
-    /* Sidebar - Dark Theme */
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 215 20% 91%;
-    --sidebar-primary: 263 70% 58%;
+    /* Sidebar — immer dunkel ("Das Büro des Detektivs") */
+    --sidebar-background: 217 33% 17%;
+    --sidebar-foreground: 210 40% 85%;
+    --sidebar-primary: 168 76% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 40% 16%;
-    --sidebar-accent-foreground: 215 20% 91%;
-    --sidebar-border: 222 40% 20%;
-    --sidebar-ring: 263 70% 58%;
+    --sidebar-accent: 217 33% 22%;
+    --sidebar-accent-foreground: 210 40% 85%;
+    --sidebar-border: 217 33% 25%;
+    --sidebar-ring: 168 76% 42%;
 
-    /* Custom Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(263 70% 58%) 0%, hsl(280 70% 50%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(263 70% 98%) 0%, hsl(0 0% 100%) 100%);
-    --gradient-cta: linear-gradient(135deg, hsl(263 70% 58%) 0%, hsl(263 70% 45%) 100%);
-    
-    /* Shadows */
+    /* Gradients — Teal */
+    --gradient-primary: linear-gradient(135deg, hsl(175 84% 26%) 0%, hsl(168 76% 42%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(175 84% 95%) 0%, hsl(0 0% 100%) 100%);
+    --gradient-cta: linear-gradient(135deg, hsl(175 84% 26%) 0%, hsl(175 84% 35%) 100%);
+
+    /* Shadows — Teal */
     --shadow-sm: 0 1px 2px 0 hsl(222 47% 11% / 0.05);
     --shadow-md: 0 4px 6px -1px hsl(222 47% 11% / 0.08), 0 2px 4px -2px hsl(222 47% 11% / 0.04);
     --shadow-lg: 0 10px 15px -3px hsl(222 47% 11% / 0.08), 0 4px 6px -4px hsl(222 47% 11% / 0.04);
     --shadow-xl: 0 20px 25px -5px hsl(222 47% 11% / 0.1), 0 8px 10px -6px hsl(222 47% 11% / 0.08);
-    --shadow-primary: 0 10px 40px -10px hsl(263 70% 58% / 0.4);
+    --shadow-primary: 0 10px 40px -10px hsl(175 84% 26% / 0.4);
   }
 
   .dark {
     --background: 222 47% 7%;
-    --foreground: 215 20% 96%;
+    --foreground: 210 40% 92%;
 
-    --card: 222 47% 10%;
-    --card-foreground: 215 20% 96%;
+    --card: 217 33% 12%;
+    --card-foreground: 210 40% 92%;
 
-    --popover: 222 47% 10%;
-    --popover-foreground: 215 20% 96%;
+    --popover: 217 33% 12%;
+    --popover-foreground: 210 40% 92%;
 
-    --primary: 263 70% 62%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 168 76% 48%;
+    --primary-foreground: 222 47% 7%;
 
-    --secondary: 222 40% 16%;
-    --secondary-foreground: 215 20% 96%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 92%;
 
-    --muted: 222 40% 16%;
-    --muted-foreground: 215 16% 60%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 16% 57%;
 
-    --accent: 222 40% 16%;
-    --accent-foreground: 215 20% 96%;
+    --accent: 168 76% 42%;
+    --accent-foreground: 0 0% 100%;
 
-    --success: 158 64% 42%;
+    --success: 142 71% 40%;
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 45%;
@@ -101,28 +102,28 @@
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 222 40% 20%;
-    --input: 222 40% 20%;
-    --ring: 263 70% 62%;
+    --border: 217 33% 22%;
+    --input: 217 33% 22%;
+    --ring: 168 76% 48%;
 
     --sidebar-background: 222 47% 5%;
-    --sidebar-foreground: 215 20% 91%;
-    --sidebar-primary: 263 70% 62%;
+    --sidebar-foreground: 210 40% 91%;
+    --sidebar-primary: 168 76% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 222 40% 12%;
-    --sidebar-accent-foreground: 215 20% 91%;
+    --sidebar-accent-foreground: 210 40% 91%;
     --sidebar-border: 222 40% 16%;
-    --sidebar-ring: 263 70% 62%;
+    --sidebar-ring: 168 76% 48%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(263 70% 55%) 0%, hsl(280 70% 45%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(175 84% 30%) 0%, hsl(168 76% 38%) 100%);
     --gradient-hero: linear-gradient(180deg, hsl(222 47% 10%) 0%, hsl(222 47% 7%) 100%);
-    --gradient-cta: linear-gradient(135deg, hsl(263 70% 55%) 0%, hsl(263 70% 40%) 100%);
-    
+    --gradient-cta: linear-gradient(135deg, hsl(175 84% 30%) 0%, hsl(175 84% 22%) 100%);
+
     --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
     --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.4), 0 2px 4px -2px hsl(0 0% 0% / 0.2);
     --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.4), 0 4px 6px -4px hsl(0 0% 0% / 0.2);
     --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.5), 0 8px 10px -6px hsl(0 0% 0% / 0.3);
-    --shadow-primary: 0 10px 40px -10px hsl(263 70% 50% / 0.5);
+    --shadow-primary: 0 10px 40px -10px hsl(168 76% 42% / 0.5);
   }
 }
 
@@ -137,7 +138,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-semibold tracking-tight;
+    @apply font-heading font-semibold tracking-tight;
   }
 }
 

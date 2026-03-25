@@ -408,7 +408,7 @@ const Account = () => {
                     <div className="space-y-0.5">
                       <Label htmlFor="newsletter" className="text-sm font-medium">Newsletter</Label>
                       <p className="text-xs text-muted-foreground">
-                        XpenzAI Newsletter erhalten (Tipps, Updates, Angebote)
+                        BillMonk Newsletter erhalten (Tipps, Updates, Angebote)
                       </p>
                     </div>
                     <Switch

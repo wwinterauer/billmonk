@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Upload, 
-  CheckCircle, 
-  Receipt, 
-  Building2, 
-  BarChart3, 
+import {
+  LayoutDashboard,
+  Upload,
+  CheckCircle,
+  Receipt,
+  Building2,
+  BarChart3,
   Settings,
-  Sparkles,
+  Search,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -154,9 +154,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
         <Link to="/dashboard" className="flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-primary flex-shrink-0">
-            <Sparkles className="h-5 w-5 text-primary-foreground" />
+            <Search className="h-5 w-5 text-primary-foreground" />
           </div>
-          {!collapsed && <span className="text-xl font-bold text-sidebar-foreground">XpenzAi</span>}
+          {!collapsed && <span className="text-xl font-bold text-sidebar-foreground">BillMonk</span>}
         </Link>
         <Button variant="ghost" size="icon" onClick={onToggle} className="text-sidebar-foreground hover:bg-sidebar-accent h-8 w-8">
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}

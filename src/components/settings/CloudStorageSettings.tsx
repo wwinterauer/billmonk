@@ -127,7 +127,7 @@ export const CloudStorageSettings = () => {
           backup_weekday: data.backup_weekday ?? 1,
           backup_day_of_month: data.backup_day_of_month,
           backup_time: data.backup_time || '02:00',
-          backup_file_prefix: data.backup_file_prefix || 'XpenzAI-Backup',
+          backup_file_prefix: data.backup_file_prefix || 'BillMonk-Backup',
           backup_include_files: data.backup_include_files ?? true,
           backup_include_invoices: (data as any).backup_include_invoices ?? false,
           backup_status_filter: data.backup_status_filter || ['review'],
@@ -296,7 +296,7 @@ export const CloudStorageSettings = () => {
     if (!connection) return '';
     const now = new Date();
     return connection.backup_zip_pattern
-      .replace('{prefix}', connection.backup_file_prefix || 'XpenzAI-Backup')
+      .replace('{prefix}', connection.backup_file_prefix || 'BillMonk-Backup')
       .replace('{datum}', format(now, 'yyyy-MM-dd'))
       .replace('{zeit}', format(now, 'HHmm'))
       .replace('{anzahl}', '12')
@@ -481,7 +481,7 @@ export const CloudStorageSettings = () => {
                     <Input
                       value={connection.backup_file_prefix}
                       onChange={(e) => updateConnection({ backup_file_prefix: e.target.value })}
-                      placeholder="XpenzAI-Backup"
+                      placeholder="BillMonk-Backup"
                     />
                   </div>
                 </div>

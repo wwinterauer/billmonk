@@ -168,10 +168,10 @@ export function Features() {
         <div className="text-center mb-16">
           <Badge variant="secondary" className="mb-4">Features</Badge>
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4" style={{ textWrap: 'balance' }}>
-            Alles für deine Belegverwaltung — und darüber hinaus
+            Was Monk alles kann.
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto" style={{ textWrap: 'pretty' }}>
-            Von der KI-Erkennung über Bankabgleich und CRM bis zum kompletten Rechnungsmodul — XpenzAi wächst mit deinem Unternehmen.
+            Von der KI-Erkennung über Bankabgleich und CRM bis zum kompletten Rechnungsmodul — BillMonk wächst mit deinem Unternehmen.
           </p>
         </div>
 
