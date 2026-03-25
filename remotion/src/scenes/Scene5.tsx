@@ -73,7 +73,7 @@ export const Scene5: React.FC = () => {
         transform: `translate(-50%, -50%) scale(${logoScale})`,
         opacity: logoOp,
       }}>
-        <Img src={staticFile("images/logo-teal.png")} style={{ height: 90 }} />
+        <Img src={staticFile("images/logo-white.png")} style={{ height: 90 }} />
       </div>
 
       {/* CTA text */}

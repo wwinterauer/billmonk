@@ -91,7 +91,7 @@ export const Scene1: React.FC = () => {
         transform: `translate(-50%, -50%) translateY(${logoY}px) scale(${logoScale})`,
         opacity: logoOpacity,
       }}>
-        <Img src={staticFile("images/logo-teal.png")} style={{ height: 100 }} />
+        <Img src={staticFile("images/logo-white.png")} style={{ height: 100 }} />
       </div>
 
       {/* Accent line */}
