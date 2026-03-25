@@ -2,7 +2,7 @@ import {
   Brain, Mail, Camera, RefreshCw, FileSpreadsheet, Shield, Smartphone,
   Landmark, FileText, ClipboardList, Tags, Users, Zap, Building2, Search,
   CloudUpload, Keyboard, ReceiptText, UserCheck, Repeat, CreditCard, ArrowRightLeft,
-  Scissors, CheckCheck, Filter, Ban, BarChart3, PenLine, Hash, Palette,
+  Scissors, CheckCheck, Filter, BarChart3, PenLine, Hash, Palette,
   Percent, Package, Briefcase, Timer, Download, Wifi, BookOpen,
   Inbox, Globe, FileDown
 } from 'lucide-react';
@@ -60,7 +60,7 @@ const featureBlocks: FeatureBlock[] = [
       { icon: Building2, title: 'CSV-Bankimport', description: 'Kontoauszüge als CSV importieren und Buchungen mit Belegen matchen.' },
       { icon: Landmark, title: 'Live-Bankanbindung', description: 'Open-Banking-Anbindung für Echtzeit-Synchronisation deiner Konten.', planBadge: 'Pro' },
       { icon: Filter, title: 'Absender-Filter', description: 'Nur Belege von bestimmten Absendern importieren — mit Stichwort-Filtern.' },
-      { icon: Ban, title: 'Absender-Blockierung', description: 'Unerwünschte Absender blockieren — keine Werbe-Mails mehr im System.' },
+      
     ],
   },
   {
