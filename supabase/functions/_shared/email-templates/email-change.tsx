@@ -9,6 +9,7 @@ import {
   Head,
   Heading,
   Html,
+  Img,
   Link,
   Preview,
   Text,
@@ -21,38 +22,40 @@ interface EmailChangeEmailProps {
   confirmationUrl: string
 }
 
+const LOGO_URL = 'https://nvvssxykygdxjywncvgd.supabase.co/storage/v1/object/public/email-assets/logo.png'
+
 export const EmailChangeEmail = ({
   siteName,
   email,
   newEmail,
   confirmationUrl,
 }: EmailChangeEmailProps) => (
-  <Html lang="en" dir="ltr">
+  <Html lang="de" dir="ltr">
     <Head />
-    <Preview>Confirm your email change for {siteName}</Preview>
+    <Preview>E-Mail-Änderung für BillMonk bestätigen</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>Confirm your email change</Heading>
+        <Img src={LOGO_URL} alt="BillMonk" height="40" style={logo} />
+        <Heading style={h1}>E-Mail-Änderung bestätigen</Heading>
         <Text style={text}>
-          You requested to change your email address for {siteName} from{' '}
+          Du hast beantragt, deine E-Mail-Adresse für BillMonk von{' '}
           <Link href={`mailto:${email}`} style={link}>
             {email}
           </Link>{' '}
-          to{' '}
+          zu{' '}
           <Link href={`mailto:${newEmail}`} style={link}>
             {newEmail}
-          </Link>
-          .
+          </Link>{' '}
+          zu ändern.
         </Text>
         <Text style={text}>
-          Click the button below to confirm this change:
+          Klicke auf den Button, um die Änderung zu bestätigen:
         </Text>
         <Button style={button} href={confirmationUrl}>
-          Confirm Email Change
+          E-Mail-Änderung bestätigen
         </Button>
         <Text style={footer}>
-          If you didn't request this change, please secure your account
-          immediately.
+          Falls du diese Änderung nicht angefordert hast, sichere bitte umgehend dein Konto.
         </Text>
       </Container>
     </Body>
@@ -61,26 +64,27 @@ export const EmailChangeEmail = ({
 
 export default EmailChangeEmail
 
-const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }
+const main = { backgroundColor: '#ffffff', fontFamily: "'Inter', Arial, sans-serif" }
 const container = { padding: '20px 25px' }
+const logo = { margin: '0 0 24px' }
 const h1 = {
   fontSize: '22px',
   fontWeight: 'bold' as const,
-  color: '#000000',
+  color: 'hsl(222, 47%, 11%)',
   margin: '0 0 20px',
 }
 const text = {
   fontSize: '14px',
-  color: '#55575d',
+  color: 'hsl(215, 16%, 47%)',
   lineHeight: '1.5',
   margin: '0 0 25px',
 }
-const link = { color: 'inherit', textDecoration: 'underline' }
+const link = { color: 'hsl(175, 84%, 26%)', textDecoration: 'underline' }
 const button = {
-  backgroundColor: '#000000',
+  backgroundColor: 'hsl(175, 84%, 26%)',
   color: '#ffffff',
   fontSize: '14px',
-  borderRadius: '8px',
+  borderRadius: '12px',
   padding: '12px 20px',
   textDecoration: 'none',
 }

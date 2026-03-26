@@ -9,6 +9,7 @@ import {
   Head,
   Heading,
   Html,
+  Img,
   Link,
   Preview,
   Text,
@@ -20,31 +21,32 @@ interface InviteEmailProps {
   confirmationUrl: string
 }
 
+const LOGO_URL = 'https://nvvssxykygdxjywncvgd.supabase.co/storage/v1/object/public/email-assets/logo.png'
+
 export const InviteEmail = ({
   siteName,
   siteUrl,
   confirmationUrl,
 }: InviteEmailProps) => (
-  <Html lang="en" dir="ltr">
+  <Html lang="de" dir="ltr">
     <Head />
-    <Preview>You've been invited to join {siteName}</Preview>
+    <Preview>Du wurdest zu BillMonk eingeladen</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>You've been invited</Heading>
+        <Img src={LOGO_URL} alt="BillMonk" height="40" style={logo} />
+        <Heading style={h1}>Du wurdest eingeladen</Heading>
         <Text style={text}>
-          You've been invited to join{' '}
+          Du wurdest eingeladen,{' '}
           <Link href={siteUrl} style={link}>
-            <strong>{siteName}</strong>
-          </Link>
-          . Click the button below to accept the invitation and create your
-          account.
+            <strong>BillMonk</strong>
+          </Link>{' '}
+          beizutreten. Klicke auf den Button, um die Einladung anzunehmen und dein Konto zu erstellen.
         </Text>
         <Button style={button} href={confirmationUrl}>
-          Accept Invitation
+          Einladung annehmen
         </Button>
         <Text style={footer}>
-          If you weren't expecting this invitation, you can safely ignore this
-          email.
+          Falls du diese Einladung nicht erwartet hast, kannst du diese E-Mail ignorieren.
         </Text>
       </Container>
     </Body>
@@ -53,26 +55,27 @@ export const InviteEmail = ({
 
 export default InviteEmail
 
-const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }
+const main = { backgroundColor: '#ffffff', fontFamily: "'Inter', Arial, sans-serif" }
 const container = { padding: '20px 25px' }
+const logo = { margin: '0 0 24px' }
 const h1 = {
   fontSize: '22px',
   fontWeight: 'bold' as const,
-  color: '#000000',
+  color: 'hsl(222, 47%, 11%)',
   margin: '0 0 20px',
 }
 const text = {
   fontSize: '14px',
-  color: '#55575d',
+  color: 'hsl(215, 16%, 47%)',
   lineHeight: '1.5',
   margin: '0 0 25px',
 }
-const link = { color: 'inherit', textDecoration: 'underline' }
+const link = { color: 'hsl(175, 84%, 26%)', textDecoration: 'underline' }
 const button = {
-  backgroundColor: '#000000',
+  backgroundColor: 'hsl(175, 84%, 26%)',
   color: '#ffffff',
   fontSize: '14px',
-  borderRadius: '8px',
+  borderRadius: '12px',
   padding: '12px 20px',
   textDecoration: 'none',
 }
