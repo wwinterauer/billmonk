@@ -39,7 +39,7 @@ export default function Beta() {
 
       // Increment used_count via RPC not possible with anon, so we set cookie and let it be
       // We'll increment server-side or via admin. For now just set cookie.
-      const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
+      const expires = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toUTCString();
       document.cookie = `beta_access=true; expires=${expires}; path=/; SameSite=Lax`;
 
       // Try to increment used_count (will work if user is authenticated admin, otherwise silently fail)
