@@ -12,10 +12,22 @@ import { FAQ } from '@/components/landing/FAQ';
 import { CTA } from '@/components/landing/CTA';
 import { Footer } from '@/components/landing/Footer';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 
 const Index = () => {
   const { user, loading } = useAuth();
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const scrollTo = params.get('scrollTo');
+    if (scrollTo) {
+      setTimeout(() => {
+        document.getElementById(scrollTo)?.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    }
+  }, [location.search]);
 
   if (!loading && user) {
     return <Navigate to="/dashboard" replace />;
