@@ -48,6 +48,7 @@ interface UserData {
   stripe_revenue: number;
   stripe_payment_count: number;
   stripe_last_payment_at: string | null;
+  is_beta_user: boolean;
 }
 
 export function UserManagement() {
@@ -247,7 +248,14 @@ export function UserManagement() {
                   {filteredUsers.map(u => (
                     <TableRow key={u.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedUser(u)}>
                       <TableCell className="font-mono text-sm max-w-[200px] truncate">{u.email}</TableCell>
-                      <TableCell>{[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          {[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}
+                          {u.is_beta_user && (
+                            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-[10px] px-1.5 py-0">Beta</Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-sm">{u.account_type === 'company' ? 'Firma' : u.account_type === 'private' ? 'Privat' : u.account_type === 'association' ? 'Verein' : '—'}</TableCell>
                       <TableCell><Badge variant={planColor(u.plan)}>{u.plan || 'free'}</Badge></TableCell>
                       <TableCell>{subBadge(u.subscription_status)}</TableCell>

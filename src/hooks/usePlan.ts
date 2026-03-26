@@ -7,6 +7,7 @@ export interface PlanData {
   plan: PlanType;
   effectivePlan: PlanType;
   isAdmin: boolean;
+  isBetaUser: boolean;
   adminViewPlan: PlanType | null;
   hasStripeCustomer: boolean;
   receiptsUsed: number;
@@ -28,6 +29,7 @@ export function usePlan(): PlanData {
   const [plan, setPlan] = useState<PlanType>('free');
   const [adminViewPlan, setAdminViewPlanState] = useState<PlanType | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isBetaUser, setIsBetaUser] = useState(false);
   const [receiptsUsed, setReceiptsUsed] = useState(0);
   const [receiptsCredit, setReceiptsCredit] = useState(0);
   const [documentsUsed, setDocumentsUsed] = useState(0);
@@ -39,7 +41,7 @@ export function usePlan(): PlanData {
     if (!user) return;
     const { data } = await supabase
       .from('profiles')
-      .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan, monthly_document_count, document_credit, stripe_customer_id')
+      .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan, monthly_document_count, document_credit, stripe_customer_id, is_beta_user')
       .eq('id', user.id)
       .single();
 
@@ -51,6 +53,7 @@ export function usePlan(): PlanData {
       setDocumentsCredit((data as any).document_credit || 0);
       setAdminViewPlanState((data.admin_view_plan as PlanType) || null);
       setHasStripeCustomer(!!data.stripe_customer_id);
+      setIsBetaUser(!!(data as any).is_beta_user);
     }
   }, [user]);
 
@@ -122,6 +125,7 @@ export function usePlan(): PlanData {
     plan,
     effectivePlan,
     isAdmin,
+    isBetaUser,
     adminViewPlan,
     hasStripeCustomer,
     receiptsUsed,

@@ -49,6 +49,33 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated");
     logStep("User authenticated", { userId: user.id, email: user.email });
 
+    // Check if user is a beta user — if so, skip Stripe entirely
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("is_beta_user, plan, stripe_customer_id")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.is_beta_user) {
+      logStep("Beta user detected, preserving business plan");
+      // Ensure beta user always has business plan
+      if (profile.plan !== 'business') {
+        await supabaseAdmin.from("profiles").update({
+          plan: 'business',
+          subscription_status: 'active',
+        }).eq("id", user.id);
+      }
+      return new Response(JSON.stringify({
+        subscribed: true,
+        plan: 'business',
+        subscription_status: 'active',
+        is_beta_user: true,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
 

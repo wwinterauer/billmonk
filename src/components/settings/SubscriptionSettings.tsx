@@ -29,7 +29,7 @@ const UPGRADE_PLANS: { plan: Exclude<PlanType, 'free'>; features: string[] }[] =
 ];
 
 export function SubscriptionSettings() {
-  const { plan, effectivePlan, isAdmin, hasStripeCustomer, receiptsUsed, receiptsLimit, receiptsCredit, documentsUsed, documentsLimit, documentsCredit, loading: planLoading } = usePlan();
+  const { plan, effectivePlan, isAdmin, isBetaUser, hasStripeCustomer, receiptsUsed, receiptsLimit, receiptsCredit, documentsUsed, documentsLimit, documentsCredit, loading: planLoading } = usePlan();
   const { user } = useAuth();
   const { toast } = useToast();
   const [portalLoading, setPortalLoading] = useState(false);
@@ -134,6 +134,66 @@ export function SubscriptionSettings() {
     if (!isPaid) return '30 Tage gratis testen';
     return '7 Tage gratis testen';
   };
+
+  // Beta user special view
+  if (isBetaUser) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-primary" />
+                  Dein Abo
+                </CardTitle>
+                <CardDescription>Beta-Tester — Dauerhafter Zugang</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs">
+                  Beta-Tester
+                </Badge>
+                <Badge variant="default" className="text-sm">
+                  Business Plan
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
+              <Crown className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium text-foreground">Beta-Tester — Dauerhafter Business-Zugang (kostenlos)</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Als Beta-Tester hast du dauerhaften Zugriff auf alle Business-Features — komplett kostenlos. Vielen Dank für dein frühes Vertrauen!
+                </p>
+              </div>
+            </div>
+
+            {/* Usage stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <p className="text-2xl font-bold text-foreground">∞</p>
+                <p className="text-xs text-muted-foreground">Kosten/Monat</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <p className="text-2xl font-bold text-foreground">{PLAN_LIMITS['business'].receiptsPerMonth}</p>
+                <p className="text-xs text-muted-foreground">Belege/Monat</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <p className="text-2xl font-bold text-foreground">{receiptsUsed}</p>
+                <p className="text-xs text-muted-foreground">Belege verwendet</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <p className="text-2xl font-bold text-foreground">{Math.max(0, receiptsLimit - receiptsUsed)}</p>
+                <p className="text-xs text-muted-foreground">Belege verfügbar</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

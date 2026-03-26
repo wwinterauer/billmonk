@@ -79,6 +79,25 @@ const Register = () => {
         });
       }
     } else {
+      // Check if beta_access cookie is set → mark as beta user
+      const isBetaUser = document.cookie.split(';').some(c => c.trim().startsWith('beta_access=true'));
+      if (isBetaUser) {
+        // Mark profile as beta user with business plan (fire-and-forget, will be applied once profile exists)
+        const markBeta = async () => {
+          // Wait briefly for the handle_new_user trigger to create the profile
+          await new Promise(r => setTimeout(r, 1500));
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          if (currentUser) {
+            await supabase.from('profiles').update({
+              is_beta_user: true,
+              plan: 'business',
+              subscription_status: 'active',
+            } as any).eq('id', currentUser.id);
+          }
+        };
+        markBeta().catch(() => {});
+      }
+
       // Send welcome email (fire-and-forget)
       supabase.functions.invoke('send-transactional-email', {
         body: {
