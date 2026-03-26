@@ -68,7 +68,7 @@ export const FEATURE_DESCRIPTIONS: Record<string, { title: string; description: 
 };
 
 // Plan hierarchy for comparison
-const PLAN_ORDER: PlanType[] = ['free', 'starter', 'pro', 'business'];
+export const PLAN_ORDER: PlanType[] = ['free', 'starter', 'pro', 'business'];
 
 export function isPlanSufficient(currentPlan: PlanType, requiredPlan: PlanType): boolean {
   return PLAN_ORDER.indexOf(currentPlan) >= PLAN_ORDER.indexOf(requiredPlan);
