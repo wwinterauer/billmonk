@@ -85,6 +85,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             checkSubscription();
             startSubscriptionPolling();
           }, 500);
+
+          // Send welcome email on first sign-in (after email confirmation)
+          // Idempotency key ensures it's only sent once per user
+          if (event === 'SIGNED_IN') {
+            const u = session.user;
+            supabase.functions.invoke('send-transactional-email', {
+              body: {
+                templateName: 'welcome-email',
+                recipientEmail: u.email,
+                idempotencyKey: `welcome-${u.id}`,
+                templateData: { name: u.user_metadata?.first_name || undefined },
+              },
+            }).catch(() => {});
+          }
         }
 
         if (event === 'SIGNED_OUT') {
@@ -129,18 +143,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     });
-
-    // Send welcome email after successful signup
-    if (!error && data?.user) {
-      supabase.functions.invoke('send-transactional-email', {
-        body: {
-          templateName: 'welcome-email',
-          recipientEmail: email,
-          idempotencyKey: `welcome-${data.user.id}`,
-          templateData: { name: firstName },
-        },
-      }).catch(() => {}); // best-effort, don't block signup
-    }
+    
+    return { error: error as Error | null };
     
     return { error: error as Error | null };
   };
