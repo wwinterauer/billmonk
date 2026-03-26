@@ -11,7 +11,8 @@ import { ActivityFeed } from '@/components/admin/ActivityFeed';
 import { AnnouncementManager } from '@/components/admin/AnnouncementManager';
 import { SupportManagement } from '@/components/admin/SupportManagement';
 import { FAQManagement } from '@/components/admin/FAQManagement';
-import { Shield, Users, CreditCard, BarChart3, Mail, HeartPulse, Blocks, Activity, Megaphone, MessageSquare, HelpCircle } from 'lucide-react';
+import { BetaCodeManagement } from '@/components/admin/BetaCodeManagement';
+import { Shield, Users, CreditCard, BarChart3, Mail, HeartPulse, Blocks, Activity, Megaphone, MessageSquare, HelpCircle, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Admin() {
@@ -94,6 +95,10 @@ export default function Admin() {
               <HelpCircle className="h-4 w-4" />
               FAQ
             </TabsTrigger>
+            <TabsTrigger value="beta" className="gap-2">
+              <KeyRound className="h-4 w-4" />
+              Beta-Codes
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -125,6 +130,9 @@ export default function Admin() {
           </TabsContent>
           <TabsContent value="faq">
             <FAQManagement />
+          </TabsContent>
+          <TabsContent value="beta">
+            <BetaCodeManagement />
           </TabsContent>
         </Tabs>
       </div>

@@ -37,6 +37,8 @@ import PricingPage from "./pages/PricingPage";
 import Admin from "./pages/Admin";
 import Unsubscribe from "./pages/Unsubscribe";
 import { PageTracker } from "./components/PageTracker";
+import { BetaGate } from "./components/BetaGate";
+import Beta from "./pages/Beta";
 
 const queryClient = new QueryClient();
 
@@ -47,7 +49,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <BetaGate>
           <Routes>
+            <Route path="/beta" element={<Beta />} />
             <Route path="/" element={<Index />} />
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/login" element={<Login />} />
@@ -211,6 +215,7 @@ const App = () => (
             />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </BetaGate>
           <PageTracker />
           <InstallPrompt />
           <CameraButton />
