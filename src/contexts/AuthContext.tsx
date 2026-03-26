@@ -85,20 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             checkSubscription();
             startSubscriptionPolling();
           }, 500);
-
-          // Send welcome email on first sign-in (after email confirmation)
-          // Idempotency key ensures it's only sent once per user
-          if (event === 'SIGNED_IN') {
-            const u = session.user;
-            supabase.functions.invoke('send-transactional-email', {
-              body: {
-                templateName: 'welcome-email',
-                recipientEmail: u.email,
-                idempotencyKey: `welcome-${u.id}`,
-                templateData: { name: u.user_metadata?.first_name || undefined },
-              },
-            }).catch(() => {});
-          }
         }
 
         if (event === 'SIGNED_OUT') {
