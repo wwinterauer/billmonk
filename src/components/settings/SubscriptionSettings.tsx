@@ -2,14 +2,16 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ExternalLink, CreditCard, Crown, Check } from 'lucide-react';
+import { Loader2, ExternalLink, CreditCard, Crown, Check, Info } from 'lucide-react';
 import { usePlan } from '@/hooks/usePlan';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { PLAN_NAMES, PLAN_LIMITS, PLAN_PRICES, PlanType } from '@/lib/planConfig';
+import { PLAN_NAMES, PLAN_LIMITS, PLAN_PRICES, PLAN_ORDER, PlanType } from '@/lib/planConfig';
 import { STRIPE_TIERS } from '@/lib/stripeConfig';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 
 const UPGRADE_PLANS: { plan: Exclude<PlanType, 'free'>; features: string[] }[] = [
   {
@@ -28,11 +30,30 @@ const UPGRADE_PLANS: { plan: Exclude<PlanType, 'free'>; features: string[] }[] =
 
 export function SubscriptionSettings() {
   const { plan, effectivePlan, isAdmin, hasStripeCustomer, receiptsUsed, receiptsLimit, receiptsCredit, documentsUsed, documentsLimit, documentsCredit, loading: planLoading } = usePlan();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [portalLoading, setPortalLoading] = useState(false);
   const [checkLoading, setCheckLoading] = useState(false);
   const [yearly, setYearly] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
+  // Fetch trialed_plans from profile
+  const { data: profileData } = useQuery({
+    queryKey: ['profile-trialed-plans', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from('profiles')
+        .select('trialed_plans, subscription_status')
+        .eq('id', user.id)
+        .single();
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  const trialedPlans: string[] = (profileData?.trialed_plans as string[]) || [];
+  const subscriptionStatus = profileData?.subscription_status || '';
 
   const openPortal = async () => {
     setPortalLoading(true);
@@ -79,7 +100,7 @@ export function SubscriptionSettings() {
       const priceId = yearly ? tier.yearlyPriceId : tier.monthlyPriceId;
 
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { priceId },
+        body: { priceId, targetPlan },
       });
 
       if (error) throw error;
@@ -99,6 +120,20 @@ export function SubscriptionSettings() {
 
   const displayPlan = isAdmin ? plan : effectivePlan;
   const isPaid = displayPlan !== 'free';
+  const currentPlanIndex = PLAN_ORDER.indexOf(displayPlan);
+  const isTrialing = subscriptionStatus === 'trialing';
+
+  // Filter upgrade plans to only show plans higher than current
+  const availableUpgrades = UPGRADE_PLANS.filter(
+    (item) => PLAN_ORDER.indexOf(item.plan) > currentPlanIndex
+  );
+
+  const getButtonLabel = (targetPlan: string) => {
+    const alreadyTrialed = trialedPlans.includes(targetPlan);
+    if (alreadyTrialed) return 'Jetzt upgraden';
+    if (!isPaid) return '30 Tage gratis testen';
+    return '7 Tage gratis testen';
+  };
 
   return (
     <div className="space-y-6">
@@ -112,9 +147,16 @@ export function SubscriptionSettings() {
               </CardTitle>
               <CardDescription>Verwalte deinen Plan und dein Abonnement</CardDescription>
             </div>
-            <Badge variant={isPaid ? 'default' : 'secondary'} className="text-sm">
-              {PLAN_NAMES[displayPlan]} Plan
-            </Badge>
+            <div className="flex items-center gap-2">
+              {isTrialing && (
+                <Badge variant="outline" className="text-xs border-primary text-primary">
+                  Testphase
+                </Badge>
+              )}
+              <Badge variant={isPaid ? 'default' : 'secondary'} className="text-sm">
+                {PLAN_NAMES[displayPlan]} Plan
+              </Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -185,18 +227,33 @@ export function SubscriptionSettings() {
               Status prüfen
             </Button>
           </div>
+
+          {/* Downgrade hint for paid users */}
+          {isPaid && hasStripeCustomer && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/30 text-sm text-muted-foreground">
+              <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <span>
+                Ein Wechsel auf einen niedrigeren Plan ist zum Ende deiner aktuellen Laufzeit möglich.
+                Nutze dafür „Abo verwalten".
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Upgrade plans */}
-      {!isPaid && (
+      {/* Upgrade plans — show for free users AND paid users with higher plans available */}
+      {availableUpgrades.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Plan upgraden
+              {isPaid ? 'Upgrade verfügbar' : 'Plan upgraden'}
             </CardTitle>
-            <p className="text-sm text-primary font-medium mt-1">🎉 Beta-Aktion: 50% Rabatt für 12 Monate + 30 Tage gratis testen</p>
+            <p className="text-sm text-primary font-medium mt-1">
+              🎉 Beta-Aktion: 50% Rabatt für 12 Monate
+              {!isPaid && ' + 30 Tage gratis testen'}
+              {isPaid && availableUpgrades.some(u => !trialedPlans.includes(u.plan)) && ' + 7 Tage gratis testen'}
+            </p>
             <CardDescription>
               <div className="flex items-center gap-3 mt-2">
                 <Label className={!yearly ? 'text-foreground font-medium' : 'text-muted-foreground'}>
@@ -211,19 +268,26 @@ export function SubscriptionSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid sm:grid-cols-3 gap-4">
-              {UPGRADE_PLANS.map((item) => {
+            <div className={`grid gap-4 ${availableUpgrades.length === 1 ? 'sm:grid-cols-1 max-w-md' : availableUpgrades.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
+              {availableUpgrades.map((item) => {
                 const prices = PLAN_PRICES[item.plan];
                 const price = yearly ? prices.yearly : prices.monthly;
-                
+                const alreadyTrialed = trialedPlans.includes(item.plan);
 
                 return (
                   <Card key={item.plan} className="relative border-border/50">
-                    {item.plan === 'pro' && (
+                    {item.plan === 'pro' && !isPaid && (
                       <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                         <span className="bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full">
                           Beliebt
                         </span>
+                      </div>
+                    )}
+                    {alreadyTrialed && (
+                      <div className="absolute -top-3 right-3">
+                        <Badge variant="secondary" className="text-xs">
+                          Bereits getestet
+                        </Badge>
                       </div>
                     )}
                     <CardHeader className="text-center pb-2">
@@ -255,11 +319,11 @@ export function SubscriptionSettings() {
                       </ul>
                       <Button
                         className="w-full"
-                        variant={item.plan === 'pro' ? 'default' : 'outline'}
+                        variant={item.plan === 'pro' || availableUpgrades.length === 1 ? 'default' : 'outline'}
                         onClick={() => handleCheckout(item.plan)}
                         disabled={loadingPlan === item.plan}
                       >
-                        {loadingPlan === item.plan ? 'Wird geladen...' : '30 Tage gratis testen'}
+                        {loadingPlan === item.plan ? 'Wird geladen...' : getButtonLabel(item.plan)}
                       </Button>
                       <p className="text-xs text-center text-muted-foreground">
                         danach €{(PLAN_PRICES[item.plan].monthly * 0.5).toFixed(2).replace('.', ',')}/Monat für 12 Monate
