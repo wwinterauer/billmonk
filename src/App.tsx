@@ -35,6 +35,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import PricingPage from "./pages/PricingPage";
 import Admin from "./pages/Admin";
+import Unsubscribe from "./pages/Unsubscribe";
 import { PageTracker } from "./components/PageTracker";
 
 const queryClient = new QueryClient();
