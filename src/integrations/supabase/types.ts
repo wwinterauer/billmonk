@@ -1968,6 +1968,7 @@ export type Database = {
           email: string
           first_name: string | null
           id: string
+          is_beta_user: boolean
           last_name: string | null
           monthly_document_count: number
           monthly_receipt_count: number | null
@@ -2001,6 +2002,7 @@ export type Database = {
           email: string
           first_name?: string | null
           id: string
+          is_beta_user?: boolean
           last_name?: string | null
           monthly_document_count?: number
           monthly_receipt_count?: number | null
@@ -2034,6 +2036,7 @@ export type Database = {
           email?: string
           first_name?: string | null
           id?: string
+          is_beta_user?: boolean
           last_name?: string | null
           monthly_document_count?: number
           monthly_receipt_count?: number | null
