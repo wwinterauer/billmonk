@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Plus, Copy, Loader2 } from 'lucide-react';
+import { Plus, Copy, Loader2, Pencil, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface BetaCode {
