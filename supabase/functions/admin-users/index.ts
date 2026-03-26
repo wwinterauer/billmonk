@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 
 const corsHeaders = {
@@ -50,7 +50,6 @@ serve(async (req) => {
       });
     }
 
-    // Fetch all profile fields
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from("profiles")
       .select("id, email, first_name, last_name, plan, created_at, monthly_receipt_count, stripe_customer_id, subscription_status, newsletter_opt_in, street, zip, city, country, phone, account_type, company_name, uid_number, onboarding_completed, subscription_end_date, stripe_product_id, avatar_url, receipt_credit, monthly_document_count, document_credit, admin_view_plan")
@@ -58,7 +57,6 @@ serve(async (req) => {
 
     if (profilesError) throw profilesError;
 
-    // Aggregate receipt stats per user
     const { data: allReceipts } = await supabaseAdmin
       .from("receipts")
       .select("user_id, amount_gross");
@@ -72,7 +70,6 @@ serve(async (req) => {
       }
     }
 
-    // Aggregate invoice stats
     const { data: allInvoices } = await supabaseAdmin
       .from("invoices")
       .select("user_id, total");
@@ -86,7 +83,6 @@ serve(async (req) => {
       }
     }
 
-    // Support ticket counts (open)
     const { data: openTickets } = await supabaseAdmin
       .from("support_tickets")
       .select("user_id")
@@ -99,14 +95,12 @@ serve(async (req) => {
       }
     }
 
-    // Fetch Stripe payment data for users with stripe_customer_id
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     const stripeRevenueMap: Record<string, { total_paid: number; payment_count: number; last_payment_at: string | null }> = {};
 
     if (stripeKey) {
       const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
-      // Collect all stripe customer IDs mapped to user IDs
       const customerToUser: Record<string, string> = {};
       for (const p of (profiles || [])) {
         if (p.stripe_customer_id) {
@@ -114,12 +108,9 @@ serve(async (req) => {
         }
       }
 
-      // Fetch all successful payments (invoices paid) from Stripe
-      // We batch by iterating through Stripe invoices
       try {
         const stripeCustomerIds = Object.keys(customerToUser);
         
-        // Process in parallel batches for each customer
         const batchSize = 10;
         for (let i = 0; i < stripeCustomerIds.length; i += batchSize) {
           const batch = stripeCustomerIds.slice(i, i + batchSize);
@@ -137,7 +128,7 @@ serve(async (req) => {
               let lastPaymentAt: string | null = null;
 
               for (const inv of invoices.data) {
-                totalPaid += (inv.amount_paid || 0) / 100; // Convert from cents to EUR
+                totalPaid += (inv.amount_paid || 0) / 100;
                 paymentCount++;
                 if (inv.status_transitions?.paid_at) {
                   const paidDate = new Date(inv.status_transitions.paid_at * 1000).toISOString();
@@ -158,7 +149,6 @@ serve(async (req) => {
       }
     }
 
-    // Merge data
     const users = (profiles || []).map((p: any) => ({
       ...p,
       total_receipts: receiptMap[p.id]?.count || 0,

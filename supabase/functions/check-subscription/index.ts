@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
-import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +10,7 @@ const corsHeaders = {
 const PRODUCT_TO_PLAN: Record<string, string> = {
   "prod_UAKsQZUmnXhFJi": "starter",
   "prod_UAKtEUTzqyQ44I": "pro",
+  "prod_UBNbFH4F60Dh7H": "pro",
   "prod_UAKwFsOsukVbz4": "business",
   "prod_UAKzP7PQ5abo5z": "starter",
   "prod_UAL40QoQd3uz1M": "pro",
@@ -53,7 +54,6 @@ serve(async (req) => {
 
     if (customers.data.length === 0) {
       logStep("No Stripe customer found, keeping current plan");
-      // Don't reset plan - user might have a manually assigned plan
       return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
@@ -63,34 +63,38 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
-    // Save stripe_customer_id if not yet stored
     await supabaseAdmin.from("profiles").update({ stripe_customer_id: customerId }).eq("id", user.id);
 
+    // Check for active OR trialing subscriptions
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
-      status: "active",
-      limit: 1,
+      limit: 10,
     });
 
-    if (subscriptions.data.length === 0) {
-      logStep("No active subscription, keeping current plan");
-      // Don't reset plan - user might have a manually assigned plan
+    // Find first active or trialing subscription
+    const activeOrTrialing = subscriptions.data.find(
+      (s) => s.status === "active" || s.status === "trialing"
+    );
+
+    if (!activeOrTrialing) {
+      logStep("No active/trialing subscription, keeping current plan");
       return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
 
-    const subscription = subscriptions.data[0];
+    const subscription = activeOrTrialing;
     const productId = subscription.items.data[0].price.product as string;
     const plan = PRODUCT_TO_PLAN[productId] || "free";
     const subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
-    logStep("Active subscription found", { productId, plan, subscriptionEnd });
+    const subscriptionStatus = subscription.status; // 'active' or 'trialing'
+    logStep("Subscription found", { productId, plan, subscriptionEnd, status: subscriptionStatus });
 
     await supabaseAdmin.from("profiles").update({
       plan,
       stripe_product_id: productId,
-      subscription_status: "active",
+      subscription_status: subscriptionStatus,
       subscription_end_date: subscriptionEnd,
     }).eq("id", user.id);
 
@@ -99,6 +103,7 @@ serve(async (req) => {
       plan,
       product_id: productId,
       subscription_end: subscriptionEnd,
+      subscription_status: subscriptionStatus,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
