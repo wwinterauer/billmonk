@@ -520,7 +520,7 @@ const Upload = () => {
 
       if (hasDuplicate) {
         toast({
-          title: 'Mögliches Duplikat erkannt',
+          title: 'Moment — den Beleg kennen wir schon.',
           description: `${result.duplicateCheck?.matchReasons.join(', ')} (${result.duplicateCheck?.score}%)`,
           variant: 'default',
         });

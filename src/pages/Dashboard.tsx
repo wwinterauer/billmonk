@@ -6,7 +6,7 @@ import {
   TrendingDown, 
   TrendingUp, 
   Receipt, 
-  Sparkles, 
+  Search,
   Plus,
   ArrowRight,
   Calendar,
@@ -149,13 +149,13 @@ const Dashboard = () => {
       icon: Receipt,
     },
     {
-      title: 'Erkennungsrate',
-      value: loading ? null : (stats.avgAiConfidence !== null 
-        ? `${Math.round(stats.avgAiConfidence * 100)}%` 
+      title: 'Trefferquote',
+      value: loading ? null : (stats.avgAiConfidence !== null
+        ? `${Math.round(stats.avgAiConfidence * 100)}%`
         : '–'),
       change: 'KI-Genauigkeit',
       changeType: 'positive',
-      icon: Sparkles,
+      icon: Search,
     },
   ];
 
@@ -232,7 +232,7 @@ const Dashboard = () => {
                     </>
                   ) : (
                     <>
-                      <p className="text-2xl font-bold text-foreground mb-1">{stat.value}</p>
+                      <p className="text-2xl font-bold text-foreground mb-1 font-mono">{stat.value}</p>
                       <p className={`text-sm ${
                         stat.changeType === 'positive' ? 'text-success' :
                         stat.changeType === 'warning' ? 'text-warning' :
@@ -266,7 +266,7 @@ const Dashboard = () => {
                   </>
                 ) : (
                   <>
-                    <p className="text-2xl font-bold text-foreground mb-1">{formatCurrency(stats.paidThisMonth)}</p>
+                    <p className="text-2xl font-bold text-foreground mb-1 font-mono">{formatCurrency(stats.paidThisMonth)}</p>
                     <p className="text-sm text-muted-foreground">Bezahlte Rechnungen</p>
                   </>
                 )}
@@ -288,7 +288,7 @@ const Dashboard = () => {
                   </>
                 ) : (
                   <>
-                    <p className="text-2xl font-bold text-foreground mb-1">{formatCurrency(stats.openInvoiceAmount)}</p>
+                    <p className="text-2xl font-bold text-foreground mb-1 font-mono">{formatCurrency(stats.openInvoiceAmount)}</p>
                     <p className="text-sm text-muted-foreground">{stats.openInvoiceCount} Rechnung{stats.openInvoiceCount !== 1 ? 'en' : ''} offen</p>
                   </>
                 )}
@@ -310,7 +310,7 @@ const Dashboard = () => {
                   </>
                 ) : (
                   <>
-                    <p className={`text-2xl font-bold mb-1 ${stats.paidThisMonth - stats.totalExpenses >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                    <p className={`text-2xl font-bold mb-1 font-mono ${stats.paidThisMonth - stats.totalExpenses >= 0 ? 'text-green-600' : 'text-destructive'}`}>
                       {formatCurrency(stats.paidThisMonth - stats.totalExpenses)}
                     </p>
                     <p className="text-sm text-muted-foreground">Einnahmen − Ausgaben</p>
@@ -391,9 +391,9 @@ const Dashboard = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
-                          <span className="font-medium text-foreground">
-                            {receipt.amount_gross !== null 
-                              ? formatCurrency(receipt.amount_gross) 
+                          <span className="font-medium text-foreground font-mono">
+                            {receipt.amount_gross !== null
+                              ? formatCurrency(receipt.amount_gross)
                               : '–'
                             }
                           </span>

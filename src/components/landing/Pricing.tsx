@@ -182,7 +182,7 @@ export function Pricing() {
                     {plan.plan !== 'free' && (
                       <span className="text-sm text-muted-foreground line-through mr-2">{getPrice(plan.plan)}</span>
                     )}
-                    <span className="text-4xl font-bold">
+                    <span className="text-4xl font-bold font-mono">
                       {plan.plan === 'free' ? getPrice(plan.plan) : getBetaPrice(plan.plan)}
                     </span>
                     <span className="text-muted-foreground">

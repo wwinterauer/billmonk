@@ -338,7 +338,7 @@ export function useReceipts() {
       throw new Error(`Datenbank-Fehler: ${dbError.message}`);
     }
 
-    onProgress?.(50, 'KI analysiert...');
+    onProgress?.(50, 'Monk analysiert...');
 
     return receipt as Receipt;
   };
@@ -372,7 +372,7 @@ export function useReceipts() {
     }
 
     try {
-      onProgress?.(60, 'KI analysiert...');
+      onProgress?.(60, 'Monk analysiert...');
       
       // Use ID-based extraction so the Edge Function can:
       // 1. Load the file from storage

@@ -110,14 +110,14 @@ export function Hero() {
                         <Receipt className="h-4 w-4 text-primary" />
                         <span className="text-xs text-muted-foreground">Belege</span>
                       </div>
-                      <p className="text-lg font-bold text-foreground tabular-nums">247</p>
+                      <p className="text-lg font-bold text-foreground tabular-nums font-mono">247</p>
                     </div>
                     <div className="p-3 rounded-lg bg-muted/50 border border-border">
                       <div className="flex items-center gap-2 mb-1">
                         <Brain className="h-4 w-4 text-success" />
                         <span className="text-xs text-muted-foreground">KI-Genauigkeit</span>
                       </div>
-                      <p className="text-lg font-bold text-success tabular-nums">94%</p>
+                      <p className="text-lg font-bold text-success tabular-nums font-mono">94%</p>
                     </div>
                   </div>
 
@@ -128,7 +128,7 @@ export function Hero() {
                         <p className="text-sm font-medium text-foreground truncate">Amazon - Büromaterial</p>
                         <p className="text-xs text-muted-foreground">Automatisch erkannt</p>
                       </div>
-                      <span className="text-sm font-semibold text-foreground tabular-nums">€ 89,99</span>
+                      <span className="text-sm font-semibold text-foreground tabular-nums font-mono">€ 89,99</span>
                     </div>
                     <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 border border-border">
                       <FileText className="h-4 w-4 text-muted-foreground" />
@@ -136,7 +136,7 @@ export function Hero() {
                         <p className="text-sm font-medium text-foreground truncate">A1 Telekom - Mobilfunk</p>
                         <p className="text-xs text-muted-foreground">Zur Prüfung</p>
                       </div>
-                      <span className="text-sm font-semibold text-foreground tabular-nums">€ 29,90</span>
+                      <span className="text-sm font-semibold text-foreground tabular-nums font-mono">€ 29,90</span>
                     </div>
                   </div>
                 </div>

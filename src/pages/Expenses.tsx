@@ -1717,7 +1717,7 @@ const Expenses = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{formatCurrency(stats.total)}</p>
+              <p className="text-2xl font-bold font-mono">{formatCurrency(stats.total)}</p>
               <p className="text-xs text-muted-foreground mt-1">{dateRangeLabel}</p>
             </CardContent>
           </Card>
@@ -1726,7 +1726,7 @@ const Expenses = () => {
               <CardTitle className="text-sm font-medium text-muted-foreground">Anzahl</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{stats.count} Belege</p>
+              <p className="text-2xl font-bold font-mono">{stats.count} Belege</p>
               <p className="text-xs text-muted-foreground mt-1">{dateRangeLabel}</p>
             </CardContent>
           </Card>
@@ -1735,7 +1735,7 @@ const Expenses = () => {
               <CardTitle className="text-sm font-medium text-muted-foreground">Vorsteuer</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{formatCurrency(stats.vatSum)}</p>
+              <p className="text-2xl font-bold font-mono">{formatCurrency(stats.vatSum)}</p>
               <p className="text-xs text-muted-foreground mt-1">{dateRangeLabel}</p>
             </CardContent>
           </Card>
@@ -1744,7 +1744,7 @@ const Expenses = () => {
               <CardTitle className="text-sm font-medium text-muted-foreground">Durchschnitt</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{formatCurrency(stats.average)}</p>
+              <p className="text-2xl font-bold font-mono">{formatCurrency(stats.average)}</p>
               <p className="text-xs text-muted-foreground mt-1">pro Beleg</p>
             </CardContent>
           </Card>

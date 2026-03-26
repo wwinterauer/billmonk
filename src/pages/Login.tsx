@@ -53,7 +53,7 @@ const Login = () => {
     } else {
       toast({
         title: 'Willkommen zurück!',
-        description: 'Du wirst weitergeleitet...',
+        description: 'Monk hat schon angefangen, alles vorzubereiten.',
       });
       navigate('/dashboard');
     }
