@@ -27,6 +27,10 @@ export function BetaCodeManagement() {
   const [newDescription, setNewDescription] = useState('');
   const [newMaxUses, setNewMaxUses] = useState('');
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+  const [editMaxUses, setEditMaxUses] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const fetchCodes = async () => {
     const { data } = await supabase
