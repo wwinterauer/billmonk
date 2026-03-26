@@ -108,31 +108,7 @@ serve(async (req) => {
       subscription_end_date: subscriptionEnd,
     }).eq("id", user.id);
 
-    // Send subscription-confirmed email when transitioning to active paid plan
-    if (
-      subscriptionStatus === "active" &&
-      plan !== "free" &&
-      (oldPlan === "free" || oldStatus === "trialing") &&
-      oldStatus !== "active"
-    ) {
-      logStep("Sending subscription-confirmed email", { plan, email: user.email });
-      try {
-        await supabaseAdmin.functions.invoke("send-transactional-email", {
-          body: {
-            templateName: "subscription-confirmed",
-            recipientEmail: user.email,
-            idempotencyKey: `sub-confirmed-${user.id}-${subscription.id}`,
-            templateData: {
-              name: user.user_metadata?.first_name || undefined,
-              plan: plan.charAt(0).toUpperCase() + plan.slice(1),
-            },
-          },
-        });
-      } catch (e) {
-        logStep("Failed to send subscription-confirmed email", { error: String(e) });
-      }
-    }
-
+    // Subscription-confirmed email is now sent via the stripe-webhook Edge Function
     return new Response(JSON.stringify({
       subscribed: true,
       plan,
