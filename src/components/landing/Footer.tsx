@@ -56,10 +56,10 @@ export function Footer() {
               <div className="flex items-start gap-2">
                 <Mail className="h-4 w-4 mt-0.5 shrink-0" />
                 <a 
-                  href="mailto:w.winterauer@gmail.com" 
+                  href="mailto:w.winterauer@billmonk.ai" 
                   className="hover:text-foreground transition-colors"
                 >
-                  w.winterauer@gmail.com
+                  w.winterauer@billmonk.ai
                 </a>
               </div>
             </div>

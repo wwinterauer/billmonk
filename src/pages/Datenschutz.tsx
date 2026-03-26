@@ -49,7 +49,7 @@ export default function Datenschutz() {
                   <p>Gschwandt 48</p>
                   <p>4822 Bad Goisern, Österreich</p>
                   <p className="mt-2">
-                    E-Mail: <a href="mailto:w.winterauer@gmail.com" className="text-primary hover:underline">w.winterauer@gmail.com</a>
+                    E-Mail: <a href="mailto:w.winterauer@billmonk.ai" className="text-primary hover:underline">w.winterauer@billmonk.ai</a>
                   </p>
                 </div>
               </CardContent>
@@ -247,8 +247,8 @@ export default function Datenschutz() {
                 </div>
                 <p className="text-sm">
                   Kontaktieren Sie uns unter{' '}
-                  <a href="mailto:w.winterauer@gmail.com" className="text-primary hover:underline">
-                    w.winterauer@gmail.com
+                  <a href="mailto:w.winterauer@billmonk.ai" className="text-primary hover:underline">
+                    w.winterauer@billmonk.ai
                   </a>{' '}
                   zur Ausübung Ihrer Rechte.
                 </p>
@@ -349,7 +349,7 @@ export default function Datenschutz() {
                 <p className="mb-4">Bei Fragen zum Datenschutz erreichen Sie uns unter:</p>
                 <div className="bg-muted/50 p-4 rounded-lg">
                   <p className="font-medium text-foreground">Wilfried Winterauer</p>
-                  <p>E-Mail: <a href="mailto:w.winterauer@gmail.com" className="text-primary hover:underline">w.winterauer@gmail.com</a></p>
+                  <p>E-Mail: <a href="mailto:w.winterauer@billmonk.ai" className="text-primary hover:underline">w.winterauer@billmonk.ai</a></p>
                 </div>
                 <p className="mt-4 text-sm">
                   <strong>Aufsichtsbehörde:</strong> Österreichische Datenschutzbehörde, Barichgasse 40-42, 1030 Wien
