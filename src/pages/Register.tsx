@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const registerSchema = z.object({
   firstName: z.string().min(2, 'Vorname muss mindestens 2 Zeichen haben'),
@@ -78,6 +79,16 @@ const Register = () => {
         });
       }
     } else {
+      // Send welcome email (fire-and-forget)
+      supabase.functions.invoke('send-transactional-email', {
+        body: {
+          templateName: 'welcome-email',
+          recipientEmail: data.email,
+          idempotencyKey: `welcome-${data.email}-${Date.now()}`,
+          templateData: { name: data.firstName },
+        },
+      }).catch(() => {});
+
       toast({
         title: 'Konto erstellt!',
         description: 'Du wirst zum Dashboard weitergeleitet...',

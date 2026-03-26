@@ -35,6 +35,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import PricingPage from "./pages/PricingPage";
 import Admin from "./pages/Admin";
+import Unsubscribe from "./pages/Unsubscribe";
 import { PageTracker } from "./components/PageTracker";
 
 const queryClient = new QueryClient();
@@ -199,6 +200,7 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/datenschutz" element={<Datenschutz />} />
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route 
               path="/admin" 
               element={
