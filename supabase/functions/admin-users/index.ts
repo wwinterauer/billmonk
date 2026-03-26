@@ -52,7 +52,7 @@ serve(async (req) => {
 
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from("profiles")
-      .select("id, email, first_name, last_name, plan, created_at, monthly_receipt_count, stripe_customer_id, subscription_status, newsletter_opt_in, street, zip, city, country, phone, account_type, company_name, uid_number, onboarding_completed, subscription_end_date, stripe_product_id, avatar_url, receipt_credit, monthly_document_count, document_credit, admin_view_plan")
+      .select("id, email, first_name, last_name, plan, created_at, monthly_receipt_count, stripe_customer_id, subscription_status, newsletter_opt_in, street, zip, city, country, phone, account_type, company_name, uid_number, onboarding_completed, subscription_end_date, stripe_product_id, avatar_url, receipt_credit, monthly_document_count, document_credit, admin_view_plan, is_beta_user")
       .order("created_at", { ascending: false });
 
     if (profilesError) throw profilesError;
