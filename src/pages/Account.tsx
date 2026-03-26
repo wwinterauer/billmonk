@@ -5,6 +5,7 @@ import {
   Building2,
   Lock,
   Crown,
+  FileText,
   Save,
   Loader2,
   Camera,
