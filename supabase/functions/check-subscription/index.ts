@@ -91,12 +91,47 @@ serve(async (req) => {
     const subscriptionStatus = subscription.status; // 'active' or 'trialing'
     logStep("Subscription found", { productId, plan, subscriptionEnd, status: subscriptionStatus });
 
+    // Fetch current profile to detect plan changes
+    const { data: currentProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("plan, subscription_status")
+      .eq("id", user.id)
+      .single();
+
+    const oldPlan = currentProfile?.plan || "free";
+    const oldStatus = currentProfile?.subscription_status;
+
     await supabaseAdmin.from("profiles").update({
       plan,
       stripe_product_id: productId,
       subscription_status: subscriptionStatus,
       subscription_end_date: subscriptionEnd,
     }).eq("id", user.id);
+
+    // Send subscription-confirmed email when transitioning to active paid plan
+    if (
+      subscriptionStatus === "active" &&
+      plan !== "free" &&
+      (oldPlan === "free" || oldStatus === "trialing") &&
+      oldStatus !== "active"
+    ) {
+      logStep("Sending subscription-confirmed email", { plan, email: user.email });
+      try {
+        await supabaseAdmin.functions.invoke("send-transactional-email", {
+          body: {
+            templateName: "subscription-confirmed",
+            recipientEmail: user.email,
+            idempotencyKey: `sub-confirmed-${user.id}-${subscription.id}`,
+            templateData: {
+              name: user.user_metadata?.first_name || undefined,
+              plan: plan.charAt(0).toUpperCase() + plan.slice(1),
+            },
+          },
+        });
+      } catch (e) {
+        logStep("Failed to send subscription-confirmed email", { error: String(e) });
+      }
+    }
 
     return new Response(JSON.stringify({
       subscribed: true,
