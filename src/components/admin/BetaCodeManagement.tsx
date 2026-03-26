@@ -74,6 +74,32 @@ export function BetaCodeManagement() {
     toast.success('Code kopiert');
   };
 
+  const startEdit = (c: BetaCode) => {
+    setEditingId(c.id);
+    setEditDescription(c.description || '');
+    setEditMaxUses(c.max_uses !== null ? String(c.max_uses) : '');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  const saveEdit = async (id: string) => {
+    setSaving(true);
+    const { error } = await supabase.from('beta_codes').update({
+      description: editDescription.trim() || null,
+      max_uses: editMaxUses ? parseInt(editMaxUses) : null,
+    }).eq('id', id);
+    if (error) {
+      toast.error('Fehler beim Speichern');
+    } else {
+      toast.success('Code aktualisiert');
+      setEditingId(null);
+      fetchCodes();
+    }
+    setSaving(false);
+  };
+
   if (loading) {
     return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
