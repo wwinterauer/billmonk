@@ -1955,6 +1955,7 @@ export type Database = {
           trialed_plans: string[] | null
           uid_number: string | null
           updated_at: string | null
+          welcome_email_sent: boolean
           zip: string | null
         }
         Insert: {
@@ -1987,6 +1988,7 @@ export type Database = {
           trialed_plans?: string[] | null
           uid_number?: string | null
           updated_at?: string | null
+          welcome_email_sent?: boolean
           zip?: string | null
         }
         Update: {
@@ -2019,6 +2021,7 @@ export type Database = {
           trialed_plans?: string[] | null
           uid_number?: string | null
           updated_at?: string | null
+          welcome_email_sent?: boolean
           zip?: string | null
         }
         Relationships: []

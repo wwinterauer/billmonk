@@ -25,13 +25,31 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[SEND-WELCOME-EMAIL] New profile: ${record.email}`);
-
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
+
+    // Check if welcome email was already sent (idempotency)
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("welcome_email_sent")
+      .eq("id", record.id)
+      .single();
+
+    if (profile?.welcome_email_sent) {
+      console.log(`[SEND-WELCOME-EMAIL] Already sent for ${record.email}, skipping`);
+      return new Response(JSON.stringify({ skipped: true, reason: "already_sent" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    // Derive name: first_name or fallback to email
+    const name = record.first_name || record.email;
+
+    console.log(`[SEND-WELCOME-EMAIL] Sending welcome email to ${record.email}`);
 
     const { error } = await supabaseAdmin.functions.invoke(
       "send-transactional-email",
@@ -40,9 +58,7 @@ serve(async (req) => {
           templateName: "welcome-email",
           recipientEmail: record.email,
           idempotencyKey: `welcome-${record.id}`,
-          templateData: {
-            name: record.first_name || undefined,
-          },
+          templateData: { name },
         },
       }
     );
@@ -55,7 +71,13 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[SEND-WELCOME-EMAIL] Welcome email enqueued for ${record.email}`);
+    // Mark as sent to prevent duplicates
+    await supabaseAdmin
+      .from("profiles")
+      .update({ welcome_email_sent: true })
+      .eq("id", record.id);
+
+    console.log(`[SEND-WELCOME-EMAIL] Welcome email sent and flagged for ${record.email}`);
     return new Response(JSON.stringify({ sent: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
