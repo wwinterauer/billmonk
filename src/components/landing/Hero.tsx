@@ -46,7 +46,7 @@ export function Hero() {
             <div className="flex flex-wrap gap-4 justify-center lg:justify-start text-sm text-muted-foreground mb-8">
               <span className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-success" />
-                Keine Kreditkarte nötig
+                30 Tage kostenlos testen
               </span>
               <span className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-success" />
