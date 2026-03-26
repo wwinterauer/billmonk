@@ -88,7 +88,7 @@ export const Scene5: React.FC = () => {
           Jetzt kostenlos starten.
         </h2>
         <p style={{ fontSize: 24, fontWeight: 300, color: "rgba(255,255,255,0.5)" }}>
-          billmonk.lovable.app
+          billmonk.ai
         </p>
       </div>
 

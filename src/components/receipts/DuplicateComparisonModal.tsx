@@ -137,7 +137,6 @@ function ReceiptPreviewCard({ receipt, otherReceipt, type, onDelete, onViewDetai
     
     async function loadPreview() {
       if (!receipt?.file_url) {
-        console.log('[Preview] No file_url for receipt:', receipt?.id);
         return;
       }
       
@@ -146,8 +145,6 @@ function ReceiptPreviewCard({ receipt, otherReceipt, type, onDelete, onViewDetai
       setPreviewUrl(null);
       
       try {
-        console.log('[Preview] Loading file_url:', receipt.file_url);
-        
         // Get signed URL
         const { data, error } = await supabase.storage
           .from('receipts')
@@ -164,8 +161,6 @@ function ReceiptPreviewCard({ receipt, otherReceipt, type, onDelete, onViewDetai
           throw new Error('No signed URL returned');
         }
 
-        console.log('[Preview] Fetching blob from signed URL...');
-        
         // Fetch the file as blob
         const response = await fetch(data.signedUrl);
         
@@ -180,8 +175,6 @@ function ReceiptPreviewCard({ receipt, otherReceipt, type, onDelete, onViewDetai
         if (isCancelled) {
           return;
         }
-        
-        console.log('[Preview] Blob loaded - size:', blob.size, 'type:', blob.type);
         
         // Create blob URL and set state
         currentBlobUrl = URL.createObjectURL(blob);
@@ -202,7 +195,6 @@ function ReceiptPreviewCard({ receipt, otherReceipt, type, onDelete, onViewDetai
     return () => {
       isCancelled = true;
       if (currentBlobUrl) {
-        console.log('[Preview] Cleanup - revoking blob URL');
         URL.revokeObjectURL(currentBlobUrl);
       }
     };

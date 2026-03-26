@@ -140,7 +140,7 @@ const imapPresets: Record<string, ImapPreset> = {
     port: 993,
     helpText: 'Generieren Sie ein App-Passwort unter Kontosicherheit',
     helpUrl: 'https://login.yahoo.com/account/security',
-    color: 'text-purple-500',
+    color: 'text-primary',
     authType: 'app-password',
   },
   icloud: { 

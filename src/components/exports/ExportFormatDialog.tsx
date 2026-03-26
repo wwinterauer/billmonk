@@ -1103,7 +1103,7 @@ export function ExportFormatDialog({
                       {templates.map(template => (
                         <SelectItem key={template.id} value={template.id}>
                           <div className="flex items-center gap-2">
-                            <Table className="w-4 h-4 text-violet-500" />
+                            <Table className="w-4 h-4 text-primary" />
                             <span>{template.name}</span>
                             {template.is_default && (
                               <Badge variant="secondary" className="text-xs">

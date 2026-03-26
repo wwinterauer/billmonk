@@ -146,8 +146,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   duplicate: { label: 'Duplikat', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
   not_a_receipt: { label: 'Kein Beleg', color: 'bg-gray-500/10 text-gray-600 border-gray-500/20' },
   error: { label: 'Fehler', color: 'bg-red-500/10 text-red-600 border-red-500/20' },
-  needs_splitting: { label: 'Aufteilen', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
-  split: { label: 'Aufgeteilt', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
+  needs_splitting: { label: 'Aufteilen', color: 'bg-chart-4/10 text-chart-4 border-chart-4/20' },
+  split: { label: 'Aufgeteilt', color: 'bg-chart-4/10 text-chart-4 border-chart-4/20' },
   completed: { label: 'Abgeschlossen', color: 'bg-slate-500/10 text-slate-600 border-slate-500/20' },
 };
 
@@ -1961,7 +1961,7 @@ const Expenses = () => {
                   size="sm" 
                   variant="outline"
                   disabled={bulkActionLoading !== null}
-                  className="border-violet-500/50 text-violet-600 hover:bg-violet-50 hover:text-violet-700"
+                  className="border-primary/50 text-primary hover:bg-primary/5 hover:text-primary"
                 >
                   {bulkActionLoading === 'ai' ? (
                     <>
@@ -2439,7 +2439,7 @@ const Expenses = () => {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                                  className="h-8 w-8 text-chart-4 hover:text-chart-4/80 hover:bg-chart-4/5"
                                   onClick={() => openSplitDialog(receipt)}
                                   title="PDF aufteilen"
                                 >

@@ -182,7 +182,7 @@ export const useEmailImport = () => {
       if (!user?.id) throw new Error('Nicht angemeldet');
 
       const token = generateToken();
-      const importEmail = `receipts+${token}@import.lovable.app`;
+      const importEmail = `receipts+${token}@import.billmonk.ai`;
 
       const { data, error } = await supabase
         .from('email_connections')
@@ -236,7 +236,7 @@ export const useEmailImport = () => {
       if (!emailConnection?.id || !user?.id) throw new Error('Keine Verbindung vorhanden');
 
       const newToken = generateToken();
-      const newEmail = `receipts+${newToken}@import.lovable.app`;
+      const newEmail = `receipts+${newToken}@import.billmonk.ai`;
 
       const { error } = await supabase
         .from('email_connections')
@@ -412,7 +412,7 @@ export const useEmailImport = () => {
         functionName = 'sync-microsoft'; // To be implemented
       }
       
-      console.log(`Syncing account ${accountId} with ${functionName}${resync ? ' (resync mode)' : ''}`);
+      // Sync account via edge function
       
       const { data, error } = await supabase.functions.invoke(functionName, {
         body: { accountId, resync },

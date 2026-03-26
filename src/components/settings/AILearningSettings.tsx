@@ -277,7 +277,7 @@ export function AILearningSettings() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-3xl font-bold text-violet-600">{stats?.totalVendors || 0}</p>
+              <p className="text-3xl font-bold text-primary">{stats?.totalVendors || 0}</p>
               <p className="text-sm text-muted-foreground">Lieferanten mit Lern-Daten</p>
             </div>
           </CardContent>
@@ -319,7 +319,7 @@ export function AILearningSettings() {
         <CardContent>
           <div className="flex items-center justify-between">
             {[
-              { icon: FileText, label: 'KI erkennt Beleg', bgColor: 'bg-violet-100', textColor: 'text-violet-600' },
+              { icon: FileText, label: 'KI erkennt Beleg', bgColor: 'bg-primary/10', textColor: 'text-primary' },
               { icon: Pencil, label: 'Du korrigierst', bgColor: 'bg-orange-100', textColor: 'text-orange-600' },
               { icon: Brain, label: 'KI lernt Muster', bgColor: 'bg-blue-100', textColor: 'text-blue-600' },
               { icon: Sparkles, label: 'Bessere Erkennung', bgColor: 'bg-green-100', textColor: 'text-green-600' },
@@ -363,7 +363,7 @@ export function AILearningSettings() {
                       <span className="w-32 text-sm truncate">{field?.label || fieldName}</span>
                       <div className="flex-1 bg-muted rounded-full h-2">
                         <div
-                          className="bg-violet-500 h-2 rounded-full transition-all"
+                          className="bg-primary h-2 rounded-full transition-all"
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
@@ -498,7 +498,7 @@ export function AILearningSettings() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Brain className="w-5 h-5 text-violet-600" />
+              <Brain className="w-5 h-5 text-primary" />
               Lern-Details: {selectedLearning?.vendor?.display_name}
             </DialogTitle>
             <DialogDescription>

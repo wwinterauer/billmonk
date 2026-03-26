@@ -72,7 +72,6 @@ export function applyLearnedPatterns(
     if (mistake) {
       const correctedValue = parseFieldValue(fieldName, mistake.correct);
       enhanced[fieldName] = correctedValue;
-      console.log(`[Learning] Applied mistake correction for ${fieldName}: "${currentValue}" → "${correctedValue}"`);
       continue;
     }
 
@@ -85,7 +84,6 @@ export function applyLearnedPatterns(
         const mostCommonPrefix = findMostCommonPrefix(fieldPatterns, value);
         if (mostCommonPrefix) {
           enhanced[fieldName] = mostCommonPrefix + value;
-          console.log(`[Learning] Applied prefix for ${fieldName}: "${value}" → "${mostCommonPrefix}${value}"`);
         }
       }
     }
@@ -98,7 +96,6 @@ export function applyLearnedPatterns(
       if (!hasSuffix && value.length > 0) {
         const mostCommonSuffix = fieldPatterns.suffixes[0];
         enhanced[fieldName] = value + mostCommonSuffix;
-        console.log(`[Learning] Applied suffix for ${fieldName}: "${value}" → "${value}${mostCommonSuffix}"`);
       }
     }
 

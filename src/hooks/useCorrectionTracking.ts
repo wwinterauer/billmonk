@@ -253,7 +253,6 @@ export function useCorrectionTracking() {
         const parsed = detectedStr !== '' ? parseFloat(detectedStr) : NaN;
         const originalVatRate = !isNaN(parsed) ? parsed : null;
         await recordVatRateCorrection(vendorId, user.id, vatRate, originalVatRate);
-        console.log(`[VAT Learning] Recorded correction: ${originalVatRate}% → ${vatRate}%`);
       }
       
       // 4. Update learning level

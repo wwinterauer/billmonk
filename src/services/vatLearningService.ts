@@ -70,7 +70,6 @@ export async function recordVatRateCorrection(
           frequency: 1,
         });
 
-      console.log(`[VAT Learning] Created new learning for vendor ${vendorId} with rate ${correctedRate}%`);
       return;
     }
 
@@ -129,7 +128,6 @@ export async function recordVatRateCorrection(
         });
     }
 
-    console.log(`[VAT Learning] Updated vendor ${vendorId}: rate ${correctedRate}%, confidence ${newConfidence}%`);
   } catch (error) {
     console.error('Error in recordVatRateCorrection:', error);
   }

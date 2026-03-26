@@ -487,7 +487,6 @@ const Review = () => {
 
         if (corrections.length > 0) {
           trackCorrections(corrections);
-          console.log(`[AI Learning] Tracked ${corrections.length} corrections for vendor ${trackingVendorId}`);
         } else {
           trackSuccessfulPrediction(currentReceipt.id, trackingVendorId);
         }

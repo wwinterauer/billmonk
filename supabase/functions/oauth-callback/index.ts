@@ -9,7 +9,7 @@ const MICROSOFT_CLIENT_ID = Deno.env.get("MICROSOFT_CLIENT_ID");
 const MICROSOFT_CLIENT_SECRET = Deno.env.get("MICROSOFT_CLIENT_SECRET");
 const MICROSOFT_REDIRECT_URI = Deno.env.get("MICROSOFT_REDIRECT_URI");
 
-const FRONTEND_URL = Deno.env.get("FRONTEND_URL") || "https://id-preview--430e6085-1d7d-43f1-8d01-b2631b5aa0a4.lovable.app";
+const FRONTEND_URL = Deno.env.get("FRONTEND_URL") || "https://billmonk.ai";
 
 serve(async (req) => {
   const url = new URL(req.url);

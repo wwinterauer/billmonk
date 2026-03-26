@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('[Auth] Subscription check failed:', error.message);
         return;
       }
-      console.log('[Auth] Subscription status:', data?.subscribed ? data.plan : 'free');
+      // Subscription status loaded
     } catch (err) {
       console.error('[Auth] Subscription check error:', err);
     }

@@ -22,7 +22,7 @@ export function SplitStatusBadge({
     if (variant === 'inline') {
       return (
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+          <Badge variant="outline" className="bg-chart-4/10 text-chart-4 border-chart-4/20">
             <Scissors className="h-3 w-3 mr-1" />
             Aufgeteilt
           </Badge>
@@ -31,7 +31,7 @@ export function SplitStatusBadge({
               variant="link"
               size="sm"
               onClick={onShowParts}
-              className="text-purple-600 h-auto p-0 text-xs"
+              className="text-chart-4 h-auto p-0 text-xs"
             >
               Teile anzeigen →
             </Button>
@@ -41,7 +41,7 @@ export function SplitStatusBadge({
     }
 
     return (
-      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+      <Badge variant="outline" className="bg-chart-4/10 text-chart-4 border-chart-4/20">
         <Scissors className="h-3 w-3 mr-1" />
         Aufgeteilt
       </Badge>

@@ -1,6 +1,6 @@
 
 -- =====================================================
--- XpenzAi Database Schema Setup
+-- BillMonk Database Schema Setup
 -- =====================================================
 
 -- Enable UUID extension

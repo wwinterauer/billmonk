@@ -67,7 +67,7 @@ interface SplitSuggestionDialogProps {
 const SPLIT_COLORS = [
   { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-800', ring: 'ring-blue-400' },
   { bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-800', ring: 'ring-green-400' },
-  { bg: 'bg-purple-100', border: 'border-purple-300', text: 'text-purple-800', ring: 'ring-purple-400' },
+  { bg: 'bg-teal-100', border: 'border-teal-300', text: 'text-teal-800', ring: 'ring-teal-400' },
   { bg: 'bg-orange-100', border: 'border-orange-300', text: 'text-orange-800', ring: 'ring-orange-400' },
   { bg: 'bg-pink-100', border: 'border-pink-300', text: 'text-pink-800', ring: 'ring-pink-400' },
   { bg: 'bg-teal-100', border: 'border-teal-300', text: 'text-teal-800', ring: 'ring-teal-400' },
@@ -214,7 +214,7 @@ export function SplitSuggestionDialog({ open, onClose, receipt }: SplitSuggestio
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Scissors className="h-5 w-5 text-purple-600" />
+            <Scissors className="h-5 w-5 text-chart-4" />
             PDF aufteilen
           </DialogTitle>
           <DialogDescription>
@@ -428,7 +428,7 @@ export function SplitSuggestionDialog({ open, onClose, receipt }: SplitSuggestio
             <Button
               onClick={handleSplit}
               disabled={isSplitting || !!validationError}
-              className="bg-purple-600 hover:bg-purple-700"
+              className="bg-chart-4 hover:bg-chart-4/90"
             >
               {isSplitting ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

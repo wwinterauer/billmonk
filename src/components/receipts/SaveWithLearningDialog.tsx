@@ -55,7 +55,7 @@ export function SaveWithLearningDialog({
       <AlertDialogContent className="w-full max-w-2xl sm:max-w-2xl">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-violet-600" />
+            <Brain className="w-5 h-5 text-primary" />
             Änderungen speichern
           </AlertDialogTitle>
           <AlertDialogDescription>
@@ -93,7 +93,7 @@ export function SaveWithLearningDialog({
           </div>
           
           {/* Learning option */}
-          <div className="flex items-start gap-3 p-3 bg-violet-50 border border-violet-200 rounded-lg">
+          <div className="flex items-start gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
             <Checkbox
               id="remember-corrections"
               checked={rememberCorrections}
@@ -103,11 +103,11 @@ export function SaveWithLearningDialog({
             <div className="flex-1">
               <Label 
                 htmlFor="remember-corrections" 
-                className="font-medium text-violet-800 cursor-pointer"
+                className="font-medium text-primary cursor-pointer"
               >
                 Für "{vendorName}" merken
               </Label>
-              <p className="text-sm text-violet-600 mt-0.5">
+              <p className="text-sm text-primary/80 mt-0.5">
                 Die KI lernt aus dieser Korrektur und erkennt zukünftige Belege 
                 dieses Lieferanten besser.
               </p>

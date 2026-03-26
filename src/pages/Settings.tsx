@@ -921,8 +921,8 @@ const Settings = () => {
           <Card>
             <CardHeader>
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                  <Brain className="h-5 w-5 text-violet-600" />
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Brain className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <CardTitle>KI-Training</CardTitle>

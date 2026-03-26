@@ -28,20 +28,20 @@ export function NeedsSplittingBanner({ receipt, onSplitComplete }: NeedsSplittin
 
   return (
     <>
-      <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50 overflow-hidden">
+      <Card className="border-chart-4/20 bg-gradient-to-r from-chart-4/5 to-primary/5 overflow-hidden">
         <div className="flex items-center p-4 gap-4">
           {/* Icon */}
-          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
-            <Scissors className="h-6 w-6 text-purple-600" />
+          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-chart-4/10 flex items-center justify-center">
+            <Scissors className="h-6 w-6 text-chart-4" />
           </div>
-          
+
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="font-semibold text-purple-900">
+              <span className="font-semibold text-foreground">
                 Mehrere Rechnungen erkannt
               </span>
-              <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-300">
+              <Badge variant="outline" className="bg-chart-4/10 text-chart-4 border-chart-4/30">
                 {receipt.split_suggestion?.invoice_count || '?'} Rechnungen
               </Badge>
             </div>
@@ -72,7 +72,7 @@ export function NeedsSplittingBanner({ receipt, onSplitComplete }: NeedsSplittin
           {/* Action Button */}
           <Button
             onClick={() => setShowDialog(true)}
-            className="bg-purple-600 hover:bg-purple-700 flex-shrink-0"
+            className="bg-chart-4 hover:bg-chart-4/90 flex-shrink-0"
           >
             <Scissors className="h-4 w-4 mr-2" />
             Aufteilen

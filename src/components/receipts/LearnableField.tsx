@@ -101,7 +101,7 @@ export function LearnableField({
           {hasLearning && !isVatRateField && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-violet-50 text-violet-700 border-violet-200">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-primary/5 text-primary border-primary/20">
                   <Brain className="w-3 h-3 mr-1" />
                   Gelernt
                 </Badge>

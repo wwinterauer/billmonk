@@ -293,7 +293,7 @@ export default function Datenschutz() {
                 <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
                   <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Opt-Out Möglichkeiten</h4>
                   <ul className="list-disc list-inside space-y-1 text-blue-700 dark:text-blue-300 text-sm">
-                    <li>Kontaktieren Sie den Lovable Support unter support@lovable.dev</li>
+                    <li>Kontaktieren Sie den BillMonk Support unter support@billmonk.ai</li>
                     <li>Business/Enterprise: Aktivieren Sie "Data collection opt out" in den Einstellungen</li>
                   </ul>
                 </div>

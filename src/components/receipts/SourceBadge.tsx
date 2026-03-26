@@ -56,7 +56,7 @@ const sourceConfig: Record<string, SourceConfig> = {
   split: { 
     icon: Scissors, 
     label: 'Aufgeteilt', 
-    className: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800' 
+    className: 'bg-chart-4/10 text-chart-4 border-chart-4/20 dark:bg-chart-4/10 dark:text-chart-4 dark:border-chart-4/20' 
   },
   cloud: { 
     icon: Cloud, 

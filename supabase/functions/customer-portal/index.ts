@@ -37,7 +37,7 @@ serve(async (req) => {
       throw new Error("No Stripe customer found");
     }
 
-    const origin = req.headers.get("origin") || "https://receipt-ai-pal.lovable.app";
+    const origin = req.headers.get("origin") || "https://billmonk.ai";
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customers.data[0].id,
       return_url: `${origin}/settings?tab=subscription`,

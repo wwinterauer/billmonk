@@ -68,7 +68,7 @@ serve(async (req) => {
     // Ensure beta coupon exists
     await ensureBetaCoupon(stripe);
 
-    const origin = req.headers.get("origin") || "https://receipt-ai-pal.lovable.app";
+    const origin = req.headers.get("origin") || "https://billmonk.ai";
 
     // Only offer trial to new customers who never had a subscription
     const trialConfig = !hasHadSubscription
