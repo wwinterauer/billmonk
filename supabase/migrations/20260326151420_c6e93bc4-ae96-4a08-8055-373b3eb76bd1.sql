@@ -1,0 +1,1 @@
+INSERT INTO public.beta_codes (code, description, is_active, used_count, max_uses) VALUES ('BILLMONK-BETA-2026', 'Erster Admin-Beta-Code für Wilfried', true, 0, null);
