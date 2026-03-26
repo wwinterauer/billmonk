@@ -525,6 +525,45 @@ ${hintText}`;
 
     console.log(`Expenses-only mode: ${expensesOnlyPrompt ? 'ACTIVE' : 'inactive'} (flag: ${expensesOnly}, keywords: ${extractionKeywords.length}, hint: ${hintText ? 'yes' : 'no'})`);
 
+    // Fetch user's categories for intelligent category matching
+    let categoryList = 'Büromaterial, Software & Lizenzen, Reisekosten, Bewirtung, Telefon & Internet, Versicherungen, Miete & Betriebskosten, Fahrzeugkosten, Werbung & Marketing, Sonstiges';
+    
+    // Determine user_id: from receipt lookup or from auth header
+    let userId: string | null = null;
+    if (receiptId) {
+      const { data: receiptUser } = await supabase
+        .from('receipts')
+        .select('user_id')
+        .eq('id', receiptId)
+        .single();
+      userId = receiptUser?.user_id || null;
+    }
+    if (!userId) {
+      // Try from auth header
+      const authHeader = req.headers.get('authorization');
+      if (authHeader) {
+        const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+        userId = user?.id || null;
+      }
+    }
+    
+    if (userId) {
+      const { data: userCategories } = await supabase
+        .from('categories')
+        .select('name')
+        .or(`user_id.eq.${userId},is_system.eq.true`)
+        .eq('is_hidden', false)
+        .order('sort_order');
+      
+      if (userCategories && userCategories.length > 0) {
+        const catNames = userCategories.map(c => c.name).filter(n => n !== 'Keine Rechnung');
+        if (catNames.length > 0) {
+          categoryList = catNames.join(', ');
+          console.log(`Using ${catNames.length} user categories for AI matching`);
+        }
+      }
+    }
+
     const userPrompt = `Analysiere dieses Dokument in zwei Schritten:
 
 SCHRITT 1: DOKUMENTEN-TYP ERKENNEN
@@ -552,7 +591,7 @@ Extrahiere folgende Informationen im JSON-Format:
   "vat_amount": MwSt-Betrag als Zahl (falls erkennbar, sonst null),
   "vat_rate": MwSt-Satz als Zahl (z.B. 20 für 20%),
   "receipt_date": "Datum im Format YYYY-MM-DD",
-  "category": "Kategorie: Büromaterial, Software & Lizenzen, Reisekosten, Bewirtung, Telefon & Internet, Versicherungen, Miete & Betriebskosten, Fahrzeugkosten, Werbung & Marketing, Sonstiges",
+  "category": "Wähle die passendste Kategorie aus dieser Liste: ${categoryList}",
   "payment_method": "Zahlungsart: Überweisung, Kreditkarte, Bar, PayPal, Lastschrift (sonst null)",
   "invoice_number": "Rechnungsnummer/Belegnummer (suche nach 'Rechnungsnummer:', 'RE-Nr.:', 'Invoice:', etc.)",
   "confidence": Konfidenz von 0.0 bis 1.0
