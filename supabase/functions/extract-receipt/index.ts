@@ -525,6 +525,45 @@ ${hintText}`;
 
     console.log(`Expenses-only mode: ${expensesOnlyPrompt ? 'ACTIVE' : 'inactive'} (flag: ${expensesOnly}, keywords: ${extractionKeywords.length}, hint: ${hintText ? 'yes' : 'no'})`);
 
+    // Fetch user's categories for intelligent category matching
+    let categoryList = 'Büromaterial, Software & Lizenzen, Reisekosten, Bewirtung, Telefon & Internet, Versicherungen, Miete & Betriebskosten, Fahrzeugkosten, Werbung & Marketing, Sonstiges';
+    
+    // Determine user_id: from receipt lookup or from auth header
+    let userId: string | null = null;
+    if (receiptId) {
+      const { data: receiptUser } = await supabase
+        .from('receipts')
+        .select('user_id')
+        .eq('id', receiptId)
+        .single();
+      userId = receiptUser?.user_id || null;
+    }
+    if (!userId) {
+      // Try from auth header
+      const authHeader = req.headers.get('authorization');
+      if (authHeader) {
+        const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+        userId = user?.id || null;
+      }
+    }
+    
+    if (userId) {
+      const { data: userCategories } = await supabase
+        .from('categories')
+        .select('name')
+        .or(`user_id.eq.${userId},is_system.eq.true`)
+        .eq('is_hidden', false)
+        .order('sort_order');
+      
+      if (userCategories && userCategories.length > 0) {
+        const catNames = userCategories.map(c => c.name).filter(n => n !== 'Keine Rechnung');
+        if (catNames.length > 0) {
+          categoryList = catNames.join(', ');
+          console.log(`Using ${catNames.length} user categories for AI matching`);
+        }
+      }
+    }
+
     const userPrompt = `Analysiere dieses Dokument in zwei Schritten:
 
 SCHRITT 1: DOKUMENTEN-TYP ERKENNEN
