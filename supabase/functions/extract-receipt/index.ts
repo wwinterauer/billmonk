@@ -591,7 +591,7 @@ Extrahiere folgende Informationen im JSON-Format:
   "vat_amount": MwSt-Betrag als Zahl (falls erkennbar, sonst null),
   "vat_rate": MwSt-Satz als Zahl (z.B. 20 für 20%),
   "receipt_date": "Datum im Format YYYY-MM-DD",
-  "category": "Kategorie: Büromaterial, Software & Lizenzen, Reisekosten, Bewirtung, Telefon & Internet, Versicherungen, Miete & Betriebskosten, Fahrzeugkosten, Werbung & Marketing, Sonstiges",
+  "category": "Wähle die passendste Kategorie aus dieser Liste: ${categoryList}",
   "payment_method": "Zahlungsart: Überweisung, Kreditkarte, Bar, PayPal, Lastschrift (sonst null)",
   "invoice_number": "Rechnungsnummer/Belegnummer (suche nach 'Rechnungsnummer:', 'RE-Nr.:', 'Invoice:', etc.)",
   "confidence": Konfidenz von 0.0 bis 1.0
