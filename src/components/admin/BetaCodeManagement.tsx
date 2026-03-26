@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Plus, Copy, Loader2 } from 'lucide-react';
+import { Plus, Copy, Loader2, Pencil, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface BetaCode {
@@ -27,6 +27,10 @@ export function BetaCodeManagement() {
   const [newDescription, setNewDescription] = useState('');
   const [newMaxUses, setNewMaxUses] = useState('');
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+  const [editMaxUses, setEditMaxUses] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const fetchCodes = async () => {
     const { data } = await supabase
@@ -68,6 +72,32 @@ export function BetaCodeManagement() {
   const copyCode = (code: string) => {
     navigator.clipboard.writeText(code);
     toast.success('Code kopiert');
+  };
+
+  const startEdit = (c: BetaCode) => {
+    setEditingId(c.id);
+    setEditDescription(c.description || '');
+    setEditMaxUses(c.max_uses !== null ? String(c.max_uses) : '');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  const saveEdit = async (id: string) => {
+    setSaving(true);
+    const { error } = await supabase.from('beta_codes').update({
+      description: editDescription.trim() || null,
+      max_uses: editMaxUses ? parseInt(editMaxUses) : null,
+    }).eq('id', id);
+    if (error) {
+      toast.error('Fehler beim Speichern');
+    } else {
+      toast.success('Code aktualisiert');
+      setEditingId(null);
+      fetchCodes();
+    }
+    setSaving(false);
   };
 
   if (loading) {
@@ -123,6 +153,7 @@ export function BetaCodeManagement() {
                     <TableHead>Status</TableHead>
                     <TableHead>Erstellt</TableHead>
                     <TableHead>Aktiv</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -136,11 +167,19 @@ export function BetaCodeManagement() {
                           </Button>
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{c.description || '–'}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {editingId === c.id ? (
+                          <Input value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Beschreibung" className="h-8 text-sm" />
+                        ) : (c.description || '–')}
+                      </TableCell>
                       <TableCell>
-                        <span className="font-mono text-sm">
-                          {c.used_count}{c.max_uses !== null ? ` / ${c.max_uses}` : ' / ∞'}
-                        </span>
+                        {editingId === c.id ? (
+                          <Input type="number" value={editMaxUses} onChange={e => setEditMaxUses(e.target.value)} placeholder="∞" className="h-8 w-24 font-mono text-sm" />
+                        ) : (
+                          <span className="font-mono text-sm">
+                            {c.used_count}{c.max_uses !== null ? ` / ${c.max_uses}` : ' / ∞'}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={c.is_active ? 'default' : 'secondary'}>
@@ -152,6 +191,22 @@ export function BetaCodeManagement() {
                       </TableCell>
                       <TableCell>
                         <Switch checked={c.is_active} onCheckedChange={() => toggleActive(c.id, c.is_active)} />
+                      </TableCell>
+                      <TableCell>
+                        {editingId === c.id ? (
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => saveEdit(c.id)} disabled={saving}>
+                              <Check className="h-4 w-4 text-green-600" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={cancelEdit}>
+                              <X className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(c)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
