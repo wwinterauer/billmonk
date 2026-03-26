@@ -1,43 +1,55 @@
 
 
-## Plan: Logos einsetzen + Build-Error beheben
+## Problem
 
-### 1. Logo-Asset kopieren
-- `user-uploads://logo_BM_white_transparent_1200-2.png` → `src/assets/logo-billmonk.png`
-- Das bisherige `_600.png` wird nicht verwendet — nur dieses hochaufgeloeste Bild
+Die Header-Buttons "Features" und "So funktioniert's" nutzen `scrollToSection()`, das per `document.getElementById()` nach dem Element sucht. Auf der `/pricing`-Seite existieren diese Sektionen (`#features`, `#how-it-works`) aber nicht — sie sind nur auf der Index-Seite (`/`). Daher passiert beim Klick nichts.
 
-### 2. Logo an 8 Stellen einsetzen (CSS-skaliert)
-Ueberall wird das aktuelle Platzhalter-Logo (gradient-div + Search-Icon + "BillMonk"-Text) durch ein `<img>` ersetzt:
+## Loesung
 
-| Datei | Hoehe | Kontext |
-|---|---|---|
-| `Header.tsx` | `h-8` (32px) | Navbar, inkl. Beta-Badge daneben |
-| `Footer.tsx` | `h-7` (28px) | Footer-Branding, inkl. Beta-Badge |
-| `Sidebar.tsx` | `h-8` / collapsed: `h-8 w-8 object-contain` | Dashboard-Sidebar |
-| `Login.tsx` | `h-12` (48px) | Auth-Karte |
-| `Register.tsx` | `h-12` | Auth-Karte |
-| `ForgotPassword.tsx` | `h-12` | Auth-Karte |
-| `ResetPassword.tsx` | `h-12` | Auth-Karte |
-| `Hero.tsx` | `h-6` (24px) | Mock-Dashboard-Preview |
+Die `scrollToSection`-Funktion muss pruefen, ob man sich auf der Startseite befindet. Falls nicht, wird zuerst per `navigate('/')` zur Startseite navigiert und dann zum Anker gescrollt.
 
-Import-Pattern:
-```tsx
-import logoBillmonk from "@/assets/logo-billmonk.png";
-// ...
-<img src={logoBillmonk} alt="BillMonk" className="h-8" />
+### Aenderung: `src/components/landing/Header.tsx`
+
+- `useLocation()` und `useNavigate()` aus `react-router-dom` importieren
+- `scrollToSection` anpassen:
+  - Wenn `location.pathname !== '/'`: navigiere zu `/#sectionId` (z.B. `/#features`)
+  - Wenn auf `/`: wie bisher per `getElementById` + `scrollIntoView`
+- Fuer die Navigation mit Hash: nach `navigate('/')` ein kurzes Timeout oder `useEffect` nutzen, das beim Laden der Startseite den Hash ausliest und zum Element scrollt
+
+Alternativ einfacher: `navigate('/#features')` verwenden und in der Index-Seite einen `useEffect` einbauen, der bei vorhandenem `location.hash` zur Sektion scrollt.
+
+### Konkret
+
+**Header.tsx** — `scrollToSection` erweitern:
+```ts
+const navigate = useNavigate();
+const location = useLocation();
+
+const scrollToSection = (id: string) => {
+  if (location.pathname !== '/') {
+    navigate(`/?scrollTo=${id}`);
+  } else {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  }
+  setMobileMenuOpen(false);
+};
 ```
 
-Bei collapsed Sidebar: Logo wird auf Icon-Groesse beschnitten (`w-9 h-9 object-cover object-left`), sodass nur das Haekchen-Symbol sichtbar ist.
+**Index.tsx** — Hash-Scroll beim Laden:
+```ts
+const location = useLocation();
+useEffect(() => {
+  const params = new URLSearchParams(location.search);
+  const scrollTo = params.get('scrollTo');
+  if (scrollTo) {
+    setTimeout(() => {
+      document.getElementById(scrollTo)?.scrollIntoView({ behavior: 'smooth' });
+    }, 300);
+  }
+}, [location]);
+```
 
-Beta-Badge bleibt neben dem Logo erhalten wo vorhanden.
-
-### 3. Build-Error beheben
-- `supabase/functions/admin-metrics/index.ts` Zeile 2:
-  - Von: `import { createClient } from "npm:@supabase/supabase-js@2.57.2"`
-  - Zu: `import { createClient } from "https://esm.sh/@supabase/supabase-js@2"` (wie alle anderen Edge Functions)
-
-### Aenderungen gesamt
-- 1 Asset-Datei kopiert
-- 8 TSX-Dateien aktualisiert (Logo-Ersetzung)
-- 1 Edge-Function-Import korrigiert
+### Dateien
+- `src/components/landing/Header.tsx` — Navigation-Logik erweitern
+- `src/pages/Index.tsx` — ScrollTo-Parameter auswerten
 
