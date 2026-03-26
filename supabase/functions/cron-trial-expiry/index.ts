@@ -29,12 +29,20 @@ serve(async (req) => {
     const windowEnd = new Date(threeDaysFromNow);
     windowEnd.setHours(windowEnd.getHours() + 12);
 
+    // Also check: signup was ~27 days ago (created_at)
+    const signupWindowStart = new Date(now);
+    signupWindowStart.setDate(signupWindowStart.getDate() - 28);
+    const signupWindowEnd = new Date(now);
+    signupWindowEnd.setDate(signupWindowEnd.getDate() - 26);
+
     const { data: trialingUsers, error } = await supabaseAdmin
       .from("profiles")
-      .select("id, email, first_name, plan, subscription_end_date")
+      .select("id, email, first_name, plan, subscription_end_date, created_at, subscription_status")
       .eq("subscription_status", "trialing")
       .gte("subscription_end_date", windowStart.toISOString())
-      .lte("subscription_end_date", windowEnd.toISOString());
+      .lte("subscription_end_date", windowEnd.toISOString())
+      .gte("created_at", signupWindowStart.toISOString())
+      .lte("created_at", signupWindowEnd.toISOString());
 
     if (error) {
       console.error("[CRON-TRIAL-EXPIRY] Query error:", error.message);
