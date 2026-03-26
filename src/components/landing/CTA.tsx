@@ -30,7 +30,7 @@ export function CTA() {
             </span>
             <span className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
-              Keine Kreditkarte
+              30 Tage kostenlos testen
             </span>
           </div>
           
