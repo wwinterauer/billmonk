@@ -55,5 +55,7 @@ project_id = "nvvssxykygdxjywncvgd"
     verify_jwt = false
   [functions.handle-email-suppression]
     verify_jwt = false
+  [functions.send-welcome-email]
+    verify_jwt = false
   [functions.cron-trial-expiry]
     verify_jwt = false
