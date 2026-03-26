@@ -153,6 +153,7 @@ export function BetaCodeManagement() {
                     <TableHead>Status</TableHead>
                     <TableHead>Erstellt</TableHead>
                     <TableHead>Aktiv</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
