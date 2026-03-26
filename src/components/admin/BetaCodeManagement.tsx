@@ -166,11 +166,19 @@ export function BetaCodeManagement() {
                           </Button>
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{c.description || '–'}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {editingId === c.id ? (
+                          <Input value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Beschreibung" className="h-8 text-sm" />
+                        ) : (c.description || '–')}
+                      </TableCell>
                       <TableCell>
-                        <span className="font-mono text-sm">
-                          {c.used_count}{c.max_uses !== null ? ` / ${c.max_uses}` : ' / ∞'}
-                        </span>
+                        {editingId === c.id ? (
+                          <Input type="number" value={editMaxUses} onChange={e => setEditMaxUses(e.target.value)} placeholder="∞" className="h-8 w-24 font-mono text-sm" />
+                        ) : (
+                          <span className="font-mono text-sm">
+                            {c.used_count}{c.max_uses !== null ? ` / ${c.max_uses}` : ' / ∞'}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={c.is_active ? 'default' : 'secondary'}>
@@ -182,6 +190,22 @@ export function BetaCodeManagement() {
                       </TableCell>
                       <TableCell>
                         <Switch checked={c.is_active} onCheckedChange={() => toggleActive(c.id, c.is_active)} />
+                      </TableCell>
+                      <TableCell>
+                        {editingId === c.id ? (
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => saveEdit(c.id)} disabled={saving}>
+                              <Check className="h-4 w-4 text-green-600" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={cancelEdit}>
+                              <X className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(c)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
