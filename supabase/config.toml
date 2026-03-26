@@ -1,67 +1,49 @@
 project_id = "nvvssxykygdxjywncvgd"
 
-[functions.extract-receipt]
-verify_jwt = false
-
-[functions.email-import-webhook]
-verify_jwt = false
-
-[functions.sync-imap-emails]
-verify_jwt = false
-
-[functions.cron-email-sync]
-verify_jwt = false
-
-[functions.oauth-start]
-verify_jwt = false
-
-[functions.oauth-callback]
-verify_jwt = false
-
-[functions.sync-gmail]
-verify_jwt = false
-
-[functions.sync-microsoft]
-verify_jwt = false
-
-[functions.convert-image-to-pdf]
-verify_jwt = false
-
-[functions.combine-images-to-pdf]
-verify_jwt = false
-
-[functions.split-pdf]
-verify_jwt = false
-
-[functions.encrypt-password]
-verify_jwt = false
-
-[functions.backup-to-drive]
-verify_jwt = false
-
-[functions.check-subscription]
-verify_jwt = false
-
-[functions.create-checkout]
-verify_jwt = false
-
-[functions.customer-portal]
-verify_jwt = false
-
-[functions.bank-connect]
-verify_jwt = false
-
-[functions.sync-bank-live]
-verify_jwt = false
-
-[functions.auto-reconcile]
-verify_jwt = false
-
-[functions.send-document-email]
-verify_jwt = false
-
-[functions.reward-support-credit]
-verify_jwt = false
-
-[functions.process-email-queue]
-verify_jwt = true
+[functions]
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.auto-reconcile]
+    verify_jwt = false
+  [functions.backup-to-drive]
+    verify_jwt = false
+  [functions.bank-connect]
+    verify_jwt = false
+  [functions.check-subscription]
+    verify_jwt = false
+  [functions.combine-images-to-pdf]
+    verify_jwt = false
+  [functions.convert-image-to-pdf]
+    verify_jwt = false
+  [functions.create-checkout]
+    verify_jwt = false
+  [functions.cron-email-sync]
+    verify_jwt = false
+  [functions.customer-portal]
+    verify_jwt = false
+  [functions.email-import-webhook]
+    verify_jwt = false
+  [functions.encrypt-password]
+    verify_jwt = false
+  [functions.extract-receipt]
+    verify_jwt = false
+  [functions.oauth-callback]
+    verify_jwt = false
+  [functions.oauth-start]
+    verify_jwt = false
+  [functions.process-email-queue]
+    verify_jwt = true
+  [functions.reward-support-credit]
+    verify_jwt = false
+  [functions.send-document-email]
+    verify_jwt = false
+  [functions.split-pdf]
+    verify_jwt = false
+  [functions.sync-bank-live]
+    verify_jwt = false
+  [functions.sync-gmail]
+    verify_jwt = false
+  [functions.sync-imap-emails]
+    verify_jwt = false
+  [functions.sync-microsoft]
+    verify_jwt = false
