@@ -118,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
     const redirectUrl = `${window.location.origin}/dashboard`;
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -129,6 +129,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     });
+
+    // Send welcome email after successful signup
+    if (!error && data?.user) {
+      supabase.functions.invoke('send-transactional-email', {
+        body: {
+          templateName: 'welcome-email',
+          recipientEmail: email,
+          idempotencyKey: `welcome-${data.user.id}`,
+          templateData: { name: firstName },
+        },
+      }).catch(() => {}); // best-effort, don't block signup
+    }
     
     return { error: error as Error | null };
   };
