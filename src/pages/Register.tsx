@@ -79,8 +79,8 @@ const Register = () => {
         });
       }
     } else {
-      // Check if beta_access cookie is set → mark as beta user
-      const isBetaUser = document.cookie.split(';').some(c => c.trim().startsWith('beta_access=true'));
+      // Check if beta_access is set → mark as beta user
+      const isBetaUser = localStorage.getItem('beta_access') === 'true' || document.cookie.split(';').some(c => c.trim().startsWith('beta_access=true'));
       if (isBetaUser) {
         // Mark profile as beta user with business plan (fire-and-forget, will be applied once profile exists)
         const markBeta = async () => {

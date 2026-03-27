@@ -39,6 +39,8 @@ export default function Beta() {
 
       // Increment used_count via RPC not possible with anon, so we set cookie and let it be
       // We'll increment server-side or via admin. For now just set cookie.
+      // Set both localStorage (works in iframes) and cookie (works on published domain)
+      localStorage.setItem('beta_access', 'true');
       const expires = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toUTCString();
       document.cookie = `beta_access=true; expires=${expires}; path=/; SameSite=Lax`;
 

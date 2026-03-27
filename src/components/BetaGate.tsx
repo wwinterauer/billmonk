@@ -1,6 +1,8 @@
 import { Navigate, useLocation } from 'react-router-dom';
 
 function hasBetaAccess(): boolean {
+  // Check localStorage (primary) and cookie (legacy fallback)
+  if (localStorage.getItem('beta_access') === 'true') return true;
   return document.cookie.split(';').some(c => c.trim().startsWith('beta_access=true'));
 }
 
