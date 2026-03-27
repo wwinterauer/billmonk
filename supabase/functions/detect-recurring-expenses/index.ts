@@ -52,7 +52,7 @@ function keywordSimilarity(a: string | null, b: string | null): number {
 
 function detectFrequency(daysGaps: number[]): { frequency: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'; score: number } | null {
   if (daysGaps.length === 0) return null;
-  const avgGap = daysGaps.reduce((a, b) => a + b, 0) / daysGaps.length;
+  const _avgGap = daysGaps.reduce((a, b) => a + b, 0) / daysGaps.length;
 
   const patterns: { freq: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'; target: number; tolerance: number }[] = [
     { freq: 'monthly', target: 30, tolerance: 5 },
