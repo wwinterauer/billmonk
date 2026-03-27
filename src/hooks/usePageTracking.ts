@@ -23,11 +23,31 @@ export function usePageTracking() {
     // Don't track admin pages
     if (path.startsWith('/admin')) return;
 
-    supabase.from('page_views').insert({
+    const record: any = {
       path,
       referrer: document.referrer || null,
       user_agent: navigator.userAgent,
       session_id: getSessionId(),
-    } as any).then(); // fire and forget
+    };
+
+    // Try to get country from cached value or geo API
+    const cachedCountry = sessionStorage.getItem('pv_country');
+    if (cachedCountry) {
+      record.country = cachedCountry;
+      supabase.from('page_views').insert(record).then();
+    } else {
+      fetch('https://ip-api.com/json/?fields=countryCode')
+        .then(r => r.json())
+        .then(data => {
+          if (data?.countryCode) {
+            sessionStorage.setItem('pv_country', data.countryCode);
+            record.country = data.countryCode;
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          supabase.from('page_views').insert(record).then();
+        });
+    }
   }, [location.pathname]);
 }

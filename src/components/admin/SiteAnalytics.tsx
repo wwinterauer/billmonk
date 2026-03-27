@@ -17,9 +17,15 @@ interface TopPage {
   views: number;
 }
 
+interface CountryViews {
+  country: string;
+  views: number;
+}
+
 export function SiteAnalytics() {
   const [dailyViews, setDailyViews] = useState<DailyViews[]>([]);
   const [topPages, setTopPages] = useState<TopPage[]>([]);
+  const [countryViews, setCountryViews] = useState<CountryViews[]>([]);
   const [totalViews, setTotalViews] = useState(0);
   const [uniqueSessions, setUniqueSessions] = useState(0);
   const [loading, setLoading] = useState(true);
