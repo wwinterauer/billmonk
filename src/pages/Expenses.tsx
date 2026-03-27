@@ -2580,7 +2580,7 @@ const Expenses = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Abbrechen</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={() => receiptToDelete && handleDelete(receiptToDelete)}
+              onClick={confirmDelete}
               className="bg-destructive hover:bg-destructive/90"
             >
               Löschen
