@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { RefreshCw, Loader2, AlertTriangle, Check, X, Pause, StickyNote, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Input } from '@/components/ui/input';
+
 import {
   Select,
   SelectContent,
