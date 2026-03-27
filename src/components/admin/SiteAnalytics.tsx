@@ -185,6 +185,52 @@ export function SiteAnalytics() {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            Aufrufe nach Land
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {countryViews.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={countryViews.slice(0, 10)} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis type="number" className="text-xs" />
+                  <YAxis dataKey="country" type="category" className="text-xs" width={80} />
+                  <Tooltip />
+                  <Bar dataKey="views" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name="Aufrufe" />
+                </BarChart>
+              </ResponsiveContainer>
+              <Table className="mt-4">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Land</TableHead>
+                    <TableHead className="text-right">Aufrufe</TableHead>
+                    <TableHead className="text-right">Anteil</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {countryViews.map(c => (
+                    <TableRow key={c.country}>
+                      <TableCell className="font-medium">{c.country}</TableCell>
+                      <TableCell className="text-right">{c.views}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {totalViews > 0 ? ((c.views / totalViews) * 100).toFixed(1) : 0}%
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">Noch keine Länderdaten vorhanden</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
