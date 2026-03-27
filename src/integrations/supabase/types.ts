@@ -1926,6 +1926,7 @@ export type Database = {
       }
       page_views: {
         Row: {
+          country: string | null
           created_at: string
           id: string
           path: string
@@ -1935,6 +1936,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          country?: string | null
           created_at?: string
           id?: string
           path: string
@@ -1944,6 +1946,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          country?: string | null
           created_at?: string
           id?: string
           path?: string
