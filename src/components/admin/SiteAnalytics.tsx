@@ -38,7 +38,7 @@ export function SiteAnalytics() {
         // Fetch page views from the last 30 days
         const { data: views } = await supabase
           .from('page_views')
-          .select('path, session_id, created_at')
+          .select('path, session_id, created_at, country')
           .gte('created_at', thirtyDaysAgo) as any;
 
         if (!views || views.length === 0) {
