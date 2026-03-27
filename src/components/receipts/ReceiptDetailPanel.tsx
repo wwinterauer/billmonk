@@ -1262,6 +1262,16 @@ export function ReceiptDetailPanel({
                       </Alert>
                     )}
 
+                    {/* Recurring expense badge */}
+                    {recurringInfo && (
+                      <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20 gap-1.5">
+                        <Repeat className="h-3 w-3" />
+                        Wiederkehrend · {
+                          { monthly: 'Monatlich', quarterly: 'Quartalsweise', semi_annual: 'Halbjährlich', annual: 'Jährlich' }[recurringInfo.frequency] || recurringInfo.frequency
+                        }
+                      </Badge>
+                    )}
+
                     {/* Unsaved AI Changes Alert */}
                     {hasUnsavedAiChanges && Object.keys(changedFields).length > 0 && (
                       <Alert className="bg-amber-50 border-amber-200">
