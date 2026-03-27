@@ -2567,7 +2567,6 @@ const Expenses = () => {
 
           </TabsContent>
         </Tabs>
-      </div>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -2581,7 +2580,7 @@ const Expenses = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Abbrechen</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={confirmDelete}
+              onClick={() => receiptToDelete && handleDelete(receiptToDelete)}
               className="bg-destructive hover:bg-destructive/90"
             >
               Löschen
@@ -2596,7 +2595,7 @@ const Expenses = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>{selectedIds.size} Belege löschen?</AlertDialogTitle>
             <AlertDialogDescription>
-              Diese Belege werden unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
+              Die ausgewählten Belege werden unwiderruflich gelöscht.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2610,9 +2609,7 @@ const Expenses = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-          </TabsContent>
-        </Tabs>
+      </div>
 
       {/* Receipt Detail Panel */}
       <ReceiptDetailPanel
