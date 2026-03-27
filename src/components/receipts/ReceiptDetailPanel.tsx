@@ -476,6 +476,28 @@ export function ReceiptDetailPanel({
     loadReceipt();
   }, [receiptId, open]);
 
+  // Check if receipt belongs to a recurring expense
+  useEffect(() => {
+    if (!receiptId || !open) {
+      setRecurringInfo(null);
+      return;
+    }
+    const check = async () => {
+      const { data } = await supabase
+        .from('recurring_expense_entries')
+        .select('recurring_expense_id, recurring_expenses(frequency)')
+        .eq('expense_id', receiptId)
+        .limit(1);
+      if (data && data.length > 0) {
+        const re = (data[0] as any).recurring_expenses;
+        setRecurringInfo({ frequency: re?.frequency || 'monthly' });
+      } else {
+        setRecurringInfo(null);
+      }
+    };
+    check();
+  }, [receiptId, open]);
+
   // Load user naming and description settings from profile
   useEffect(() => {
     const loadSettings = async () => {
