@@ -2564,6 +2564,9 @@ const Expenses = () => {
             </CardContent>
           </Card>
         </motion.div>
+
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Delete Confirmation Dialog */}
