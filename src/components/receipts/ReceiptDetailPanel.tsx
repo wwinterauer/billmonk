@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Repeat } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
@@ -193,6 +194,8 @@ export function ReceiptDetailPanel({
   const [changedFields, setChangedFields] = useState<Record<string, { old: string; new: string }>>({});
   const [currentAiConfidence, setCurrentAiConfidence] = useState<number | null>(null);
   
+  // Recurring expense badge state
+  const [recurringInfo, setRecurringInfo] = useState<{ frequency: string } | null>(null);
 
   // Filename editing state
   const [isEditingFilename, setIsEditingFilename] = useState(false);
@@ -471,6 +474,28 @@ export function ReceiptDetailPanel({
     };
 
     loadReceipt();
+  }, [receiptId, open]);
+
+  // Check if receipt belongs to a recurring expense
+  useEffect(() => {
+    if (!receiptId || !open) {
+      setRecurringInfo(null);
+      return;
+    }
+    const check = async () => {
+      const { data } = await supabase
+        .from('recurring_expense_entries')
+        .select('recurring_expense_id, recurring_expenses(frequency)')
+        .eq('expense_id', receiptId)
+        .limit(1);
+      if (data && data.length > 0) {
+        const re = (data[0] as any).recurring_expenses;
+        setRecurringInfo({ frequency: re?.frequency || 'monthly' });
+      } else {
+        setRecurringInfo(null);
+      }
+    };
+    check();
   }, [receiptId, open]);
 
   // Load user naming and description settings from profile
@@ -1235,6 +1260,16 @@ export function ReceiptDetailPanel({
                           </div>
                         </AlertDescription>
                       </Alert>
+                    )}
+
+                    {/* Recurring expense badge */}
+                    {recurringInfo && (
+                      <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20 gap-1.5">
+                        <Repeat className="h-3 w-3" />
+                        Wiederkehrend · {
+                          { monthly: 'Monatlich', quarterly: 'Quartalsweise', semi_annual: 'Halbjährlich', annual: 'Jährlich' }[recurringInfo.frequency] || recurringInfo.frequency
+                        }
+                      </Badge>
                     )}
 
                     {/* Unsaved AI Changes Alert */}

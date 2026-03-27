@@ -2360,6 +2360,111 @@ export type Database = {
           },
         ]
       }
+      recurring_expense_entries: {
+        Row: {
+          expense_id: string
+          id: string
+          matched_at: string
+          recurring_expense_id: string
+        }
+        Insert: {
+          expense_id: string
+          id?: string
+          matched_at?: string
+          recurring_expense_id: string
+        }
+        Update: {
+          expense_id?: string
+          id?: string
+          matched_at?: string
+          recurring_expense_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_expense_entries_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_expense_entries_recurring_expense_id_fkey"
+            columns: ["recurring_expense_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_expenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurring_expenses: {
+        Row: {
+          average_amount: number
+          category_id: string | null
+          confidence: number
+          created_at: string
+          frequency: string
+          id: string
+          is_user_confirmed: boolean
+          last_seen_date: string | null
+          matched_description: string | null
+          next_expected_date: string | null
+          notes: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          vendor_name: string
+        }
+        Insert: {
+          average_amount?: number
+          category_id?: string | null
+          confidence?: number
+          created_at?: string
+          frequency?: string
+          id?: string
+          is_user_confirmed?: boolean
+          last_seen_date?: string | null
+          matched_description?: string | null
+          next_expected_date?: string | null
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          vendor_name: string
+        }
+        Update: {
+          average_amount?: number
+          category_id?: string | null
+          confidence?: number
+          created_at?: string
+          frequency?: string
+          id?: string
+          is_user_confirmed?: boolean
+          last_seen_date?: string | null
+          matched_description?: string | null
+          next_expected_date?: string | null
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          vendor_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_expenses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recurring_invoices: {
         Row: {
           auto_send: boolean | null

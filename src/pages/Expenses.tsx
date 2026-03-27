@@ -1,4 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { RecurringExpensesTab } from '@/components/expenses/RecurringExpensesTab';
+import { Repeat } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Search, 
@@ -1451,6 +1454,21 @@ const Expenses = () => {
           </div>
         </div>
 
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="all">Alle Ausgaben</TabsTrigger>
+            <TabsTrigger value="recurring" className="flex items-center gap-1.5">
+              <Repeat className="h-3.5 w-3.5" />
+              Wiederkehrend
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="recurring">
+            <RecurringExpensesTab />
+          </TabsContent>
+
+          <TabsContent value="all">
+
         {/* Filters */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -2546,7 +2564,9 @@ const Expenses = () => {
             </CardContent>
           </Card>
         </motion.div>
-      </div>
+
+          </TabsContent>
+        </Tabs>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -2575,7 +2595,7 @@ const Expenses = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>{selectedIds.size} Belege löschen?</AlertDialogTitle>
             <AlertDialogDescription>
-              Diese Belege werden unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
+              Die ausgewählten Belege werden unwiderruflich gelöscht.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2589,6 +2609,7 @@ const Expenses = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
 
       {/* Receipt Detail Panel */}
       <ReceiptDetailPanel
