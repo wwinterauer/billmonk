@@ -73,6 +73,18 @@ export function SiteAnalytics() {
             .sort((a, b) => b.views - a.views)
             .slice(0, 10)
         );
+
+        // Country views
+        const byCountry: Record<string, number> = {};
+        views.forEach((v: any) => {
+          const c = v.country || 'Unbekannt';
+          byCountry[c] = (byCountry[c] || 0) + 1;
+        });
+        setCountryViews(
+          Object.entries(byCountry)
+            .map(([country, views]) => ({ country, views }))
+            .sort((a, b) => b.views - a.views)
+        );
       } catch (err) {
         console.error('Analytics error:', err);
       } finally {
