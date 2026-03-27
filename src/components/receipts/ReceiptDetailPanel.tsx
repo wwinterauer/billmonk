@@ -194,6 +194,8 @@ export function ReceiptDetailPanel({
   const [changedFields, setChangedFields] = useState<Record<string, { old: string; new: string }>>({});
   const [currentAiConfidence, setCurrentAiConfidence] = useState<number | null>(null);
   
+  // Recurring expense badge state
+  const [recurringInfo, setRecurringInfo] = useState<{ frequency: string } | null>(null);
 
   // Filename editing state
   const [isEditingFilename, setIsEditingFilename] = useState(false);
