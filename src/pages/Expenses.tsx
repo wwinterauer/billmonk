@@ -2608,6 +2608,9 @@ const Expenses = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+          </TabsContent>
+        </Tabs>
+
       {/* Receipt Detail Panel */}
       <ReceiptDetailPanel
         receiptId={selectedReceiptId}
