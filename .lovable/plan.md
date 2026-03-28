@@ -1,23 +1,28 @@
 
+# Splitbuchungen — Phasenweise Umsetzung
 
-# Plan: Lieferanten-Standard-Kategorie direkt im KI-Training bearbeiten
+## Phase 1: Datenmodell + Feature-Toggle + Plan-Gating ✅
+- DB: `receipt_split_lines` Tabelle + RLS ✅
+- DB: `receipts.is_split_booking` boolean ✅
+- DB: `profiles.split_booking_enabled` boolean ✅
+- `planConfig.ts`: `splitBooking: 'business'` ✅
+- `usePlan.ts`: `splitBookingEnabled` exponiert ✅
+- Settings: Toggle unter Business-Plan-Check ✅
 
-## Überblick
-In der "Lieferanten-Standard-Kategorien"-Tabelle im KI-Training-Reiter wird die Kategorie-Spalte von einem statischen Badge zu einem Select-Dropdown umgebaut. Da beide Stellen (KI-Training und Lieferanten-Einstellungen) auf dasselbe DB-Feld `vendors.default_category_id` zugreifen, sind Änderungen automatisch synchron.
+## Phase 2: Split-Editor UI
+- `SplitBookingEditor.tsx` (Brutto/Netto editierbar, bidirektional)
+- Integration in `Review.tsx` + `ReceiptDetailPanel.tsx`
+- Alles hinter `splitBookingEnabled`-Check
 
-## Änderungen in `AILearningSettings.tsx`
+## Phase 3: Ausgaben, Dashboard, Reports
+- Split-Badges und expandierbare Zeilen (nur wenn aktiviert)
+- Kategorie-Aggregation über Split-Lines
 
-1. **`useCategories` Hook importieren** — liefert die verfügbaren Kategorien für das Dropdown
-2. **VendorDefaultCategory-Interface erweitern** — `vendor_id` und `default_category_id` mitspeichern
-3. **Select-Dropdown pro Zeile** — ersetzt das statische Badge; zeigt alle Kategorien + Option "Keine Standard-Kategorie"
-4. **Update-Handler `handleUpdateVendorCategory`** — schreibt `vendors.default_category_id` per Supabase-Update, refresht die Daten danach
-5. **Toast-Feedback** bei Erfolg/Fehler
+## Phase 4: Export-Vorlagen + Steuerexport
+- Split-Spalten in Vorlagen-Editor (conditional)
+- Checkbox "Splitbuchungen aufteilen" in Export-Dialog
+- DATEV/BMD: N Buchungszeilen pro Split-Beleg
+- CSV/Excel: Split-Zeilen mit Positionsnummer
 
-## Dateien
-
-| Datei | Änderung |
-|---|---|
-| `AILearningSettings.tsx` | useCategories Import, Select-Dropdown in Vendor-Defaults-Tabelle, Update-Handler |
-
-Keine DB-Änderungen nötig — das Feld `vendors.default_category_id` existiert bereits.
-
+## Phase 5: KI-Integration
+- Kategorie-Vorschläge pro Rechnungsposition
