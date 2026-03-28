@@ -1271,6 +1271,7 @@ export function ExportFormatDialog({
                   </div>
                 )}
 
+                {exportFormat === 'zip' && (
                   <>
                     <div>
                       <Label>Ordnerstruktur</Label>
