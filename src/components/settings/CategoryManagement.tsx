@@ -33,6 +33,7 @@ import {
   FileText,
   Flower2,
   Globe,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -77,6 +78,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TAX_CATEGORY_INFO } from './taxCategoryInfo';
 
 // Icon mapping
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -174,6 +177,10 @@ export function CategoryManagement() {
   const [formData, setFormData] = useState<CategoryFormData>(DEFAULT_FORM_DATA);
   const [isNewCategory, setIsNewCategory] = useState(true);
   
+  // Info dialog for tax categories
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [infoCategory, setInfoCategory] = useState<Category | null>(null);
+
   // Delete with reassignment
   const [reassignCategory, setReassignCategory] = useState<string>('');
 
@@ -603,6 +610,28 @@ export function CategoryManagement() {
                           {COUNTRY_FLAGS[category.country]}
                         </span>
                       )}
+                      {category.is_system && category.country && TAX_CATEGORY_INFO[category.name] && (
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex items-center justify-center h-5 w-5 rounded-full hover:bg-muted transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInfoCategory(category);
+                                  setInfoDialogOpen(true);
+                                }}
+                              >
+                                <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs">
+                              <p className="text-xs">{TAX_CATEGORY_INFO[category.name].short}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                       {category.is_hidden && (
                         <Badge variant="outline" className="text-xs">Ausgeblendet</Badge>
                       )}
@@ -872,6 +901,58 @@ export function CategoryManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Tax Category Info Dialog */}
+      <Dialog open={infoDialogOpen} onOpenChange={setInfoDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {infoCategory?.country && (
+                <span>{COUNTRY_FLAGS[infoCategory.country]}</span>
+              )}
+              {infoCategory?.name}
+            </DialogTitle>
+            {infoCategory?.tax_code && (
+              <div className="pt-1">
+                <code className="text-xs bg-muted px-2 py-1 rounded font-mono text-muted-foreground">
+                  {infoCategory.tax_code}
+                </code>
+              </div>
+            )}
+          </DialogHeader>
+
+          {infoCategory && TAX_CATEGORY_INFO[infoCategory.name] && (() => {
+            const info = TAX_CATEGORY_INFO[infoCategory.name];
+            return (
+              <div className="space-y-4 text-sm">
+                <p className="text-muted-foreground">{info.long}</p>
+
+                <div>
+                  <h4 className="font-medium mb-1.5">Was gehört hierher?</h4>
+                  <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                    {info.examples.map((ex, i) => (
+                      <li key={i}>{ex}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-1 border-t">
+                  <div className="flex items-start gap-2">
+                    <span className="font-medium shrink-0">Gesetzliche Grundlage:</span>
+                    <span className="text-muted-foreground">{info.law}</span>
+                  </div>
+                  {info.deductibility && (
+                    <div className="flex items-start gap-2">
+                      <span className="font-medium shrink-0">Absetzbarkeit:</span>
+                      <Badge variant="secondary" className="text-xs">{info.deductibility}</Badge>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
