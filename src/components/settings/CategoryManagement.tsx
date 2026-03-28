@@ -254,7 +254,7 @@ export function CategoryManagement() {
 
   useEffect(() => {
     fetchCategories();
-  }, [user]);
+  }, [user, selectedCountry]);
 
   // Toggle tax categories for selected country
   const handleToggleTaxCategories = async (show: boolean) => {
@@ -521,16 +521,11 @@ export function CategoryManagement() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="AT">🇦🇹 Österreich (EAR)</SelectItem>
-              <SelectItem value="DE">🇩🇪 Deutschland (SKR03/04)</SelectItem>
-              <SelectItem value="CH">🇨🇭 Schweiz (KMU)</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2 text-sm">
+            <span>{COUNTRY_FLAGS[selectedCountry]}</span>
+            <span className="font-medium">{COUNTRY_LABELS[selectedCountry]}</span>
+            <span className="text-muted-foreground text-xs">(aus deinem Profil)</span>
+          </div>
 
           <Button
             variant="outline"
