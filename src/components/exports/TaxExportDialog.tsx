@@ -20,6 +20,7 @@ import {
   type TaxExportConfig,
   type ReceiptForExport,
   type InvoiceForExport,
+  type SplitLineForExport,
   generateTaxExport,
 } from '@/lib/taxExportFormats';
 
@@ -109,10 +110,11 @@ export function TaxExportDialog({ open, onOpenChange, defaultBookingType = 'both
     try {
       // Fetch receipts if needed
       let receipts: ReceiptForExport[] = [];
+      let splitLines: SplitLineForExport[] = [];
       if (bookingType === 'expenses' || bookingType === 'both') {
         const { data, error } = await supabase
           .from('receipts')
-          .select('receipt_date, amount_gross, amount_net, vat_rate, vat_amount, vendor, vendor_brand, description, invoice_number, category, currency')
+          .select('id, receipt_date, amount_gross, amount_net, vat_rate, vat_amount, vendor, vendor_brand, description, invoice_number, category, currency, is_split_booking')
           .eq('user_id', user.id)
           .eq('status', 'approved')
           .gte('receipt_date', format(dateFrom, 'yyyy-MM-dd'))
@@ -121,6 +123,22 @@ export function TaxExportDialog({ open, onOpenChange, defaultBookingType = 'both
 
         if (error) throw error;
         receipts = (data || []) as ReceiptForExport[];
+
+        // Fetch split lines for split bookings
+        const splitReceiptIds = receipts
+          .filter(r => r.is_split_booking && r.id)
+          .map(r => r.id!);
+        
+        if (splitReceiptIds.length > 0) {
+          const { data: slData } = await supabase
+            .from('receipt_split_lines')
+            .select('receipt_id, description, category, amount_gross, amount_net, vat_rate, vat_amount, is_private, sort_order')
+            .eq('user_id', user.id)
+            .in('receipt_id', splitReceiptIds)
+            .order('sort_order', { ascending: true });
+          
+          splitLines = (slData || []) as SplitLineForExport[];
+        }
       }
 
       // Fetch invoices if needed
@@ -170,7 +188,7 @@ export function TaxExportDialog({ open, onOpenChange, defaultBookingType = 'both
         bankAccount,
       };
 
-      generateTaxExport(config, receipts, invoices);
+      generateTaxExport(config, receipts, invoices, splitLines);
 
       toast({
         title: 'Export erstellt',

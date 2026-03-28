@@ -48,6 +48,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import type { Receipt } from '@/hooks/useReceipts';
 import { useNavigate } from 'react-router-dom';
+import { usePlan } from '@/hooks/usePlan';
 import { 
   useExportTemplates, 
   DEFAULT_COLUMNS,
@@ -96,6 +97,7 @@ export function ExportFormatDialog({
   const navigate = useNavigate();
   const abortRef = useRef(false);
   const { templates, loading: templatesLoading } = useExportTemplates();
+  const { splitBookingEnabled } = usePlan();
 
   // Template selection
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('default');
@@ -104,6 +106,7 @@ export function ExportFormatDialog({
   const [includeHeader, setIncludeHeader] = useState(true);
   const [includeTotals, setIncludeTotals] = useState(true);
   const [excludeNoReceipt, setExcludeNoReceipt] = useState(true);
+  const [expandSplitBookings, setExpandSplitBookings] = useState(false);
 
   // ZIP options
   const [zipStructure, setZipStructure] = useState<'flat' | 'month' | 'category' | 'vendor'>('month');
@@ -478,6 +481,15 @@ export function ExportFormatDialog({
       case 'payment_method': return receipt.payment_method;
       case 'status': return receipt.status;
       case 'notes': return receipt.notes;
+      // Split-specific fields (populated when expandSplitBookings is active)
+      case 'split_position': return (receipt as any)._split_position ?? '';
+      case 'split_description': return (receipt as any)._split_description ?? '';
+      case 'split_category': return (receipt as any)._split_category ?? '';
+      case 'split_amount_gross': return (receipt as any)._split_amount_gross ?? '';
+      case 'split_amount_net': return (receipt as any)._split_amount_net ?? '';
+      case 'split_vat_rate': return (receipt as any)._split_vat_rate ?? '';
+      case 'split_vat_amount': return (receipt as any)._split_vat_amount ?? '';
+      case 'split_is_private': return (receipt as any)._split_is_private ? 'Ja' : '';
       default: return (receipt as unknown as Record<string, unknown>)[field];
     }
   };
@@ -540,13 +552,63 @@ export function ExportFormatDialog({
     }
   };
 
-  const prepareExportData = () => {
+  const prepareExportData = async () => {
     const columns = visibleColumns;
     let sortedReceipts = [...receipts];
 
     // Filter out "Keine Rechnung" if option is enabled (not for ZIP)
     if (excludeNoReceipt && exportFormat !== 'zip') {
       sortedReceipts = sortedReceipts.filter(r => r.category !== 'Keine Rechnung');
+    }
+
+    // Expand split bookings into multiple rows
+    if (expandSplitBookings && splitBookingEnabled && user) {
+      const splitReceiptIds = sortedReceipts
+        .filter(r => (r as any).is_split_booking)
+        .map(r => r.id);
+
+      if (splitReceiptIds.length > 0) {
+        const { data: splitLines } = await supabase
+          .from('receipt_split_lines')
+          .select('*')
+          .eq('user_id', user.id)
+          .in('receipt_id', splitReceiptIds)
+          .order('sort_order', { ascending: true });
+
+        if (splitLines && splitLines.length > 0) {
+          // Group by receipt_id
+          const linesByReceipt = new Map<string, typeof splitLines>();
+          splitLines.forEach(line => {
+            const lines = linesByReceipt.get(line.receipt_id) || [];
+            lines.push(line);
+            linesByReceipt.set(line.receipt_id, lines);
+          });
+
+          // Expand receipts
+          const expanded: Receipt[] = [];
+          for (const receipt of sortedReceipts) {
+            const lines = linesByReceipt.get(receipt.id);
+            if ((receipt as any).is_split_booking && lines && lines.length > 0) {
+              lines.forEach((line, idx) => {
+                expanded.push({
+                  ...receipt,
+                  _split_position: idx + 1,
+                  _split_description: line.description,
+                  _split_category: line.category,
+                  _split_amount_gross: line.amount_gross,
+                  _split_amount_net: line.amount_net,
+                  _split_vat_rate: line.vat_rate,
+                  _split_vat_amount: line.vat_amount,
+                  _split_is_private: line.is_private,
+                } as any);
+              });
+            } else {
+              expanded.push(receipt);
+            }
+          }
+          sortedReceipts = expanded;
+        }
+      }
     }
 
     // Apply sorting from template
@@ -580,8 +642,8 @@ export function ExportFormatDialog({
   };
 
   // CSV Export - returns Blob
-  const generateCSV = (): Blob => {
-    const { columns, receipts: data, groupedData } = prepareExportData();
+  const generateCSV = async (): Promise<Blob> => {
+    const { columns, receipts: data, groupedData } = await prepareExportData();
     const lines: string[] = [];
     const template = selectedTemplate;
 
@@ -634,8 +696,8 @@ export function ExportFormatDialog({
   };
 
   // Excel Export - returns Blob
-  const generateExcel = (): Blob => {
-    const { columns, receipts: data, groupedData } = prepareExportData();
+  const generateExcel = async (): Promise<Blob> => {
+    const { columns, receipts: data, groupedData } = await prepareExportData();
     const template = selectedTemplate;
     const rows: unknown[][] = [];
 
@@ -703,8 +765,8 @@ export function ExportFormatDialog({
   };
 
   // PDF Export - returns Blob
-  const generatePDF = (): Blob => {
-    const { columns, receipts: data, groupedData } = prepareExportData();
+  const generatePDF = async (): Promise<Blob> => {
+    const { columns, receipts: data, groupedData } = await prepareExportData();
     const template = selectedTemplate;
 
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -980,17 +1042,17 @@ export function ExportFormatDialog({
 
       switch (exportFormat) {
         case 'csv': {
-          const blob = generateCSV();
+          const blob = await generateCSV();
           await saveExportFile(blob, `ausgaben_${exportDate}.csv`, subfolder);
           break;
         }
         case 'excel': {
-          const blob = generateExcel();
+          const blob = await generateExcel();
           await saveExportFile(blob, `ausgaben_${exportDate}.xlsx`, subfolder);
           break;
         }
         case 'pdf': {
-          const blob = generatePDF();
+          const blob = await generatePDF();
           await saveExportFile(blob, `ausgaben_${exportDate}.pdf`, subfolder);
           break;
         }
@@ -1247,6 +1309,23 @@ export function ExportFormatDialog({
                       id="excludeNoReceipt"
                       checked={excludeNoReceipt}
                       onCheckedChange={setExcludeNoReceipt}
+                    />
+                  </div>
+                )}
+
+                {/* Split bookings option (only when feature enabled, not for ZIP) */}
+                {splitBookingEnabled && exportFormat !== 'zip' && (
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="expandSplitBookings">Splitbuchungen aufteilen</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Split-Belege erzeugen mehrere Zeilen
+                      </p>
+                    </div>
+                    <Switch
+                      id="expandSplitBookings"
+                      checked={expandSplitBookings}
+                      onCheckedChange={setExpandSplitBookings}
                     />
                   </div>
                 )}
