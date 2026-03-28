@@ -224,14 +224,21 @@ export function CategoryManagement() {
         }
       });
 
-      const categoriesWithCounts = (catData || []).map(cat => ({
-        ...cat,
-        is_hidden: cat.is_hidden ?? false,
-        sort_order: cat.sort_order ?? 0,
-        receipt_count: counts[cat.name] || 0,
-        country: (cat as any).country ?? null,
-        tax_code: (cat as any).tax_code ?? null,
-      })) as Category[];
+      const categoriesWithCounts = (catData || [])
+        .filter(cat => {
+          // Only show tax categories from user's country, hide other countries
+          const catCountry = (cat as any).country;
+          if (catCountry && catCountry !== selectedCountry) return false;
+          return true;
+        })
+        .map(cat => ({
+          ...cat,
+          is_hidden: cat.is_hidden ?? false,
+          sort_order: cat.sort_order ?? 0,
+          receipt_count: counts[cat.name] || 0,
+          country: (cat as any).country ?? null,
+          tax_code: (cat as any).tax_code ?? null,
+        })) as Category[];
 
       setCategories(categoriesWithCounts);
     } catch (error) {
@@ -247,7 +254,7 @@ export function CategoryManagement() {
 
   useEffect(() => {
     fetchCategories();
-  }, [user]);
+  }, [user, selectedCountry]);
 
   // Toggle tax categories for selected country
   const handleToggleTaxCategories = async (show: boolean) => {
@@ -514,16 +521,11 @@ export function CategoryManagement() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="AT">🇦🇹 Österreich (EAR)</SelectItem>
-              <SelectItem value="DE">🇩🇪 Deutschland (SKR03/04)</SelectItem>
-              <SelectItem value="CH">🇨🇭 Schweiz (KMU)</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2 text-sm">
+            <span>{COUNTRY_FLAGS[selectedCountry]}</span>
+            <span className="font-medium">{COUNTRY_LABELS[selectedCountry]}</span>
+            <span className="text-muted-foreground text-xs">(aus deinem Profil)</span>
+          </div>
 
           <Button
             variant="outline"
