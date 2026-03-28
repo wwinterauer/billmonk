@@ -711,6 +711,89 @@ export type Database = {
           },
         ]
       }
+      community_contributions: {
+        Row: {
+          contributed_at: string | null
+          id: string
+          pattern_id: string
+          user_id: string
+        }
+        Insert: {
+          contributed_at?: string | null
+          id?: string
+          pattern_id: string
+          user_id: string
+        }
+        Update: {
+          contributed_at?: string | null
+          id?: string
+          pattern_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_contributions_pattern_id_fkey"
+            columns: ["pattern_id"]
+            isOneToOne: false
+            referencedRelation: "community_patterns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_patterns: {
+        Row: {
+          admin_notes: string | null
+          admin_reviewed: boolean
+          contributor_count: number
+          country: string | null
+          created_at: string | null
+          id: string
+          is_rejected: boolean
+          is_verified: boolean
+          keyword: string | null
+          pattern_type: string
+          suggested_category: string
+          suggested_vat_rate: number | null
+          total_confirmations: number
+          updated_at: string | null
+          vendor_name_normalized: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          admin_reviewed?: boolean
+          contributor_count?: number
+          country?: string | null
+          created_at?: string | null
+          id?: string
+          is_rejected?: boolean
+          is_verified?: boolean
+          keyword?: string | null
+          pattern_type?: string
+          suggested_category: string
+          suggested_vat_rate?: number | null
+          total_confirmations?: number
+          updated_at?: string | null
+          vendor_name_normalized?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          admin_reviewed?: boolean
+          contributor_count?: number
+          country?: string | null
+          created_at?: string | null
+          id?: string
+          is_rejected?: boolean
+          is_verified?: boolean
+          keyword?: string | null
+          pattern_type?: string
+          suggested_category?: string
+          suggested_vat_rate?: number | null
+          total_confirmations?: number
+          updated_at?: string | null
+          vendor_name_normalized?: string | null
+        }
+        Relationships: []
+      }
       company_settings: {
         Row: {
           account_holder: string | null
@@ -2004,12 +2087,37 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_learning_settings: {
+        Row: {
+          auto_verify: boolean
+          id: number
+          is_active: boolean
+          updated_at: string | null
+          verification_threshold: number
+        }
+        Insert: {
+          auto_verify?: boolean
+          id?: number
+          is_active?: boolean
+          updated_at?: string | null
+          verification_threshold?: number
+        }
+        Update: {
+          auto_verify?: boolean
+          id?: number
+          is_active?: boolean
+          updated_at?: string | null
+          verification_threshold?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           account_type: string | null
           admin_view_plan: string | null
           avatar_url: string | null
           city: string | null
+          community_opt_out: boolean
           company_name: string | null
           country: string | null
           created_at: string | null
@@ -2045,6 +2153,7 @@ export type Database = {
           admin_view_plan?: string | null
           avatar_url?: string | null
           city?: string | null
+          community_opt_out?: boolean
           company_name?: string | null
           country?: string | null
           created_at?: string | null
@@ -2080,6 +2189,7 @@ export type Database = {
           admin_view_plan?: string | null
           avatar_url?: string | null
           city?: string | null
+          community_opt_out?: boolean
           company_name?: string | null
           country?: string | null
           created_at?: string | null

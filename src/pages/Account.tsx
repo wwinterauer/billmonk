@@ -77,6 +77,61 @@ const COUNTRIES = [
   { value: 'SI', label: 'Slowenien' },
 ];
 
+function CommunityOptOut() {
+  const { user } = useAuth();
+  const [optOut, setOptOut] = useState(false);
+  const [plan, setPlan] = useState('free');
+  const [loaded, setLoaded] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('profiles')
+      .select('community_opt_out, plan')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setOptOut(!!(data as any).community_opt_out);
+          setPlan(data.plan || 'free');
+        }
+        setLoaded(true);
+      });
+  }, [user]);
+
+  const toggleOptOut = async (checked: boolean) => {
+    if (!user) return;
+    setOptOut(checked);
+    await supabase.from('profiles').update({ community_opt_out: checked } as any).eq('id', user.id);
+    toast({ title: checked ? 'Plattform-Lernen deaktiviert' : 'Plattform-Lernen aktiviert' });
+  };
+
+  if (!loaded) return null;
+
+  const isFree = plan === 'free';
+
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-border p-4">
+      <div className="space-y-0.5">
+        <Label className="text-sm font-medium flex items-center gap-1.5">
+          Plattform-Verbesserung
+        </Label>
+        <p className="text-xs text-muted-foreground">
+          {isFree
+            ? 'Im kostenlosen Plan tragen deine anonymisierten Korrekturen zur Verbesserung der Plattform bei.'
+            : 'Deine anonymisierten Korrekturen helfen, die Erkennung für alle Nutzer zu verbessern.'}
+        </p>
+      </div>
+      <Switch
+        checked={!optOut}
+        onCheckedChange={checked => toggleOptOut(!checked)}
+        disabled={isFree}
+      />
+    </div>
+  );
+}
+
 const Account = () => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -423,6 +478,9 @@ const Account = () => {
                       onCheckedChange={checked => setProfile(p => ({ ...p, newsletter_opt_in: checked }))}
                     />
                   </div>
+
+                  {/* Community Intelligence Info */}
+                  <CommunityOptOut />
 
                   <Button onClick={handleSaveProfile} disabled={saving}>
                     {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}

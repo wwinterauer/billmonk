@@ -337,6 +337,39 @@ export function useCorrectionTracking() {
       
       // 4. Update learning level
       await updateLearningLevel(learning.id, vendorId);
+
+      // 5. Community Intelligence: aggregate pattern (fire-and-forget)
+      if (fieldName === 'category' && correctedValue) {
+        try {
+          // Get vendor name and user country
+          const { data: vendorData } = await supabase
+            .from('vendors')
+            .select('display_name')
+            .eq('id', vendorId)
+            .single();
+          
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('country')
+            .eq('id', user.id)
+            .single();
+
+          if (vendorData?.display_name) {
+            supabase.functions.invoke('aggregate-community-pattern', {
+              body: {
+                user_id: user.id,
+                vendor_name: vendorData.display_name,
+                category: String(correctedValue),
+                country: profileData?.country?.toUpperCase() || null,
+                pattern_type: 'vendor_category',
+              },
+            }).catch(e => console.error('Community pattern aggregation failed:', e));
+          }
+        } catch (communityError) {
+          // Silent fail - community learning is best-effort
+          console.error('Community aggregation error:', communityError);
+        }
+      }
       
     } catch (error) {
       console.error('Error tracking correction:', error);
