@@ -240,6 +240,50 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
     }
   };
 
+  const handleLoadAiSuggestions = async () => {
+    if (!receiptId) return;
+    setLoadingAiSuggestions(true);
+    try {
+      // Load line_items_raw from receipt
+      const { data: receipt } = await supabase
+        .from('receipts')
+        .select('line_items_raw')
+        .eq('id', receiptId)
+        .single();
+
+      const lineItems = (receipt as any)?.line_items_raw;
+      if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
+        toast({ title: 'Keine KI-Positionen', description: 'Für diesen Beleg wurden keine Rechnungspositionen erkannt. Analysiere den Beleg erneut.', variant: 'destructive' });
+        return;
+      }
+
+      const newLines: SplitLine[] = lineItems.map((item: any, idx: number) => {
+        const vatRate = item.vat_rate ?? mainVatRate ?? 20;
+        const grossAmount = item.amount_gross ?? 0;
+        const netAmount = item.amount_net ?? +(grossAmount / (1 + vatRate / 100)).toFixed(2);
+        const vatAmount = +(grossAmount - netAmount).toFixed(2);
+        return {
+          sort_order: idx,
+          description: item.description || '',
+          category: item.category || mainCategory || '',
+          amount_gross: grossAmount,
+          amount_net: netAmount,
+          vat_rate: vatRate,
+          vat_amount: vatAmount,
+          is_private: false,
+          _lastEdited: 'gross' as const,
+        };
+      });
+
+      setLines(newLines);
+      toast({ title: 'KI-Vorschläge geladen', description: `${newLines.length} Positionen aus der KI-Analyse übernommen.` });
+    } catch {
+      toast({ title: 'Fehler', description: 'KI-Vorschläge konnten nicht geladen werden.', variant: 'destructive' });
+    } finally {
+      setLoadingAiSuggestions(false);
+    }
+  };
+
   if (loading) return null;
 
   if (!isActive) {
