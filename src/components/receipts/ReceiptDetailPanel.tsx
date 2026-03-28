@@ -1101,7 +1101,7 @@ export function ReceiptDetailPanel({
                       fileName={receipt.file_name}
                       signedUrl={signedUrl}
                       userModifiedFields={receipt.user_modified_fields || []}
-                      currentFormData={{
+                       currentFormData={{
                         vendor,
                         vendor_brand: vendorBrand,
                         description,
@@ -1109,6 +1109,7 @@ export function ReceiptDetailPanel({
                         receipt_date: receiptDate,
                         amount_gross: amountGross,
                         vat_rate: vatRate,
+                        category,
                       }}
                       vendorId={selectedVendorId || undefined}
                       vendorExpensesOnly={vendorExtractionData?.expenses_only_extraction}
@@ -1194,6 +1195,12 @@ export function ReceiptDetailPanel({
                           // KI hat MwSt-Satz geändert → manuelle Net/VAT-Overrides zurücksetzen
                           setAmountNetOverride('');
                           setVatAmountOverride('');
+                        }
+                        if (updates.category !== undefined) {
+                          if (category !== updates.category) {
+                            changes['Kategorie'] = { old: category || '-', new: updates.category };
+                          }
+                          setCategory(updates.category);
                         }
                         if (updates.confidence !== undefined) {
                           setCurrentAiConfidence(updates.confidence);
