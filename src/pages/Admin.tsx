@@ -12,7 +12,8 @@ import { AnnouncementManager } from '@/components/admin/AnnouncementManager';
 import { SupportManagement } from '@/components/admin/SupportManagement';
 import { FAQManagement } from '@/components/admin/FAQManagement';
 import { BetaCodeManagement } from '@/components/admin/BetaCodeManagement';
-import { Shield, Users, CreditCard, BarChart3, Mail, HeartPulse, Blocks, Activity, Megaphone, MessageSquare, HelpCircle, KeyRound } from 'lucide-react';
+import { CommunityLearning } from '@/components/admin/CommunityLearning';
+import { Shield, Users, CreditCard, BarChart3, Mail, HeartPulse, Blocks, Activity, Megaphone, MessageSquare, HelpCircle, KeyRound, Brain } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Admin() {
@@ -99,6 +100,10 @@ export default function Admin() {
               <KeyRound className="h-4 w-4" />
               Beta-Codes
             </TabsTrigger>
+            <TabsTrigger value="community" className="gap-2">
+              <Brain className="h-4 w-4" />
+              KI-Plattform
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -133,6 +138,9 @@ export default function Admin() {
           </TabsContent>
           <TabsContent value="beta">
             <BetaCodeManagement />
+          </TabsContent>
+          <TabsContent value="community">
+            <CommunityLearning />
           </TabsContent>
         </Tabs>
       </div>
