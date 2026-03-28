@@ -97,6 +97,7 @@ export function ExportFormatDialog({
   const navigate = useNavigate();
   const abortRef = useRef(false);
   const { templates, loading: templatesLoading } = useExportTemplates();
+  const { splitBookingEnabled } = usePlan();
 
   // Template selection
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('default');
@@ -105,6 +106,7 @@ export function ExportFormatDialog({
   const [includeHeader, setIncludeHeader] = useState(true);
   const [includeTotals, setIncludeTotals] = useState(true);
   const [excludeNoReceipt, setExcludeNoReceipt] = useState(true);
+  const [expandSplitBookings, setExpandSplitBookings] = useState(false);
 
   // ZIP options
   const [zipStructure, setZipStructure] = useState<'flat' | 'month' | 'category' | 'vendor'>('month');
