@@ -344,6 +344,7 @@ export function AILearningSettings() {
       r.category_name.toLowerCase().includes(categoryRuleSearch.toLowerCase())
   );
 
+  const filteredData = learningData.filter(
     (l) =>
       !searchQuery ||
       l.vendor?.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
