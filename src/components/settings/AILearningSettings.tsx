@@ -366,7 +366,7 @@ export function AILearningSettings() {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
@@ -390,6 +390,15 @@ export function AILearningSettings() {
             <div className="text-center">
               <p className="text-3xl font-bold text-blue-600">{stats?.totalCorrections || 0}</p>
               <p className="text-sm text-muted-foreground">Korrekturen gesamt</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-3xl font-bold text-purple-600">{stats?.categoryRulesCount || 0}</p>
+              <p className="text-sm text-muted-foreground">Kategorie-Regeln</p>
             </div>
           </CardContent>
         </Card>
