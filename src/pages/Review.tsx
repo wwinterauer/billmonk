@@ -780,7 +780,7 @@ const Review = () => {
                         fileName={currentReceipt.file_name}
                         signedUrl={signedUrl}
                         userModifiedFields={currentReceipt.user_modified_fields || []}
-                        currentFormData={{
+                         currentFormData={{
                           vendor: formData.vendor,
                           vendor_brand: formData.vendor_brand,
                           description: formData.description,
@@ -788,6 +788,7 @@ const Review = () => {
                           receipt_date: formData.receipt_date,
                           amount_gross: formData.amount_gross,
                           vat_rate: formData.vat_rate,
+                          category: formData.category,
                         }}
                         onFieldsUpdated={handleReanalysisUpdate}
                         disabled={imageLoading}
