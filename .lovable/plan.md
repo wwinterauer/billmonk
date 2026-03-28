@@ -25,5 +25,7 @@
 - DATEV/BMD: N Buchungszeilen pro Split-Beleg ✅
 - CSV/Excel/PDF: Split-Zeilen mit Positionsnummer ✅
 
-## Phase 5: KI-Integration
-- Kategorie-Vorschläge pro Rechnungsposition
+## Phase 5: KI-Integration ✅
+- Rechnungspositionen-Extraktion im AI-Prompt (line_items mit Kategorie pro Position) ✅
+- line_items_raw in DB gespeichert ✅
+- "KI-Vorschläge" Button im SplitBookingEditor ✅
