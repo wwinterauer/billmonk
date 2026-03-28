@@ -496,6 +496,16 @@ export function ReanalyzeOptions({
             </DropdownMenuItem>
 
             <DropdownMenuItem
+              onClick={() => reanalyzeSingleField('category')}
+              className="flex-col items-start py-1.5"
+            >
+              <div className="flex items-center gap-1">
+                <Briefcase className="w-3 h-3" />
+                <span className="text-xs">Kategorie</span>
+              </div>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
               onClick={() => reanalyzeFields(['amount_gross', 'amount_net', 'vat_amount', 'vat_rate'])}
               className="flex-col items-start py-1.5"
             >
