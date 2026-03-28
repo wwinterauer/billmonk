@@ -610,6 +610,28 @@ export function CategoryManagement() {
                           {COUNTRY_FLAGS[category.country]}
                         </span>
                       )}
+                      {category.is_system && category.country && TAX_CATEGORY_INFO[category.name] && (
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex items-center justify-center h-5 w-5 rounded-full hover:bg-muted transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInfoCategory(category);
+                                  setInfoDialogOpen(true);
+                                }}
+                              >
+                                <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs">
+                              <p className="text-xs">{TAX_CATEGORY_INFO[category.name].short}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                       {category.is_hidden && (
                         <Badge variant="outline" className="text-xs">Ausgeblendet</Badge>
                       )}
