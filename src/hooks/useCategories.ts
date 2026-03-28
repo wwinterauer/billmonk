@@ -12,6 +12,8 @@ export interface Category {
   is_hidden: boolean;
   sort_order: number;
   created_at: string;
+  country: string | null;
+  tax_code: string | null;
 }
 
 export function useCategories(options?: { includeHidden?: boolean }) {
