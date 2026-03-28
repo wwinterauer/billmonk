@@ -1175,6 +1175,16 @@ const Review = () => {
                       </Select>
                     </div>
 
+                    {/* Split Booking Editor */}
+                    {splitBookingEnabled && currentReceipt && (
+                      <SplitBookingEditor
+                        receiptId={currentReceipt.id}
+                        totalGross={parseFloat(formData.amount_gross) || 0}
+                        mainCategory={formData.category}
+                        mainVatRate={parseFloat(formData.vat_rate) || 20}
+                      />
+                    )}
+
                     {/* Amount & VAT Row */}
                     <div className="grid sm:grid-cols-2 gap-4">
                       {/* Gross Amount */}
