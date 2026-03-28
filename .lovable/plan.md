@@ -1,109 +1,127 @@
 
 
-# Plan: Länderspezifische Kategorie-Zuordnungshilfe im KI-Prompt
+# Plan: Community Intelligence - Plattform-weites Lern-System
 
-## Ziel
-Die automatische Kategorie-Erkennung der KI verbessern, indem länderspezifische Zuordnungsregeln (typische Lieferanten, Schlüsselwörter, Ausnahmen) direkt in den Extraction-Prompt injiziert werden.
+## Konzept
 
-## Problem heute
-Der Prompt übergibt nur eine kommaseparierte Liste von Kategorienamen:
-```
-"category": "Wähle die passendste Kategorie aus dieser Liste: Bewirtung 50% (AT), Reisekosten (AT), KFZ-Kosten (AT), ..."
-```
-Die KI hat keinerlei Kontext, welche Ausgaben zu welcher Kategorie gehören. Bei ähnlich klingenden Kategorien (z.B. "Büromaterial" vs "Geringwertige WG") oder länderspezifischen Besonderheiten (Bewirtung 50% AT vs 70% DE) rät sie oft falsch.
+Anonymisierte Aggregation von User-Korrekturen zu plattformweiten Mustern. Jeder User trägt bei, Admin verwaltet und sieht den Fortschritt. Free-User können nicht opt-outen (ihr "Beitrag" ist Teil des Free-Plans). Zahlende User können in den Einstellungen opt-outen.
 
-## Lösung
-Einen neuen Prompt-Block `KATEGORIE-ZUORDNUNGSHILFE` einfügen, der basierend auf dem User-Land (aus `profiles.country`) länderspezifische Mapping-Regeln enthält.
+## Datenbank-Änderungen
 
-## Änderungen
+### Neue Tabelle: `community_patterns`
+Speichert aggregierte, anonymisierte Muster:
 
-### Datei: `supabase/functions/extract-receipt/index.ts`
+| Spalte | Typ | Beschreibung |
+|---|---|---|
+| id | uuid | PK |
+| pattern_type | text | `vendor_category`, `keyword_category`, `vendor_vat_rate` |
+| vendor_name_normalized | text | Normalisierter Lieferantenname (lowercase, trimmed) |
+| keyword | text | Optional - für keyword-basierte Muster |
+| suggested_category | text | Vorgeschlagene Kategorie |
+| suggested_vat_rate | numeric | Optional - für MwSt-Muster |
+| country | text | Länderspezifisch (AT/DE/CH) |
+| contributor_count | integer | Anzahl verschiedener User die dieses Muster bestätigt haben |
+| total_confirmations | integer | Gesamtzahl Bestätigungen |
+| is_verified | boolean | Admin-verifiziert oder Schwelle erreicht |
+| verification_threshold | integer | Default 3 |
+| admin_reviewed | boolean | Vom Admin geprüft |
+| admin_notes | text | Admin-Notizen |
+| created_at, updated_at | timestamptz | |
 
-**1. Neue Funktion `buildCategoryHints(country, categories)`**
+RLS: Admin kann alles, Service-Role kann inserieren/updaten. Normale User: SELECT nur `is_verified = true`.
 
-Generiert einen Prompt-Block mit Zuordnungsregeln pro Kategorie:
+### Neue Tabelle: `community_contributions`
+Trackt welche User beigetragen haben (für contributor_count Berechnung), ohne den konkreten Inhalt zu speichern:
 
-```text
-KATEGORIE-ZUORDNUNGSHILFE (Österreich):
+| Spalte | Typ |
+|---|---|
+| id | uuid |
+| user_id | uuid |
+| pattern_id | uuid → community_patterns |
+| contributed_at | timestamptz |
 
-Verwende diese Regeln um die passende Kategorie zu wählen:
+RLS: Service-Role only (kein direkter User-Zugriff).
 
-- "Bewirtung 50% (AT)": Geschäftsessen, Restaurant, Gasthaus, Catering, Café-Bewirtung
-  → Typische Lieferanten: Restaurants, Hotels, Caterer
-  → NICHT: Mitarbeiter-Verpflegung, eigene Mahlzeiten auf Reise (→ Reisekosten)
+### Neue Tabelle: `platform_learning_settings`
+Admin-Einstellungen (1 Row):
 
-- "Reisekosten (AT)": Bahntickets, Flüge, Hotel, Taxi, Mietwagen, Parkgebühren auf Dienstreise
-  → Typische Lieferanten: ÖBB, Flixbus, Airlines, Booking.com, Hotels
-  → Tagesdiäten (26,40€), Nächtigungspauschale (15€)
-  → NICHT: tägliche Fahrt zum Büro (→ KFZ-Kosten)
+| Spalte | Typ | Default |
+|---|---|---|
+| id | integer | 1 |
+| is_active | boolean | true |
+| verification_threshold | integer | 3 |
+| auto_verify | boolean | true |
+| updated_at | timestamptz | |
 
-- "KFZ-Kosten (AT)": Treibstoff, Reparatur, Service, KFZ-Versicherung, Vignette, Maut, Parkgebühren
-  → Typische Lieferanten: Tankstellen (BP, Shell, OMV), Werkstätten, ASFINAG, ÖAMTC
-  → Luxustangente beachten (>40.000€ Anschaffung)
+### Profiles-Erweiterung
+- `community_opt_out` (boolean, default false) - nur für zahlende User nutzbar
 
-- "Büromaterial (AT)": Papier, Stifte, Ordner, Druckerpatronen, Briefumschläge, Porto
-  → Typische Lieferanten: Pagro, Office World, Thalia (Bürobedarf)
-  → NUR Verbrauchsmaterial, NICHT Geräte (→ GWG oder AfA)
+## Admin-Dashboard: Neuer Tab "KI-Plattform"
 
-- "Geringwertige WG (AT)": Einzelne Wirtschaftsgüter unter 1.000€ netto
-  → Laptop, Monitor, Drucker, Smartphone, Tastatur, Headset
-  → NICHT: Software-Abos (→ Rechts-/Beratungskosten oder eigene Kategorie)
+Neuer Admin-Tab mit Brain-Icon, aufgeteilt in 3 Bereiche:
 
-- "Telefon & Internet (AT)": Mobilfunk, Festnetz, Internet-Anschluss
-  → Typische Lieferanten: A1, Magenta, Drei, Fonira
+### 1. Übersicht & Einstellungen (oben)
+- **Toggle**: Community Learning aktiv/inaktiv
+- **Schwellwert-Slider**: Ab wie vielen Usern ein Muster als verifiziert gilt (1-10)
+- **Auto-Verify Toggle**: Automatische Verifikation wenn Schwelle erreicht
+- **KPI-Cards**: Gesamt-Muster | Verifiziert | Wartend auf Review | Beitragende User | Opt-Out-Rate
 
-- "Versicherungen (AT)": Betriebliche Versicherungen
-  → Typische Lieferanten: Generali, UNIQA, Allianz, Wiener Städtische, Zürich
-  → NUR betriebliche Versicherungen, NICHT SVS (→ Sozialversicherung SVS)
+### 2. Fortschritts-Visualisierung (mitte)
+- **Progress-Ring/Donut**: Verifizierte vs. unverifizierte Muster
+- **Top-Kategorien-Balkendiagramm**: Welche Kategorien die meisten Community-Muster haben
+- **Länder-Verteilung**: AT/DE/CH Aufteilung der Muster
+- **Timeline**: Wachstum der Muster über Zeit (letzte 30 Tage)
 
-- "Sozialversicherung SVS (AT)": SVS-Beiträge
-  → Typische Lieferanten: SVS, Sozialversicherung der Selbständigen
+### 3. Muster-Tabelle (unten)
+- Durchsuchbare/filterbare Tabelle aller Community-Muster
+- Spalten: Lieferant/Keyword | Kategorie | Land | Bestätigungen | Status (Badge: verifiziert/wartend/abgelehnt)
+- Admin-Aktionen pro Zeile: Verifizieren, Ablehnen, Bearbeiten, Notiz hinzufügen
+- Bulk-Aktionen: Alle wartenden verifizieren
 
-- "Bankgebühren (AT)": Kontoführung, Überweisungsgebühren, Kreditkartengebühren, Zinsen
-  → Typische Lieferanten: Banken (Erste Bank, Raiffeisen, BAWAG, Sparkasse)
+## User-seitige Anzeige
 
-... (analog für DE und CH mit jeweiligen Besonderheiten)
-```
+### Settings-Seite (Account)
+- Info-Banner: "Deine anonymisierten Korrekturen helfen, die Erkennung für alle Nutzer zu verbessern."
+- **Zahlende User**: Toggle "Plattform-Lernen deaktivieren" mit Hinweis
+- **Free User**: Gleicher Text, aber Toggle ist disabled mit Tooltip "Im kostenlosen Plan tragen deine Korrekturen zur Verbesserung der Plattform bei."
 
-**2. Länderspezifische Besonderheiten eingebaut:**
+### Beim Speichern von Korrekturen
+Im bestehenden `useCorrectionTracking` Hook: Nach dem Speichern einer Korrektur wird asynchron (fire-and-forget) eine Edge Function aufgerufen, die das Muster in `community_patterns` aggregiert - sofern der User nicht opted-out hat.
 
-| Land | Besonderheit im Prompt |
-|------|----------------------|
-| AT | Bewirtung 50%, GWG 1.000€, SVS, WKO-Kammerumlage, Kilometergeld 0,42€ |
-| DE | Bewirtung 70%, GWG 800€, IHK-Beiträge, Homeoffice-Pauschale 1.260€, Computer AfA 1 Jahr seit 2021 |
-| CH | Bewirtung ~50%, GWG 1.000 CHF, Kilometerpauschale 0,70 CHF, AHV/IV/ALV, Handelskammer |
+## Edge Function: `aggregate-community-pattern`
 
-**3. Integration in den Prompt**
+Wird nach jeder Korrektur aufgerufen:
+1. Prüft ob User opt-out hat
+2. Normalisiert Vendor-Name
+3. Upsert in `community_patterns` (contributor_count hochzählen wenn neuer User)
+4. Insert in `community_contributions`
+5. Prüft ob Schwelle erreicht → auto-verify
 
-Der neue Block wird zwischen der Kategorie-Liste und den bestehenden Regeln eingefügt:
-```typescript
-const categoryHints = buildCategoryHints(userCountry, catNames);
-// Im userPrompt:
-"category": "Wähle die passendste Kategorie aus dieser Liste: ${categoryList}"
-// Danach:
-+ categoryHints
-```
+## Integration in Extraktion
 
-**4. Typische Lieferanten-Keyword-Mappings** (Beispiele aus Recherche):
+In `extract-receipt/index.ts` wird vor dem AI-Call geprüft:
+1. Lade verifizierte `community_patterns` für das Land des Users
+2. Füge als zusätzlichen Prompt-Block ein: "Plattform-Erfahrung: Diese Lieferanten werden typischerweise so zugeordnet: ..."
+3. Priorität: User-eigene Regeln > Community-Muster > KI-Hinweise
 
-| Keyword auf Rechnung | → Kategorie |
-|---------------------|-------------|
-| "Google Ads", "Meta Ads", "LinkedIn" | Werbung & Marketing |
-| "Booking.com", "Hotel", "ÖBB", "Flixbus" | Reisekosten |
-| "Shell", "BP", "OMV", "Tankstelle" | KFZ-Kosten |
-| "A1 Telekom", "Magenta", "Drei" | Telefon & Internet |
-| "Amazon" (Büroartikel) | Büromaterial ODER GWG (nach Betrag) |
-| "SVS", "Sozialversicherung" | Sozialversicherung |
-| "WKO", "Wirtschaftskammer" | Kammerumlage WKO |
-| "Steuerberater", "Rechtsanwalt" | Rechts-/Beratungskosten |
+## Betroffene Dateien
 
-## Umfang
-- Nur 1 Datei wird geändert: `supabase/functions/extract-receipt/index.ts`
-- Keine DB-Änderungen nötig
-- Keine Frontend-Änderungen nötig
-- Der Prompt wird je nach Land um ca. 500-800 Tokens länger
+| Datei | Änderung |
+|---|---|
+| **Neue Dateien** | |
+| `src/components/admin/CommunityLearning.tsx` | Admin-Tab Komponente |
+| `supabase/functions/aggregate-community-pattern/index.ts` | Aggregations-Logik |
+| **Bestehende Dateien** | |
+| `src/pages/Admin.tsx` | Neuen Tab hinzufügen |
+| `src/hooks/useCorrectionTracking.ts` | Edge Function Call nach Korrektur |
+| `src/pages/Account.tsx` oder `src/pages/Settings.tsx` | Opt-out Toggle + Info-Banner |
+| `supabase/functions/extract-receipt/index.ts` | Community-Muster in Prompt laden |
+| DB-Migration | 3 neue Tabellen + profiles Spalte |
 
-## Risiken
-- Längerer Prompt = minimal höhere Kosten pro Extraktion
-- Token-Limit: bei 4096 max_tokens und dem längeren Input-Prompt kein Problem (Input-Tokens sind separat)
+## Phasen-Vorschlag
+
+1. **DB + Edge Function** - Tabellen, Aggregations-Function, profiles.community_opt_out
+2. **Admin-Dashboard** - CommunityLearning Komponente mit KPIs, Tabelle, Einstellungen
+3. **User-Integration** - Opt-out Toggle, Info-Banner, Correction-Hook Anbindung
+4. **Extraktion** - Community-Muster in extract-receipt Prompt einbauen
 
