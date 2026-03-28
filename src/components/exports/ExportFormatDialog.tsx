@@ -481,6 +481,15 @@ export function ExportFormatDialog({
       case 'payment_method': return receipt.payment_method;
       case 'status': return receipt.status;
       case 'notes': return receipt.notes;
+      // Split-specific fields (populated when expandSplitBookings is active)
+      case 'split_position': return (receipt as any)._split_position ?? '';
+      case 'split_description': return (receipt as any)._split_description ?? '';
+      case 'split_category': return (receipt as any)._split_category ?? '';
+      case 'split_amount_gross': return (receipt as any)._split_amount_gross ?? '';
+      case 'split_amount_net': return (receipt as any)._split_amount_net ?? '';
+      case 'split_vat_rate': return (receipt as any)._split_vat_rate ?? '';
+      case 'split_vat_amount': return (receipt as any)._split_vat_amount ?? '';
+      case 'split_is_private': return (receipt as any)._split_is_private ? 'Ja' : '';
       default: return (receipt as unknown as Record<string, unknown>)[field];
     }
   };
