@@ -368,19 +368,20 @@ export function CategoryManagement() {
         if (error) throw error;
         toast({ title: 'Kategorie erstellt' });
       } else if (selectedCategory) {
+        // For system categories, only update icon, color, is_hidden (not name)
+        const updateData = selectedCategory.is_system
+          ? { icon: formData.icon, color: formData.color, is_hidden: formData.is_hidden }
+          : { name: formData.name.trim(), icon: formData.icon, color: formData.color, is_hidden: formData.is_hidden };
+
         const { error } = await supabase
           .from('categories')
-          .update({
-            name: formData.name.trim(),
-            icon: formData.icon,
-            color: formData.color,
-            is_hidden: formData.is_hidden,
-          })
+          .update(updateData)
           .eq('id', selectedCategory.id);
 
         if (error) throw error;
 
-        if (selectedCategory.name !== formData.name.trim()) {
+        // Rename receipts only for non-system categories
+        if (!selectedCategory.is_system && selectedCategory.name !== formData.name.trim()) {
           const { error: updateError } = await supabase
             .from('receipts')
             .update({ category: formData.name.trim() })
