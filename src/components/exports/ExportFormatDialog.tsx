@@ -1042,17 +1042,17 @@ export function ExportFormatDialog({
 
       switch (exportFormat) {
         case 'csv': {
-          const blob = generateCSV();
+          const blob = await generateCSV();
           await saveExportFile(blob, `ausgaben_${exportDate}.csv`, subfolder);
           break;
         }
         case 'excel': {
-          const blob = generateExcel();
+          const blob = await generateExcel();
           await saveExportFile(blob, `ausgaben_${exportDate}.xlsx`, subfolder);
           break;
         }
         case 'pdf': {
-          const blob = generatePDF();
+          const blob = await generatePDF();
           await saveExportFile(blob, `ausgaben_${exportDate}.pdf`, subfolder);
           break;
         }

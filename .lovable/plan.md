@@ -19,11 +19,11 @@
 - Kategorie-Aggregation über Split-Lines in Dashboard ✅
 - Kategorie-Aggregation über Split-Lines in Reports ✅
 
-## Phase 4: Export-Vorlagen + Steuerexport
-- Split-Spalten in Vorlagen-Editor (conditional)
-- Checkbox "Splitbuchungen aufteilen" in Export-Dialog
-- DATEV/BMD: N Buchungszeilen pro Split-Beleg
-- CSV/Excel: Split-Zeilen mit Positionsnummer
+## Phase 4: Export-Vorlagen + Steuerexport ✅
+- Split-Spalten in Vorlagen-Editor (conditional) ✅
+- Checkbox "Splitbuchungen aufteilen" in Export-Dialog ✅
+- DATEV/BMD: N Buchungszeilen pro Split-Beleg ✅
+- CSV/Excel/PDF: Split-Zeilen mit Positionsnummer ✅
 
 ## Phase 5: KI-Integration
 - Kategorie-Vorschläge pro Rechnungsposition
