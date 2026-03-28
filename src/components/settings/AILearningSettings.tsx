@@ -189,6 +189,42 @@ export function AILearningSettings() {
 
       if (correctionsError) throw correctionsError;
 
+      // Load category rules
+      const { data: rules, error: rulesError } = await supabase
+        .from('category_rules')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('match_count', { ascending: false });
+
+      if (rulesError) throw rulesError;
+      setCategoryRules(rules || []);
+
+      // Load vendors with default categories
+      const { data: vendorsWithDefaults, error: vendorDefaultsError } = await supabase
+        .from('vendors')
+        .select('display_name, default_category_id')
+        .eq('user_id', user.id)
+        .not('default_category_id', 'is', null);
+
+      if (vendorDefaultsError) throw vendorDefaultsError;
+
+      // Load category names for vendor defaults
+      if (vendorsWithDefaults && vendorsWithDefaults.length > 0) {
+        const categoryIds = [...new Set(vendorsWithDefaults.map(v => v.default_category_id).filter(Boolean))];
+        const { data: categories } = await supabase
+          .from('categories')
+          .select('id, name')
+          .in('id', categoryIds as string[]);
+
+        const categoryMap = new Map((categories || []).map(c => [c.id, c.name]));
+        setVendorDefaults(vendorsWithDefaults.map(v => ({
+          vendor_name: v.display_name,
+          category_name: categoryMap.get(v.default_category_id!) || 'Unbekannt',
+        })));
+      } else {
+        setVendorDefaults([]);
+      }
+
       // Calculate field stats
       const fieldStats: Record<string, number> = {};
       corrections?.forEach((c) => {
@@ -209,6 +245,7 @@ export function AILearningSettings() {
         trainedVendors: typedLearning.filter((l) => (l.learning_level ?? 0) >= 2).length,
         totalCorrections: corrections?.length || 0,
         fieldStats,
+        categoryRulesCount: rules?.length || 0,
       });
     } catch (error) {
       console.error('Error loading learning data:', error);
