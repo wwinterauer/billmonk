@@ -31,7 +31,6 @@ import {
   Wifi,
   Zap,
   FileText,
-  RotateCcw,
   Flower2,
   Globe,
 } from 'lucide-react';
