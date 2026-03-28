@@ -8,309 +8,309 @@ export interface TaxCategoryInfoEntry {
 
 export const TAX_CATEGORY_INFO: Record<string, TaxCategoryInfoEntry> = {
   // ==================== ÖSTERREICH (AT) ====================
-  "Bewirtung 50%": {
+  "Bewirtung 50% (AT)": {
     short: "Geschäftsessen & Bewirtung von Kunden/Partnern. Nur 50% absetzbar.",
     long: "Bewirtungsaufwendungen aus geschäftlichem Anlass. Nur 50% der Kosten sind steuerlich absetzbar. Der Beleg muss Datum, Ort, Teilnehmer und den geschäftlichen Anlass enthalten.",
     law: "§20 Abs. 1 Z 3 EStG",
     examples: ["Geschäftsessen mit Kunden", "Arbeitsessen mit Geschäftspartnern", "Bewirtung bei Geschäftsverhandlungen", "Trinkgeld (bis 10% angemessen)"],
     deductibility: "50% absetzbar",
   },
-  "Reisekosten": {
+  "Reisekosten (AT)": {
     short: "Fahrtkosten, Nächtigungen, Diäten bei Geschäftsreisen.",
     long: "Betrieblich veranlasste Reisekosten inkl. Kilometergeld (0,42€/km PKW 2024), Nächtigungspauschale und Tagesdiäten (26,40€ Inland). Eine Reise liegt vor bei mind. 25 km Entfernung und mind. 3 Stunden Dauer.",
     law: "§4 Abs. 5 / §16 Abs. 1 Z 9 EStG",
     examples: ["Kilometergeld (0,42€/km PKW)", "Nächtigungspauschale (15€ ohne Beleg)", "Tagesdiäten (26,40€ Inland)", "Bahntickets & Flüge", "Taxi bei Geschäftsreisen"],
     deductibility: "100% absetzbar",
   },
-  "KFZ-Kosten": {
+  "KFZ-Kosten (AT)": {
     short: "Treibstoff, Reparaturen, Versicherung, Maut, Parkgebühren.",
     long: "Betriebliche KFZ-Kosten inkl. Treibstoff, Service, Reparaturen, Versicherung, Vignette, Maut und Parkgebühren. Bei gemischter Nutzung: Fahrtenbuch oder Kilometerpauschale. Luxustangente beachten (Anschaffungskosten über 40.000€).",
     law: "§4 Abs. 5 / §16 EStG, LuxustangenteV",
     examples: ["Treibstoff & Ladestrom", "Reparaturen & Service", "Versicherung & Steuer", "Vignette & Maut", "Parkgebühren", "Leasing-Raten"],
     deductibility: "100% (bei rein betrieblicher Nutzung)",
   },
-  "Büromaterial & Verbrauch": {
+  "Büromaterial (AT)": {
     short: "Papier, Druckerpatronen, Stifte, Ordner und sonstiger Bürobedarf.",
     long: "Sämtliche Verbrauchsmaterialien für den Bürobetrieb. Einzelanschaffungen unter 1.000€ netto sind sofort absetzbar (GWG). Darüber hinaus: AfA über Nutzungsdauer.",
     law: "§4 Abs. 4 / §16 Abs. 1 EStG",
     examples: ["Papier & Druckerpatronen", "Stifte, Ordner, Mappen", "Briefumschläge & Porto", "Kopierpapier", "Kleinmaterial"],
     deductibility: "100% absetzbar",
   },
-  "Software & Lizenzen": {
-    short: "Abonnements, Lizenzen und Cloud-Dienste für den Betrieb.",
-    long: "Betrieblich genutzte Software, SaaS-Abonnements und Lizenzen. Laufende Kosten sofort absetzbar, Einmallizenzen ggf. über Nutzungsdauer abschreiben.",
-    law: "§4 Abs. 4 / §7 EStG",
-    examples: ["Office-Pakete", "Buchhaltungssoftware", "Cloud-Speicher", "Domain & Hosting", "Projektmanagement-Tools"],
-    deductibility: "100% absetzbar",
-  },
-  "Telefon & Internet": {
+  "Telefon & Internet (AT)": {
     short: "Mobilfunk, Festnetz und Internetkosten (betrieblicher Anteil).",
     long: "Betrieblich veranlasste Telekommunikationskosten. Bei gemischter Nutzung nur der betriebliche Anteil absetzbar (Schätzung oder Einzelnachweis).",
     law: "§4 Abs. 4 EStG",
     examples: ["Mobilfunkvertrag", "Festnetztelefon", "Internet-Anschluss", "VoIP-Dienste"],
     deductibility: "Betrieblicher Anteil (typisch 50-100%)",
   },
-  "Versicherungen": {
+  "Versicherungen (AT)": {
     short: "Betriebliche Versicherungen (Haftpflicht, Rechtsschutz, etc.).",
     long: "Betrieblich veranlasste Versicherungsprämien. Private Versicherungen sind nicht absetzbar, Mischversicherungen anteilig.",
     law: "§4 Abs. 4 EStG",
     examples: ["Berufshaftpflicht", "Betriebsrechtsschutz", "Betriebsunterbrechung", "Elektronikversicherung", "Kfz-Haftpflicht (betrieblich)"],
     deductibility: "100% absetzbar (wenn rein betrieblich)",
   },
-  "Miete & Betriebskosten": {
+  "Miete & Betriebskosten (AT)": {
     short: "Büromiete, Betriebskosten und anteilige Wohnungskosten (Arbeitszimmer).",
     long: "Miete und Betriebskosten für betrieblich genutzte Räumlichkeiten. Arbeitszimmer im Wohnungsverband: nur absetzbar wenn Mittelpunkt der Tätigkeit, anteilige Kosten nach m².",
     law: "§4 Abs. 4 / §20 Abs. 1 Z 2 lit. d EStG",
     examples: ["Büromiete", "Strom & Heizung (Betrieb)", "Reinigung", "Grundsteuer (anteilig)", "Arbeitszimmer (anteilig)"],
     deductibility: "100% (Büro) / anteilig (Arbeitszimmer)",
   },
-  "Fortbildung": {
+  "Fortbildung (AT)": {
     short: "Kurse, Seminare und Fachliteratur mit Bezug zur Tätigkeit.",
     long: "Aus- und Fortbildungskosten, die im Zusammenhang mit der ausgeübten oder verwandten Tätigkeit stehen. Umschulungskosten sind ebenfalls absetzbar.",
     law: "§4 Abs. 4 Z 7 / §16 Abs. 1 Z 10 EStG",
     examples: ["Fachseminare & Workshops", "Online-Kurse", "Fachliteratur & Fachzeitschriften", "Konferenzen & Messen", "Prüfungsgebühren"],
     deductibility: "100% absetzbar",
   },
-  "Werbung & Marketing": {
+  "Werbung & Marketing (AT)": {
     short: "Werbemaßnahmen, Visitenkarten, Online-Werbung, PR-Kosten.",
     long: "Alle Aufwendungen für Werbung und Marketing des Betriebs. Sofort in voller Höhe absetzbar.",
     law: "§4 Abs. 4 EStG",
     examples: ["Online-Werbung (Google, Meta)", "Visitenkarten & Drucksorten", "Website-Kosten", "Werbegeschenke (bis 50€/Person)", "Messen & Ausstellungen"],
     deductibility: "100% absetzbar",
   },
-  "Beratung & Fremdleistungen": {
+  "Rechts-/Beratungskosten (AT)": {
     short: "Steuerberater, Rechtsanwalt, Freelancer und externe Dienstleister.",
     long: "Kosten für betrieblich veranlasste Beratung und zugekaufte Leistungen. Umsatzsteuer bei Reverse-Charge-Leistungen beachten.",
     law: "§4 Abs. 4 EStG",
     examples: ["Steuerberatung", "Rechtsberatung", "Unternehmensberatung", "Freelancer-Honorare", "Übersetzungen"],
     deductibility: "100% absetzbar",
   },
-  "Bankspesen & Gebühren": {
+  "Bankgebühren (AT)": {
     short: "Kontoführung, Überweisungsgebühren, Kreditkartengebühren.",
     long: "Betrieblich veranlasste Bank- und Finanzierungskosten. Bei gemischtem Konto nur der betriebliche Anteil.",
     law: "§4 Abs. 4 EStG",
     examples: ["Kontoführungsgebühren", "Überweisungskosten", "Kreditkartengebühren", "Bankgarantien", "Zinsen für Betriebskredite"],
     deductibility: "100% absetzbar (betrieblicher Anteil)",
   },
-  "Hardware & Geräte": {
-    short: "Computer, Drucker, Monitore und technische Geräte.",
-    long: "Betrieblich genutzte Hardware und Geräte. Unter 1.000€ netto: sofort als GWG absetzbar. Darüber: AfA über Nutzungsdauer (PC/Laptop: 3 Jahre).",
-    law: "§4 Abs. 4 / §13 EStG (GWG), §7 EStG (AfA)",
-    examples: ["Laptop & Desktop-PC", "Monitor & Bildschirm", "Drucker & Scanner", "Tastatur & Maus", "Externe Festplatten"],
-    deductibility: "GWG bis 1.000€ sofort, sonst AfA",
+  "Geringwertige WG (AT)": {
+    short: "Wirtschaftsgüter unter 1.000€ netto – sofort absetzbar.",
+    long: "Geringwertige Wirtschaftsgüter (GWG) mit Anschaffungskosten bis 1.000€ netto können im Jahr der Anschaffung sofort als Betriebsausgabe abgesetzt werden.",
+    law: "§13 EStG",
+    examples: ["Laptop & PC (unter 1.000€)", "Monitor", "Drucker & Scanner", "Tastatur & Maus", "Externe Festplatten", "Smartphone"],
+    deductibility: "100% sofort absetzbar (bis 1.000€ netto)",
   },
-  "Porto & Versand": {
-    short: "Briefporto, Paketversand, Kurierdienstkosten.",
-    long: "Sämtliche betrieblich veranlassten Versandkosten für Post, Pakete und Kurierdienste.",
-    law: "§4 Abs. 4 EStG",
-    examples: ["Briefporto", "Paketversand", "Kurierdienste", "Einschreiben"],
+  "Abschreibungen AfA (AT)": {
+    short: "Absetzung für Abnutzung bei Wirtschaftsgütern über 1.000€.",
+    long: "Wirtschaftsgüter mit Anschaffungskosten über 1.000€ netto werden über die betriebsgewöhnliche Nutzungsdauer abgeschrieben (z.B. PC: 3 Jahre, Büromöbel: 10 Jahre, KFZ: 8 Jahre).",
+    law: "§7 / §8 EStG",
+    examples: ["Computer & Laptops (3 Jahre)", "Büromöbel (10 Jahre)", "KFZ (8 Jahre)", "Maschinen", "Einrichtung"],
+    deductibility: "Jährliche AfA über Nutzungsdauer",
+  },
+  "Sozialversicherung SVS (AT)": {
+    short: "SVS-Beiträge für Selbständige (Kranken-, Pensions-, Unfallversicherung).",
+    long: "Pflichtbeiträge an die Sozialversicherung der Selbständigen (SVS). Umfasst Kranken-, Pensions- und Unfallversicherung. Als Betriebsausgabe oder Sonderausgabe absetzbar.",
+    law: "§4 Abs. 4 / §18 EStG, GSVG",
+    examples: ["SVS Krankenversicherung", "SVS Pensionsversicherung", "SVS Unfallversicherung", "Nachzahlungen SVS"],
     deductibility: "100% absetzbar",
   },
-  "Sonstige Betriebsausgaben": {
-    short: "Sonstige betriebliche Ausgaben, die keiner anderen Kategorie zuzuordnen sind.",
-    long: "Auffangkategorie für betriebliche Ausgaben, die in keine spezifische Kategorie fallen. Betriebliche Veranlassung muss nachweisbar sein.",
-    law: "§4 Abs. 4 EStG",
-    examples: ["Geschenke an Geschäftspartner (bis 50€)", "Mitgliedsbeiträge (Berufsverbände)", "Fachliteratur", "Kleinmaterial"],
+  "Kammerumlage WKO (AT)": {
+    short: "Pflichtbeiträge an die Wirtschaftskammer (WKO).",
+    long: "Kammerumlage und Grundumlage an die Wirtschaftskammer Österreich. Pflichtbeitrag für Gewerbetreibende, als Betriebsausgabe voll absetzbar.",
+    law: "§4 Abs. 4 EStG, WKG",
+    examples: ["Kammerumlage KU1", "Grundumlage", "Fachgruppengebühren"],
     deductibility: "100% absetzbar",
   },
 
   // ==================== DEUTSCHLAND (DE) ====================
-  "Bewirtung 70%": {
+  "Bewirtung 70% (DE)": {
     short: "Geschäftsessen mit externen Partnern. 70% absetzbar.",
     long: "Bewirtungskosten aus geschäftlichem Anlass mit externen Personen. 70% der angemessenen Kosten sind als Betriebsausgabe absetzbar. Bewirtungsbeleg muss maschinell erstellt sein und Angaben zu Ort, Tag, Teilnehmer, Anlass und Höhe enthalten.",
     law: "§4 Abs. 5 Satz 1 Nr. 2 EStG",
     examples: ["Geschäftsessen mit Kunden", "Bewirtung bei Verhandlungen", "Restaurantbesuche mit Geschäftspartnern"],
     deductibility: "70% absetzbar, 100% Vorsteuerabzug",
   },
-  "Reisekosten DE": {
+  "Reisekosten (DE)": {
     short: "Fahrtkosten, Übernachtung, Verpflegungsmehraufwand bei Dienstreisen.",
     long: "Betrieblich veranlasste Reisekosten mit Verpflegungsmehraufwand (14€ bei 8-24h, 28€ bei 24h Abwesenheit), Kilometerpauschale (0,30€/km PKW) und Übernachtungskosten.",
     law: "§4 Abs. 5 / §9 Abs. 1 Satz 3 Nr. 5a EStG",
     examples: ["Verpflegungsmehraufwand (14€/28€)", "Kilometerpauschale (0,30€/km)", "Hotelübernachtungen", "Bahntickets & Flüge", "Parkgebühren auf Reisen"],
     deductibility: "100% absetzbar",
   },
-  "KFZ-Kosten DE": {
+  "KFZ-Kosten (DE)": {
     short: "Betriebliche Fahrzeugkosten inkl. Treibstoff, Versicherung, Reparaturen.",
     long: "Alle Kosten für betrieblich genutzte Fahrzeuge. 1%-Regelung oder Fahrtenbuch für private Mitbenutzung. Kein Luxuslimit wie in AT.",
     law: "§4 Abs. 4 / §6 Abs. 1 Nr. 4 EStG",
     examples: ["Treibstoff & Ladestrom", "Kfz-Versicherung", "Reparatur & Wartung", "Kfz-Steuer", "Leasingraten"],
     deductibility: "100% (bei Fahrtenbuch) oder 1%-Regelung",
   },
-  "Bürobedarf DE": {
+  "Bürobedarf (DE)": {
     short: "Schreibwaren, Druckerzubehör und sonstiger Bürobedarf.",
     long: "Verbrauchsmaterialien für den Bürobetrieb. GWG-Grenze: 800€ netto für Sofortabschreibung.",
     law: "§4 Abs. 4 / §6 Abs. 2 EStG (GWG)",
     examples: ["Papier & Toner", "Ordner & Mappen", "Schreibmaterial", "Druckerzubehör"],
     deductibility: "100% absetzbar",
   },
-  "Software & IT DE": {
-    short: "Software-Lizenzen, Cloud-Dienste, IT-Services.",
-    long: "Betrieblich genutzte Software und IT-Dienstleistungen. Seit 2021 können digitale Wirtschaftsgüter (Software, Lizenzen) im Jahr der Anschaffung voll abgeschrieben werden (Nutzungsdauer 1 Jahr laut BMF).",
-    law: "§4 Abs. 4 EStG, BMF-Schreiben 2021",
-    examples: ["Software-Abonnements", "Cloud-Services", "Hosting & Domains", "IT-Support"],
-    deductibility: "100% absetzbar (seit 2021 Sofortabschreibung)",
-  },
-  "Telekommunikation DE": {
+  "Telekommunikation (DE)": {
     short: "Telefon, Internet, Mobilfunk (betrieblicher Anteil).",
     long: "Betrieblich veranlasste Telekommunikationskosten. Bei gemischter Nutzung: pauschal 20% (max. 20€/Monat) oder Einzelnachweis.",
     law: "§4 Abs. 4 / §3 Nr. 45 EStG",
     examples: ["Mobilfunkvertrag", "Internetanschluss", "Festnetztelefon", "Faxkosten"],
     deductibility: "Betrieblicher Anteil oder Pauschale",
   },
-  "Versicherungen DE": {
+  "Versicherungen (DE)": {
     short: "Betriebliche Versicherungen (Haftpflicht, Rechtsschutz, etc.).",
     long: "Betrieblich veranlasste Versicherungsbeiträge sind in voller Höhe als Betriebsausgabe absetzbar.",
     law: "§4 Abs. 4 EStG",
     examples: ["Berufshaftpflicht", "Betriebshaftpflicht", "Rechtsschutzversicherung", "Inhaltsversicherung"],
     deductibility: "100% absetzbar",
   },
-  "Raumkosten DE": {
+  "Raumkosten/Miete (DE)": {
     short: "Büromiete, Nebenkosten, häusliches Arbeitszimmer.",
     long: "Miete und Nebenkosten für Betriebsräume. Häusliches Arbeitszimmer: max. 1.260€/Jahr Pauschale oder volle Kosten wenn Mittelpunkt der Tätigkeit.",
     law: "§4 Abs. 5 Satz 1 Nr. 6b / §4 Abs. 4 EStG",
     examples: ["Büromiete", "Nebenkosten (Strom, Heizung)", "Reinigung", "Arbeitszimmer-Pauschale (1.260€)"],
     deductibility: "100% (Büro) / max. 1.260€ (Arbeitszimmer)",
   },
-  "Fortbildung DE": {
+  "Fortbildungskosten (DE)": {
     short: "Berufliche Weiterbildung, Kurse, Fachliteratur.",
     long: "Fort- und Weiterbildungskosten mit beruflichem Zusammenhang sind in voller Höhe absetzbar. Auch Umschulungskosten und Erststudium (als Sonderausgaben).",
     law: "§4 Abs. 4 / §9 Abs. 1 Satz 1 EStG",
     examples: ["Seminare & Kurse", "Fachliteratur", "Konferenzteilnahme", "Online-Weiterbildung"],
     deductibility: "100% absetzbar",
   },
-  "Werbung DE": {
+  "Werbekosten (DE)": {
     short: "Werbemaßnahmen, Anzeigen, Online-Marketing, Drucksachen.",
-    long: "Sämtliche Werbekosten für den Betrieb. Streuartikel/Geschenke an Geschäftspartner: max. 50€ pro Person und Jahr (ab 2024: 50€).",
+    long: "Sämtliche Werbekosten für den Betrieb. Streuartikel/Geschenke an Geschäftspartner: max. 50€ pro Person und Jahr.",
     law: "§4 Abs. 4 / §4 Abs. 5 Satz 1 Nr. 1 EStG",
     examples: ["Google Ads & Social Media Werbung", "Visitenkarten", "Flyer & Broschüren", "Werbegeschenke (bis 50€/Person)"],
     deductibility: "100% absetzbar",
   },
-  "Fremdleistungen DE": {
+  "Rechts-/Beratungskosten (DE)": {
     short: "Steuerberater, Anwalt, Subunternehmer, externe Dienstleister.",
     long: "Betrieblich veranlasste Kosten für externe Beratung und Dienstleistungen.",
     law: "§4 Abs. 4 EStG",
     examples: ["Steuerberatungskosten", "Rechtsberatung", "Freelancer & Subunternehmer", "Buchführungskosten"],
     deductibility: "100% absetzbar",
   },
-  "Bank & Finanzierung DE": {
-    short: "Kontoführung, Kreditkosten, Leasinggebühren.",
-    long: "Betrieblich veranlasste Finanzierungskosten und Bankgebühren.",
-    law: "§4 Abs. 4 EStG",
-    examples: ["Kontoführungsgebühren", "Darlehenszinsen", "Leasingraten", "Kreditkartengebühren"],
-    deductibility: "100% absetzbar (betrieblicher Anteil)",
+  "Geringwertige WG (DE)": {
+    short: "Wirtschaftsgüter bis 800€ netto – sofort absetzbar.",
+    long: "Geringwertige Wirtschaftsgüter mit Anschaffungskosten bis 800€ netto können im Jahr der Anschaffung vollständig abgeschrieben werden.",
+    law: "§6 Abs. 2 EStG",
+    examples: ["Laptop & PC (unter 800€)", "Monitore", "Drucker & Scanner", "Smartphones (betrieblich)", "Tablet"],
+    deductibility: "100% sofort absetzbar (bis 800€ netto)",
   },
-  "Hardware DE": {
-    short: "Computer, Peripherie, technische Geräte.",
-    long: "Betrieblich genutzte Hardware. GWG bis 800€ netto sofort absetzbar. Computerhardware kann seit 2021 mit Nutzungsdauer 1 Jahr abgeschrieben werden.",
-    law: "§6 Abs. 2 EStG (GWG), BMF 2021",
-    examples: ["Laptop & PC", "Monitore", "Drucker & Scanner", "Smartphones (betrieblich)", "Tablet"],
-    deductibility: "GWG bis 800€ sofort, darüber AfA",
+  "Abschreibungen AfA (DE)": {
+    short: "Absetzung für Abnutzung bei Wirtschaftsgütern über 800€.",
+    long: "Wirtschaftsgüter mit Anschaffungskosten über 800€ netto werden über die betriebsgewöhnliche Nutzungsdauer abgeschrieben. Seit 2021: Computerhardware und Software mit 1 Jahr Nutzungsdauer (BMF-Schreiben).",
+    law: "§7 EStG, BMF-Schreiben 2021",
+    examples: ["Computer & Hardware (seit 2021: 1 Jahr)", "Büromöbel (13 Jahre)", "KFZ (6 Jahre)", "Maschinen"],
+    deductibility: "Jährliche AfA über Nutzungsdauer",
   },
-  "Versand DE": {
-    short: "Porto, Paketversand, Kurierkosten.",
-    long: "Betrieblich veranlasste Versandkosten jeder Art.",
+  "Leasingkosten (DE)": {
+    short: "Leasing für betriebliche Güter (KFZ, Geräte, Ausstattung).",
+    long: "Leasingraten für betrieblich genutzte Wirtschaftsgüter. Bei KFZ-Leasing: 1%-Regelung oder Fahrtenbuch für Privatanteil beachten.",
     law: "§4 Abs. 4 EStG",
-    examples: ["Briefporto", "DHL/Hermes-Versand", "Kurierdienste", "Verpackungsmaterial"],
-    deductibility: "100% absetzbar",
+    examples: ["KFZ-Leasing", "IT-Leasing", "Büroausstattung-Leasing", "Maschinenleasing"],
+    deductibility: "100% absetzbar (Betriebsausgabe)",
   },
-  "Sonstiges DE": {
-    short: "Sonstige betriebliche Aufwendungen ohne spezielle Zuordnung.",
-    long: "Auffangkategorie für betriebliche Aufwendungen, die keiner speziellen Kategorie zugeordnet werden können.",
-    law: "§4 Abs. 4 EStG",
-    examples: ["Mitgliedsbeiträge (IHK, Verbände)", "Geschenke bis 50€", "Umzugskosten (betrieblich)", "Verschiedenes"],
+  "Geschenke §4 Abs.5 (DE)": {
+    short: "Geschenke an Geschäftspartner – max. 50€ pro Person/Jahr.",
+    long: "Geschenke an Personen, die nicht Arbeitnehmer sind. Pro Empfänger und Wirtschaftsjahr max. 50€ (brutto bei Kleinunternehmer, netto bei Vorsteuerabzug). Wird die Grenze überschritten, ist der gesamte Betrag nicht absetzbar.",
+    law: "§4 Abs. 5 Satz 1 Nr. 1 EStG",
+    examples: ["Weihnachtsgeschenke an Kunden", "Jubiläumsgeschenke", "Präsente bei Geschäftsabschluss"],
+    deductibility: "Max. 50€ pro Person/Jahr",
+  },
+  "IHK-Beiträge (DE)": {
+    short: "Pflichtbeiträge an Industrie- und Handelskammer.",
+    long: "IHK-Grundbeitrag und Umlage sind als Betriebsausgaben voll absetzbar. Pflichtmitgliedschaft für Gewerbetreibende.",
+    law: "§4 Abs. 4 EStG, IHKG",
+    examples: ["IHK-Grundbeitrag", "IHK-Umlage", "Handwerkskammer-Beiträge"],
     deductibility: "100% absetzbar",
   },
 
   // ==================== SCHWEIZ (CH) ====================
-  "Verpflegung & Repräsentation": {
+  "Geschäftsbewirtung (CH)": {
     short: "Geschäftsessen und Repräsentationskosten. Einschränkungen beachten.",
     long: "Geschäftlich begründete Verpflegungs- und Repräsentationsaufwendungen. Übermässige Aufwendungen werden steuerlich nicht anerkannt. Angemessener Rahmen ist nachzuweisen.",
     law: "Art. 59 DBG / Art. 25 StHG",
     examples: ["Geschäftsessen mit Kunden", "Repräsentationskosten", "Kundenanlässe"],
     deductibility: "Geschäftsüblicher Rahmen, angemessene Kosten",
   },
-  "Reisekosten CH": {
+  "Reisekosten (CH)": {
     short: "Geschäftsreisen, Spesen, Übernachtungen.",
     long: "Geschäftlich begründete Reisekosten. Für Arbeitnehmer gelten kantonale Pauschalspesen-Regelungen. Selbständige: effektive Kosten oder Kilometerpauschale (0,70 CHF/km).",
     law: "Art. 59 DBG / Spesenreglement",
     examples: ["Kilometergeld (0,70 CHF/km)", "Bahntickets (Halbtax/GA anteilig)", "Hotelübernachtungen", "Verpflegungsspesen"],
     deductibility: "100% (effektiv oder Pauschale)",
   },
-  "Fahrzeugkosten CH": {
+  "Fahrzeugkosten (CH)": {
     short: "Geschäftsfahrzeug-Kosten, Treibstoff, Unterhalt.",
     long: "Kosten für geschäftlich genutzte Fahrzeuge. Privatanteil muss als Einkommen versteuert werden (0,9% des Kaufpreises pro Monat oder Fahrtenbuch).",
     law: "Art. 59 DBG",
     examples: ["Treibstoff", "Reparaturen & Service", "Versicherung & MFK", "Leasing", "Autobahnvignette"],
     deductibility: "100% abzgl. Privatanteil",
   },
-  "Büromaterial CH": {
+  "Büromaterial (CH)": {
     short: "Bürobedarf, Verbrauchsmaterial, Druckerzubehör.",
     long: "Sämtliches Verbrauchsmaterial für den Geschäftsbetrieb. Sofort als Aufwand verbuchbar.",
     law: "Art. 59 DBG",
     examples: ["Papier & Toner", "Schreibmaterial", "Ordner & Ablage"],
     deductibility: "100% absetzbar",
   },
-  "Informatik & Software CH": {
-    short: "IT-Kosten, Software-Lizenzen, Cloud-Dienste.",
-    long: "Geschäftlich genutzte IT-Infrastruktur und Software. Abschreibung über Nutzungsdauer oder Sofortabschreibung bei geringem Wert.",
-    law: "Art. 59 DBG / Merkblatt Abschreibungen",
-    examples: ["Software-Abonnements", "Cloud-Speicher", "Hosting", "IT-Support"],
-    deductibility: "100% absetzbar",
-  },
-  "Telekommunikation CH": {
+  "Telekommunikation (CH)": {
     short: "Telefon, Internet, Mobile (geschäftlicher Anteil).",
     long: "Geschäftlich bedingte Kommunikationskosten. Bei Mischnutzung nur der geschäftliche Anteil absetzbar.",
     law: "Art. 59 DBG",
     examples: ["Mobilfunk-Abo", "Internet-Anschluss", "Festnetz"],
     deductibility: "Geschäftlicher Anteil",
   },
-  "Versicherungen CH": {
-    short: "Geschäftliche Versicherungen (Haftpflicht, BVG-Beiträge etc.).",
-    long: "Geschäftlich notwendige Versicherungsprämien. AHV/IV/EO/ALV-Beiträge des Arbeitgebers sowie BVG-Beiträge sind ebenfalls absetzbar.",
-    law: "Art. 59 DBG / Art. 33 DBG",
-    examples: ["Berufshaftpflicht", "Betriebshaftpflicht", "AHV/IV/EO-Beiträge (AG-Anteil)", "BVG-Beiträge"],
+  "Versicherungsprämien (CH)": {
+    short: "Geschäftliche Versicherungen (Haftpflicht, Sachversicherungen etc.).",
+    long: "Geschäftlich notwendige Versicherungsprämien sind als Geschäftsaufwand absetzbar.",
+    law: "Art. 59 DBG",
+    examples: ["Berufshaftpflicht", "Betriebshaftpflicht", "Sachversicherungen", "Betriebsunterbrechung"],
     deductibility: "100% absetzbar",
   },
-  "Miete & Raumkosten CH": {
+  "Mietaufwand (CH)": {
     short: "Geschäftsmiete, Nebenkosten, anteiliges Arbeitszimmer.",
     long: "Miete und Nebenkosten für Geschäftsräume. Arbeitszimmer in der Wohnung: anteilig absetzbar wenn kein anderer Arbeitsplatz vorhanden und regelmässig genutzt.",
     law: "Art. 59 DBG",
     examples: ["Geschäftsmiete", "Nebenkosten", "Reinigung", "Arbeitszimmer (anteilig)"],
     deductibility: "100% (Geschäftsräume) / anteilig (Arbeitszimmer)",
   },
-  "Weiterbildung CH": {
+  "Weiterbildung (CH)": {
     short: "Berufliche Weiterbildung, Kurse, Fachliteratur.",
     long: "Weiterbildungskosten im Zusammenhang mit der beruflichen Tätigkeit. Für Arbeitnehmer: max. 12.900 CHF/Jahr absetzbar (Bundessteuer).",
     law: "Art. 33 Abs. 1 lit. j DBG",
     examples: ["Fachkurse & Seminare", "Fachliteratur", "Konferenzen", "CAS/MAS-Studiengänge (berufsbegleitend)"],
     deductibility: "100% (Selbständige) / max. 12.900 CHF (Arbeitnehmer)",
   },
-  "Werbung & Marketing CH": {
+  "Werbeaufwand (CH)": {
     short: "Werbung, Inserate, Online-Marketing.",
     long: "Geschäftlich bedingte Werbekosten jeder Art. Vollständig als Aufwand absetzbar.",
     law: "Art. 59 DBG",
     examples: ["Online-Werbung", "Inserate", "Visitenkarten & Drucksachen", "Messen"],
     deductibility: "100% absetzbar",
   },
-  "Beratung & Honorare CH": {
+  "Beratungskosten (CH)": {
     short: "Treuhänder, Anwalt, externe Berater und Dienstleister.",
     long: "Geschäftlich begründete Beratungskosten und externe Honorare.",
     law: "Art. 59 DBG",
     examples: ["Treuhandkosten", "Rechtsberatung", "Unternehmensberatung", "Freelancer-Honorare"],
     deductibility: "100% absetzbar",
   },
-  "Bank & Spesen CH": {
-    short: "Kontogebühren, Bankspesen, Kreditkosten.",
-    long: "Geschäftlich bedingte Bankkosten und Finanzierungsaufwand.",
-    law: "Art. 59 DBG",
-    examples: ["Kontogebühren", "Bankkarten-Gebühren", "Darlehenszinsen", "TWINT-Gebühren"],
-    deductibility: "100% absetzbar (geschäftlicher Anteil)",
+  "Abschreibungen (CH)": {
+    short: "Abschreibungen auf Geschäftsvermögen (Maschinen, Einrichtung, IT).",
+    long: "Abschreibungen auf Anlagevermögen gemäss den vom Bund publizierten Abschreibungssätzen (Merkblatt A 1995). Degressive oder lineare Methode zulässig.",
+    law: "Art. 59 DBG / Merkblatt Abschreibungen",
+    examples: ["Büroeinrichtung (12.5-25%)", "IT-Hardware (30-40%)", "Fahrzeuge (30-40%)", "Maschinen (20-30%)"],
+    deductibility: "Gemäss Abschreibungstabelle",
   },
-  "Sonstiger Geschäftsaufwand CH": {
-    short: "Übriger geschäftlicher Aufwand ohne spezifische Kategorie.",
-    long: "Auffangkategorie für geschäftlich begründete Aufwendungen, die keiner anderen Kategorie zugeordnet werden können.",
-    law: "Art. 59 DBG",
-    examples: ["Verbandsbeiträge", "Geschenke an Geschäftspartner", "Diverses"],
+  "AHV/IV/EO-Beiträge (CH)": {
+    short: "Sozialversicherungsbeiträge für Selbständige (AHV, IV, EO).",
+    long: "Pflichtbeiträge an AHV/IV/EO für Selbständigerwerbende. Beitragssatz abhängig vom Einkommen (5,371% bis 10,6%). Als Geschäftsaufwand absetzbar.",
+    law: "Art. 59 DBG / AHVG",
+    examples: ["AHV-Beiträge", "IV-Beiträge", "EO-Beiträge", "Verwaltungskosten Ausgleichskasse"],
+    deductibility: "100% absetzbar",
+  },
+  "BVG-Beiträge (CH)": {
+    short: "Berufliche Vorsorge (2. Säule) – Arbeitgeberbeiträge.",
+    long: "Beiträge an die berufliche Vorsorge (BVG/Pensionskasse). Für Selbständige freiwillig, für Arbeitnehmer obligatorisch ab CHF 22.050 Jahreslohn. Arbeitgeberbeiträge als Geschäftsaufwand absetzbar.",
+    law: "Art. 59 DBG / BVG",
+    examples: ["Pensionskasse AG-Beiträge", "Freiwillige BVG-Beiträge (Selbständige)", "Einkäufe in Pensionskasse"],
     deductibility: "100% absetzbar",
   },
 };
