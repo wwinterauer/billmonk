@@ -2028,6 +2028,7 @@ export type Database = {
           phone: string | null
           plan: string | null
           receipt_credit: number | null
+          split_booking_enabled: boolean
           street: string | null
           stripe_customer_id: string | null
           stripe_product_id: string | null
@@ -2062,6 +2063,7 @@ export type Database = {
           phone?: string | null
           plan?: string | null
           receipt_credit?: number | null
+          split_booking_enabled?: boolean
           street?: string | null
           stripe_customer_id?: string | null
           stripe_product_id?: string | null
@@ -2096,6 +2098,7 @@ export type Database = {
           phone?: string | null
           plan?: string | null
           receipt_credit?: number | null
+          split_booking_enabled?: boolean
           street?: string | null
           stripe_customer_id?: string | null
           stripe_product_id?: string | null
@@ -2154,6 +2157,69 @@ export type Database = {
             foreignKeyName: "quote_settings_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      receipt_split_lines: {
+        Row: {
+          amount_gross: number
+          amount_net: number
+          category: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_private: boolean
+          receipt_id: string
+          sort_order: number
+          updated_at: string | null
+          user_id: string
+          vat_amount: number
+          vat_rate: number
+        }
+        Insert: {
+          amount_gross?: number
+          amount_net?: number
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_private?: boolean
+          receipt_id: string
+          sort_order?: number
+          updated_at?: string | null
+          user_id: string
+          vat_amount?: number
+          vat_rate?: number
+        }
+        Update: {
+          amount_gross?: number
+          amount_net?: number
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_private?: boolean
+          receipt_id?: string
+          sort_order?: number
+          updated_at?: string | null
+          user_id?: string
+          vat_amount?: number
+          vat_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipt_split_lines_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipt_split_lines_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -2225,6 +2291,7 @@ export type Database = {
           is_duplicate: boolean | null
           is_mixed_tax_rate: boolean | null
           is_no_receipt_entry: boolean | null
+          is_split_booking: boolean
           line_items_raw: Json | null
           notes: string | null
           original_pages: number[] | null
@@ -2279,6 +2346,7 @@ export type Database = {
           is_duplicate?: boolean | null
           is_mixed_tax_rate?: boolean | null
           is_no_receipt_entry?: boolean | null
+          is_split_booking?: boolean
           line_items_raw?: Json | null
           notes?: string | null
           original_pages?: number[] | null
@@ -2333,6 +2401,7 @@ export type Database = {
           is_duplicate?: boolean | null
           is_mixed_tax_rate?: boolean | null
           is_no_receipt_entry?: boolean | null
+          is_split_booking?: boolean
           line_items_raw?: Json | null
           notes?: string | null
           original_pages?: number[] | null
