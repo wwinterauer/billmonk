@@ -173,6 +173,14 @@ const Reports = () => {
     enabled: !!user && !!dateRange.from && !!dateRange.to,
   });
 
+  // Fetch split lines for split-aware category aggregation
+  const splitReceiptIds = useMemo(() => {
+    if (!splitBookingEnabled || !receipts) return [];
+    return receipts.filter(r => (r as any).is_split_booking).map(r => r.id);
+  }, [receipts, splitBookingEnabled]);
+
+  const { data: splitLines } = useSplitLines(splitBookingEnabled && splitReceiptIds.length > 0, splitReceiptIds);
+
   // Fetch invoices data for income analysis (Business plan)
   const { data: invoices, isLoading: invoicesLoading } = useQuery({
     queryKey: ['reports-invoices', dateRange.from?.toISOString(), dateRange.to?.toISOString(), user?.id],
