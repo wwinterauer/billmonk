@@ -160,6 +160,7 @@ const Review = () => {
   const { getReceipts, updateReceipt, getReceiptFileUrl, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
+  const { splitBookingEnabled } = usePlan();
   const queryClient = useQueryClient();
 
   // State
