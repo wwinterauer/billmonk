@@ -1505,6 +1505,17 @@ export function ReceiptDetailPanel({
                       </Select>
                     </LearnableField>
 
+                    {/* Split Booking Editor */}
+                    {splitBookingEnabled && receiptId && (
+                      <SplitBookingEditor
+                        receiptId={receiptId}
+                        totalGross={amountGross !== '' ? parseFloat(amountGross) : 0}
+                        mainCategory={category}
+                        mainVatRate={vatRate !== '' ? parseFloat(vatRate) : 20}
+                        onSplitChange={() => onUpdate()}
+                      />
+                    )}
+
                     {/* Amount & VAT */}
                     <div className="grid grid-cols-2 gap-4">
                       <LearnableField
