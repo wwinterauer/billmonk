@@ -81,6 +81,7 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isActive, setIsActive] = useState(false);
+  const [loadingAiSuggestions, setLoadingAiSuggestions] = useState(false);
 
   // Load existing split lines
   useEffect(() => {
