@@ -55,6 +55,18 @@ export const DEFAULT_COLUMNS: ExportColumn[] = [
   { id: '12', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 12, align: 'left' },
 ];
 
+// Split-specific columns (only visible when feature is enabled)
+export const SPLIT_COLUMNS: ExportColumn[] = [
+  { id: 's1', field: 'split_position', label: 'Split-Position', type: 'number', format: '#0', visible: false, order: 20, align: 'right' },
+  { id: 's2', field: 'split_description', label: 'Positions-Beschreibung', type: 'text', format: null, visible: false, order: 21, align: 'left' },
+  { id: 's3', field: 'split_category', label: 'Positions-Kategorie', type: 'text', format: null, visible: false, order: 22, align: 'left' },
+  { id: 's4', field: 'split_amount_gross', label: 'Positions-Brutto', type: 'currency', format: '€ #.##0,00', visible: false, order: 23, align: 'right' },
+  { id: 's5', field: 'split_amount_net', label: 'Positions-Netto', type: 'currency', format: '€ #.##0,00', visible: false, order: 24, align: 'right' },
+  { id: 's6', field: 'split_vat_rate', label: 'Positions-MwSt-Satz', type: 'percent', format: '#0%', visible: false, order: 25, align: 'right' },
+  { id: 's7', field: 'split_vat_amount', label: 'Positions-MwSt-Betrag', type: 'currency', format: '€ #.##0,00', visible: false, order: 26, align: 'right' },
+  { id: 's8', field: 'split_is_private', label: 'Privatanteil', type: 'text', format: null, visible: false, order: 27, align: 'left' },
+];
+
 // Default columns for invoice export templates
 export const DEFAULT_INVOICE_COLUMNS: ExportColumn[] = [
   { id: 'i1', field: 'invoice_number', label: 'Rechnungsnr.', type: 'text', format: null, visible: true, order: 0, align: 'left' },

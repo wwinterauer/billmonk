@@ -86,6 +86,7 @@ function escapeCSVField(val: string): string {
 // ── Convert receipts/invoices to BookingRows ──────────
 
 export interface ReceiptForExport {
+  id?: string;
   receipt_date: string | null;
   amount_gross: number | null;
   amount_net: number | null;
@@ -97,6 +98,19 @@ export interface ReceiptForExport {
   invoice_number: string | null;
   category: string | null;
   currency: string | null;
+  is_split_booking?: boolean;
+}
+
+export interface SplitLineForExport {
+  receipt_id: string;
+  description: string | null;
+  category: string | null;
+  amount_gross: number;
+  amount_net: number;
+  vat_rate: number;
+  vat_amount: number;
+  is_private: boolean;
+  sort_order: number;
 }
 
 export interface InvoiceForExport {
@@ -122,6 +136,31 @@ function receiptToRow(r: ReceiptForExport, config: TaxExportConfig): BookingRow 
     invoiceNumber: r.invoice_number || '',
     vatRate: r.vat_rate,
     currency: r.currency || 'EUR',
+  };
+}
+
+function splitLineToRow(
+  line: SplitLineForExport, 
+  receipt: ReceiptForExport, 
+  config: TaxExportConfig
+): BookingRow {
+  const d = receipt.receipt_date ? new Date(receipt.receipt_date) : new Date();
+  const text = [
+    receipt.vendor_brand || receipt.vendor || '',
+    line.description || line.category || '',
+  ].filter(Boolean).join(' - ').substring(0, 60) || 'Split-Position';
+  
+  return {
+    amount: Math.abs(line.amount_gross),
+    isExpense: true,
+    account: config.defaultExpenseAccount || '5000',
+    counterAccount: config.bankAccount || '2800',
+    buKey: getBUKey(line.vat_rate),
+    date: format(d, 'ddMM'),
+    text,
+    invoiceNumber: receipt.invoice_number || '',
+    vatRate: line.vat_rate,
+    currency: receipt.currency || 'EUR',
   };
 }
 
