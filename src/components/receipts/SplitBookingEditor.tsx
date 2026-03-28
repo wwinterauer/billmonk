@@ -304,6 +304,16 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
           <Badge variant="secondary" className="text-xs">{lines.length} Positionen</Badge>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleLoadAiSuggestions}
+            disabled={loadingAiSuggestions}
+            className="gap-1"
+          >
+            {loadingAiSuggestions ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            KI-Vorschläge
+          </Button>
           <Button variant="ghost" size="sm" onClick={handleRemoveSplit} className="text-destructive gap-1">
             <X className="h-3 w-3" />
             Aufheben
