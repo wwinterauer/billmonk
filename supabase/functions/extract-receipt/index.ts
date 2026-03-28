@@ -548,18 +548,34 @@ ${hintText}`;
     }
     
     if (userId) {
-      const { data: userCategories } = await supabase
+      // Get user's country to filter system categories
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('country')
+        .eq('id', userId)
+        .single();
+      const userCountry = userProfile?.country?.toUpperCase() || null;
+
+      let query = supabase
         .from('categories')
-        .select('name')
-        .or(`user_id.eq.${userId},is_system.eq.true`)
+        .select('name, country')
         .eq('is_hidden', false)
         .order('sort_order');
+      
+      if (userCountry) {
+        // User's own categories OR system categories from their country
+        query = query.or(`user_id.eq.${userId},and(is_system.eq.true,country.eq.${userCountry})`);
+      } else {
+        query = query.or(`user_id.eq.${userId},is_system.eq.true`);
+      }
+
+      const { data: userCategories } = await query;
       
       if (userCategories && userCategories.length > 0) {
         const catNames = userCategories.map(c => c.name).filter(n => n !== 'Keine Rechnung');
         if (catNames.length > 0) {
           categoryList = catNames.join(', ');
-          console.log(`Using ${catNames.length} user categories for AI matching`);
+          console.log(`Using ${catNames.length} user categories for AI matching (country: ${userCountry})`);
         }
       }
     }
