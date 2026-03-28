@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
+import { useSplitLines, aggregateWithSplitLines } from '@/hooks/useSplitLines';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
