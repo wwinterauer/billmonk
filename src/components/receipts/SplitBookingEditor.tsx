@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Trash2, AlertTriangle, Check, X, Split } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, Check, X, Split, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -81,6 +81,7 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isActive, setIsActive] = useState(false);
+  const [loadingAiSuggestions, setLoadingAiSuggestions] = useState(false);
 
   // Load existing split lines
   useEffect(() => {
@@ -239,6 +240,50 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
     }
   };
 
+  const handleLoadAiSuggestions = async () => {
+    if (!receiptId) return;
+    setLoadingAiSuggestions(true);
+    try {
+      // Load line_items_raw from receipt
+      const { data: receipt } = await supabase
+        .from('receipts')
+        .select('line_items_raw')
+        .eq('id', receiptId)
+        .single();
+
+      const lineItems = (receipt as any)?.line_items_raw;
+      if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
+        toast({ title: 'Keine KI-Positionen', description: 'Für diesen Beleg wurden keine Rechnungspositionen erkannt. Analysiere den Beleg erneut.', variant: 'destructive' });
+        return;
+      }
+
+      const newLines: SplitLine[] = lineItems.map((item: any, idx: number) => {
+        const vatRate = item.vat_rate ?? mainVatRate ?? 20;
+        const grossAmount = item.amount_gross ?? 0;
+        const netAmount = item.amount_net ?? +(grossAmount / (1 + vatRate / 100)).toFixed(2);
+        const vatAmount = +(grossAmount - netAmount).toFixed(2);
+        return {
+          sort_order: idx,
+          description: item.description || '',
+          category: item.category || mainCategory || '',
+          amount_gross: grossAmount,
+          amount_net: netAmount,
+          vat_rate: vatRate,
+          vat_amount: vatAmount,
+          is_private: false,
+          _lastEdited: 'gross' as const,
+        };
+      });
+
+      setLines(newLines);
+      toast({ title: 'KI-Vorschläge geladen', description: `${newLines.length} Positionen aus der KI-Analyse übernommen.` });
+    } catch {
+      toast({ title: 'Fehler', description: 'KI-Vorschläge konnten nicht geladen werden.', variant: 'destructive' });
+    } finally {
+      setLoadingAiSuggestions(false);
+    }
+  };
+
   if (loading) return null;
 
   if (!isActive) {
@@ -259,6 +304,16 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
           <Badge variant="secondary" className="text-xs">{lines.length} Positionen</Badge>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleLoadAiSuggestions}
+            disabled={loadingAiSuggestions}
+            className="gap-1"
+          >
+            {loadingAiSuggestions ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            KI-Vorschläge
+          </Button>
           <Button variant="ghost" size="sm" onClick={handleRemoveSplit} className="text-destructive gap-1">
             <X className="h-3 w-3" />
             Aufheben
