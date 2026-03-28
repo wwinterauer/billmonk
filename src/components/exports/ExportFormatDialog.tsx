@@ -642,8 +642,8 @@ export function ExportFormatDialog({
   };
 
   // CSV Export - returns Blob
-  const generateCSV = (): Blob => {
-    const { columns, receipts: data, groupedData } = prepareExportData();
+  const generateCSV = async (): Promise<Blob> => {
+    const { columns, receipts: data, groupedData } = await prepareExportData();
     const lines: string[] = [];
     const template = selectedTemplate;
 
