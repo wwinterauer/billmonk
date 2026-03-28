@@ -84,7 +84,7 @@ export function useDashboardData(year: number, month: number) {
       // Fetch current month receipts
       const { data: currentMonthReceipts, error: currentError } = await supabase
         .from('receipts')
-        .select('id, amount_gross, vat_amount, status, ai_confidence, category')
+        .select('id, amount_gross, vat_amount, status, ai_confidence, category, is_split_booking')
         .eq('user_id', user.id)
         .gte('created_at', startOfMonth.toISOString())
         .lte('created_at', endOfMonth.toISOString());
@@ -181,12 +181,46 @@ export function useDashboardData(year: number, month: number) {
         .filter(r => (r as any).category !== NO_RECEIPT_CATEGORY)
         .reduce((sum, r) => sum + (r.amount_gross || 0), 0);
 
-      // Calculate category totals (exclude "Keine Rechnung")
+      // Calculate category totals (exclude "Keine Rechnung"), split-aware
+      // Fetch split lines for split bookings
+      const splitBookingIds = billableReceipts
+        .filter(r => (r as any).is_split_booking)
+        .map(r => r.id);
+
+      let splitLinesData: any[] = [];
+      if (splitBookingIds.length > 0) {
+        const { data: sl } = await supabase
+          .from('receipt_split_lines')
+          .select('*')
+          .eq('user_id', user.id)
+          .in('receipt_id', splitBookingIds);
+        splitLinesData = sl || [];
+      }
+
+      // Group split lines by receipt
+      const splitByReceipt = new Map<string, any[]>();
+      splitLinesData.forEach((line: any) => {
+        const lines = splitByReceipt.get(line.receipt_id) || [];
+        lines.push(line);
+        splitByReceipt.set(line.receipt_id, lines);
+      });
+
       const categoryMap = new Map<string, number>();
       billableReceipts.forEach(r => {
+        if ((r as any).is_split_booking) {
+          const lines = splitByReceipt.get(r.id);
+          if (lines && lines.length > 0) {
+            lines.forEach((line: any) => {
+              const cat = line.category || r.category;
+              if (cat) {
+                categoryMap.set(cat, (categoryMap.get(cat) || 0) + (line.amount_gross || 0));
+              }
+            });
+            return;
+          }
+        }
         if (r.category) {
-          const current = categoryMap.get(r.category) || 0;
-          categoryMap.set(r.category, current + (r.amount_gross || 0));
+          categoryMap.set(r.category, (categoryMap.get(r.category) || 0) + (r.amount_gross || 0));
         }
       });
 

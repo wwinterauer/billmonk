@@ -311,7 +311,7 @@ const Expenses = () => {
   const [exportFormatDialogOpen, setExportFormatDialogOpen] = useState(false);
   const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>('csv');
   const [taxExportOpen, setTaxExportOpen] = useState(false);
-  const { effectivePlan } = usePlan();
+  const { effectivePlan, splitBookingEnabled } = usePlan();
 
   // Detail panel state (edit mode)
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
@@ -2404,6 +2404,16 @@ const Expenses = () => {
                                   >
                                     <Copy className="w-3 h-3 mr-1" />
                                     {receipt.duplicate_score || 0}%
+                                  </Badge>
+                                )}
+                                {/* Split Booking badge */}
+                                {splitBookingEnabled && (receipt as any).is_split_booking && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="bg-violet-50 text-violet-700 border-violet-200 text-xs"
+                                  >
+                                    <Layers className="w-3 h-3 mr-1" />
+                                    Splitbuchung
                                   </Badge>
                                 )}
                                 {/* Source Badge for email imports */}
