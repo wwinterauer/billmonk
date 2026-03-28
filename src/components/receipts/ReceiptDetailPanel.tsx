@@ -94,6 +94,8 @@ import { SourceBadge, NoReceiptBadge } from './SourceBadge';
 import { ReanalyzeOptions } from './ReanalyzeOptions';
 import { TagSelector } from '@/components/tags/TagSelector';
 import { useTags } from '@/hooks/useTags';
+import { SplitBookingEditor } from './SplitBookingEditor';
+import { usePlan } from '@/hooks/usePlan';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;

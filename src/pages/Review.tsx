@@ -78,7 +78,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { TagSelector } from '@/components/tags/TagSelector';
-
+import { SplitBookingEditor } from '@/components/receipts/SplitBookingEditor';
+import { usePlan } from '@/hooks/usePlan';
 // International VAT rates grouped by country
 const VAT_RATE_GROUPS = [
   {
