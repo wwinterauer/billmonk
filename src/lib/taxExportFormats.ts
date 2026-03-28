@@ -316,12 +316,31 @@ export function generateTaxExport(
   config: TaxExportConfig,
   receipts: ReceiptForExport[],
   invoices: InvoiceForExport[],
+  splitLines?: SplitLineForExport[],
 ): void {
   const rows: string[] = [];
   const bookingRows: BookingRow[] = [];
 
+  // Group split lines by receipt_id
+  const splitByReceipt = new Map<string, SplitLineForExport[]>();
+  if (splitLines) {
+    splitLines.forEach(line => {
+      const lines = splitByReceipt.get(line.receipt_id) || [];
+      lines.push(line);
+      splitByReceipt.set(line.receipt_id, lines);
+    });
+  }
+
   if (config.bookingType === 'expenses' || config.bookingType === 'both') {
-    receipts.forEach(r => bookingRows.push(receiptToRow(r, config)));
+    receipts.forEach(r => {
+      // If receipt has split lines, generate one row per split line
+      if (r.is_split_booking && r.id && splitByReceipt.has(r.id)) {
+        const lines = splitByReceipt.get(r.id)!;
+        lines.forEach(line => bookingRows.push(splitLineToRow(line, r, config)));
+      } else {
+        bookingRows.push(receiptToRow(r, config));
+      }
+    });
   }
   if (config.bookingType === 'income' || config.bookingType === 'both') {
     invoices.forEach(inv => bookingRows.push(invoiceToRow(inv, config)));
