@@ -52,6 +52,98 @@ interface MultiInvoiceResult {
   reason?: string;
 }
 
+// Country-specific category assignment hints for improved AI accuracy
+function buildCategoryHints(country: string | null, categories: string[]): string {
+  if (!country || categories.length === 0) return '';
+
+  const has = (name: string) => categories.some(c => c.toLowerCase().includes(name.toLowerCase()));
+
+  let hints = `
+
+KATEGORIE-ZUORDNUNGSHILFE:
+
+Verwende diese Regeln um die passendste Kategorie zu wählen. Ordne NUR Kategorien aus der obigen Liste zu.
+
+ALLGEMEINE ZUORDNUNGS-REGELN:
+- Wenn ein Lieferant eindeutig zu einer Kategorie passt, wähle diese
+- Bei Unsicherheit zwischen zwei Kategorien: wähle die spezifischere
+- "Sonstiges" nur wenn KEINE andere Kategorie passt
+
+TYPISCHE LIEFERANTEN → KATEGORIE:
+- Tankstellen (Shell, BP, OMV, Eni, Total, JET, Avanti) → KFZ/Fahrzeug-Kategorie
+- Restaurants, Gasthäuser, Hotels (Bewirtung) → Bewirtungs-Kategorie
+- Bahngesellschaften (ÖBB, DB, SBB), Fluglinien, Booking.com, Hotels → Reisekosten-Kategorie
+- Telekom-Anbieter (A1, Magenta, Drei, Telekom, Vodafone, Swisscom, Sunrise) → Telefon/Internet-Kategorie
+- Google Ads, Meta/Facebook Ads, LinkedIn, Bing Ads → Werbung/Marketing-Kategorie
+- Steuerberater, Rechtsanwalt, Notar, Wirtschaftsprüfer → Beratungs-Kategorie
+- Pagro, Bürobedarf, Papier, Stifte, Ordner, Druckerpatronen → Büromaterial-Kategorie
+- Banken (Kontoführung, Überweisungsgebühren) → Bankgebühren-Kategorie
+- Versicherungen (Generali, UNIQA, Allianz, Zurich, AXA) → Versicherungs-Kategorie
+
+BETRAGSBEZOGENE REGELN:
+- Einzelne Geräte (Laptop, Monitor, Drucker, Smartphone, Headset, Tastatur, Möbelstück) → Geringwertige WG / GWG Kategorie (wenn vorhanden)
+- Software-Abos, Cloud-Dienste (Microsoft 365, Adobe, Dropbox) → Software/EDV oder Beratungs-Kategorie
+- NUR Verbrauchsmaterial (Papier, Toner, Stifte) → Büromaterial
+- Geräte sind KEIN Büromaterial!
+
+ABGRENZUNGEN (häufige Verwechslungen):
+- Parkgebühren auf REISE → Reisekosten; tägliches Parken am Büro → KFZ-Kosten
+- Restaurant auf GESCHÄFTSREISE kann Reisekosten ODER Bewirtung sein (je nach Kontext)
+- Amazon: nach INHALT kategorisieren (Bürobedarf? Elektronik/GWG? Software?)
+`;
+
+  if (country === 'AT') {
+    hints += `
+LÄNDERSPEZIFISCHE REGELN (ÖSTERREICH):
+${has('Bewirtung') ? `- Bewirtung: Geschäftsessen, Restaurant, Gasthaus, Catering (50% absetzbar in AT)
+  → NICHT für eigene Verpflegung auf Dienstreise (→ Reisekosten)` : ''}
+${has('Reisekosten') ? `- Reisekosten: ÖBB, Flixbus, WESTbahn, Airlines, Hotels, Booking.com, Taxi, Mietwagen
+  → Tagesdiäten AT: 26,40€, Nächtigungspauschale: 15€
+  → NICHT: tägliche Fahrt Wohnung-Büro (→ KFZ-Kosten)` : ''}
+${has('KFZ') ? `- KFZ-Kosten: OMV, BP, Shell, ASFINAG, ÖAMTC, Vignette, Maut, Werkstätten
+  → Kilometergeld AT: 0,42€/km` : ''}
+${has('Geringwertig') ? `- Geringwertige WG: Einzelne Wirtschaftsgüter unter 1.000€ netto (GWG-Grenze AT)
+  → NICHT: Software-Abos, Verbrauchsmaterial` : ''}
+${has('SVS') || has('Sozialversicherung') ? `- Sozialversicherung SVS: SVS-Beiträge, Sozialversicherung der Selbständigen` : ''}
+${has('WKO') || has('Kammerumlage') ? `- Kammerumlage WKO: Wirtschaftskammer, Fachgruppe, Innung` : ''}
+${has('Porto') || has('Versand') ? `- Porto & Versand: Österreichische Post, DHL, DPD, GLS, UPS` : ''}
+${has('Telefon') || has('Internet') ? `- Telefon & Internet: A1, Magenta, Drei, Fonira` : ''}
+${has('Versicherung') ? `- Versicherungen: Generali, UNIQA, Allianz, Wiener Städtische, Zürich
+  → NUR betriebliche Versicherungen, NICHT SVS (→ Sozialversicherung)` : ''}
+${has('Bankgebühr') ? `- Bankgebühren: Erste Bank, Raiffeisen, BAWAG, Sparkasse` : ''}
+`;
+  } else if (country === 'DE') {
+    hints += `
+LÄNDERSPEZIFISCHE REGELN (DEUTSCHLAND):
+${has('Bewirtung') ? `- Bewirtung: Geschäftsessen, Restaurant, Catering (70% absetzbar in DE)
+  → NICHT für eigene Verpflegung auf Dienstreise (→ Reisekosten)` : ''}
+${has('Reisekosten') ? `- Reisekosten: Deutsche Bahn, Flixbus, Airlines, Hotels, Taxi
+  → Verpflegungspauschale: 28€ (>24h), 14€ (>8h)` : ''}
+${has('KFZ') ? `- KFZ-Kosten: Shell, Aral, Total, ADAC, Werkstätten
+  → Pendlerpauschale: 0,30€/km (ab 21. km: 0,38€)` : ''}
+${has('Geringwertig') ? `- Geringwertige WG: Einzelne Wirtschaftsgüter unter 800€ netto (GWG-Grenze DE)
+  → Computer/Peripherie: sofort absetzbar seit 2021 (unabhängig vom Preis)` : ''}
+${has('IHK') ? `- IHK-Beiträge: Industrie- und Handelskammer, Handwerkskammer (HWK)` : ''}
+${has('Telefon') || has('Internet') ? `- Telefon & Internet: Telekom, Vodafone, O2, 1&1` : ''}
+${has('Versicherung') ? `- Versicherungen: Allianz, AXA, HUK, ERGO, Generali` : ''}
+${has('Bankgebühr') ? `- Bankgebühren: Deutsche Bank, Commerzbank, Sparkasse, Volksbank` : ''}
+`;
+  } else if (country === 'CH') {
+    hints += `
+LÄNDERSPEZIFISCHE REGELN (SCHWEIZ):
+${has('Bewirtung') ? `- Bewirtung: Geschäftsessen, Restaurant (~50% absetzbar in CH)` : ''}
+${has('Reisekosten') ? `- Reisekosten: SBB, Swiss, Hotels, Taxi
+  → Kilometerpauschale CH: 0,70 CHF/km` : ''}
+${has('KFZ') ? `- KFZ-Kosten: Migrol, Shell, Coop Pronto, TCS` : ''}
+${has('Geringwertig') ? `- Geringwertige WG: Einzelne Wirtschaftsgüter unter 1.000 CHF` : ''}
+${has('AHV') || has('Sozialversicherung') ? `- AHV/IV/ALV: Ausgleichskasse, SVA, Sozialversicherungsbeiträge` : ''}
+${has('Telefon') || has('Internet') ? `- Telefon & Internet: Swisscom, Sunrise, Salt, UPC` : ''}
+`;
+  }
+
+  return hints;
+}
+
 // Multi-Invoice Check Prompt
 const multiInvoiceCheckPrompt = `Analysiere dieses Dokument sorgfältig.
 
@@ -575,7 +667,12 @@ ${hintText}`;
         const catNames = userCategories.map(c => c.name).filter(n => n !== 'Keine Rechnung');
         if (catNames.length > 0) {
           categoryList = catNames.join(', ');
-          console.log(`Using ${catNames.length} user categories for AI matching (country: ${userCountry})`);
+          // Build country-specific category hints
+          const categoryHints = buildCategoryHints(userCountry, catNames);
+          if (categoryHints) {
+            categoryList += categoryHints;
+          }
+          console.log(`Using ${catNames.length} user categories for AI matching (country: ${userCountry}, hints: ${categoryHints ? 'yes' : 'no'})`);
         }
       }
     }
