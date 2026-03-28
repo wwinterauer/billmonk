@@ -1,39 +1,23 @@
 
 
-# Plan: Kategorie-Lern-Übersicht im KI-Training Tab
+# Plan: Lieferanten-Standard-Kategorie direkt im KI-Training bearbeiten
 
 ## Überblick
-Der KI-Training-Reiter wird um zwei neue Abschnitte erweitert:
-1. **Kategorie-Regeln (Produkt/Keyword)** — Tabelle mit gelernten Keyword→Kategorie-Zuordnungen aus `category_rules`
-2. **Lieferanten-Standard-Kategorien** — Anzeige welche Lieferanten eine Default-Kategorie haben
+In der "Lieferanten-Standard-Kategorien"-Tabelle im KI-Training-Reiter wird die Kategorie-Spalte von einem statischen Badge zu einem Select-Dropdown umgebaut. Da beide Stellen (KI-Training und Lieferanten-Einstellungen) auf dasselbe DB-Feld `vendors.default_category_id` zugreifen, sind Änderungen automatisch synchron.
 
-Zusätzlich wird die Statistik-Karte um die Anzahl gelernter Kategorie-Regeln erweitert.
+## Änderungen in `AILearningSettings.tsx`
 
-## Änderungen
-
-### `AILearningSettings.tsx`
-
-**Neue Daten laden** in `loadLearningData()`:
-- `category_rules` abfragen (user_id, keyword, category_name, match_count, updated_at), sortiert nach match_count desc
-- `vendors` mit `default_category_id IS NOT NULL` abfragen, um Lieferanten-Defaults zu zeigen (ggf. mit Category-Name per Join oder separatem Lookup)
-
-**Neue Stats-Karte**:
-- "Kategorie-Regeln" Zähler (Anzahl `category_rules` Einträge)
-
-**Neuer Abschnitt: "Gelernte Kategorie-Regeln"**:
-- Suchbare Tabelle mit Spalten: Keyword | Kategorie | Treffer (match_count) | Löschen-Button
-- Löschen-Button entfernt einzelne Regeln aus `category_rules`
-- Leerer Zustand: "Noch keine Kategorie-Regeln. Ändere eine Kategorie bei einem Beleg und das System merkt sich das."
-
-**Neuer Abschnitt: "Lieferanten-Standard-Kategorien"**:
-- Kompakte Liste der Lieferanten mit gesetzter Default-Kategorie (Name → Kategorie-Name)
-- Nur anzeigen wenn mindestens 1 Eintrag vorhanden
-
-**Keine DB-Änderungen nötig** — `category_rules` und `vendors.default_category_id` existieren bereits.
+1. **`useCategories` Hook importieren** — liefert die verfügbaren Kategorien für das Dropdown
+2. **VendorDefaultCategory-Interface erweitern** — `vendor_id` und `default_category_id` mitspeichern
+3. **Select-Dropdown pro Zeile** — ersetzt das statische Badge; zeigt alle Kategorien + Option "Keine Standard-Kategorie"
+4. **Update-Handler `handleUpdateVendorCategory`** — schreibt `vendors.default_category_id` per Supabase-Update, refresht die Daten danach
+5. **Toast-Feedback** bei Erfolg/Fehler
 
 ## Dateien
 
 | Datei | Änderung |
 |---|---|
-| `AILearningSettings.tsx` | Neue Datenabfragen, Stats-Karte, zwei neue Card-Abschnitte mit Tabellen |
+| `AILearningSettings.tsx` | useCategories Import, Select-Dropdown in Vendor-Defaults-Tabelle, Update-Handler |
+
+Keine DB-Änderungen nötig — das Feld `vendors.default_category_id` existiert bereits.
 
