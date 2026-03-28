@@ -48,6 +48,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import type { Receipt } from '@/hooks/useReceipts';
 import { useNavigate } from 'react-router-dom';
+import { usePlan } from '@/hooks/usePlan';
 import { 
   useExportTemplates, 
   DEFAULT_COLUMNS,
