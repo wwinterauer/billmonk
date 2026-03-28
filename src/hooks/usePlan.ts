@@ -8,6 +8,7 @@ export interface PlanData {
   effectivePlan: PlanType;
   isAdmin: boolean;
   isBetaUser: boolean;
+  splitBookingEnabled: boolean;
   adminViewPlan: PlanType | null;
   hasStripeCustomer: boolean;
   receiptsUsed: number;
@@ -128,6 +129,7 @@ export function usePlan(): PlanData {
     effectivePlan,
     isAdmin,
     isBetaUser,
+    splitBookingEnabled,
     adminViewPlan,
     hasStripeCustomer,
     receiptsUsed,
