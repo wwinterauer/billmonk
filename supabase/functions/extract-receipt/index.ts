@@ -610,8 +610,27 @@ Extrahiere folgende Informationen im JSON-Format:
   "category": "Wähle die passendste Kategorie aus dieser Liste: ${categoryList}",
   "payment_method": "Zahlungsart: Überweisung, Kreditkarte, Bar, PayPal, Lastschrift (sonst null)",
   "invoice_number": "Rechnungsnummer/Belegnummer (suche nach 'Rechnungsnummer:', 'RE-Nr.:', 'Invoice:', etc.)",
-  "confidence": Konfidenz von 0.0 bis 1.0
+  "confidence": Konfidenz von 0.0 bis 1.0,
+  "line_items": [
+    {
+      "description": "Positionsbeschreibung",
+      "amount_gross": Bruttobetrag,
+      "amount_net": Nettobetrag (falls erkennbar),
+      "vat_rate": MwSt-Satz,
+      "category": "Passende Kategorie aus obiger Liste"
+    }
+  ]
 }
+
+WICHTIGE REGELN FÜR LINE_ITEMS (Rechnungspositionen):
+- Extrahiere JEDE einzelne Rechnungsposition/Zeile als separates Objekt
+- Jede Position bekommt eine eigene Kategorie-Zuordnung aus der Kategorie-Liste
+- amount_gross und amount_net pro Position (nicht die Gesamtsumme)
+- Bei Kassenbons: Jede Produktzeile einzeln erfassen
+- Bei Rechnungen: Jede Positionszeile einzeln erfassen
+- Summenzeilen, Zwischensummen und Gesamtbeträge NICHT als Position erfassen
+- Wenn keine einzelnen Positionen erkennbar: leeres Array []
+- vat_rate pro Position: den jeweiligen Steuersatz (kann unterschiedlich sein)
 
 WICHTIGE REGELN FÜR LIEFERANT/VENDOR:
 - "vendor" = Offizieller/rechtlicher Firmenname MIT Rechtsform. Priorisiere:
@@ -842,7 +861,11 @@ WEITERE REGELN:
   "vendor_country": "AT",
   "vat_confidence": 0.92,
   "vat_detection_method": "explicit",
-  "special_vat_case": null
+  "special_vat_case": null,
+  "line_items": [
+    {"description": "Büromaterial", "amount_gross": 120.00, "amount_net": 100.00, "vat_rate": 20, "category": "Bürobedarf"},
+    {"description": "Druckerpatronen", "amount_gross": 30.00, "amount_net": 25.00, "vat_rate": 20, "category": "Bürobedarf"}
+  ]
 }
 
 Beispiel Kleinunternehmer:
