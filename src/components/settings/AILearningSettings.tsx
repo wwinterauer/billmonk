@@ -152,6 +152,11 @@ export function AILearningSettings() {
   const [resetTarget, setResetTarget] = useState<VendorLearningData | null>(null);
   const [isResetting, setIsResetting] = useState(false);
 
+  const [categoryRules, setCategoryRules] = useState<CategoryRule[]>([]);
+  const [vendorDefaults, setVendorDefaults] = useState<VendorDefaultCategory[]>([]);
+  const [categoryRuleSearch, setCategoryRuleSearch] = useState('');
+  const [isDeletingRule, setIsDeletingRule] = useState<string | null>(null);
+
   useEffect(() => {
     if (user) {
       loadLearningData();
