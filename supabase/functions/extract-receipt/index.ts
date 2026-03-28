@@ -672,7 +672,28 @@ ${hintText}`;
           if (categoryHints) {
             categoryList += categoryHints;
           }
-          console.log(`Using ${catNames.length} user categories for AI matching (country: ${userCountry}, hints: ${categoryHints ? 'yes' : 'no'})`);
+
+          // Load verified community patterns for additional context
+          const { data: communityPatterns } = await supabase
+            .from('community_patterns')
+            .select('vendor_name_normalized, suggested_category, contributor_count')
+            .eq('is_verified', true)
+            .eq('country', userCountry || '')
+            .order('contributor_count', { ascending: false })
+            .limit(50);
+
+          if (communityPatterns && communityPatterns.length > 0) {
+            const communityHints = communityPatterns
+              .filter(cp => catNames.some(cn => cn.toLowerCase() === cp.suggested_category.toLowerCase()))
+              .map(cp => `- "${cp.vendor_name_normalized}" → ${cp.suggested_category}`)
+              .join('\n');
+            
+            if (communityHints) {
+              categoryList += `\n\nPLATTFORM-ERFAHRUNG (verifizierte Zuordnungen anderer Nutzer):\n${communityHints}`;
+            }
+          }
+
+          console.log(`Using ${catNames.length} user categories for AI matching (country: ${userCountry}, hints: ${categoryHints ? 'yes' : 'no'}, community: ${communityPatterns?.length || 0})`);
         }
       }
     }
