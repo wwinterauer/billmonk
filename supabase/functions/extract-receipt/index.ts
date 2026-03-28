@@ -667,7 +667,12 @@ ${hintText}`;
         const catNames = userCategories.map(c => c.name).filter(n => n !== 'Keine Rechnung');
         if (catNames.length > 0) {
           categoryList = catNames.join(', ');
-          console.log(`Using ${catNames.length} user categories for AI matching (country: ${userCountry})`);
+          // Build country-specific category hints
+          const categoryHints = buildCategoryHints(userCountry, catNames);
+          if (categoryHints) {
+            categoryList += categoryHints;
+          }
+          console.log(`Using ${catNames.length} user categories for AI matching (country: ${userCountry}, hints: ${categoryHints ? 'yes' : 'no'})`);
         }
       }
     }
