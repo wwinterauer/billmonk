@@ -35,6 +35,7 @@ export function usePlan(): PlanData {
   const [documentsUsed, setDocumentsUsed] = useState(0);
   const [documentsCredit, setDocumentsCredit] = useState(0);
   const [hasStripeCustomer, setHasStripeCustomer] = useState(false);
+  const [splitBookingEnabled, setSplitBookingEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async () => {
