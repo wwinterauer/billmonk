@@ -90,11 +90,25 @@ interface VendorLearningData {
   } | null;
 }
 
+interface CategoryRule {
+  id: string;
+  keyword: string;
+  category_name: string;
+  match_count: number | null;
+  updated_at: string | null;
+}
+
+interface VendorDefaultCategory {
+  vendor_name: string;
+  category_name: string;
+}
+
 interface Stats {
   totalVendors: number;
   trainedVendors: number;
   totalCorrections: number;
   fieldStats: Record<string, number>;
+  categoryRulesCount: number;
 }
 
 function LearningLevelBadge({ level }: { level: number }) {
