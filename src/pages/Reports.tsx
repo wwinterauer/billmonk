@@ -415,7 +415,7 @@ const Reports = () => {
     };
   }, [receipts, previousReceipts]);
 
-  // Group data by category
+  // Group data by category (split-aware)
   const categoryData = useMemo(() => {
     if (!receipts) return [];
 
@@ -428,29 +428,19 @@ const Reports = () => {
       categoryColorMap.set(cat.name, cat.color || '#94A3B8');
     });
 
-    const grouped = billableReceipts.reduce((acc: Record<string, { name: string; color: string; amount: number; count: number; vat: number }>, receipt) => {
-      const catName = receipt.category || 'Ohne Kategorie';
-      const catColor = categoryColorMap.get(catName) || '#94A3B8';
+    // Use split-aware aggregation
+    const aggregated = aggregateWithSplitLines(billableReceipts, splitLines || [], splitBookingEnabled);
 
-      if (!acc[catName]) {
-        acc[catName] = {
-          name: catName,
-          color: catColor,
-          amount: 0,
-          count: 0,
-          vat: 0,
-        };
-      }
-
-      acc[catName].amount += receipt.amount_gross || 0;
-      acc[catName].count += 1;
-      acc[catName].vat += receipt.vat_amount || 0;
-
-      return acc;
-    }, {});
-
-    return Object.values(grouped).sort((a, b) => b.amount - a.amount);
-  }, [receipts, categories]);
+    return Array.from(aggregated.entries())
+      .map(([catName, data]) => ({
+        name: catName,
+        color: categoryColorMap.get(catName) || '#94A3B8',
+        amount: data.amount,
+        count: data.count,
+        vat: data.vat,
+      }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [receipts, categories, splitLines, splitBookingEnabled]);
 
   // Prepare data for Pie Chart
   const pieChartData = useMemo(() => {
