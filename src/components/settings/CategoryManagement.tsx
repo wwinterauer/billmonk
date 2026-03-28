@@ -177,6 +177,10 @@ export function CategoryManagement() {
   const [formData, setFormData] = useState<CategoryFormData>(DEFAULT_FORM_DATA);
   const [isNewCategory, setIsNewCategory] = useState(true);
   
+  // Info dialog for tax categories
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [infoCategory, setInfoCategory] = useState<Category | null>(null);
+
   // Delete with reassignment
   const [reassignCategory, setReassignCategory] = useState<string>('');
 
