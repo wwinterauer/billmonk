@@ -289,27 +289,34 @@ export function useCorrectionTracking() {
                 .slice(0, 5); // max 5 keywords per correction
               
               for (const keyword of keywords) {
-                await supabase
+                // Upsert: if keyword exists, update category_name and increment match_count
+                const { data: existing } = await supabase
                   .from('category_rules')
-                  .upsert(
-                    {
+                  .select('id, match_count')
+                  .eq('user_id', user.id)
+                  .eq('keyword', keyword)
+                  .maybeSingle();
+                
+                if (existing) {
+                  await supabase
+                    .from('category_rules')
+                    .update({
+                      category_name: String(correctedValue),
+                      match_count: (existing.match_count || 1) + 1,
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', existing.id);
+                } else {
+                  await supabase
+                    .from('category_rules')
+                    .insert({
                       user_id: user.id,
                       keyword,
                       category_name: String(correctedValue),
                       match_count: 1,
                       source: 'correction',
-                      updated_at: new Date().toISOString(),
-                    },
-                    { onConflict: 'user_id,keyword' }
-                  );
-                
-                // If rule already existed, increment match_count
-                await supabase.rpc('increment_category_rule_count' as any, {
-                  p_user_id: user.id,
-                  p_keyword: keyword,
-                }).catch(() => {
-                  // RPC may not exist yet, fallback: just upsert is enough
-                });
+                    });
+                }
               }
             }
           }
