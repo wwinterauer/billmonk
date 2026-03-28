@@ -526,7 +526,7 @@ ${hintText}`;
     console.log(`Expenses-only mode: ${expensesOnlyPrompt ? 'ACTIVE' : 'inactive'} (flag: ${expensesOnly}, keywords: ${extractionKeywords.length}, hint: ${hintText ? 'yes' : 'no'})`);
 
     // Fetch user's categories for intelligent category matching
-    let categoryList = 'Büromaterial, Software & Lizenzen, Reisekosten, Bewirtung, Telefon & Internet, Versicherungen, Miete & Betriebskosten, Fahrzeugkosten, Werbung & Marketing, Sonstiges';
+    let categoryList = 'Sonstiges';
     
     // Determine user_id: from receipt lookup or from auth header
     let userId: string | null = null;
