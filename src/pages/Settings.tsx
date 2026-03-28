@@ -188,6 +188,57 @@ const SPACE_REPLACEMENT_OPTIONS = [
   { value: 'hyphen', label: 'Bindestrich', description: 'Leerzeichen durch - ersetzen' },
 ];
 
+import { Switch } from '@/components/ui/switch';
+
+const SplitBookingToggle = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('profiles')
+      .select('split_booking_enabled')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) setEnabled(!!data.split_booking_enabled);
+        setLoading(false);
+      });
+  }, [user]);
+
+  const handleToggle = async (checked: boolean) => {
+    if (!user) return;
+    setEnabled(checked);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ split_booking_enabled: checked })
+      .eq('id', user.id);
+    if (error) {
+      setEnabled(!checked);
+      toast({ title: 'Fehler', description: 'Einstellung konnte nicht gespeichert werden.', variant: 'destructive' });
+    } else {
+      toast({ title: checked ? 'Splitbuchungen aktiviert' : 'Splitbuchungen deaktiviert' });
+    }
+  };
+
+  if (loading) return null;
+
+  return (
+    <div className="flex items-center justify-between">
+      <div className="space-y-1">
+        <Label>Splitbuchungen aktivieren</Label>
+        <p className="text-sm text-muted-foreground">
+          Ermöglicht die Aufteilung von Belegen in mehrere Buchungszeilen mit unterschiedlichen Kategorien und Steuersätzen.
+        </p>
+      </div>
+      <Switch checked={enabled} onCheckedChange={handleToggle} />
+    </div>
+  );
+};
+
 const Settings = () => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -824,6 +875,28 @@ const Settings = () => {
               <DescriptionSettings />
             </CardContent>
           </Card>
+
+          {/* Split Booking Toggle - only visible for Business plan */}
+          {isPlanSufficient(effectivePlan, 'business') && (
+            <Card className="mt-6">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <FileCheck className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle>Splitbuchungen</CardTitle>
+                    <CardDescription>
+                      Teile Belege mit mehreren Kategorien oder Steuersätzen in separate Buchungszeilen auf
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <SplitBookingToggle />
+              </CardContent>
+            </Card>
+          )}
         </motion.div>
       </TabsContent>
 

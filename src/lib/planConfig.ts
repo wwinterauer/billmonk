@@ -54,6 +54,7 @@ export const FEATURE_MIN_PLAN: Record<string, PlanType> = {
   invoiceModule: 'business',
   taxExport: 'business',
   liveBankConnection: 'pro',
+  splitBooking: 'business',
 };
 
 // Human-readable feature descriptions for upgrade cards
@@ -65,6 +66,7 @@ export const FEATURE_DESCRIPTIONS: Record<string, { title: string; description: 
   invoiceModule: { title: 'Ausgangsrechnungen', description: 'Erstelle und verwalte Rechnungen, Kunden und Artikel.' },
   taxExport: { title: 'Steuerberater-Export', description: 'Exportiere Buchungsdaten im DATEV- oder BMD-Format für deinen Steuerberater.' },
   liveBankConnection: { title: 'Live-Bankanbindung', description: 'Verbinde dein Bankkonto direkt und gleiche Ein- & Ausgangsrechnungen automatisch ab.' },
+  splitBooking: { title: 'Splitbuchungen', description: 'Teile Belege mit mehreren Kategorien oder Steuersätzen in separate Buchungszeilen auf.' },
 };
 
 // Plan hierarchy for comparison

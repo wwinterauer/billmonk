@@ -8,6 +8,7 @@ export interface PlanData {
   effectivePlan: PlanType;
   isAdmin: boolean;
   isBetaUser: boolean;
+  splitBookingEnabled: boolean;
   adminViewPlan: PlanType | null;
   hasStripeCustomer: boolean;
   receiptsUsed: number;
@@ -35,13 +36,14 @@ export function usePlan(): PlanData {
   const [documentsUsed, setDocumentsUsed] = useState(0);
   const [documentsCredit, setDocumentsCredit] = useState(0);
   const [hasStripeCustomer, setHasStripeCustomer] = useState(false);
+  const [splitBookingEnabled, setSplitBookingEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
       .from('profiles')
-      .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan, monthly_document_count, document_credit, stripe_customer_id, is_beta_user')
+      .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan, monthly_document_count, document_credit, stripe_customer_id, is_beta_user, split_booking_enabled')
       .eq('id', user.id)
       .single();
 
@@ -54,6 +56,7 @@ export function usePlan(): PlanData {
       setAdminViewPlanState((data.admin_view_plan as PlanType) || null);
       setHasStripeCustomer(!!data.stripe_customer_id);
       setIsBetaUser(!!(data as any).is_beta_user);
+      setSplitBookingEnabled(!!(data as any).split_booking_enabled);
     }
   }, [user]);
 
@@ -126,6 +129,7 @@ export function usePlan(): PlanData {
     effectivePlan,
     isAdmin,
     isBetaUser,
+    splitBookingEnabled,
     adminViewPlan,
     hasStripeCustomer,
     receiptsUsed,
