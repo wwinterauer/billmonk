@@ -411,6 +411,7 @@ export type Database = {
       categories: {
         Row: {
           color: string | null
+          country: string | null
           created_at: string | null
           icon: string | null
           id: string
@@ -418,10 +419,12 @@ export type Database = {
           is_system: boolean | null
           name: string
           sort_order: number | null
+          tax_code: string | null
           user_id: string | null
         }
         Insert: {
           color?: string | null
+          country?: string | null
           created_at?: string | null
           icon?: string | null
           id?: string
@@ -429,10 +432,12 @@ export type Database = {
           is_system?: boolean | null
           name: string
           sort_order?: number | null
+          tax_code?: string | null
           user_id?: string | null
         }
         Update: {
           color?: string | null
+          country?: string | null
           created_at?: string | null
           icon?: string | null
           id?: string
@@ -440,6 +445,7 @@ export type Database = {
           is_system?: boolean | null
           name?: string
           sort_order?: number | null
+          tax_code?: string | null
           user_id?: string | null
         }
         Relationships: [
