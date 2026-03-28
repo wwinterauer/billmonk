@@ -1,53 +1,33 @@
 
 
-# Plan: Info-Tooltips und Detail-Dialog für Steuer-Kategorien
+# Fix: Info-Icons erscheinen nicht bei Steuer-Kategorien
 
-## Überblick
-Jede Steuer-Kategorie bekommt ein Info-Icon in der Tabelle. Beim Mouseover erscheint eine Kurzinfo (Tooltip), was in diese Kategorie gehört. Beim Klick auf das Icon öffnet sich ein Dialog mit der vollständigen steuerrechtlichen Beschreibung.
+## Problem
+Die Kategorienamen in der Datenbank enthalten Länderkürzel in Klammern (z.B. `"Bewirtung 50% (AT)"`), aber die Schlüssel im `TAX_CATEGORY_INFO`-Objekt haben keine solchen Suffixe (z.B. `"Bewirtung 50%"`). Dadurch schlägt der Lookup `TAX_CATEGORY_INFO[category.name]` immer fehl und das Info-Icon wird nie angezeigt.
 
-## 1. Daten-Mapping (im Code, kein DB-Change)
+## Lösung
+Die Schlüssel in `taxCategoryInfo.ts` an die tatsächlichen DB-Namen anpassen, also mit Länderkürzel in Klammern.
 
-Neues konstantes Objekt `TAX_CATEGORY_INFO` in `CategoryManagement.tsx`, das pro Kategoriename eine Kurzinfo und Langinfo enthält. Basierend auf:
+## Änderungen
 
-- **AT**: EStG, EAR-Verordnung
-- **DE**: EStG §4, §9, SKR03-Kontenrahmen
-- **CH**: OR, KMU-Kontenrahmen
+### `src/components/settings/taxCategoryInfo.ts`
+Alle Keys umbenennen, damit sie exakt den DB-Namen entsprechen:
 
-Beispiel-Einträge:
-
-| Kategorie | Kurzinfo (Tooltip) | Langinfo (Dialog) |
-|---|---|---|
-| Bewirtung 50% (AT) | Geschäftsessen, Bewirtung von Kunden/Partnern. 50% absetzbar. | Gem. §20 EStG: Bewirtungsaufwendungen aus geschäftlichem Anlass. Nur 50% absetzbar. Voraussetzung: Beleg mit Datum, Ort, Teilnehmer, geschäftlicher Anlass. Trinkgeld bis 10% angemessen. |
-| Reisekosten (AT) | Fahrtkosten, Nächtigungen, Diäten bei Geschäftsreisen. | Gem. §16/§4 EStG: Kilometergeld (0,42€/km PKW), Nächtigungspauschale, Tagesdiäten (26,40€ Inland). Reise = mind. 25km, mind. 3h. |
-| KFZ-Kosten (AT) | Treibstoff, Reparaturen, Versicherung, Maut, Parkgebühren. | Betriebliche KFZ-Kosten inkl. Treibstoff, Service, Reparaturen, Versicherung, Vignette, Maut, Parkgebühren. Bei gemischter Nutzung: Fahrtenbuch oder km-Pauschale. Luxustangente beachten (40.000€ Anschaffungskosten). |
-| ... | ... | ... |
-
-Insgesamt ~43 Einträge (15 AT + 15 DE + 13 CH).
-
-## 2. UI-Änderungen in CategoryManagement.tsx
-
-### Tabelle
-- Neben dem Kategorienamen (bei System-Kategorien mit `country`): kleines Info-Icon (`Info` aus lucide-react)
-- **Hover** auf das Icon → Tooltip mit Kurzinfo (via Radix Tooltip, bereits im Projekt vorhanden)
-- **Klick** auf das Icon → Dialog mit vollständiger Info (Überschrift, Steuernummer, gesetzliche Grundlage, Liste erlaubter Ausgaben, Hinweise)
-
-### Info-Dialog
-- Titel: Kategoriename + Flagge
-- Steuernummer als Badge
-- Abschnitt "Was gehört hierher?" mit Aufzählung
-- Abschnitt "Gesetzliche Grundlage" mit Paragraphen-Verweis
-- Abschnitt "Hinweise" mit Absetzbarkeits-Regeln
-
-## 3. Neue Imports
-
-- `Info` Icon aus lucide-react
-- `Tooltip, TooltipTrigger, TooltipContent, TooltipProvider` aus `@/components/ui/tooltip`
-
-## Dateien
-
-| Datei | Änderung |
+| Aktuell (falsch) | Korrekt (wie in DB) |
 |---|---|
-| `CategoryManagement.tsx` | TAX_CATEGORY_INFO Konstante, Info-Icon mit Tooltip + Detail-Dialog |
+| `"Bewirtung 50%"` | `"Bewirtung 50% (AT)"` |
+| `"Reisekosten"` | `"Reisekosten (AT)"` |
+| `"KFZ-Kosten"` | `"KFZ-Kosten (AT)"` |
+| `"Büromaterial & Verbrauch"` | `"Büromaterial & Verbrauch (AT)"` |
+| ... (alle 15 AT-Einträge) | ... |
+| `"Bewirtung 70%"` | `"Bewirtung 70% (DE)"` |
+| `"Reisekosten DE"` | `"Reisekosten (DE)"` |
+| ... (alle 15 DE-Einträge) | ... |
+| `"Verpflegung & Repräsentation"` | `"Geschäftsbewirtung (CH)"` |
+| `"Reisekosten CH"` | `"Reisekosten (CH)"` |
+| ... (alle 13 CH-Einträge) | ... |
 
-Keine Datenbank-Änderungen nötig.
+Alle 43 Keys werden so umbenannt, dass sie exakt mit den in der Migration eingefügten Kategorienamen übereinstimmen.
+
+Keine anderen Dateien betroffen — der Lookup-Code in `CategoryManagement.tsx` ist korrekt, nur die Keys stimmen nicht.
 
