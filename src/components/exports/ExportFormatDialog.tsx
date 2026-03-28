@@ -696,8 +696,8 @@ export function ExportFormatDialog({
   };
 
   // Excel Export - returns Blob
-  const generateExcel = (): Blob => {
-    const { columns, receipts: data, groupedData } = prepareExportData();
+  const generateExcel = async (): Promise<Blob> => {
+    const { columns, receipts: data, groupedData } = await prepareExportData();
     const template = selectedTemplate;
     const rows: unknown[][] = [];
 
@@ -765,8 +765,8 @@ export function ExportFormatDialog({
   };
 
   // PDF Export - returns Blob
-  const generatePDF = (): Blob => {
-    const { columns, receipts: data, groupedData } = prepareExportData();
+  const generatePDF = async (): Promise<Blob> => {
+    const { columns, receipts: data, groupedData } = await prepareExportData();
     const template = selectedTemplate;
 
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
