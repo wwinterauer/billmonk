@@ -901,6 +901,58 @@ export function CategoryManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Tax Category Info Dialog */}
+      <Dialog open={infoDialogOpen} onOpenChange={setInfoDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {infoCategory?.country && (
+                <span>{COUNTRY_FLAGS[infoCategory.country]}</span>
+              )}
+              {infoCategory?.name}
+            </DialogTitle>
+            {infoCategory?.tax_code && (
+              <div className="pt-1">
+                <code className="text-xs bg-muted px-2 py-1 rounded font-mono text-muted-foreground">
+                  {infoCategory.tax_code}
+                </code>
+              </div>
+            )}
+          </DialogHeader>
+
+          {infoCategory && TAX_CATEGORY_INFO[infoCategory.name] && (() => {
+            const info = TAX_CATEGORY_INFO[infoCategory.name];
+            return (
+              <div className="space-y-4 text-sm">
+                <p className="text-muted-foreground">{info.long}</p>
+
+                <div>
+                  <h4 className="font-medium mb-1.5">Was gehört hierher?</h4>
+                  <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                    {info.examples.map((ex, i) => (
+                      <li key={i}>{ex}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-1 border-t">
+                  <div className="flex items-start gap-2">
+                    <span className="font-medium shrink-0">Gesetzliche Grundlage:</span>
+                    <span className="text-muted-foreground">{info.law}</span>
+                  </div>
+                  {info.deductibility && (
+                    <div className="flex items-start gap-2">
+                      <span className="font-medium shrink-0">Absetzbarkeit:</span>
+                      <Badge variant="secondary" className="text-xs">{info.deductibility}</Badge>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
