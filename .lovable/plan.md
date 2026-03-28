@@ -1,43 +1,53 @@
 
 
-# Plan: Standard-Kategorien entfernen und Beleg-Zuordnungen bereinigen
+# Plan: Info-Tooltips und Detail-Dialog für Steuer-Kategorien
 
 ## Überblick
-Alle generischen System-Kategorien (ohne Länderzuordnung) aus der DB löschen. Bei Belegen, die eine dieser Kategorien zugeordnet haben, das `category`-Feld auf `NULL` setzen, damit keine verwaisten Zuordnungen entstehen.
+Jede Steuer-Kategorie bekommt ein Info-Icon in der Tabelle. Beim Mouseover erscheint eine Kurzinfo (Tooltip), was in diese Kategorie gehört. Beim Klick auf das Icon öffnet sich ein Dialog mit der vollständigen steuerrechtlichen Beschreibung.
 
-## 1. Datenbank-Änderungen (via Insert-Tool, da Datenmanipulation)
+## 1. Daten-Mapping (im Code, kein DB-Change)
 
-**Schritt 1:** Beleg-Kategorien bereinigen — alle Belege, die eine der alten Standard-Kategorien nutzen, auf `NULL` setzen:
+Neues konstantes Objekt `TAX_CATEGORY_INFO` in `CategoryManagement.tsx`, das pro Kategoriename eine Kurzinfo und Langinfo enthält. Basierend auf:
 
-```sql
-UPDATE public.receipts 
-SET category = NULL 
-WHERE category IN (
-  SELECT name FROM public.categories 
-  WHERE is_system = true AND country IS NULL
-);
-```
+- **AT**: EStG, EAR-Verordnung
+- **DE**: EStG §4, §9, SKR03-Kontenrahmen
+- **CH**: OR, KMU-Kontenrahmen
 
-**Schritt 2:** Standard-Kategorien löschen:
+Beispiel-Einträge:
 
-```sql
-DELETE FROM public.categories 
-WHERE is_system = true AND country IS NULL;
-```
+| Kategorie | Kurzinfo (Tooltip) | Langinfo (Dialog) |
+|---|---|---|
+| Bewirtung 50% (AT) | Geschäftsessen, Bewirtung von Kunden/Partnern. 50% absetzbar. | Gem. §20 EStG: Bewirtungsaufwendungen aus geschäftlichem Anlass. Nur 50% absetzbar. Voraussetzung: Beleg mit Datum, Ort, Teilnehmer, geschäftlicher Anlass. Trinkgeld bis 10% angemessen. |
+| Reisekosten (AT) | Fahrtkosten, Nächtigungen, Diäten bei Geschäftsreisen. | Gem. §16/§4 EStG: Kilometergeld (0,42€/km PKW), Nächtigungspauschale, Tagesdiäten (26,40€ Inland). Reise = mind. 25km, mind. 3h. |
+| KFZ-Kosten (AT) | Treibstoff, Reparaturen, Versicherung, Maut, Parkgebühren. | Betriebliche KFZ-Kosten inkl. Treibstoff, Service, Reparaturen, Versicherung, Vignette, Maut, Parkgebühren. Bei gemischter Nutzung: Fahrtenbuch oder km-Pauschale. Luxustangente beachten (40.000€ Anschaffungskosten). |
+| ... | ... | ... |
 
-## 2. Code-Anpassungen
+Insgesamt ~43 Einträge (15 AT + 15 DE + 13 CH).
 
-### `CategoryManagement.tsx`
-- **"Standard-Kategorien wiederherstellen" Button entfernen** — der `handleRestoreDefaults` Handler und der zugehörige Button werden gelöscht, da es keine generischen System-Kategorien mehr gibt.
+## 2. UI-Änderungen in CategoryManagement.tsx
 
-### `extract-receipt/index.ts` (Edge Function)
-- Die hardcodierte Fallback-Kategorienliste (`Büromaterial, Software & Lizenzen, Reisekosten, ...`) durch die tatsächlichen User-Kategorien ersetzen oder einen neutralen Fallback verwenden.
+### Tabelle
+- Neben dem Kategorienamen (bei System-Kategorien mit `country`): kleines Info-Icon (`Info` aus lucide-react)
+- **Hover** auf das Icon → Tooltip mit Kurzinfo (via Radix Tooltip, bereits im Projekt vorhanden)
+- **Klick** auf das Icon → Dialog mit vollständiger Info (Überschrift, Steuernummer, gesetzliche Grundlage, Liste erlaubter Ausgaben, Hinweise)
+
+### Info-Dialog
+- Titel: Kategoriename + Flagge
+- Steuernummer als Badge
+- Abschnitt "Was gehört hierher?" mit Aufzählung
+- Abschnitt "Gesetzliche Grundlage" mit Paragraphen-Verweis
+- Abschnitt "Hinweise" mit Absetzbarkeits-Regeln
+
+## 3. Neue Imports
+
+- `Info` Icon aus lucide-react
+- `Tooltip, TooltipTrigger, TooltipContent, TooltipProvider` aus `@/components/ui/tooltip`
 
 ## Dateien
 
 | Datei | Änderung |
 |---|---|
-| DB (Insert-Tool) | UPDATE receipts + DELETE categories |
-| `CategoryManagement.tsx` | "Restore Defaults" Button + Handler entfernen |
-| `extract-receipt/index.ts` | Hardcodierte Kategorienliste anpassen |
+| `CategoryManagement.tsx` | TAX_CATEGORY_INFO Konstante, Info-Icon mit Tooltip + Detail-Dialog |
+
+Keine Datenbank-Änderungen nötig.
 
