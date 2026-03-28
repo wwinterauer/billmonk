@@ -14,9 +14,10 @@
 - Integration in `Review.tsx` + `ReceiptDetailPanel.tsx`
 - Alles hinter `splitBookingEnabled`-Check
 
-## Phase 3: Ausgaben, Dashboard, Reports
-- Split-Badges und expandierbare Zeilen (nur wenn aktiviert)
-- Kategorie-Aggregation über Split-Lines
+## Phase 3: Ausgaben, Dashboard, Reports ✅
+- Split-Badges in Expenses-Tabelle (nur wenn aktiviert) ✅
+- Kategorie-Aggregation über Split-Lines in Dashboard ✅
+- Kategorie-Aggregation über Split-Lines in Reports ✅
 
 ## Phase 4: Export-Vorlagen + Steuerexport
 - Split-Spalten in Vorlagen-Editor (conditional)
