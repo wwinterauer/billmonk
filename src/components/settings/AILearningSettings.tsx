@@ -595,7 +595,122 @@ export function AILearningSettings() {
         </CardContent>
       </Card>
 
-      {/* Details Dialog */}
+      {/* Gelernte Kategorie-Regeln */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Tag className="w-5 h-5 text-purple-600" />
+              Gelernte Kategorie-Regeln
+            </CardTitle>
+            {categoryRules.length > 0 && (
+              <div className="relative w-[200px]">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Regel suchen..."
+                  className="pl-8"
+                  value={categoryRuleSearch}
+                  onChange={(e) => setCategoryRuleSearch(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {categoryRules.length === 0 ? (
+            <div className="text-center py-8">
+              <Tag className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-muted-foreground">Noch keine Kategorie-Regeln</p>
+              <p className="text-sm text-muted-foreground/70 mt-1">
+                Ändere eine Kategorie bei einem Beleg und das System merkt sich das automatisch.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Keyword</TableHead>
+                    <TableHead>Kategorie</TableHead>
+                    <TableHead className="text-center">Treffer</TableHead>
+                    <TableHead className="text-right">Aktion</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCategoryRules.map((rule) => (
+                    <TableRow key={rule.id}>
+                      <TableCell>
+                        <code className="bg-muted px-2 py-0.5 rounded text-sm">{rule.keyword}</code>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{rule.category_name}</Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="text-muted-foreground">{rule.match_count || 1}x</span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              disabled={isDeletingRule === rule.id}
+                              onClick={() => handleDeleteCategoryRule(rule.id)}
+                            >
+                              {isDeletingRule === rule.id ? (
+                                <LoaderIcon className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Regel löschen</TooltipContent>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Lieferanten-Standard-Kategorien */}
+      {vendorDefaults.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Store className="w-5 h-5 text-blue-600" />
+              Lieferanten-Standard-Kategorien
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Lieferant</TableHead>
+                    <TableHead>Standard-Kategorie</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {vendorDefaults.map((vd, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-medium">{vd.vendor_name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{vd.category_name}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
