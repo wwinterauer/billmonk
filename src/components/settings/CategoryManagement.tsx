@@ -268,12 +268,13 @@ export function CategoryManagement() {
         return;
       }
 
-      for (const cat of taxCats) {
-        await supabase
-          .from('categories')
-          .update({ is_hidden: !show })
-          .eq('id', cat.id);
-      }
+      const ids = taxCats.map(c => c.id);
+      const { error } = await supabase
+        .from('categories')
+        .update({ is_hidden: !show })
+        .in('id', ids);
+
+      if (error) throw error;
 
       toast({
         title: show
@@ -281,7 +282,7 @@ export function CategoryManagement() {
           : `${COUNTRY_FLAGS[selectedCountry]} ${taxCats.length} Steuer-Kategorien ausgeblendet`,
       });
       
-      fetchCategories();
+      await fetchCategories();
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -701,10 +702,17 @@ export function CategoryManagement() {
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="z.B. Fortbildung"
                 maxLength={50}
+                disabled={!isNewCategory && selectedCategory?.is_system}
               />
-              <p className="text-xs text-muted-foreground">
-                {formData.name.length}/50 Zeichen
-              </p>
+              {!isNewCategory && selectedCategory?.is_system ? (
+                <p className="text-xs text-muted-foreground">
+                  Steuer-Kategorien können nicht umbenannt werden
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {formData.name.length}/50 Zeichen
+                </p>
+              )}
             </div>
 
             {/* Color */}
