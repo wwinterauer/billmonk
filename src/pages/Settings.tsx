@@ -824,6 +824,28 @@ const Settings = () => {
               <DescriptionSettings />
             </CardContent>
           </Card>
+
+          {/* Split Booking Toggle - only visible for Business plan */}
+          {isPlanSufficient(effectivePlan, 'business') && (
+            <Card className="mt-6">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <FileCheck className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle>Splitbuchungen</CardTitle>
+                    <CardDescription>
+                      Teile Belege mit mehreren Kategorien oder Steuersätzen in separate Buchungszeilen auf
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <SplitBookingToggle />
+              </CardContent>
+            </Card>
+          )}
         </motion.div>
       </TabsContent>
 
