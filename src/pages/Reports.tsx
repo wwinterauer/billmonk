@@ -89,7 +89,7 @@ import { TaxExportDialog } from '@/components/exports/TaxExportDialog';
 const Reports = () => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { effectivePlan } = usePlan();
+  const { effectivePlan, splitBookingEnabled } = usePlan();
   const showIncome = isPlanSufficient(effectivePlan, 'business');
   
   // Period state
