@@ -224,14 +224,21 @@ export function CategoryManagement() {
         }
       });
 
-      const categoriesWithCounts = (catData || []).map(cat => ({
-        ...cat,
-        is_hidden: cat.is_hidden ?? false,
-        sort_order: cat.sort_order ?? 0,
-        receipt_count: counts[cat.name] || 0,
-        country: (cat as any).country ?? null,
-        tax_code: (cat as any).tax_code ?? null,
-      })) as Category[];
+      const categoriesWithCounts = (catData || [])
+        .filter(cat => {
+          // Only show tax categories from user's country, hide other countries
+          const catCountry = (cat as any).country;
+          if (catCountry && catCountry !== selectedCountry) return false;
+          return true;
+        })
+        .map(cat => ({
+          ...cat,
+          is_hidden: cat.is_hidden ?? false,
+          sort_order: cat.sort_order ?? 0,
+          receipt_count: counts[cat.name] || 0,
+          country: (cat as any).country ?? null,
+          tax_code: (cat as any).tax_code ?? null,
+        })) as Category[];
 
       setCategories(categoriesWithCounts);
     } catch (error) {
