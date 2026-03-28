@@ -1174,7 +1174,7 @@ Beispiel Kleinunternehmer:
             is_mixed_tax_rate: extractedData.is_mixed_tax_rate || false,
             tax_rate_details: extractedData.tax_rate_details || null,
             receipt_date: extractedData.receipt_date,
-            category: extractedData.category,
+            category: finalCategory,
             payment_method: extractedData.payment_method,
             invoice_number: extractedData.invoice_number,
             ai_confidence: extractedData.confidence,
