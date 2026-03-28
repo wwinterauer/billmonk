@@ -20,6 +20,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useCategories } from '@/hooks/useCategories';
 import {
   Table,
   TableBody,
@@ -96,7 +98,9 @@ interface CategoryRule {
 }
 
 interface VendorDefaultCategory {
+  vendor_id: string;
   vendor_name: string;
+  default_category_id: string;
   category_name: string;
 }
 
@@ -139,6 +143,7 @@ function LearningLevelBadge({ level }: { level: number }) {
 export function AILearningSettings() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { categories } = useCategories();
   const [isLoading, setIsLoading] = useState(true);
   const [learningData, setLearningData] = useState<VendorLearningData[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -199,7 +204,7 @@ export function AILearningSettings() {
       // Load vendors with default categories
       const { data: vendorsWithDefaults, error: vendorDefaultsError } = await supabase
         .from('vendors')
-        .select('display_name, default_category_id')
+        .select('id, display_name, default_category_id')
         .eq('user_id', user.id)
         .not('default_category_id', 'is', null);
 
@@ -208,14 +213,16 @@ export function AILearningSettings() {
       // Load category names for vendor defaults
       if (vendorsWithDefaults && vendorsWithDefaults.length > 0) {
         const categoryIds = [...new Set(vendorsWithDefaults.map(v => v.default_category_id).filter(Boolean))];
-        const { data: categories } = await supabase
+        const { data: catData } = await supabase
           .from('categories')
           .select('id, name')
           .in('id', categoryIds as string[]);
 
-        const categoryMap = new Map((categories || []).map(c => [c.id, c.name]));
+        const categoryMap = new Map((catData || []).map(c => [c.id, c.name]));
         setVendorDefaults(vendorsWithDefaults.map(v => ({
+          vendor_id: v.id,
           vendor_name: v.display_name,
+          default_category_id: v.default_category_id!,
           category_name: categoryMap.get(v.default_category_id!) || 'Unbekannt',
         })));
       } else {
@@ -331,6 +338,31 @@ export function AILearningSettings() {
       });
     } finally {
       setIsDeletingRule(null);
+    }
+  };
+
+  const handleUpdateVendorCategory = async (vendorId: string, categoryId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('vendors')
+        .update({ default_category_id: categoryId })
+        .eq('id', vendorId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Standard-Kategorie aktualisiert',
+        description: categoryId ? 'Die Standard-Kategorie wurde geändert.' : 'Die Standard-Kategorie wurde entfernt.',
+      });
+
+      await loadLearningData();
+    } catch (error) {
+      console.error('Error updating vendor category:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Standard-Kategorie konnte nicht aktualisiert werden.',
+      });
     }
   };
 
@@ -693,11 +725,28 @@ export function AILearningSettings() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {vendorDefaults.map((vd, i) => (
-                    <TableRow key={i}>
+                  {vendorDefaults.map((vd) => (
+                    <TableRow key={vd.vendor_id}>
                       <TableCell className="font-medium">{vd.vendor_name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{vd.category_name}</Badge>
+                        <Select
+                          value={vd.default_category_id}
+                          onValueChange={(value) =>
+                            handleUpdateVendorCategory(vd.vendor_id, value === '__none__' ? null : value)
+                          }
+                        >
+                          <SelectTrigger className="w-[220px] h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Keine Standard-Kategorie</SelectItem>
+                            {categories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                     </TableRow>
                   ))}
