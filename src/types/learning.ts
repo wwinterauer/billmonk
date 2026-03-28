@@ -77,7 +77,8 @@ export const LEARNABLE_FIELDS = [
   { id: 'amount_net', label: 'Nettobetrag', type: 'currency' },
   { id: 'vat_amount', label: 'MwSt-Betrag', type: 'currency' },
   { id: 'vat_rate', label: 'MwSt-Satz', type: 'percent' },
-  { id: 'description', label: 'Beschreibung', type: 'text' }
+  { id: 'description', label: 'Beschreibung', type: 'text' },
+  { id: 'category', label: 'Kategorie', type: 'text' }
 ] as const;
 
 export type LearnableFieldId = typeof LEARNABLE_FIELDS[number]['id'];

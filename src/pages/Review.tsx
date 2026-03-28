@@ -342,6 +342,7 @@ const Review = () => {
     receipt_date?: Date;
     amount_gross?: string;
     vat_rate?: string;
+    category?: string;
     confidence?: number;
   }) => {
     setFormData(prev => ({
@@ -353,6 +354,7 @@ const Review = () => {
       receipt_date: updates.receipt_date ?? prev.receipt_date,
       amount_gross: updates.amount_gross ?? prev.amount_gross,
       vat_rate: updates.vat_rate ?? prev.vat_rate,
+      category: updates.category ?? prev.category,
     }));
     if (updates.confidence !== undefined) {
       setAiConfidence(updates.confidence);
@@ -778,7 +780,7 @@ const Review = () => {
                         fileName={currentReceipt.file_name}
                         signedUrl={signedUrl}
                         userModifiedFields={currentReceipt.user_modified_fields || []}
-                        currentFormData={{
+                         currentFormData={{
                           vendor: formData.vendor,
                           vendor_brand: formData.vendor_brand,
                           description: formData.description,
@@ -786,6 +788,7 @@ const Review = () => {
                           receipt_date: formData.receipt_date,
                           amount_gross: formData.amount_gross,
                           vat_rate: formData.vat_rate,
+                          category: formData.category,
                         }}
                         onFieldsUpdated={handleReanalysisUpdate}
                         disabled={imageLoading}
