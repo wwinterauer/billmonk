@@ -552,13 +552,63 @@ export function ExportFormatDialog({
     }
   };
 
-  const prepareExportData = () => {
+  const prepareExportData = async () => {
     const columns = visibleColumns;
     let sortedReceipts = [...receipts];
 
     // Filter out "Keine Rechnung" if option is enabled (not for ZIP)
     if (excludeNoReceipt && exportFormat !== 'zip') {
       sortedReceipts = sortedReceipts.filter(r => r.category !== 'Keine Rechnung');
+    }
+
+    // Expand split bookings into multiple rows
+    if (expandSplitBookings && splitBookingEnabled && user) {
+      const splitReceiptIds = sortedReceipts
+        .filter(r => (r as any).is_split_booking)
+        .map(r => r.id);
+
+      if (splitReceiptIds.length > 0) {
+        const { data: splitLines } = await supabase
+          .from('receipt_split_lines')
+          .select('*')
+          .eq('user_id', user.id)
+          .in('receipt_id', splitReceiptIds)
+          .order('sort_order', { ascending: true });
+
+        if (splitLines && splitLines.length > 0) {
+          // Group by receipt_id
+          const linesByReceipt = new Map<string, typeof splitLines>();
+          splitLines.forEach(line => {
+            const lines = linesByReceipt.get(line.receipt_id) || [];
+            lines.push(line);
+            linesByReceipt.set(line.receipt_id, lines);
+          });
+
+          // Expand receipts
+          const expanded: Receipt[] = [];
+          for (const receipt of sortedReceipts) {
+            const lines = linesByReceipt.get(receipt.id);
+            if ((receipt as any).is_split_booking && lines && lines.length > 0) {
+              lines.forEach((line, idx) => {
+                expanded.push({
+                  ...receipt,
+                  _split_position: idx + 1,
+                  _split_description: line.description,
+                  _split_category: line.category,
+                  _split_amount_gross: line.amount_gross,
+                  _split_amount_net: line.amount_net,
+                  _split_vat_rate: line.vat_rate,
+                  _split_vat_amount: line.vat_amount,
+                  _split_is_private: line.is_private,
+                } as any);
+              });
+            } else {
+              expanded.push(receipt);
+            }
+          }
+          sortedReceipts = expanded;
+        }
+      }
     }
 
     // Apply sorting from template
