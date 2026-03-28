@@ -310,7 +310,40 @@ export function AILearningSettings() {
     }
   };
 
-  const filteredData = learningData.filter(
+  const handleDeleteCategoryRule = async (ruleId: string) => {
+    setIsDeletingRule(ruleId);
+    try {
+      const { error } = await supabase
+        .from('category_rules')
+        .delete()
+        .eq('id', ruleId);
+
+      if (error) throw error;
+
+      setCategoryRules(prev => prev.filter(r => r.id !== ruleId));
+      toast({
+        title: 'Regel gelöscht',
+        description: 'Die Kategorie-Regel wurde entfernt.',
+      });
+    } catch (error) {
+      console.error('Error deleting category rule:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Regel konnte nicht gelöscht werden.',
+      });
+    } finally {
+      setIsDeletingRule(null);
+    }
+  };
+
+  const filteredCategoryRules = categoryRules.filter(
+    (r) =>
+      !categoryRuleSearch ||
+      r.keyword.toLowerCase().includes(categoryRuleSearch.toLowerCase()) ||
+      r.category_name.toLowerCase().includes(categoryRuleSearch.toLowerCase())
+  );
+
     (l) =>
       !searchQuery ||
       l.vendor?.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
