@@ -1209,6 +1209,7 @@ Beispiel Kleinunternehmer:
             vat_confidence: vatRateSource === 'learned' ? 1.0 : (extractedData.vat_confidence || null),
             vat_detection_method: vatRateSource === 'learned' ? 'learned' : (extractedData.vat_detection_method || null),
             special_vat_case: extractedData.special_vat_case || null,
+            line_items_raw: (extractedData as any).line_items || null,
           })
           .eq('id', receiptId);
 
