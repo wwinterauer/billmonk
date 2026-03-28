@@ -42,7 +42,7 @@ export function usePlan(): PlanData {
     if (!user) return;
     const { data } = await supabase
       .from('profiles')
-      .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan, monthly_document_count, document_credit, stripe_customer_id, is_beta_user')
+      .select('plan, monthly_receipt_count, receipt_credit, admin_view_plan, monthly_document_count, document_credit, stripe_customer_id, is_beta_user, split_booking_enabled')
       .eq('id', user.id)
       .single();
 
@@ -55,6 +55,7 @@ export function usePlan(): PlanData {
       setAdminViewPlanState((data.admin_view_plan as PlanType) || null);
       setHasStripeCustomer(!!data.stripe_customer_id);
       setIsBetaUser(!!(data as any).is_beta_user);
+      setSplitBookingEnabled(!!(data as any).split_booking_enabled);
     }
   }, [user]);
 
