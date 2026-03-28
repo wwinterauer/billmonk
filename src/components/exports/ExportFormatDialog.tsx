@@ -1254,7 +1254,23 @@ export function ExportFormatDialog({
                   </div>
                 )}
 
-                {exportFormat === 'zip' && (
+                {/* Split bookings option (only when feature enabled, not for ZIP) */}
+                {splitBookingEnabled && exportFormat !== 'zip' && (
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="expandSplitBookings">Splitbuchungen aufteilen</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Split-Belege erzeugen mehrere Zeilen
+                      </p>
+                    </div>
+                    <Switch
+                      id="expandSplitBookings"
+                      checked={expandSplitBookings}
+                      onCheckedChange={setExpandSplitBookings}
+                    />
+                  </div>
+                )}
+
                   <>
                     <div>
                       <Label>Ordnerstruktur</Label>
