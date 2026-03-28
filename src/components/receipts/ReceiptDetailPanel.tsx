@@ -174,6 +174,7 @@ export function ReceiptDetailPanel({
   const { getReceipt, updateReceipt, rejectReceipt, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
+  const { splitBookingEnabled } = usePlan();
 
   // State
   const [loading, setLoading] = useState(true);
