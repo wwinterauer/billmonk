@@ -94,6 +94,8 @@ import { SourceBadge, NoReceiptBadge } from './SourceBadge';
 import { ReanalyzeOptions } from './ReanalyzeOptions';
 import { TagSelector } from '@/components/tags/TagSelector';
 import { useTags } from '@/hooks/useTags';
+import { SplitBookingEditor } from './SplitBookingEditor';
+import { usePlan } from '@/hooks/usePlan';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
@@ -172,6 +174,7 @@ export function ReceiptDetailPanel({
   const { getReceipt, updateReceipt, rejectReceipt, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
+  const { splitBookingEnabled } = usePlan();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -1501,6 +1504,17 @@ export function ReceiptDetailPanel({
                         </SelectContent>
                       </Select>
                     </LearnableField>
+
+                    {/* Split Booking Editor */}
+                    {splitBookingEnabled && receiptId && (
+                      <SplitBookingEditor
+                        receiptId={receiptId}
+                        totalGross={amountGross !== '' ? parseFloat(amountGross) : 0}
+                        mainCategory={category}
+                        mainVatRate={vatRate !== '' ? parseFloat(vatRate) : 20}
+                        onSplitChange={() => onUpdate()}
+                      />
+                    )}
 
                     {/* Amount & VAT */}
                     <div className="grid grid-cols-2 gap-4">

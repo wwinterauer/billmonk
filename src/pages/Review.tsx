@@ -78,7 +78,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { TagSelector } from '@/components/tags/TagSelector';
-
+import { SplitBookingEditor } from '@/components/receipts/SplitBookingEditor';
+import { usePlan } from '@/hooks/usePlan';
 // International VAT rates grouped by country
 const VAT_RATE_GROUPS = [
   {
@@ -159,6 +160,7 @@ const Review = () => {
   const { getReceipts, updateReceipt, getReceiptFileUrl, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
+  const { splitBookingEnabled } = usePlan();
   const queryClient = useQueryClient();
 
   // State
@@ -1172,6 +1174,16 @@ const Review = () => {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Split Booking Editor */}
+                    {splitBookingEnabled && currentReceipt && (
+                      <SplitBookingEditor
+                        receiptId={currentReceipt.id}
+                        totalGross={parseFloat(formData.amount_gross) || 0}
+                        mainCategory={formData.category}
+                        mainVatRate={parseFloat(formData.vat_rate) || 20}
+                      />
+                    )}
 
                     {/* Amount & VAT Row */}
                     <div className="grid sm:grid-cols-2 gap-4">
