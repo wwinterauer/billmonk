@@ -1059,6 +1059,7 @@ Beispiel Kleinunternehmer:
         // Check for learned VAT rate
         let finalVatRate = extractedData.vat_rate;
         let vatRateSource: 'ai' | 'learned' = 'ai';
+        let finalCategory = extractedData.category;
 
         // First get the receipt to find user_id and vendor_id
         const { data: receiptInfo } = await supabase
@@ -1071,7 +1072,7 @@ Beispiel Kleinunternehmer:
           // Try to find vendor by name for VAT learning
           const { data: vendorMatch } = await supabase
             .from('vendors')
-            .select('id, expenses_only_extraction, legal_names')
+            .select('id, expenses_only_extraction, legal_names, default_category_id')
             .eq('user_id', receiptInfo.user_id)
             .or(`display_name.ilike.${extractedData.vendor}`)
             .maybeSingle();
@@ -1081,7 +1082,7 @@ Beispiel Kleinunternehmer:
           if (!finalVendorMatch) {
             const { data: allVendors } = await supabase
               .from('vendors')
-              .select('id, expenses_only_extraction, legal_names')
+              .select('id, expenses_only_extraction, legal_names, default_category_id')
               .eq('user_id', receiptInfo.user_id);
             
             if (allVendors) {
@@ -1095,6 +1096,44 @@ Beispiel Kleinunternehmer:
 
           const vendorId = receiptInfo.vendor_id || finalVendorMatch?.id;
           const _vendorExpensesOnly = finalVendorMatch?.expenses_only_extraction === true;
+
+          // === CATEGORY LEARNING: Apply learned rules ===
+          // Priority: Product rule (keyword match) > Vendor default > AI suggestion
+          
+          // 1. Check product-based category rules (keyword matching)
+          if (extractedData.description) {
+            const { data: categoryRules } = await supabase
+              .from('category_rules')
+              .select('keyword, category_name, match_count')
+              .eq('user_id', receiptInfo.user_id)
+              .order('match_count', { ascending: false });
+            
+            if (categoryRules && categoryRules.length > 0) {
+              const descLower = extractedData.description.toLowerCase();
+              const matchedRule = categoryRules.find(rule => 
+                descLower.includes(rule.keyword.toLowerCase())
+              );
+              
+              if (matchedRule) {
+                console.log(`[Category Learning] Product rule matched: keyword="${matchedRule.keyword}" → category="${matchedRule.category_name}" (match_count: ${matchedRule.match_count}, AI suggested: "${finalCategory}")`);
+                finalCategory = matchedRule.category_name;
+              }
+            }
+          }
+
+          // 2. If no product rule matched, check vendor default category
+          if (finalCategory === extractedData.category && finalVendorMatch?.default_category_id) {
+            const { data: vendorCategory } = await supabase
+              .from('categories')
+              .select('name')
+              .eq('id', finalVendorMatch.default_category_id)
+              .maybeSingle();
+            
+            if (vendorCategory?.name) {
+              console.log(`[Category Learning] Vendor default category: "${vendorCategory.name}" (AI suggested: "${finalCategory}")`);
+              finalCategory = vendorCategory.name;
+            }
+          }
 
           if (vendorId) {
             // Check for learned VAT rate
