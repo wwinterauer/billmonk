@@ -33,11 +33,13 @@ import {
   FileText,
   RotateCcw,
   Flower2,
+  Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -114,6 +116,18 @@ const COLOR_PALETTE = [
   '#64748B', '#EF4444', '#F97316', '#14B8A6', '#84CC16', '#A855F7',
 ];
 
+const COUNTRY_FLAGS: Record<string, string> = {
+  AT: '🇦🇹',
+  DE: '🇩🇪',
+  CH: '🇨🇭',
+};
+
+const COUNTRY_LABELS: Record<string, string> = {
+  AT: 'Österreich',
+  DE: 'Deutschland',
+  CH: 'Schweiz',
+};
+
 interface Category {
   id: string;
   user_id: string | null;
@@ -125,6 +139,8 @@ interface Category {
   sort_order: number;
   created_at: string;
   receipt_count?: number;
+  country: string | null;
+  tax_code: string | null;
 }
 
 interface CategoryFormData {
@@ -148,6 +164,9 @@ export function CategoryManagement() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showTaxCodes, setShowTaxCodes] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<string>('AT');
+  const [togglingTax, setTogglingTax] = useState(false);
   
   // Modal states
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -159,13 +178,31 @@ export function CategoryManagement() {
   // Delete with reassignment
   const [reassignCategory, setReassignCategory] = useState<string>('');
 
+  // Load user's country from profile
+  useEffect(() => {
+    const loadUserCountry = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('country')
+        .eq('id', user.id)
+        .single();
+      if (data?.country) {
+        const c = data.country.toUpperCase();
+        if (['AT', 'DE', 'CH'].includes(c)) {
+          setSelectedCountry(c);
+        }
+      }
+    };
+    loadUserCountry();
+  }, [user]);
+
   // Fetch categories with receipt counts
   const fetchCategories = async () => {
     if (!user) return;
     
     setLoading(true);
     try {
-      // Get categories
       const { data: catData, error: catError } = await supabase
         .from('categories')
         .select('*')
@@ -174,7 +211,6 @@ export function CategoryManagement() {
 
       if (catError) throw catError;
 
-      // Get receipt counts per category
       const { data: countData, error: countError } = await supabase
         .from('receipts')
         .select('category')
@@ -182,7 +218,6 @@ export function CategoryManagement() {
 
       if (countError) throw countError;
 
-      // Calculate counts
       const counts: Record<string, number> = {};
       countData?.forEach(r => {
         if (r.category) {
@@ -190,12 +225,13 @@ export function CategoryManagement() {
         }
       });
 
-      // Merge data
       const categoriesWithCounts = (catData || []).map(cat => ({
         ...cat,
         is_hidden: cat.is_hidden ?? false,
         sort_order: cat.sort_order ?? 0,
         receipt_count: counts[cat.name] || 0,
+        country: (cat as any).country ?? null,
+        tax_code: (cat as any).tax_code ?? null,
       })) as Category[];
 
       setCategories(categoriesWithCounts);
@@ -214,7 +250,43 @@ export function CategoryManagement() {
     fetchCategories();
   }, [user]);
 
-  // Open modal for new category
+  // Toggle tax categories for selected country
+  const handleToggleTaxCategories = async (show: boolean) => {
+    setTogglingTax(true);
+    try {
+      // Get all tax categories for the selected country
+      const taxCats = categories.filter(c => c.country === selectedCountry && c.is_system);
+      
+      if (taxCats.length === 0) {
+        toast({ title: `Keine Steuer-Kategorien für ${COUNTRY_LABELS[selectedCountry]} gefunden` });
+        return;
+      }
+
+      for (const cat of taxCats) {
+        await supabase
+          .from('categories')
+          .update({ is_hidden: !show })
+          .eq('id', cat.id);
+      }
+
+      toast({
+        title: show
+          ? `${COUNTRY_FLAGS[selectedCountry]} ${taxCats.length} Steuer-Kategorien eingeblendet`
+          : `${COUNTRY_FLAGS[selectedCountry]} ${taxCats.length} Steuer-Kategorien ausgeblendet`,
+      });
+      
+      fetchCategories();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setTogglingTax(false);
+    }
+  };
+
   const handleNewCategory = () => {
     setIsNewCategory(true);
     setSelectedCategory(null);
@@ -225,7 +297,6 @@ export function CategoryManagement() {
     setEditModalOpen(true);
   };
 
-  // Open modal for editing
   const handleEdit = (category: Category) => {
     setIsNewCategory(false);
     setSelectedCategory(category);
@@ -238,11 +309,9 @@ export function CategoryManagement() {
     setEditModalOpen(true);
   };
 
-  // Save category (create or update)
   const handleSave = async () => {
     if (!user) return;
     
-    // Validate
     if (formData.name.trim().length < 2) {
       toast({
         variant: 'destructive',
@@ -261,7 +330,6 @@ export function CategoryManagement() {
       return;
     }
 
-    // Check for duplicate names
     const duplicate = categories.find(
       c => c.name.toLowerCase() === formData.name.trim().toLowerCase() && c.id !== selectedCategory?.id
     );
@@ -277,7 +345,6 @@ export function CategoryManagement() {
     setSaving(true);
     try {
       if (isNewCategory) {
-        // Create new category
         const maxSortOrder = Math.max(...categories.map(c => c.sort_order), 0);
         const { error } = await supabase
           .from('categories')
@@ -292,10 +359,8 @@ export function CategoryManagement() {
           });
 
         if (error) throw error;
-
         toast({ title: 'Kategorie erstellt' });
       } else if (selectedCategory) {
-        // Update existing category
         const { error } = await supabase
           .from('categories')
           .update({
@@ -308,7 +373,6 @@ export function CategoryManagement() {
 
         if (error) throw error;
 
-        // If name changed, update receipts
         if (selectedCategory.name !== formData.name.trim()) {
           const { error: updateError } = await supabase
             .from('receipts')
@@ -335,20 +399,17 @@ export function CategoryManagement() {
     }
   };
 
-  // Open delete dialog
   const handleDeleteClick = (category: Category) => {
     setSelectedCategory(category);
     setReassignCategory('');
     setDeleteDialogOpen(true);
   };
 
-  // Confirm delete
   const handleDelete = async () => {
     if (!selectedCategory || !user) return;
 
     setSaving(true);
     try {
-      // If category has receipts, reassign them
       if (selectedCategory.receipt_count && selectedCategory.receipt_count > 0 && reassignCategory) {
         const { error: reassignError } = await supabase
           .from('receipts')
@@ -359,7 +420,6 @@ export function CategoryManagement() {
         if (reassignError) throw reassignError;
       }
 
-      // Delete category
       const { error } = await supabase
         .from('categories')
         .delete()
@@ -381,7 +441,6 @@ export function CategoryManagement() {
     }
   };
 
-  // Toggle visibility
   const handleToggleVisibility = async (category: Category) => {
     try {
       const { error } = await supabase
@@ -407,7 +466,6 @@ export function CategoryManagement() {
     }
   };
 
-  // Restore default categories
   const handleRestoreDefaults = async () => {
     try {
       const { error } = await supabase
@@ -428,7 +486,6 @@ export function CategoryManagement() {
     }
   };
 
-  // Render icon
   const renderIcon = (iconName: string | null, color: string | null) => {
     const IconComponent = iconName ? ICON_MAP[iconName] : FileText;
     if (!IconComponent) return <FileText className="h-4 w-4" />;
@@ -441,6 +498,11 @@ export function CategoryManagement() {
       </div>
     );
   };
+
+  // Count how many tax categories for selected country are currently visible
+  const taxCatsForCountry = categories.filter(c => c.country === selectedCountry && c.is_system);
+  const visibleTaxCats = taxCatsForCountry.filter(c => !c.is_hidden);
+  const allTaxVisible = taxCatsForCountry.length > 0 && visibleTaxCats.length === taxCatsForCountry.length;
 
   if (loading) {
     return (
@@ -464,6 +526,62 @@ export function CategoryManagement() {
         </Button>
       </div>
 
+      {/* Tax categories control */}
+      <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
+        <div className="flex items-center gap-2">
+          <Globe className="h-4 w-4 text-muted-foreground" />
+          <h4 className="font-medium text-sm">Steuerliche Kategorien</h4>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="AT">🇦🇹 Österreich (EAR)</SelectItem>
+              <SelectItem value="DE">🇩🇪 Deutschland (SKR03/04)</SelectItem>
+              <SelectItem value="CH">🇨🇭 Schweiz (KMU)</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleToggleTaxCategories(!allTaxVisible)}
+            disabled={togglingTax}
+          >
+            {togglingTax && <Loader2 className="h-3 w-3 mr-2 animate-spin" />}
+            {allTaxVisible ? (
+              <>
+                <EyeOff className="h-3.5 w-3.5 mr-1.5" />
+                Steuer-Kategorien ausblenden
+              </>
+            ) : (
+              <>
+                <Eye className="h-3.5 w-3.5 mr-1.5" />
+                Steuer-Kategorien einblenden
+              </>
+            )}
+          </Button>
+
+          <div className="flex items-center gap-2 ml-auto">
+            <Label htmlFor="show-tax-codes" className="text-xs text-muted-foreground cursor-pointer">
+              Steuernummern anzeigen
+            </Label>
+            <Switch
+              id="show-tax-codes"
+              checked={showTaxCodes}
+              onCheckedChange={setShowTaxCodes}
+            />
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          {visibleTaxCats.length} von {taxCatsForCountry.length} {COUNTRY_LABELS[selectedCountry]}-Kategorien aktiv
+        </p>
+      </div>
+
       {/* Table */}
       <div className="border rounded-lg">
         <Table>
@@ -471,6 +589,7 @@ export function CategoryManagement() {
             <TableRow>
               <TableHead className="w-12"></TableHead>
               <TableHead>Name</TableHead>
+              {showTaxCodes && <TableHead>Steuernr.</TableHead>}
               <TableHead>Typ</TableHead>
               <TableHead className="text-right">Belege</TableHead>
               <TableHead className="text-right">Aktionen</TableHead>
@@ -479,7 +598,7 @@ export function CategoryManagement() {
           <TableBody>
             {categories.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={showTaxCodes ? 6 : 5} className="text-center py-8 text-muted-foreground">
                   Keine Kategorien vorhanden
                 </TableCell>
               </TableRow>
@@ -493,14 +612,32 @@ export function CategoryManagement() {
                     {renderIcon(category.icon, category.color)}
                   </TableCell>
                   <TableCell className="font-medium">
-                    {category.name}
-                    {category.is_hidden && (
-                      <Badge variant="outline" className="ml-2 text-xs">Ausgeblendet</Badge>
-                    )}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {category.name}
+                      {category.country && (
+                        <span className="text-xs" title={COUNTRY_LABELS[category.country]}>
+                          {COUNTRY_FLAGS[category.country]}
+                        </span>
+                      )}
+                      {category.is_hidden && (
+                        <Badge variant="outline" className="text-xs">Ausgeblendet</Badge>
+                      )}
+                    </div>
                   </TableCell>
+                  {showTaxCodes && (
+                    <TableCell>
+                      {category.tax_code ? (
+                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">
+                          {category.tax_code}
+                        </code>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Badge variant={category.is_system ? 'secondary' : 'outline'}>
-                      {category.is_system ? 'Standard' : 'Eigene'}
+                      {category.is_system ? (category.country ? 'Steuer' : 'Standard') : 'Eigene'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
