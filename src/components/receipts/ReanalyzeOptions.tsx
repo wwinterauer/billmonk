@@ -66,6 +66,7 @@ const REANALYZABLE_FIELDS = [
   { id: 'vat_rate', label: 'MwSt-Satz', icon: Percent },
   { id: 'vat_amount', label: 'Vorsteuer', icon: Percent },
   { id: 'description', label: 'Beschreibung', icon: FileText },
+  { id: 'category', label: 'Kategorie', icon: Briefcase },
 ] as const;
 
 interface ReanalyzeOptionsProps {
@@ -82,6 +83,7 @@ interface ReanalyzeOptionsProps {
     receipt_date?: Date | null;
     amount_gross?: string;
     vat_rate?: string;
+    category?: string;
   };
   onFieldsUpdated: (updates: {
     vendor?: string;
@@ -91,6 +93,7 @@ interface ReanalyzeOptionsProps {
     receipt_date?: Date;
     amount_gross?: string;
     vat_rate?: string;
+    category?: string;
     confidence?: number;
   }) => void;
   onReanalyzeComplete?: () => void;
@@ -198,6 +201,11 @@ export function ReanalyzeOptions({
         changes.push('MwSt-Satz');
       }
 
+      if (shouldUpdate('category') && normalized.category) {
+        updates.category = normalized.category;
+        changes.push('Kategorie');
+      }
+
       updates.confidence = normalized.confidence;
 
       // 4. Call update callback
@@ -251,6 +259,7 @@ export function ReanalyzeOptions({
         if (!currentFormData.receipt_date) fieldsToAnalyze.push('receipt_date');
         if (!currentFormData.amount_gross) fieldsToAnalyze.push('amount_gross');
         if (!currentFormData.vat_rate) fieldsToAnalyze.push('vat_rate');
+        if (!currentFormData.category) fieldsToAnalyze.push('category');
 
         if (fieldsToAnalyze.length === 0) {
           toast({

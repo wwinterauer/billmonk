@@ -245,7 +245,80 @@ export function useCorrectionTracking() {
         correctedValue
       );
       
-      // 3b. Special handling for VAT rate corrections
+      // 3b. Special handling for category corrections
+      if (fieldName === 'category' && correctedValue) {
+        try {
+          // Update vendor's default_category_id
+          const { data: matchedCategory } = await supabase
+            .from('categories')
+            .select('id')
+            .eq('name', String(correctedValue))
+            .limit(1)
+            .maybeSingle();
+          
+          if (matchedCategory) {
+            await supabase
+              .from('vendors')
+              .update({ default_category_id: matchedCategory.id })
+              .eq('id', vendorId);
+          }
+
+          // Extract keywords from description for product-level learning
+          // Get the receipt's description
+          if (receiptId) {
+            const { data: receiptData } = await supabase
+              .from('receipts')
+              .select('description')
+              .eq('id', receiptId)
+              .single();
+            
+            if (receiptData?.description) {
+              const stopWords = new Set([
+                'und', 'oder', 'der', 'die', 'das', 'ein', 'eine', 'für', 'mit', 'von',
+                'auf', 'aus', 'bei', 'nach', 'über', 'unter', 'vor', 'zum', 'zur',
+                'inkl', 'zzgl', 'netto', 'brutto', 'stück', 'stk', 'paket',
+                'rechnung', 'beleg', 'quittung', 'datum', 'summe', 'gesamt',
+              ]);
+              
+              const keywords = receiptData.description
+                .toLowerCase()
+                .replace(/[^a-zäöüß\s-]/g, ' ')
+                .split(/\s+/)
+                .filter(w => w.length >= 4 && !stopWords.has(w))
+                .filter((w, i, arr) => arr.indexOf(w) === i) // unique
+                .slice(0, 5); // max 5 keywords per correction
+              
+              for (const keyword of keywords) {
+                await supabase
+                  .from('category_rules')
+                  .upsert(
+                    {
+                      user_id: user.id,
+                      keyword,
+                      category_name: String(correctedValue),
+                      match_count: 1,
+                      source: 'correction',
+                      updated_at: new Date().toISOString(),
+                    },
+                    { onConflict: 'user_id,keyword' }
+                  );
+                
+                // If rule already existed, increment match_count
+                await supabase.rpc('increment_category_rule_count' as any, {
+                  p_user_id: user.id,
+                  p_keyword: keyword,
+                }).catch(() => {
+                  // RPC may not exist yet, fallback: just upsert is enough
+                });
+              }
+            }
+          }
+        } catch (categoryError) {
+          console.error('Error tracking category correction:', categoryError);
+        }
+      }
+
+      // 3c. Special handling for VAT rate corrections
       if (fieldName === 'vat_rate') {
         const correctedStr = String(correctedValue ?? '').replace(',', '.');
         const vatRate = correctedStr !== '' ? parseFloat(correctedStr) : 0;
