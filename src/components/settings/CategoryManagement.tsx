@@ -466,25 +466,6 @@ export function CategoryManagement() {
     }
   };
 
-  const handleRestoreDefaults = async () => {
-    try {
-      const { error } = await supabase
-        .from('categories')
-        .update({ is_hidden: false })
-        .eq('is_system', true);
-
-      if (error) throw error;
-
-      toast({ title: 'Standard-Kategorien wiederhergestellt' });
-      fetchCategories();
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
-      });
-    }
-  };
 
   const renderIcon = (iconName: string | null, color: string | null) => {
     const IconComponent = iconName ? ICON_MAP[iconName] : FileText;
@@ -637,7 +618,7 @@ export function CategoryManagement() {
                   )}
                   <TableCell>
                     <Badge variant={category.is_system ? 'secondary' : 'outline'}>
-                      {category.is_system ? (category.country ? 'Steuer' : 'Standard') : 'Eigene'}
+                      {category.is_system ? 'Steuer' : 'Eigene'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
@@ -693,13 +674,6 @@ export function CategoryManagement() {
         </Table>
       </div>
 
-      {/* Restore Defaults */}
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={handleRestoreDefaults}>
-          <RotateCcw className="h-4 w-4 mr-2" />
-          Standard-Kategorien wiederherstellen
-        </Button>
-      </div>
 
       {/* Edit/Create Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
