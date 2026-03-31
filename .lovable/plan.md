@@ -1,86 +1,58 @@
 
 
-# Keyword-Lernsystem erweitern: Positions-Level + Buchungsart
+# AI-Confidence Dot für Buchungsart
 
 ## Übersicht
 
-Das bestehende Keyword-Lernsystem (`category_rules`) wird um Buchungsart-Support und Line-Item-Extraktion erweitert. Aktuell speichert es nur `category_name` + `match_count` pro Keyword. Neu kommen `tax_type_name` und `tax_type_match_count` dazu, und Keywords werden auch aus Line-Items extrahiert.
+Der Confidence-Dot (farbiger Punkt: grün/gelb/rot/grau) wird bereits bei allen Feldern in Review.tsx angezeigt, fehlt aber beim Buchungsart-Dropdown. In ReceiptDetailPanel.tsx wird ein anderes Pattern verwendet (LearnableField), dort fehlt der Dot ebenfalls.
 
 ## Änderungen
 
-### 1. Database Migration — `category_rules` erweitern
+### 1. `src/pages/Review.tsx` — Confidence-Dot bei Buchungsart ergänzen
 
-```sql
-ALTER TABLE public.category_rules 
-  ADD COLUMN IF NOT EXISTS tax_type_name text,
-  ADD COLUMN IF NOT EXISTS tax_type_match_count integer NOT NULL DEFAULT 0;
+**Zeilen 1162-1164**: Das Label `<Label>Buchungsart</Label>` wird erweitert um den gleichen Tooltip+Dot wie bei Kategorie (Zeilen 1131-1143):
+
+```tsx
+<div className="space-y-2">
+  <div className="flex items-center gap-2">
+    <Label>Buchungsart</Label>
+    <Tooltip>
+      <TooltipTrigger>
+        <div className={cn(
+          'h-2 w-2 rounded-full',
+          getConfidenceColor(getFieldConfidence(currentReceipt?.tax_type, currentReceipt?.ai_confidence))
+        )} />
+      </TooltipTrigger>
+      <TooltipContent>
+        {currentReceipt?.tax_type ? 'Von KI erkannt' : 'Nicht erkannt'}
+      </TooltipContent>
+    </Tooltip>
+  </div>
+  <Select ...>
 ```
 
-Keine bestehenden Daten betroffen — beide Spalten sind nullable/default 0.
+Wenn `tax_type` leer/null ist → grauer Dot ("Nicht erkannt"). Wenn AI einen Wert gesetzt hat → farbiger Dot basierend auf `ai_confidence`.
 
-### 2. `src/hooks/useCorrectionTracking.ts` — Keyword-Extraktion erweitern
+### 2. `src/components/receipts/ReceiptDetailPanel.tsx` — Buchungsart in LearnableField wrappen
 
-**a) Keyword-Extraktion refactoren (Zeilen ~266-322)**
+**Zeilen 1487-1502**: Das Buchungsart-Dropdown wird analog zum Kategorie-Feld (Zeilen 1466-1485) in eine `LearnableField`-Komponente gewrappt. Das zeigt automatisch "Gelernt"/"Geändert"-Badges und den Reset-Button:
 
-Aktuelle Logik extrahiert Keywords nur aus `receiptData.description`. Änderungen:
-- Zusätzlich `line_items_raw` vom Receipt laden (`.select('description, line_items_raw')`)
-- Keywords aus Hauptbeschreibung UND jeder `line_item.description` extrahieren
-- Stopwort-Filterung und ≥4-Zeichen-Regel bleiben gleich
-- Deduplizierung, dann max 10 Keywords statt 5
-- Keyword-Extraktionslogik in eine Hilfsfunktion `extractKeywords(description, lineItemsRaw)` auslagern
-
-**b) Buchungsart-Korrekturen tracken (nach Zeile ~326)**
-
-Neuer Block analog zur Kategorie-Korrektur:
-```typescript
-if (fieldName === 'tax_type' && correctedValue) {
-  // Lade description + line_items_raw
-  // Extrahiere Keywords (gleiche Hilfsfunktion)
-  // Für jedes Keyword: upsert in category_rules
-  //   - Bei existierendem Keyword: update tax_type_name, increment tax_type_match_count
-  //   - Bei neuem Keyword: insert mit tax_type_name, tax_type_match_count: 1
-}
+```tsx
+<LearnableField
+  fieldName="tax_type"
+  label="Buchungsart"
+  value={taxType}
+  originalValue={originalReceipt?.tax_type}
+  vendorLearning={vendorLearning}
+  onReset={() => setTaxType(originalReceipt?.tax_type || '')}
+>
+  <Select value={taxType} onValueChange={setTaxType}>
+    ...
+  </Select>
+</LearnableField>
 ```
-
-Die bestehende `category_name`/`match_count`-Logik bleibt unverändert.
-
-### 3. `supabase/functions/extract-receipt/index.ts` — Auto-Fill erweitern
-
-Zeilen 887-902: Aktuell wird nur `category_name` geprüft. Erweitern:
-
-```typescript
-// Bestehende category_rules-Abfrage erweitern um tax_type_name, tax_type_match_count
-.select('keyword, category_name, match_count, tax_type_name, tax_type_match_count')
-
-// Nach category-Match: auch tax_type prüfen
-// Zusätzlich: line_items_raw durchsuchen (pro Item Keywords matchen)
-if (matchedRule && matchedRule.tax_type_name && matchedRule.tax_type_match_count >= 3) {
-  finalTaxType = matchedRule.tax_type_name;
-}
-```
-
-Für Positions-Level: Wenn `line_items_raw` vorhanden, jede Position gegen `category_rules` matchen und bei Match ≥3 die Kategorie/Buchungsart der Position überschreiben.
-
-Priorität: Positions-Keyword > Vendor-Default > AI-Vorschlag.
-
-### 4. `src/components/receipts/FieldDefaultSuggestion.tsx` — Bereits korrekt
-
-`tax_type` ist bereits in `TRACKED_FIELDS` und `FIELD_LABELS` enthalten:
-- `TRACKED_FIELDS = ['payment_method', 'category', 'tax_type', 'tax_rate']` (in `useVendorFieldDefaults.ts`)
-- `FIELD_LABELS` hat `tax_type: 'Steuerart'` → umbenennen zu `'Buchungsart'`
-
-Die Komponente ist in `Review.tsx` eingebunden. Prüfen ob auch in `ReceiptDetailPanel.tsx` — aktuell fehlt sie dort, muss ergänzt werden.
-
-### 5. `src/components/settings/AILearningSettings.tsx` — tax_type-Spalte anzeigen
-
-Die Keyword-Regel-Tabelle zeigt aktuell nur `keyword`, `category_name`, `match_count`. Erweitern um `tax_type_name` und `tax_type_match_count` als zusätzliche Spalten.
 
 ### Dateien
-
-- **Migration**: `category_rules` um `tax_type_name` + `tax_type_match_count` erweitern
-- **`src/hooks/useCorrectionTracking.ts`**: Keyword-Extraktion aus Line-Items + tax_type-Tracking
-- **`supabase/functions/extract-receipt/index.ts`**: Auto-Fill für tax_type + Positions-Level
-- **`src/components/receipts/FieldDefaultSuggestion.tsx`**: Label `Steuerart` → `Buchungsart`
-- **`src/components/receipts/ReceiptDetailPanel.tsx`**: `FieldDefaultSuggestion` einbinden
-- **`src/components/settings/AILearningSettings.tsx`**: tax_type-Spalten in Regel-Tabelle
+- `src/pages/Review.tsx` — Confidence-Dot bei Buchungsart-Label
+- `src/components/receipts/ReceiptDetailPanel.tsx` — LearnableField-Wrapper für Buchungsart
 
