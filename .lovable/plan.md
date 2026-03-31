@@ -1,42 +1,61 @@
 
 
-# Kategorie und Buchungsart trennen — verbleibende Stellen
+# Email-Einstellungen laden nicht — RLS-Policy fehlt
 
-## Betroffene Stellen
+## Ursache
 
-| Datei | Stelle | Problem |
-|---|---|---|
-| **Expenses.tsx** Zeile 2045 | Bulk-Kategorie-Dropdown | `categories.map` statt `userCategories.map` — zeigt auch Buchungsarten |
-| **RecurringExpensesTab.tsx** Zeile 231-244 | Kategorie-Select pro Expense | Ein Dropdown mit `categories.map` — kein separates Buchungsart-Dropdown |
-| **VendorManagement.tsx** Zeile 827 | Kategorie-Filter | `categories.map` — mischt beide Typen |
-| **VendorManagement.tsx** Zeile 1118 | Bulk-Kategorie-Dialog | `categories.map` — mischt beide Typen |
-| **VendorManagement.tsx** Zeile 1290 | Vendor-Edit Standard-Kategorie | `categories.map` — kein zweites Dropdown für Buchungsart |
-| **AILearningSettings.tsx** Zeile 753 | Vendor-Standard-Kategorie Tabelle | `categories.map` — mischt beide Typen |
-| **BankImportKeywords.tsx** Zeile 396 | Keyword-Kategorie | Hardcoded `CATEGORIES`-Liste — eigenes Thema, nicht Teil dieser Änderung |
+Die Tabelle `email_accounts` hat keine RLS-Policy für `SELECT` mit der `authenticated`-Rolle. Jeder Request gibt 403 zurück:
 
-## Änderungen
+```
+"permission denied for table email_accounts"
+```
 
-### 1. `src/pages/Expenses.tsx`
-- Zeile 2045: `categories.map` → `userCategories.map` (Buchungsart-Bulk existiert bereits separat)
+Da `isLoading` in `useEmailImport` ein OR aus allen 4 Queries ist (Zeile 638), blockiert die endlos retry'ende `email_accounts`-Query das gesamte UI.
 
-### 2. `src/components/expenses/RecurringExpensesTab.tsx`
-- `useCategories()` → `{ userCategories, taxCategories }` destructuren
-- Bestehendes Select (Zeile 231-244): Auf `userCategories` umstellen, Label "Kategorie"
-- Zweites Select daneben einfügen für Buchungsart mit `taxCategories`, Label "Buchungsart", speichert in `tax_type`-Feld (sofern das Feld auf `recurring_expenses` existiert — falls nicht, nur Kategorie-Dropdown auf `userCategories` einschränken)
+## Lösung (2 Teile)
 
-### 3. `src/components/settings/VendorManagement.tsx`
-- `{ categories }` → `{ userCategories, taxCategories }` destructuren
-- **Filter** (Zeile 819-840): Auf `userCategories` einschränken. Zweiten Filter "Buchungsart" mit `taxCategories` daneben hinzufügen
-- **Bulk-Kategorie-Dialog** (Zeile 1113-1131): Auf `userCategories` einschränken
-- **Vendor-Edit** (Zeile 1279-1308): Auf `userCategories` einschränken. Zweites Select "Standard-Buchungsart" daneben einfügen (speichert in `default_tax_type` auf `vendors` — falls Spalte nicht existiert, nur Kategorie-Dropdown filtern ohne zweites Dropdown)
+### 1. RLS-Policy für `email_accounts` erstellen (Migration)
 
-### 4. `src/components/settings/AILearningSettings.tsx`
-- `{ categories }` → `{ userCategories, taxCategories }` destructuren
-- Tabelle (Zeile 730-764): Spalte "Standard-Kategorie" auf `userCategories` filtern. Zweite Spalte "Buchungsart" hinzufügen mit `taxCategories`
+```sql
+ALTER TABLE public.email_accounts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own email accounts"
+  ON public.email_accounts FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert own email accounts"
+  ON public.email_accounts FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update own email accounts"
+  ON public.email_accounts FOR UPDATE
+  TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can delete own email accounts"
+  ON public.email_accounts FOR DELETE
+  TO authenticated
+  USING (user_id = auth.uid());
+```
+
+### 2. `useEmailImport.ts` — Loading-State robuster machen
+
+Zeile 638: `isLoading` nur auf die zwei primären Queries beschränken, damit ein 403 auf `email_accounts` nicht alles blockiert. Zusätzlich `isError` exposen.
+
+```typescript
+isLoading: isLoadingConnection,
+isError: isErrorAccounts || isErrorConnection,
+```
+
+### 3. `EmailImportSettings.tsx` — Fehlerbehandlung
+
+Zeile 337-345: Bei `isError` statt endlosem Spinner eine Fehlermeldung mit "Erneut laden"-Button anzeigen.
 
 ### Dateien
-- `src/pages/Expenses.tsx`
-- `src/components/expenses/RecurringExpensesTab.tsx`
-- `src/components/settings/VendorManagement.tsx`
-- `src/components/settings/AILearningSettings.tsx`
+- Migration: RLS-Policies für `email_accounts`
+- `src/hooks/useEmailImport.ts`
+- `src/components/settings/EmailImportSettings.tsx`
 
