@@ -1,89 +1,107 @@
 
 
-# Plan: Dashboards & Auswertungen um Buchungsart (tax_type) erweitern
+# Plan: Kategorien-Verwaltung trennen — Meine Kategorien vs. Buchungsarten
 
 ## Übersicht
 
-6 Änderungsbereiche: Dashboard Pie-Chart toggle, Reports-Seite tax_type-Ansicht, Trend-Gruppierung, "Offen"/"Nicht zugeordnet"-Filter, Expenses-Spalte/-Filter, Review/DetailPanel Layout.
+Die bestehende `CategoryManagement.tsx` wird umgebaut: Oben "Meine Kategorien" (persönliche, `is_system === false`), Trennlinie, unten "Buchungsarten" (steuerliche Einordnung, basierend auf `TAX_TYPES` aus `constants.ts`). Buchungsarten werden in einer eigenen Tabelle verwaltet — die Standard-Buchungsarten sind nicht löschbar, nur ausblendbar. Business-Plan-User sehen zusätzlich ein Buchungsschlüssel-Feld.
 
-## 1. Dashboard — Kategorie/Buchungsart Toggle
+## 1. DB-Migration — Buchungsarten-Tabelle
 
-**`useDashboardData.ts`:**
-- `tax_type` in die Receipts-Query aufnehmen (Zeile 87: `select` erweitern)
-- Neue `taxTypeData` analog zu `categoryData` berechnen: pro `tax_type` Summen aggregieren (split-aware)
-- "Offen" = Belege ohne `tax_type`, analog zu `untaggedTotal`
-- Neuer Return-Wert: `taxTypeData`, `openTaxTypeTotal`
+Neue Tabelle `booking_types` für benutzerdefinierte Buchungsarten:
 
-**`Dashboard.tsx`:**
-- Neuer State: `chartView: 'category' | 'taxType'` (default `'category'`)
-- Im Pie-Chart-Card Header: Toggle-Buttons "Nach Kategorie" / "Nach Buchungsart"
-- Pie-Chart wechselt zwischen `categoryData` und `taxTypeData`
-- Bei Buchungsart-Ansicht: feste Farbpalette für TAX_TYPES
+```sql
+CREATE TABLE public.booking_types (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  name text NOT NULL,
+  is_system boolean DEFAULT true,
+  is_hidden boolean DEFAULT false,
+  sort_order integer DEFAULT 0,
+  booking_key text DEFAULT null,  -- DATEV/BMD Buchungsschlüssel
+  created_at timestamptz DEFAULT now()
+);
 
-## 2. Reports — Umschaltbare Kategorie/Buchungsart-Ansicht
+ALTER TABLE public.booking_types ENABLE ROW LEVEL SECURITY;
 
-**`Reports.tsx`:**
-- Neuer State: `groupBy: 'category' | 'taxType'` (default `'category'`)
-- Toggle im Expense-Bereich: "Nach Kategorie" / "Nach Buchungsart"
-- Neues `useMemo` für `taxTypeData`: Summen pro `tax_type` aus `receipts` (split-aware via `splitLines`)
-- Feste Farben pro tax_type (aus einer Map: Betriebsausgabe → blau, GWG → grün, etc.)
-- Pie-Chart + Tabelle zeigen je nach `groupBy` die Kategorie- oder Buchungsart-Daten
-- "Offen" als eigener Eintrag für Belege ohne `tax_type`
-
-## 3. Trend-Analyse — Gruppierung nach Buchungsart
-
-**`Reports.tsx` — `timeSeriesData`:**
-- Wenn `groupBy === 'taxType'`: Zeitreihe nach tax_type statt Gesamtsumme aufschlüsseln
-- Stacked Bar Chart mit einer Farbe pro tax_type
-- Wenn `groupBy === 'category'`: bestehende Logik bleibt
-
-## 4. Expenses — tax_type Spalte und Filter
-
-**`Expenses.tsx`:**
-- `COLUMN_CONFIG`: `{ key: 'tax_type', label: 'Buchungsart', defaultVisible: false }` hinzufügen
-- `ColumnKey` Type erweitern um `'tax_type'`
-- Neuer Filter-State: `taxTypeFilter` (default `'all'`), Optionen: "Alle", TAX_TYPES + "Offen"
-- Category-Filter: "Nicht zugeordnet" als Option hinzufügen
-- `filteredReceipts`: Filter-Logik für `taxTypeFilter` und `categoryFilter === 'unassigned'`
-- Tabellenzelle: Badge mit tax_type-Label oder "Offen" in grau
-
-## 5. Review.tsx & ReceiptDetailPanel.tsx — Layout nebeneinander
-
-**Review.tsx:**
-- Kategorie + Buchungsart in `grid grid-cols-2 gap-4` nebeneinander statt untereinander
-- Kategorie-Placeholder: "Nicht zugeordnet"
-- Buchungsart-Placeholder: "Offen"
-- Zahlungsmethode: eigene Zeile darunter, rein manuell (kein AI), Vendor-Default vorausgefüllt
-
-**ReceiptDetailPanel.tsx:**
-- Gleiche Anpassung: Kategorie + Buchungsart nebeneinander (`grid grid-cols-2`)
-- Kategorie-Placeholder: "Nicht zugeordnet"
-- Buchungsart-Placeholder: "Offen"
-
-## 6. Konstanten — Farbzuordnung
-
-**`constants.ts`:**
-- `TAX_TYPE_COLORS` Map hinzufügen:
-```ts
-export const TAX_TYPE_COLORS: Record<string, string> = {
-  'Betriebsausgabe': '#3B82F6',
-  'GWG bis 1.000€': '#10B981',
-  'Bewirtung 50%': '#F59E0B',
-  'Bewirtung 100%': '#EAB308',
-  'Vorsteuer abzugsfähig': '#6366F1',
-  'Reisekosten': '#EC4899',
-  'Kfz-Kosten': '#14B8A6',
-  'Repräsentation': '#EF4444',
-  'Abschreibung': '#8B5CF6',
-  'Sonstige': '#94A3B8',
-};
+CREATE POLICY "Users can view own booking types" ON public.booking_types
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own booking types" ON public.booking_types
+  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own booking types" ON public.booking_types
+  FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete non-system booking types" ON public.booking_types
+  FOR DELETE TO authenticated USING (auth.uid() = user_id AND is_system = false);
 ```
+
+**Seed default booking types** via a trigger on `profiles` insert (or populate on first load in the frontend). The 10 standard TAX_TYPES are seeded as `is_system = true`.
+
+## 2. CategoryManagement.tsx — Umstrukturierung
+
+**Oberer Bereich: "Meine Kategorien"**
+- Header: "Meine Kategorien" + Button "Neue Kategorie"
+- Hinweistext: "Deine persönlichen Kategorien zur Organisation deiner Belege."
+- Tabelle zeigt nur `is_system === false` Kategorien (persönliche)
+- Bestehende CRUD-Logik bleibt, nur gefiltert auf eigene Kategorien
+- Steuer-Kategorien-Toggle (Länderwahl) wird entfernt aus diesem Bereich
+
+**Trennlinie:**
+```tsx
+<Separator className="my-8" />
+<h3 className="text-lg font-semibold">Buchungsarten</h3>
+<p className="text-sm text-muted-foreground">
+  Steuerliche Einordnung deiner Belege. Wird in Exporten und für den Steuerberater verwendet.
+</p>
+```
+
+**Unterer Bereich: "Buchungsarten"**
+- Tabelle mit den Buchungsarten aus `booking_types` (oder fallback auf `TAX_TYPES` Konstante)
+- Standard-Buchungsarten: nicht löschbar, nur ausblendbar (Eye/EyeOff Toggle)
+- User kann weitere hinzufügen oder vorhandene umbenennen
+- Für Business-Plan: zusätzliche Spalte "Buchungsschlüssel" als editierbares Inline-Feld
+- `usePlan()` prüft `effectivePlan === 'business'` für die Anzeige
+
+## 3. Alternativer Ansatz — Ohne neue DB-Tabelle
+
+Statt einer neuen Tabelle könnten Buchungsarten auch über das bestehende `profiles`-Feld als JSON gespeichert werden (z.B. `booking_type_settings`). Das vermeidet eine Migration:
+
+```sql
+ALTER TABLE public.profiles 
+  ADD COLUMN IF NOT EXISTS booking_type_settings jsonb DEFAULT '{}';
+```
+
+Struktur: `{ "hidden": ["Sonstige"], "custom": [{"name": "Meine Art", "key": "1234"}], "keys": {"Betriebsausgabe": "4400"} }`
+
+Die `TAX_TYPES` Konstante bleibt die Quelle für die Standardwerte. Das JSON trackt nur Abweichungen (ausgeblendet, umbenannt, Buchungsschlüssel, benutzerdefinierte Einträge).
+
+**Empfehlung: Ansatz 3 (profiles JSON)** — einfacher, keine neue Tabelle, keine RLS-Komplexität.
+
+## 4. Umsetzungsdetails (mit profiles JSON)
+
+**Migration:**
+```sql
+ALTER TABLE public.profiles 
+  ADD COLUMN IF NOT EXISTS booking_type_settings jsonb DEFAULT '{}';
+```
+
+**Hook `useBookingTypes.ts`:**
+- Lädt `booking_type_settings` aus `profiles`
+- Merged mit `TAX_TYPES` Konstante
+- Returns: `bookingTypes[]`, `updateBookingKey()`, `toggleHidden()`, `addCustomType()`, `renameType()`
+
+**CategoryManagement.tsx:**
+- Split in zwei Sections
+- Oben: Eigene Kategorien (bestehende Logik, gefiltert auf `!is_system`)
+- Unten: Buchungsarten (neuer `useBookingTypes` Hook)
+- Business-Plan: Buchungsschlüssel-Input pro Zeile
+
+**Dropdowns in Review/Expenses:**
+- "Buchungsart" Dropdown liest aus `useBookingTypes` statt direkt aus `TAX_TYPES` (damit ausgeblendete Typen nicht erscheinen)
 
 ## Technische Details
 
-- Keine DB-Migration nötig — `tax_type` existiert bereits auf `receipts` und `receipt_split_lines`
-- Split-aware Aggregation: Bei `is_split_booking` die Split-Lines nach `tax_type` gruppieren (analog zur bestehenden Category-Logik)
-- "Offen"-Filter: `tax_type IS NULL` bzw. `!receipt.tax_type`
-- "Nicht zugeordnet"-Filter: `category IS NULL` bzw. `!receipt.category`
-- Bestehende Export-Logik bleibt unverändert (Folgeschritt)
+- Keine Änderung an `tax_type` auf `receipts`/`receipt_split_lines` — bleibt Text-Feld
+- Buchungsschlüssel werden in `booking_type_settings.keys` gespeichert und im DATEV/BMD-Export berücksichtigt
+- Standard-Buchungsarten kommen aus `TAX_TYPES` Konstante, User-Overrides aus dem JSON
+- `usePlan()` wird für Feature-Gating des Buchungsschlüssel-Feldes verwendet
 
