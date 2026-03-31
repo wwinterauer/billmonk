@@ -33,6 +33,10 @@ serve(async (req) => {
     logStep("ERROR", { message: "STRIPE_SECRET_KEY not set" });
     return new Response("Server misconfigured", { status: 500 });
   }
+  if (!webhookSecret) {
+    logStep("ERROR", { message: "STRIPE_WEBHOOK_SECRET not set" });
+    return new Response("Webhook secret not configured", { status: 500 });
+  }
 
   const supabaseAdmin = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
