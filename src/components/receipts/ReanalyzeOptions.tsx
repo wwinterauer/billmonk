@@ -205,6 +205,22 @@ export function ReanalyzeOptions({
         changes.push('Kategorie');
       }
 
+      // Mixed tax rate fields
+      if (normalized.amount_net !== null && normalized.amount_net !== undefined) {
+        updates.amount_net = normalized.amount_net.toString();
+        changes.push('Nettobetrag');
+      }
+      if (normalized.vat_amount !== null && normalized.vat_amount !== undefined) {
+        updates.vat_amount = normalized.vat_amount.toString();
+        changes.push('MwSt-Betrag');
+      }
+      if (normalized.is_mixed_tax_rate !== undefined) {
+        updates.is_mixed_tax_rate = normalized.is_mixed_tax_rate;
+      }
+      if (normalized.tax_rate_details) {
+        updates.tax_rate_details = normalized.tax_rate_details;
+      }
+
       updates.confidence = normalized.confidence;
 
       // Call update callback
