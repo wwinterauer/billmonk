@@ -18,14 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-const VAT_RATES = [
-  { value: '20', label: '20%' },
-  { value: '19', label: '19%' },
-  { value: '13', label: '13%' },
-  { value: '10', label: '10%' },
-  { value: '7', label: '7%' },
-  { value: '0', label: '0%' },
-];
+import { useVatRates } from '@/hooks/useVatRates';
 
 export interface SplitLine {
   id?: string;
