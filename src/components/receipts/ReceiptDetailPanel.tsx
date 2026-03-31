@@ -1485,8 +1485,14 @@ export function ReceiptDetailPanel({
                       </LearnableField>
 
                       {/* Buchungsart (tax_type) */}
-                      <div className="space-y-2 flex flex-col justify-end">
-                        <Label>Buchungsart</Label>
+                      <LearnableField
+                        fieldName="tax_type"
+                        label="Buchungsart"
+                        value={taxType}
+                        originalValue={originalReceipt?.tax_type}
+                        vendorLearning={vendorLearning}
+                        onReset={() => setTaxType(originalReceipt?.tax_type || '')}
+                      >
                         <Select value={taxType} onValueChange={setTaxType}>
                           <SelectTrigger>
                             <SelectValue placeholder="Offen" />
@@ -1499,7 +1505,7 @@ export function ReceiptDetailPanel({
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
+                      </LearnableField>
                     </div>
 
                     {/* Split Booking Editor */}
