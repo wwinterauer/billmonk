@@ -384,7 +384,7 @@ export function ReceiptDetailPanel({
           setInvoiceNumber(data.invoice_number || '');
           setCategory(data.category || '');
           setAmountGross(data.amount_gross?.toString() || '');
-          setVatRate(data.vat_rate !== null && data.vat_rate !== undefined ? data.vat_rate.toString() : '20');
+          setVatRate(data.vat_rate !== null && data.vat_rate !== undefined ? data.vat_rate.toString() : defaultVatRate);
           // Handle mixed tax rate fields (may not be in types yet)
           const receiptData = data as unknown as Record<string, unknown>;
           const isMixed = (receiptData.is_mixed_tax_rate as boolean) || false;
