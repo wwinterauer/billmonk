@@ -64,7 +64,10 @@ import {
   AlertCircle,
   CheckCircle,
   Link2,
+  Smartphone,
+  ChevronDown,
 } from 'lucide-react';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { useEmailImport, EmailAccount, EmailAttachment } from '@/hooks/useEmailImport';
 import { OAuthProviderButtons } from './OAuthProviderButtons';
 import { toast } from 'sonner';
@@ -457,6 +460,22 @@ export const EmailImportSettings: React.FC = () => {
                       <p className="text-xs text-muted-foreground">
                         Leiten Sie Rechnungs-E-Mails an diese Adresse weiter. PDF- und Bildanhänge werden automatisch verarbeitet.
                       </p>
+
+                      <Collapsible className="mt-3">
+                        <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group">
+                          <Smartphone className="h-4 w-4" />
+                          <span>Tipp: Belege per Scan-App importieren</span>
+                          <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-2 space-y-2 text-sm text-muted-foreground border-l-2 border-muted pl-4">
+                          <p>
+                            <strong className="text-foreground">Per Teilen-Funktion (Android):</strong> Installiere BillMonk als App, scanne deinen Beleg mit einer Scan-App (z.B. Google Drive Scan, Adobe Scan) und wähle „Teilen → BillMonk". Der Beleg wird automatisch importiert.
+                          </p>
+                          <p>
+                            <strong className="text-foreground">Per Email (iOS & Android):</strong> Scanne deinen Beleg und teile ihn per Email an deine Import-Adresse: <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{emailConnection.import_email}</code>. Speichere die Adresse am besten als Kontakt in deinem Handy.
+                          </p>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
