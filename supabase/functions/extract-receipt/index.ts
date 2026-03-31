@@ -603,7 +603,7 @@ VAT-KONFIDENZ:
 - vat_detection_method: "explicit"/"calculated"/"estimated"
 
 BETRÄGE: Dezimalzahlen ohne Währungssymbol. 0 wenn nicht erkennbar. Datum: YYYY-MM-DD oder "".
-payment_method: Überweisung/Kreditkarte/Bar/PayPal/Lastschrift oder "".
+receipt_number: Rechnungsnummer suchen (RE-Nr, Invoice, Belegnummer etc.) oder "".
 receipt_number: Rechnungsnummer suchen (RE-Nr, Invoice, Belegnummer etc.) oder "".
 
 LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenzeilen.${expensesOnlyPrompt}${extractionHintPrompt}`;
