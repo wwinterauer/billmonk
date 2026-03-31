@@ -211,10 +211,11 @@ Ignoriere alle anderen Zeilen (Einnahmen, Gutschriften, Auszahlungen).
 REGELN:
 - Durchsuche ALLE Seiten des Dokuments, nicht nur die erste
 - Pro Treffer: Brutto, Netto, MwSt-Satz, MwSt-Betrag erfassen
+- Netto = Brutto / (1 + MwSt-Satz/100), MwSt = Brutto - Netto
 - Schlagwörter können mehrfach vorkommen → jede Zeile einzeln zählen
 - Ignoriere Zwischen- und Gesamtsummen — nur einzelne Kostenzeilen zählen
-- Summiere alle gefundenen Kosten-Positionen zum Gesamtbetrag (total_amount, net_amount, tax_amount)
-- Verschiedene MwSt-Sätze → is_mixed_tax_rate=true + tax_rate_details
+- Bei verschiedenen MwSt-Sätzen: is_mixed_tax_rate=true, tax_rate_details mit rate/net_amount/tax_amount/description PRO Position
+- total_amount = Summe aller Brutto, net_amount = Summe aller Netto, tax_amount = Summe aller MwSt
 - Alle Beträge POSITIV
 - Gutschriften/Erstattungen komplett ignorieren
 - description: Alle gefundenen Positionen mit jeweiligem Betrag auflisten, z.B.: "Transaktionsgebühr 3,50€; Betreiber-Abonnement 12,00€"`;
