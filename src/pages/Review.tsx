@@ -115,6 +115,7 @@ const Review = () => {
   const { toast } = useToast();
   const { getReceipts, updateReceipt, getReceiptFileUrl, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
+  const { visibleBookingTypes } = useBookingTypes();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
   const { vatRateGroups } = useVatRates();
