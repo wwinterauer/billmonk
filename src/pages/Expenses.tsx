@@ -125,7 +125,7 @@ const COLUMN_CONFIG: { key: ColumnKey; label: string; defaultVisible: boolean }[
   { key: 'invoice_number', label: 'Rechnungsnr.', defaultVisible: true },
   { key: 'description', label: 'Beschreibung', defaultVisible: true },
   { key: 'category', label: 'Kategorie', defaultVisible: true },
-  { key: 'tax_type', label: 'Buchungsart', defaultVisible: false },
+  { key: 'tax_type', label: 'Buchungsart', defaultVisible: true },
   { key: 'tags', label: 'Tags', defaultVisible: true },
   { key: 'amount', label: 'Betrag', defaultVisible: true },
   { key: 'ai', label: 'KI', defaultVisible: true },
