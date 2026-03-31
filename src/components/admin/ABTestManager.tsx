@@ -35,7 +35,6 @@ const FIELD_LABELS: Record<string, string> = {
   tax_amount: 'MwSt-Betrag',
   category: 'Kategorie',
   receipt_date: 'Datum',
-  payment_method: 'Zahlungsart',
 };
 
 const V1_FIELD_MAP: Record<string, string> = {
@@ -45,7 +44,6 @@ const V1_FIELD_MAP: Record<string, string> = {
   tax_amount: 'vat_amount',
   category: 'category',
   receipt_date: 'receipt_date',
-  payment_method: 'payment_method',
 };
 
 const V2_FIELD_MAP: Record<string, string> = {
@@ -55,7 +53,6 @@ const V2_FIELD_MAP: Record<string, string> = {
   tax_amount: 'tax_amount',
   category: 'category',
   receipt_date: 'receipt_date',
-  payment_method: 'payment_method',
 };
 
 export function ABTestManager() {
