@@ -81,11 +81,15 @@ serve(async (req) => {
       .single();
 
     if (receiptError || !originalReceipt) {
-      throw new Error("Receipt nicht gefunden oder keine Berechtigung");
+      return new Response(JSON.stringify({ error: "Receipt nicht gefunden oder keine Berechtigung" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (!originalReceipt.file_url) {
-      throw new Error("Receipt hat keine Datei");
+      return new Response(JSON.stringify({ error: "Receipt hat keine Datei" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // PDF aus Storage laden
