@@ -492,7 +492,7 @@ const InvoiceEditor = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Keine Kategorie</SelectItem>
-                  {categories.filter(c => !c.is_hidden).map(c => (
+                  {userCategories.filter(c => !c.is_hidden).map(c => (
                     <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
