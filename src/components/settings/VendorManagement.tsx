@@ -824,7 +824,7 @@ export function VendorManagement() {
                 <SelectItem value="all">Alle Kategorien</SelectItem>
                 <SelectItem value="none">Ohne Kategorie</SelectItem>
                 <Separator className="my-1" />
-                {categories.map((cat) => (
+                {userCategories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     <span className="flex items-center">
                       {cat.color && (
