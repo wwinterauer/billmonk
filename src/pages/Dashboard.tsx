@@ -63,11 +63,14 @@ const Dashboard = () => {
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
 
+  const [chartView, setChartView] = useState<'category' | 'taxType'>('category');
+
   const { 
     loading, 
     error, 
     stats, 
     categoryData,
+    taxTypeData,
     tagData,
     untaggedTotal,
     recentReceipts, 
