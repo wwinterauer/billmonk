@@ -3315,6 +3315,14 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      get_vendor_stats: {
+        Args: { p_user_id: string }
+        Returns: {
+          receipt_count: number
+          total_amount: number
+          vendor_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
