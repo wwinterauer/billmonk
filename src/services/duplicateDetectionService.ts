@@ -17,6 +17,16 @@ export interface ReceiptData {
 }
 
 /**
+ * Apply vendor filter: exact match for short names (<6 chars), ilike prefix for longer names
+ */
+function applyVendorFilter(query: any, vendor: string) {
+  if (vendor.length < 6) {
+    return query.eq('vendor', vendor);
+  }
+  return query.ilike('vendor', `%${vendor.substring(0, 10)}%`);
+}
+
+/**
  * Generate SHA-256 hash of a file
  */
 export async function generateFileHash(file: File): Promise<string> {
@@ -74,13 +84,13 @@ export async function checkForDuplicates(
 
     // 2. Invoice number + vendor match (95% - very likely)
     if (receiptData.invoice_number && receiptData.vendor) {
-      const vendorPrefix = receiptData.vendor.substring(0, 10);
-      const { data: invoiceMatch } = await supabase
+      let invoiceQuery = supabase
         .from('receipts')
         .select('id, vendor, amount_gross, receipt_date, status')
         .eq('user_id', userId)
-        .eq('invoice_number', receiptData.invoice_number)
-        .ilike('vendor', `%${vendorPrefix}%`)
+        .eq('invoice_number', receiptData.invoice_number);
+      invoiceQuery = applyVendorFilter(invoiceQuery, receiptData.vendor);
+      const { data: invoiceMatch } = await invoiceQuery
         .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
@@ -99,14 +109,14 @@ export async function checkForDuplicates(
 
     // 3. Amount + date + vendor match (90% - very likely)
     if (receiptData.amount_gross && receiptData.receipt_date && receiptData.vendor) {
-      const vendorPrefix = receiptData.vendor.substring(0, 10);
-      const { data: amountMatch } = await supabase
+      let amountQuery = supabase
         .from('receipts')
         .select('id, vendor, amount_gross, receipt_date, invoice_number, status')
         .eq('user_id', userId)
         .eq('amount_gross', receiptData.amount_gross)
-        .eq('receipt_date', receiptData.receipt_date)
-        .ilike('vendor', `%${vendorPrefix}%`)
+        .eq('receipt_date', receiptData.receipt_date);
+      amountQuery = applyVendorFilter(amountQuery, receiptData.vendor);
+      const { data: amountMatch } = await amountQuery
         .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
@@ -131,15 +141,15 @@ export async function checkForDuplicates(
       const dateTo = new Date(date);
       dateTo.setDate(date.getDate() + 3);
 
-      const vendorPrefix = receiptData.vendor.substring(0, 10);
-      const { data: nearMatch } = await supabase
+      let nearQuery = supabase
         .from('receipts')
         .select('id, vendor, amount_gross, receipt_date, status')
         .eq('user_id', userId)
         .eq('amount_gross', receiptData.amount_gross)
         .gte('receipt_date', dateFrom.toISOString().split('T')[0])
-        .lte('receipt_date', dateTo.toISOString().split('T')[0])
-        .ilike('vendor', `%${vendorPrefix}%`)
+        .lte('receipt_date', dateTo.toISOString().split('T')[0]);
+      nearQuery = applyVendorFilter(nearQuery, receiptData.vendor);
+      const { data: nearMatch } = await nearQuery
         .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
