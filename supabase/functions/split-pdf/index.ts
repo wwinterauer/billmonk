@@ -229,6 +229,37 @@ serve(async (req) => {
 
     console.log(`Split complete: ${createdReceipts.length} receipts created from ${receiptId}`);
 
+    // Background extraction with retry — runs after response is sent
+    (async () => {
+      const extractWithRetry = async (receiptId: string) => {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const { error } = await supabase.functions.invoke('extract-receipt', {
+              body: { receiptId, skipMultiCheck: true }
+            });
+            if (error) throw error;
+            console.log(`Extraction succeeded for ${receiptId} (attempt ${attempt})`);
+            return;
+          } catch (err) {
+            console.error(`Extraction attempt ${attempt} failed for ${receiptId}:`, err);
+            if (attempt < 2) {
+              await new Promise(r => setTimeout(r, 2000));
+            }
+          }
+        }
+        // Both attempts failed — mark as error
+        await supabase.from('receipts').update({
+          status: 'error',
+          notes: 'KI-Extraktion nach 2 Versuchen fehlgeschlagen',
+        }).eq('id', receiptId);
+        console.error(`Marked ${receiptId} as error after 2 failed extraction attempts`);
+      };
+
+      for (const r of createdReceipts) {
+        await extractWithRetry(r.id);
+      }
+    })();
+
     return new Response(
       JSON.stringify({
         success: true,
