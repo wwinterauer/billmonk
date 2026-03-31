@@ -113,7 +113,7 @@ const Review = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { getReceipts, updateReceipt, getReceiptFileUrl, deleteReceipt } = useReceipts();
-  const { categories, userCategories, taxCategories } = useCategories();
+  const { userCategories, taxCategories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
   const { vatRateGroups } = useVatRates();
