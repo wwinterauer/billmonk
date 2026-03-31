@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
+import { NO_RECEIPT_CATEGORY, TAX_TYPE_COLORS } from '@/lib/constants';
 import { useSplitLines, aggregateWithSplitLines } from '@/hooks/useSplitLines';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -106,6 +106,7 @@ const Reports = () => {
   const [customerSearch, setCustomerSearch] = useState('');
   const [viewMode, setViewMode] = useState<'expenses' | 'income'>('expenses');
   const [taxExportOpen, setTaxExportOpen] = useState(false);
+  const [expenseGroupBy, setExpenseGroupBy] = useState<'category' | 'taxType'>('category');
 
   const months = [
     'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
@@ -442,14 +443,77 @@ const Reports = () => {
       .sort((a, b) => b.amount - a.amount);
   }, [receipts, categories, splitLines, splitBookingEnabled]);
 
-  // Prepare data for Pie Chart
+  // Group data by tax_type (split-aware)
+  const taxTypeData = useMemo(() => {
+    if (!receipts) return [];
+
+    const billableReceipts = receipts.filter(r => r.category !== NO_RECEIPT_CATEGORY);
+    const taxTypeMap = new Map<string, { amount: number; count: number; vat: number }>();
+
+    // Group split lines by receipt for split-aware aggregation
+    const splitByReceipt = new Map<string, any[]>();
+    if (splitBookingEnabled && splitLines) {
+      splitLines.forEach((line) => {
+        const lines = splitByReceipt.get(line.receipt_id) || [];
+        lines.push(line);
+        splitByReceipt.set(line.receipt_id, lines);
+      });
+    }
+
+    billableReceipts.forEach(r => {
+      if (splitBookingEnabled && (r as any).is_split_booking) {
+        const lines = splitByReceipt.get(r.id);
+        if (lines && lines.length > 0) {
+          lines.forEach((line: any) => {
+            const tt = line.tax_type || 'Offen';
+            const existing = taxTypeMap.get(tt) || { amount: 0, count: 0, vat: 0 };
+            existing.amount += line.amount_gross || 0;
+            existing.vat += line.vat_amount || 0;
+            existing.count += 1;
+            taxTypeMap.set(tt, existing);
+          });
+          return;
+        }
+      }
+      const tt = (r as any).tax_type || 'Offen';
+      const existing = taxTypeMap.get(tt) || { amount: 0, count: 0, vat: 0 };
+      existing.amount += r.amount_gross || 0;
+      existing.vat += r.vat_amount || 0;
+      existing.count += 1;
+      taxTypeMap.set(tt, existing);
+    });
+
+    return Array.from(taxTypeMap.entries())
+      .map(([name, data]) => ({
+        name,
+        color: TAX_TYPE_COLORS[name] || '#94A3B8',
+        amount: data.amount,
+        count: data.count,
+        vat: data.vat,
+      }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [receipts, splitLines, splitBookingEnabled]);
+
+  // Prepare data for Pie Chart — depends on groupBy
   const pieChartData = useMemo(() => {
+    if (expenseGroupBy === 'taxType') {
+      return taxTypeData.map((tt) => ({
+        name: tt.name,
+        value: tt.amount,
+        color: tt.color,
+      }));
+    }
     return categoryData.map((cat) => ({
       name: cat.name,
       value: cat.amount,
       color: cat.color,
     }));
-  }, [categoryData]);
+  }, [categoryData, taxTypeData, expenseGroupBy]);
+
+  // Active table data for the breakdown table
+  const activeTableData = useMemo(() => {
+    return expenseGroupBy === 'taxType' ? taxTypeData : categoryData;
+  }, [expenseGroupBy, categoryData, taxTypeData]);
 
   // Time series data - grouped by month
   const timeSeriesData = useMemo(() => {
@@ -1358,10 +1422,32 @@ const Reports = () => {
 
         {/* Category Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Pie Chart - Expenses by Category */}
+          {/* Pie Chart - Expenses by Category/Buchungsart */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="text-lg">Ausgaben nach Kategorie</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">
+                  {expenseGroupBy === 'category' ? 'Ausgaben nach Kategorie' : 'Ausgaben nach Buchungsart'}
+                </CardTitle>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant={expenseGroupBy === 'category' ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setExpenseGroupBy('category')}
+                  >
+                    Kategorie
+                  </Button>
+                  <Button
+                    variant={expenseGroupBy === 'taxType' ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setExpenseGroupBy('taxType')}
+                  >
+                    Buchungsart
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -1407,10 +1493,12 @@ const Reports = () => {
             </CardContent>
           </Card>
 
-          {/* Bar Chart - Top Categories */}
+          {/* Bar Chart - Top Categories/Buchungsarten */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="text-lg">Top Kategorien</CardTitle>
+              <CardTitle className="text-lg">
+                {expenseGroupBy === 'category' ? 'Top Kategorien' : 'Top Buchungsarten'}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -1419,14 +1507,14 @@ const Reports = () => {
                     <Skeleton key={i} className="h-8 w-full" />
                   ))}
                 </div>
-              ) : categoryData.length === 0 ? (
+              ) : activeTableData.length === 0 ? (
                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                   Keine Daten für den gewählten Zeitraum
                 </div>
               ) : (
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={categoryData.slice(0, 5)} layout="vertical">
+                    <BarChart data={activeTableData.slice(0, 5)} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis
                         type="number"
@@ -1449,7 +1537,7 @@ const Reports = () => {
                         }}
                       />
                       <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
-                        {categoryData.slice(0, 5).map((entry, index) => (
+                        {activeTableData.slice(0, 5).map((entry, index) => (
                           <Cell key={index} fill={entry.color} />
                         ))}
                       </Bar>
@@ -1461,10 +1549,12 @@ const Reports = () => {
           </Card>
         </div>
 
-        {/* Category Detail Table */}
+        {/* Detail Table */}
         <Card className="border-border/50 mb-6">
           <CardHeader>
-            <CardTitle className="text-lg">Detailübersicht nach Kategorie</CardTitle>
+            <CardTitle className="text-lg">
+              {expenseGroupBy === 'category' ? 'Detailübersicht nach Kategorie' : 'Detailübersicht nach Buchungsart'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -1473,7 +1563,7 @@ const Reports = () => {
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}
               </div>
-            ) : categoryData.length === 0 ? (
+            ) : activeTableData.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
                 Keine Daten für den gewählten Zeitraum
               </div>
@@ -1481,7 +1571,7 @@ const Reports = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Kategorie</TableHead>
+                    <TableHead>{expenseGroupBy === 'category' ? 'Kategorie' : 'Buchungsart'}</TableHead>
                     <TableHead className="text-right">Anzahl</TableHead>
                     <TableHead className="text-right">Brutto</TableHead>
                     <TableHead className="text-right">Netto</TableHead>
@@ -1490,30 +1580,30 @@ const Reports = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {categoryData.map((cat) => (
-                    <TableRow key={cat.name}>
+                  {activeTableData.map((item) => (
+                    <TableRow key={item.name}>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div
                             className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: cat.color }}
+                            style={{ backgroundColor: item.color }}
                           />
-                          {cat.name}
+                          {item.name}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">{cat.count}</TableCell>
+                      <TableCell className="text-right">{item.count}</TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency(cat.amount)}
+                        {formatCurrency(item.amount)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(cat.amount - cat.vat)}
+                        {formatCurrency(item.amount - item.vat)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(cat.vat)}
+                        {formatCurrency(item.vat)}
                       </TableCell>
                       <TableCell className="text-right">
                         {stats?.totalGross
-                          ? ((cat.amount / stats.totalGross) * 100).toFixed(1)
+                          ? ((item.amount / stats.totalGross) * 100).toFixed(1)
                           : 0}
                         %
                       </TableCell>

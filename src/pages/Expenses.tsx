@@ -104,7 +104,7 @@ import { TagSelector } from '@/components/tags/TagSelector';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
+import { NO_RECEIPT_CATEGORY, TAX_TYPES } from '@/lib/constants';
 import { Folder } from 'lucide-react';
 import { Copy, Scissors, Layers, Zap } from 'lucide-react';
 import { checkForDuplicates, type DuplicateCheckResult } from '@/services/duplicateDetectionService';
@@ -118,7 +118,7 @@ import { SourceBadge, NoReceiptBadge } from '@/components/receipts/SourceBadge';
 type SortField = 'receipt_date' | 'vendor' | 'invoice_number' | 'amount_gross';
 type SortDirection = 'asc' | 'desc';
 
-type ColumnKey = 'date' | 'vendor' | 'invoice_number' | 'description' | 'category' | 'tags' | 'amount' | 'ai' | 'status';
+type ColumnKey = 'date' | 'vendor' | 'invoice_number' | 'description' | 'category' | 'tax_type' | 'tags' | 'amount' | 'ai' | 'status';
 
 const COLUMN_CONFIG: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
   { key: 'date', label: 'Datum', defaultVisible: true },
@@ -126,6 +126,7 @@ const COLUMN_CONFIG: { key: ColumnKey; label: string; defaultVisible: boolean }[
   { key: 'invoice_number', label: 'Rechnungsnr.', defaultVisible: true },
   { key: 'description', label: 'Beschreibung', defaultVisible: true },
   { key: 'category', label: 'Kategorie', defaultVisible: true },
+  { key: 'tax_type', label: 'Buchungsart', defaultVisible: false },
   { key: 'tags', label: 'Tags', defaultVisible: true },
   { key: 'amount', label: 'Betrag', defaultVisible: true },
   { key: 'ai', label: 'KI', defaultVisible: true },
@@ -273,6 +274,7 @@ const Expenses = () => {
     searchParams.get('status') || 'all'
   );
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [taxTypeFilter, setTaxTypeFilter] = useState<string>('all');
   const [invoiceFilter, setInvoiceFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -702,8 +704,17 @@ const Expenses = () => {
     }
 
     // Category filter
-    if (categoryFilter !== 'all') {
+    if (categoryFilter === '__unassigned__') {
+      result = result.filter(r => !r.category);
+    } else if (categoryFilter !== 'all') {
       result = result.filter(r => r.category === categoryFilter);
+    }
+
+    // Tax type filter
+    if (taxTypeFilter === '__open__') {
+      result = result.filter(r => !(r as any).tax_type);
+    } else if (taxTypeFilter !== 'all') {
+      result = result.filter(r => (r as any).tax_type === taxTypeFilter);
     }
 
     // Invoice number filter
@@ -771,7 +782,7 @@ const Expenses = () => {
     });
 
     return result;
-  }, [receipts, statusFilter, categoryFilter, tagFilter, receiptTagsCache, searchQuery, sortField, sortDirection]);
+  }, [receipts, statusFilter, categoryFilter, taxTypeFilter, tagFilter, receiptTagsCache, searchQuery, sortField, sortDirection]);
 
   // Pagination
   const totalPages = Math.ceil(filteredReceipts.length / ITEMS_PER_PAGE);
@@ -783,7 +794,7 @@ const Expenses = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, categoryFilter, invoiceFilter, tagFilter, searchQuery]);
+  }, [statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, tagFilter, searchQuery]);
 
   // Save column visibility to localStorage
   useEffect(() => {
@@ -1579,8 +1590,24 @@ const Expenses = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle Kategorien</SelectItem>
+              <SelectItem value="__unassigned__">Nicht zugeordnet</SelectItem>
+              <SelectSeparator />
               {categories.map(c => (
                 <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={taxTypeFilter} onValueChange={setTaxTypeFilter}>
+            <SelectTrigger className="w-[170px]">
+              <SelectValue placeholder="Buchungsart" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle Buchungsarten</SelectItem>
+              <SelectItem value="__open__">Offen</SelectItem>
+              <SelectSeparator />
+              {TAX_TYPES.map(t => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -2189,6 +2216,9 @@ const Expenses = () => {
                         {visibleColumns.has('category') && (
                           <TableHead>Kategorie</TableHead>
                         )}
+                        {visibleColumns.has('tax_type') && (
+                          <TableHead>Buchungsart</TableHead>
+                        )}
                         {visibleColumns.has('tags') && (
                           <TableHead>Tags</TableHead>
                         )}
@@ -2286,6 +2316,17 @@ const Expenses = () => {
                                   {receipt.category}
                                 </Badge>
                               ) : '—'}
+                            </TableCell>
+                          )}
+                          {visibleColumns.has('tax_type') && (
+                            <TableCell>
+                              {(receipt as any).tax_type ? (
+                                <Badge variant="outline" className="text-xs">
+                                  {(receipt as any).tax_type}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Offen</span>
+                              )}
                             </TableCell>
                           )}
                           {visibleColumns.has('tags') && (
