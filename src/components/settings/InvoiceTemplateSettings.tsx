@@ -113,7 +113,7 @@ export function InvoiceTemplateSettings() {
           {/* Payment Terms + Discount */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium flex items-center gap-2"><Percent className="h-4 w-4" /> Zahlungsbedingungen & Skonto</h3>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-4 gap-3 items-end">
               <div>
                 <Label>Zahlungsziel (Tage)</Label>
                 <Input type="number" value={form.default_payment_terms_days} onChange={e => setForm(f => ({ ...f, default_payment_terms_days: parseInt(e.target.value) || 14 }))} />
