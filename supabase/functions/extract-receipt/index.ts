@@ -742,7 +742,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
       }
 
       // ── Post-Processing: VAT consistency ─────────────────────────
-      if (extractedData.amount_gross != null) {
+      if (extractedData.amount_gross != null && !extractedData.is_mixed_tax_rate) {
         // Rule 0: Explicit 0% in document
         const zeroVatPattern = /0[,.]?0{0,2}\s*%\s*(USt|MwSt|Ust|mwst|umsatzsteuer)/i;
         if (zeroVatPattern.test(content) && extractedData.vat_rate !== 0) {
