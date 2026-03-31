@@ -206,6 +206,45 @@ export function ABTestManager() {
     onError: (err: any) => toast.error(`Test fehlgeschlagen: ${err.message}`),
   });
 
+  // Stop test
+  const stopTest = useMutation({
+    mutationFn: async (runId: string) => {
+      const { error } = await supabase
+        .from('ab_test_runs')
+        .update({ status: 'stopped' })
+        .eq('id', runId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Test gestoppt');
+      queryClient.invalidateQueries({ queryKey: ['ab-test-runs'] });
+    },
+    onError: (err: any) => toast.error(`Stoppen fehlgeschlagen: ${err.message}`),
+  });
+
+  // Restart test (continues from unprocessed items)
+  const restartTest = useMutation({
+    mutationFn: async (runId: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      // Reset status to running, then invoke edge function
+      await supabase.from('ab_test_runs').update({ status: 'pending' }).eq('id', runId);
+
+      const { data, error } = await supabase.functions.invoke('run-ab-test', {
+        body: { test_run_id: runId },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Test neu gestartet — Verarbeitung läuft weiter');
+      queryClient.invalidateQueries({ queryKey: ['ab-test-runs'] });
+    },
+    onError: (err: any) => toast.error(`Neustart fehlgeschlagen: ${err.message}`),
+  });
+
   const summary = selectedRun?.results_summary as Record<string, any> | null;
 
   // ── Detail View ────────────────────────────────────────────────────
