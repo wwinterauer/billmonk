@@ -1,13 +1,27 @@
 
 
-# BUGFIX: payment_method aus A/B-Test Schema entfernen
+# BUGFIX: Stripe Webhook absichern
 
-## Änderungen
+## Problem
 
-### `supabase/functions/run-ab-test/index.ts`
+Zeilen 49-58: Wenn `STRIPE_WEBHOOK_SECRET` nicht gesetzt ist, wird der Payload ohne Signaturprüfung als `JSON.parse` akzeptiert — ein Sicherheitsrisiko.
 
-1. **Zeile 47 entfernen**: `payment_method: { type: "string" as const },` aus `properties`
-2. **Zeile 78**: `"payment_method"` aus dem `required`-Array entfernen
+## Änderung
 
-Das bringt das Schema in Einklang mit `extract-receipt/index.ts`.
+### `supabase/functions/stripe-webhook/index.ts`
+
+**Zeilen 29-35**: `webhookSecret`-Check direkt nach `stripeKey`-Check einfügen — bei fehlendem Secret sofort HTTP 500 zurückgeben.
+
+**Zeilen 49-58**: Den `if/else`-Block vereinfachen — der `else`-Branch (Dev-Fallback) wird entfernt, da `webhookSecret` jetzt garantiert gesetzt ist:
+
+```typescript
+const signature = req.headers.get("stripe-signature");
+if (!signature) {
+  return new Response("Missing stripe-signature header", { status: 400 });
+}
+const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+```
+
+### Dateien
+- `supabase/functions/stripe-webhook/index.ts`
 
