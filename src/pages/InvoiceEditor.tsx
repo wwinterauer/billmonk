@@ -92,7 +92,7 @@ const InvoiceEditor = () => {
   const { settings, loading: settingsLoading } = useInvoiceSettings();
   const { settings: quoteSettings } = useQuoteSettings();
   const { createInvoice, fetchLineItems } = useInvoices();
-  const { categories } = useCategories();
+  const { userCategories } = useCategories();
   const { settings: companySettings } = useCompanySettings();
   const { activeTags } = useTags();
   const { assignTag } = useInvoiceTags();
