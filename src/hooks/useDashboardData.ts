@@ -343,6 +343,7 @@ export function useDashboardData(year: number, month: number) {
     error,
     stats,
     categoryData,
+    taxTypeData,
     tagData,
     untaggedTotal,
     recentReceipts,
