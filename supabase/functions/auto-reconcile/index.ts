@@ -165,19 +165,29 @@ serve(async (req) => {
           });
 
           if (match) {
+            // Determine if paid with skonto
+            const paidWithSkonto = matchedWithSkonto;
+            const discountAmount = paidWithSkonto && match.total && match.discount_percent
+              ? match.total * match.discount_percent / 100
+              : null;
+
             // Update transaction
             await supabase
               .from("bank_transactions")
               .update({ status: "matched", invoice_id: match.id })
               .eq("id", tx.id);
 
-            // Mark invoice as paid
+            // Mark invoice as paid (or paid_with_skonto)
+            const invoiceUpdate: Record<string, unknown> = {
+              paid_at: new Date().toISOString(),
+              status: paidWithSkonto ? "paid_with_skonto" : "paid",
+            };
+            if (discountAmount !== null) {
+              invoiceUpdate.discount_amount = discountAmount;
+            }
             await supabase
               .from("invoices")
-              .update({
-                paid_at: new Date().toISOString(),
-                status: "paid",
-              })
+              .update(invoiceUpdate)
               .eq("id", match.id);
 
             // Remove from pool
