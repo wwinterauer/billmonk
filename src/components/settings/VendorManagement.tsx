@@ -72,7 +72,7 @@ export function VendorManagement() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const { vendors, loading, isUpdatingVendor, addVendor, updateVendor, deleteVendor, fetchVendors } = useVendors();
-  const { categories } = useCategories();
+  const { categories, userCategories } = useCategories();
   const { activeTags } = useTags();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
@@ -824,7 +824,7 @@ export function VendorManagement() {
                 <SelectItem value="all">Alle Kategorien</SelectItem>
                 <SelectItem value="none">Ohne Kategorie</SelectItem>
                 <Separator className="my-1" />
-                {categories.map((cat) => (
+                {userCategories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     <span className="flex items-center">
                       {cat.color && (
@@ -1115,7 +1115,7 @@ export function VendorManagement() {
                 <SelectValue placeholder="Kategorie auswählen..." />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((cat) => (
+                {userCategories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     <span className="flex items-center">
                       {cat.color && (
@@ -1287,7 +1287,7 @@ export function VendorManagement() {
                   <SelectValue placeholder="Keine (manuell wählen)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((category) => (
+                  {userCategories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       <span className="flex items-center">
                         {category.color && (
