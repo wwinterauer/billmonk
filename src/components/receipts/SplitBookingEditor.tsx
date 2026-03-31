@@ -70,6 +70,7 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
   const { user } = useAuth();
   const { toast } = useToast();
   const { categories } = useCategories();
+  const { vatRates } = useVatRates();
   const [lines, setLines] = useState<SplitLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

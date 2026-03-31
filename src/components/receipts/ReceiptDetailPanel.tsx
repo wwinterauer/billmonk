@@ -137,6 +137,7 @@ export function ReceiptDetailPanel({
   const { categories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
+  const { vatRateGroups } = useVatRates();
 
   // State
   const [loading, setLoading] = useState(true);

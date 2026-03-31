@@ -124,6 +124,7 @@ const Review = () => {
   const { categories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
+  const { vatRateGroups } = useVatRates();
   const queryClient = useQueryClient();
 
   // State
