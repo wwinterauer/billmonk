@@ -261,15 +261,31 @@ export function ABTestManager() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>{selectedRun.name}</span>
-              <Badge variant={
-                selectedRun.status === 'completed' ? 'default' :
-                selectedRun.status === 'running' ? 'secondary' :
-                selectedRun.status === 'error' ? 'destructive' : 'outline'
-              }>
-                {selectedRun.status === 'completed' ? 'Fertig' :
-                 selectedRun.status === 'running' ? 'Läuft...' :
-                 selectedRun.status === 'error' ? 'Fehler' : 'Wartend'}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {selectedRun.status === 'running' && (
+                  <Button size="sm" variant="destructive" onClick={() => stopTest.mutate(selectedRunId!)} disabled={stopTest.isPending}>
+                    {stopTest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4 mr-1" />}
+                    Stoppen
+                  </Button>
+                )}
+                {(selectedRun.status === 'stopped' || selectedRun.status === 'error') && (
+                  <Button size="sm" variant="outline" onClick={() => restartTest.mutate(selectedRunId!)} disabled={restartTest.isPending}>
+                    {restartTest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-1" />}
+                    Fortsetzen
+                  </Button>
+                )}
+                <Badge variant={
+                  selectedRun.status === 'completed' ? 'default' :
+                  selectedRun.status === 'running' ? 'secondary' :
+                  selectedRun.status === 'stopped' ? 'outline' :
+                  selectedRun.status === 'error' ? 'destructive' : 'outline'
+                }>
+                  {selectedRun.status === 'completed' ? 'Fertig' :
+                   selectedRun.status === 'running' ? 'Läuft...' :
+                   selectedRun.status === 'stopped' ? 'Gestoppt' :
+                   selectedRun.status === 'error' ? 'Fehler' : 'Wartend'}
+                </Badge>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
