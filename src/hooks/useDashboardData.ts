@@ -67,6 +67,7 @@ export function useDashboardData(year: number, month: number) {
     paidThisMonth: 0,
   });
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [taxTypeData, setTaxTypeData] = useState<TaxTypeData[]>([]);
   const [tagData, setTagData] = useState<TagData[]>([]);
   const [untaggedTotal, setUntaggedTotal] = useState(0);
   const [recentReceipts, setRecentReceipts] = useState<RecentReceipt[]>([]);
