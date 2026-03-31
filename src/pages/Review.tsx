@@ -111,6 +111,7 @@ interface FormData {
   description: string;
   receipt_date: Date | null;
   category: string;
+  tax_type: string;
   amount_gross: string;
   vat_rate: string;
   is_mixed_tax_rate: boolean;
