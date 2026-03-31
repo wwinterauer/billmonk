@@ -1162,6 +1162,19 @@ export function ReceiptDetailPanel({
                           }
                           setCategory(updates.category);
                         }
+                        // Mixed tax rate fields
+                        if (updates.amount_net !== undefined) {
+                          setAmountNetOverride(updates.amount_net);
+                        }
+                        if (updates.vat_amount !== undefined) {
+                          setVatAmountOverride(updates.vat_amount);
+                        }
+                        if (updates.is_mixed_tax_rate !== undefined) {
+                          setIsMixedTaxRate(updates.is_mixed_tax_rate);
+                        }
+                        if (updates.tax_rate_details !== undefined) {
+                          setTaxRateDetails(updates.tax_rate_details);
+                        }
                         if (updates.confidence !== undefined) {
                           setCurrentAiConfidence(updates.confidence);
                         }

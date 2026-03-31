@@ -305,6 +305,10 @@ const Review = () => {
     vat_rate?: string;
     category?: string;
     confidence?: number;
+    amount_net?: string;
+    vat_amount?: string;
+    is_mixed_tax_rate?: boolean;
+    tax_rate_details?: TaxRateDetail[] | null;
   }) => {
     setFormData(prev => ({
       ...prev,
@@ -316,6 +320,10 @@ const Review = () => {
       amount_gross: updates.amount_gross ?? prev.amount_gross,
       vat_rate: updates.vat_rate ?? prev.vat_rate,
       category: updates.category ?? prev.category,
+      is_mixed_tax_rate: updates.is_mixed_tax_rate ?? prev.is_mixed_tax_rate,
+      tax_rate_details: updates.tax_rate_details !== undefined ? updates.tax_rate_details : prev.tax_rate_details,
+      amount_net_override: updates.amount_net ?? prev.amount_net_override,
+      vat_amount_override: updates.vat_amount ?? prev.vat_amount_override,
     }));
     if (updates.confidence !== undefined) {
       setAiConfidence(updates.confidence);
