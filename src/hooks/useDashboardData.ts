@@ -91,7 +91,7 @@ export function useDashboardData(year: number, month: number) {
       // Fetch current month receipts
       const { data: currentMonthReceipts, error: currentError } = await supabase
         .from('receipts')
-        .select('id, amount_gross, vat_amount, status, ai_confidence, category, is_split_booking')
+        .select('id, amount_gross, vat_amount, status, ai_confidence, category, tax_type, is_split_booking')
         .eq('user_id', user.id)
         .gte('created_at', startOfMonth.toISOString())
         .lte('created_at', endOfMonth.toISOString());
