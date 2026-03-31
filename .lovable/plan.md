@@ -1,31 +1,54 @@
 
 
-# Bulk-Aktionsleiste: Invoices an Expenses angleichen
+# Skonto-Betrag anzeigen + Auto-Reconcile mit Skonto-Erkennung
 
 ## Problem
 
-In **Expenses** ist die Bulk-Aktionsleiste ein inline-Element oberhalb der Tabelle (`bg-muted/50 rounded-lg, mb-4`), das sanft eingeblendet wird wenn Belege markiert sind. In **Invoices** ist sie dagegen als `fixed bottom-0` am unteren Bildschirmrand fixiert — inkonsistentes UI.
+1. Im **InvoiceEditor** und in der **Rechnungsübersicht** fehlt der Zahlbetrag nach Skonto
+2. Der **Auto-Reconciler** erkennt nur den vollen Rechnungsbetrag — wenn ein Kunde mit Skonto zahlt (z.B. 485€ statt 500€), wird die Zahlung nicht zugeordnet
 
-## Änderung
+## Änderungen
 
-### `src/pages/Invoices.tsx` — Zeile 584-609
+### 1. `src/pages/InvoiceEditor.tsx` — Zahlbetrag nach Skonto anzeigen
 
-Die fixierte Leiste (`fixed bottom-0 left-0 right-0 z-50 bg-background border-t shadow-lg`) wird ersetzt durch das Expenses-Pattern:
+Nach der bestehenden Skonto-Zeile (Zeile 833-838) eine neue Zeile einfügen:
 
 ```text
-Vorher:  <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t shadow-lg p-3">
-Nachher: <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-           className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-muted/50 rounded-lg">
+Skonto (3% bei Zahlung innerhalb von 14 Tagen)    −€15,00
+Zahlbetrag bei Skonto                              €485,00   ← NEU (fett, grün)
 ```
 
-- `Badge variant="secondary"` mit Anzahl statt einfachem `<span>`
-- Gleiche Button-Größen und Farbgebung wie bei Expenses (grün für positive Aktionen, orange/rot für destruktive)
-- Positionierung: direkt über der Tabelle, nach den Stats-Cards
-- Animation: `motion.div` mit height-Animation wie bei Expenses
-- Import `motion` von `framer-motion` hinzufügen
+Berechnung: `totals.total - totals.discountAmount`
 
-Gleiche Anpassung wird dann auch bei `Quotes.tsx`, `OrderConfirmations.tsx` und `DeliveryNotes.tsx` im nächsten Schritt übernommen.
+### 2. `src/pages/Invoices.tsx` — Betragsspalte erweitern
+
+In der Tabelle (Zeile 483) unter dem Gesamtbetrag bei Rechnungen mit `discount_percent > 0` eine zweite Zeile anzeigen:
+
+```text
+€500,00
+Skonto: €485,00   ← text-xs text-muted-foreground
+```
+
+Berechnung: `inv.total * (1 - inv.discount_percent / 100)`
+
+### 3. `supabase/functions/auto-reconcile/index.ts` — Skonto-Matching
+
+Aktuell matcht der Reconciler nur `inv.total ± 0.02€`. Erweiterung:
+
+- `discount_percent` im SELECT mit abfragen
+- Für jede Rechnung **zwei** Beträge prüfen:
+  - Voller Betrag (`inv.total`) → Status wird `paid`
+  - Skonto-Betrag (`inv.total * (1 - discount_percent/100)`) → Status wird `paid_with_skonto`
+- Bei Skonto-Match zusätzlich `discount_amount` berechnen und speichern
+
+```text
+Transaktion: €485,00
+  → Rechnung RE-2024-001: Gesamt €500,00, Skonto 3% = €485,00
+  → Match! → Status: paid_with_skonto, discount_amount: €15,00
+```
 
 ### Dateien
-- `src/pages/Invoices.tsx`
+- `src/pages/InvoiceEditor.tsx` — Zahlbetrag nach Skonto im Totals-Bereich
+- `src/pages/Invoices.tsx` — Skonto-Betrag in der Betragsspalte
+- `supabase/functions/auto-reconcile/index.ts` — Skonto-Erkennung beim Kontoabgleich
 
