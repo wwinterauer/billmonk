@@ -1,79 +1,37 @@
 
 
-# useReceipts.ts in drei Hooks aufteilen
+# Crypto: Per-User Salt
 
 ## Übersicht
 
-Die 1027 Zeilen von `useReceipts.ts` werden in drei spezialisierte Hooks aufgeteilt. Der bestehende `useReceipts()` wird zur Fassade, die alle drei importiert und re-exportiert.
+Aktuell verwendet `getEncryptionKey()` einen fixen Salt für alle User. Neues Format: `salt:iv:ciphertext` (Base64-kodiert, durch Doppelpunkte getrennt). Bestehende Werte ohne Doppelpunkte verwenden den alten fixen Salt als Fallback.
 
-## Aufteilung
+## Änderungen in `supabase/functions/_shared/crypto.ts`
 
-### 1. `src/hooks/useReceiptUpload.ts` (~300 Zeilen)
-Enthält die Upload-Pipeline und Hilfsfunktionen:
-- Constants: `ALLOWED_TYPES`, `MAX_FILE_SIZE`, `MAX_FILES`
-- `validateFile()`, `validateFiles()`
-- `getFileExtension()`, `generateStoragePath()`
-- `checkExactDuplicate()`
-- `fileToBase64()`, `isConvertibleImage()`, `convertImageToPdf()`
-- `uploadReceipt()` (Zeilen 249-345)
-- `uploadAndProcessReceipt()` (Zeilen 697-774) — ruft intern `processReceiptWithAI` auf, das als Parameter übergeben wird
-- `uploadMultipleReceipts()` (Zeilen 776-814)
-- State: `uploading`
-- Exportiert `useReceiptUpload()` Hook
+### 1. `getEncryptionKey(salt: Uint8Array)` — Salt als Parameter
 
-**Abhängigkeit**: `uploadAndProcessReceipt` und `uploadMultipleReceipts` brauchen `processReceiptWithAI` und `updateReceipt`. Diese werden als Parameter an den Hook übergeben, damit keine zirkulären Abhängigkeiten entstehen.
+Statt intern fixen Salt zu verwenden, nimmt die Funktion den Salt als Parameter entgegen.
 
-### 2. `src/hooks/useReceiptProcessing.ts` (~280 Zeilen)
-Enthält AI-Verarbeitung und Vendor-Logik:
-- `processReceiptWithAI()` (Zeilen 347-572)
-- `createVendorForReceipt()` (Zeilen 574-611)
-- `finalizeReceiptWithVendor()` (Zeilen 613-695)
-- Exportiert `useReceiptProcessing(updateReceipt)` — nimmt `updateReceipt` als Parameter
+### 2. `encryptString()` — Per-User Salt generieren
 
-### 3. `src/hooks/useReceiptCrud.ts` (~200 Zeilen)
-Enthält alle Datenbank-Operationen:
-- `getReceipts()` (Zeilen 816-858)
-- `getReceipt()` (Zeilen 860-877)
-- `updateReceipt()` (Zeilen 879-900)
-- `rejectReceipt()` (Zeilen 906-951)
-- `deleteReceipt()` (Zeilen 953-987)
-- `getReceiptFileUrl()` (Zeilen 989-1003)
-- Exportiert `useReceiptCrud()` Hook
+- 16 Bytes zufälligen Salt generieren (`crypto.getRandomValues`)
+- Salt an `getEncryptionKey(salt)` übergeben
+- Rückgabe im Format `base64(salt):base64(iv+ciphertext)` (Doppelpunkt als Trenner)
 
-### 4. `src/hooks/useReceipts.ts` — Fassade (~60 Zeilen)
-- Importiert alle drei Hooks
-- Typen und Interfaces bleiben hier (werden re-exportiert)
-- `useReceipts()` ruft die drei Hooks auf, verdrahtet die Abhängigkeiten und gibt ein einziges Objekt zurück
-- **Bestehende Imports in der gesamten App brechen nicht**
+### 3. `decryptString()` — Salt aus gespeichertem Wert parsen
 
-```typescript
-export function useReceipts() {
-  const crud = useReceiptCrud();
-  const processing = useReceiptProcessing(crud.updateReceipt);
-  const upload = useReceiptUpload(processing.processReceiptWithAI, crud.updateReceipt);
-  
-  return {
-    ...crud,
-    ...processing,
-    ...upload,
-    // Constants
-    ALLOWED_TYPES, MAX_FILE_SIZE, MAX_FILES,
-  };
-}
-```
+- Prüfe ob der String einen Doppelpunkt enthält
+- **Ja (neues Format)**: Split bei `:`, erster Teil = Salt (Base64-dekodiert), zweiter Teil = IV+Ciphertext wie bisher
+- **Nein (altes Format)**: Verwende den fixen Salt `"lovable-email-encryption-v1"` als Fallback → volle Rückwärtskompatibilität
 
-## Abhängigkeitsgraph
+### 4. `isAesEncrypted()` — Anpassen
 
-```text
-useReceipts (Fassade)
-  ├── useReceiptCrud        (eigenständig)
-  ├── useReceiptProcessing  (braucht: updateReceipt)
-  └── useReceiptUpload      (braucht: processReceiptWithAI, updateReceipt)
-```
+Berücksichtigt das neue Doppelpunkt-Format als gültiges AES-verschlüsseltes Format.
 
-## Dateien
-- Neu: `src/hooks/useReceiptUpload.ts`
-- Neu: `src/hooks/useReceiptProcessing.ts`
-- Neu: `src/hooks/useReceiptCrud.ts`
-- Geändert: `src/hooks/useReceipts.ts` — wird zur Fassade (Types + Re-Export)
+### 5. `decryptPassword()` — Keine Änderung nötig
+
+Ruft `decryptString()` auf, das intern die Format-Erkennung übernimmt. Legacy-Base64-Fallback bleibt.
+
+### Dateien
+- `supabase/functions/_shared/crypto.ts`
 
