@@ -81,6 +81,8 @@ import { TagSelector } from '@/components/tags/TagSelector';
 import { SplitBookingEditor } from '@/components/receipts/SplitBookingEditor';
 import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
+import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
+import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
 
 const PAYMENT_METHODS = [
   { value: 'Überweisung', label: 'Überweisung' },
