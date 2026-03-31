@@ -670,7 +670,24 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
       );
     }
 
-    const aiResponse = await response.json();
+    const responseText = await response.text();
+    if (!responseText || responseText.trim().length === 0) {
+      console.error("AI Gateway returned empty response body");
+      return new Response(
+        JSON.stringify({ success: false, error: "AI returned empty response. The document may be too large. Please try again." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    let aiResponse;
+    try {
+      aiResponse = JSON.parse(responseText);
+    } catch (parseErr) {
+      console.error("Failed to parse AI response:", parseErr, "Body length:", responseText.length, "First 200 chars:", responseText.substring(0, 200));
+      return new Response(
+        JSON.stringify({ success: false, error: "AI response was incomplete. Please try again." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     console.log("AI Response received (V2)");
 
     const content = aiResponse.choices?.[0]?.message?.content;
