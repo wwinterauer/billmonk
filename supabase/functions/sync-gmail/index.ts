@@ -32,6 +32,7 @@ serve(async (req) => {
   try {
     const body = await req.json();
     accountId = body.accountId;
+    const syncSince = body.syncSince || null;
 
     if (!accountId) {
       throw new Error("accountId ist erforderlich");
@@ -80,10 +81,11 @@ serve(async (req) => {
     }
 
     // Gmail API: Nachrichten suchen
-    const query = buildGmailQuery(account);
+    const query = buildGmailQuery(account, syncSince);
     console.log(`Gmail search query: ${query}`);
     
-    const messagesUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=50`;
+    const maxResults = syncSince ? 100 : 50;
+    const messagesUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`;
     
     const messagesResponse = await fetch(messagesUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -273,7 +275,7 @@ serve(async (req) => {
 
 // === HELPER FUNCTIONS ===
 
-function buildGmailQuery(account: any): string {
+function buildGmailQuery(account: any, syncSince: string | null = null): string {
   const parts: string[] = [];
   
   // Nur mit Anhängen
@@ -285,8 +287,12 @@ function buildGmailQuery(account: any): string {
     parts.push("in:inbox");
   }
   
-  // Zeitfilter: nur seit letztem Sync oder letzte 30 Tage
-  if (account.last_sync_at) {
+  // Zeitfilter
+  if (syncSince) {
+    // Historical sync: ab gewähltem Datum
+    const d = new Date(syncSince);
+    parts.push(`after:${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`);
+  } else if (account.last_sync_at) {
     const lastSync = new Date(account.last_sync_at);
     const year = lastSync.getFullYear();
     const month = lastSync.getMonth() + 1;

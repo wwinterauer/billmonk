@@ -42,6 +42,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { 
   Mail, 
   Copy, 
@@ -66,6 +72,8 @@ import {
   Link2,
   Smartphone,
   ChevronDown,
+  CalendarIcon,
+  History,
 } from 'lucide-react';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { useEmailImport, EmailAccount, EmailAttachment } from '@/hooks/useEmailImport';
@@ -73,6 +81,7 @@ import { OAuthProviderButtons } from './OAuthProviderButtons';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
+
 
 interface AddAccountFormData {
   email_address: string;
@@ -99,6 +108,68 @@ const defaultFormData: AddAccountFormData = {
   processed_folder: 'Processed',
   sync_interval: 'manual',
 };
+
+// Historical sync date picker component
+function HistoricalSyncButton({ disabled, onSync }: { 
+  accountId: string; 
+  disabled: boolean; 
+  onSync: (date: Date) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={disabled}
+          title="Historische E-Mails ab einem bestimmten Datum abrufen"
+          className="px-2"
+        >
+          <CalendarIcon className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-4" align="end">
+        <div className="space-y-3">
+          <div>
+            <p className="font-medium text-sm">Historisch abrufen</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Alle E-Mails seit einem bestimmten Datum durchsuchen. Bereits importierte Belege werden übersprungen.
+            </p>
+          </div>
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={setSelectedDate}
+            disabled={(date) => date > new Date()}
+            initialFocus
+            className="p-3 pointer-events-auto"
+          />
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={!selectedDate}
+            onClick={() => {
+              if (selectedDate) {
+                onSync(selectedDate);
+                setOpen(false);
+                setSelectedDate(undefined);
+                toast.info('Historischer Abruf gestartet', {
+                  description: `E-Mails seit ${format(selectedDate, 'dd.MM.yyyy', { locale: de })} werden durchsucht...`,
+                });
+              }
+            }}
+          >
+            <History className="h-4 w-4 mr-2" />
+            Abrufen
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 // Provider types
 type AuthType = 'oauth' | 'app-password' | 'password';
@@ -778,6 +849,12 @@ export const EmailImportSettings: React.FC = () => {
                               >
                                 <RotateCcw className="h-4 w-4" />
                               </Button>
+                              {/* Historical sync button */}
+                              <HistoricalSyncButton
+                                accountId={account.id}
+                                disabled={isSyncingThis || !account.is_active}
+                                onSync={(date) => syncEmailAccount({ accountId: account.id, syncSince: date.toISOString() })}
+                              />
                             </div>
                             {/* Löschen */}
                             <AlertDialog>

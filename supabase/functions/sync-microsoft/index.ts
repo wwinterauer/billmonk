@@ -34,6 +34,7 @@ serve(async (req) => {
   try {
     const body = await req.json();
     accountId = body.accountId;
+    const syncSince = body.syncSince || null;
 
     if (!accountId) {
       throw new Error("accountId ist erforderlich");
@@ -82,11 +83,12 @@ serve(async (req) => {
     }
 
     // Microsoft Graph API: Nachrichten mit Anhängen abrufen
-    const filterQuery = buildGraphFilter(account);
+    const filterQuery = buildGraphFilter(account, syncSince);
     console.log(`Graph API filter: ${filterQuery}`);
 
     // Nachrichten abrufen
-    const messagesUrl = `https://graph.microsoft.com/v1.0/me/messages?$filter=${encodeURIComponent(filterQuery)}&$select=id,subject,from,receivedDateTime,hasAttachments&$top=50&$orderby=receivedDateTime desc`;
+    const top = syncSince ? 100 : 50;
+    const messagesUrl = `https://graph.microsoft.com/v1.0/me/messages?$filter=${encodeURIComponent(filterQuery)}&$select=id,subject,from,receivedDateTime,hasAttachments&$top=${top}&$orderby=receivedDateTime desc`;
 
     const messagesResponse = await fetch(messagesUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -323,14 +325,16 @@ serve(async (req) => {
 
 // === HELPER FUNCTIONS ===
 
-function buildGraphFilter(account: any): string {
+function buildGraphFilter(account: any, syncSince: string | null = null): string {
   const filters: string[] = [];
 
   // Nur E-Mails mit Anhängen
   filters.push("hasAttachments eq true");
 
   // Zeitfilter
-  if (account.last_sync_at) {
+  if (syncSince) {
+    filters.push(`receivedDateTime ge ${new Date(syncSince).toISOString()}`);
+  } else if (account.last_sync_at) {
     const lastSync = new Date(account.last_sync_at).toISOString();
     filters.push(`receivedDateTime ge ${lastSync}`);
   } else {
