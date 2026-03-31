@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
               user_id: rec.user_id,
               customer_id: rec.customer_id,
               invoice_number: invoiceNumber,
-              status: rec.auto_send ? "sent" : "draft",
+              status: "draft",
               invoice_date: today,
               due_date: dueDate.toISOString().split("T")[0],
               subtotal,
