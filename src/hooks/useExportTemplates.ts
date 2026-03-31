@@ -48,12 +48,12 @@ export const DEFAULT_COLUMNS: ExportColumn[] = [
   { id: '14', field: 'tax_type', label: 'Buchungsart', type: 'text', format: null, visible: true, order: 5, align: 'left' },
   { id: '13', field: 'tags', label: 'Tags', type: 'text', format: null, visible: false, order: 6, align: 'left' },
   { id: '6', field: 'amount_gross', label: 'Brutto', type: 'currency', format: '€ #.##0,00', visible: true, order: 7, align: 'right' },
-  { id: '7', field: 'amount_net', label: 'Netto', type: 'currency', format: '€ #.##0,00', visible: true, order: 7, align: 'right' },
-  { id: '8', field: 'vat_rate', label: 'MwSt-Satz', type: 'percent', format: '#0%', visible: true, order: 8, align: 'right' },
-  { id: '9', field: 'vat_amount', label: 'Vorsteuer', type: 'currency', format: '€ #.##0,00', visible: true, order: 9, align: 'right' },
-  { id: '10', field: 'payment_method', label: 'Zahlungsart', type: 'text', format: null, visible: false, order: 10, align: 'left' },
-  { id: '11', field: 'status', label: 'Status', type: 'text', format: null, visible: false, order: 11, align: 'left' },
-  { id: '12', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 12, align: 'left' },
+  { id: '7', field: 'amount_net', label: 'Netto', type: 'currency', format: '€ #.##0,00', visible: true, order: 8, align: 'right' },
+  { id: '8', field: 'vat_rate', label: 'MwSt-Satz', type: 'percent', format: '#0%', visible: true, order: 9, align: 'right' },
+  { id: '9', field: 'vat_amount', label: 'Vorsteuer', type: 'currency', format: '€ #.##0,00', visible: true, order: 10, align: 'right' },
+  { id: '10', field: 'payment_method', label: 'Zahlungsart', type: 'text', format: null, visible: false, order: 11, align: 'left' },
+  { id: '11', field: 'status', label: 'Status', type: 'text', format: null, visible: false, order: 12, align: 'left' },
+  { id: '12', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 13, align: 'left' },
 ];
 
 // Split-specific columns (only visible when feature is enabled)
