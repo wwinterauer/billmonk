@@ -83,19 +83,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
-import { TAX_TYPES } from '@/lib/constants';
-
-const PAYMENT_METHODS = [
-  { value: 'Überweisung', label: 'Überweisung' },
-  { value: 'Kreditkarte', label: 'Kreditkarte' },
-  { value: 'Debitkarte', label: 'Karte Debitzahlung' },
-  { value: 'Bar', label: 'Barzahlung' },
-  { value: 'PayPal', label: 'PayPal' },
-  { value: 'Apple Pay', label: 'Apple Pay' },
-  { value: 'Google Pay', label: 'Google Pay' },
-  { value: 'Lastschrift', label: 'Lastschrift' },
-  { value: 'Sonstige', label: 'Sonstige' },
-];
+import { TAX_TYPES, PAYMENT_METHODS } from '@/lib/constants';
 
 interface TaxRateDetail {
   rate: number;
