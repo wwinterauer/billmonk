@@ -136,6 +136,7 @@ export const useEmailImport = () => {
       return data as EmailAccount[];
     },
     enabled: !!user?.id,
+    retry: false,
   });
 
   // Fetch import history
