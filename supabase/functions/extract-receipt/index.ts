@@ -741,7 +741,22 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         }));
       }
 
-      // ── Post-Processing: VAT consistency ─────────────────────────
+      // ── Post-Processing: derive is_mixed_tax_rate from tax_rate_details ──
+      const detailRates = Array.isArray(extractedData.tax_rate_details)
+        ? [...new Set(extractedData.tax_rate_details.map((t: any) => Number(t?.rate)).filter((r: number) => !Number.isNaN(r)))]
+        : [];
+      if (detailRates.length > 1) extractedData.is_mixed_tax_rate = true;
+
+      // ── Post-Processing: recalculate net/vat from tax_rate_details for mixed rates ──
+      if (extractedData.is_mixed_tax_rate && Array.isArray(extractedData.tax_rate_details) && extractedData.tax_rate_details.length) {
+        const calcNet = extractedData.tax_rate_details.reduce((s: number, t: any) => s + (Number(t?.net_amount) || 0), 0);
+        const calcVat = extractedData.tax_rate_details.reduce((s: number, t: any) => s + (Number(t?.tax_amount) || 0), 0);
+        extractedData.amount_net = Math.round(calcNet * 100) / 100;
+        extractedData.vat_amount = Math.round(calcVat * 100) / 100;
+        console.log(`[VAT Mixed] Recalculated from tax_rate_details: net=${extractedData.amount_net}, vat=${extractedData.vat_amount}`);
+      }
+
+      // ── Post-Processing: VAT consistency (skip for mixed tax rates) ──
       if (extractedData.amount_gross != null && !extractedData.is_mixed_tax_rate) {
         // Rule 0: Explicit 0% in document
         const zeroVatPattern = /0[,.]?0{0,2}\s*%\s*(USt|MwSt|Ust|mwst|umsatzsteuer)/i;
