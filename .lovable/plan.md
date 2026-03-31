@@ -1,30 +1,79 @@
 
 
-# Vendor-Update Race Condition absichern
+# useReceipts.ts in drei Hooks aufteilen
 
 ## Übersicht
 
-Die `updateVendor()`-Funktion in `useVendors.ts` führt mehrere sequenzielle DB-Calls durch. Ein doppelter Klick kann parallele Ausführungen auslösen. Lösung: useRef-basiertes Lock im Hook + Button-Deaktivierung im UI.
+Die 1027 Zeilen von `useReceipts.ts` werden in drei spezialisierte Hooks aufgeteilt. Der bestehende `useReceipts()` wird zur Fassade, die alle drei importiert und re-exportiert.
 
-**Hinweis:** `VendorManagement.tsx` hat bereits `isSaving`-State und deaktiviert den Button damit. Das Problem ist aber, dass `updateVendor()` selbst kein Guard hat — andere Aufrufer (z.B. programmatische Calls) wären ungeschützt. Der Guard muss also im Hook selbst sitzen.
+## Aufteilung
 
-## Änderungen
+### 1. `src/hooks/useReceiptUpload.ts` (~300 Zeilen)
+Enthält die Upload-Pipeline und Hilfsfunktionen:
+- Constants: `ALLOWED_TYPES`, `MAX_FILE_SIZE`, `MAX_FILES`
+- `validateFile()`, `validateFiles()`
+- `getFileExtension()`, `generateStoragePath()`
+- `checkExactDuplicate()`
+- `fileToBase64()`, `isConvertibleImage()`, `convertImageToPdf()`
+- `uploadReceipt()` (Zeilen 249-345)
+- `uploadAndProcessReceipt()` (Zeilen 697-774) — ruft intern `processReceiptWithAI` auf, das als Parameter übergeben wird
+- `uploadMultipleReceipts()` (Zeilen 776-814)
+- State: `uploading`
+- Exportiert `useReceiptUpload()` Hook
 
-### 1. `src/hooks/useVendors.ts`
+**Abhängigkeit**: `uploadAndProcessReceipt` und `uploadMultipleReceipts` brauchen `processReceiptWithAI` und `updateReceipt`. Diese werden als Parameter an den Hook übergeben, damit keine zirkulären Abhängigkeiten entstehen.
 
-- `useRef<boolean>(false)` als `isUpdatingRef` hinzufügen (kein useState, da kein Re-Render nötig)
-- Zusätzlich `useState<boolean>(false)` als `isUpdatingVendor` für UI-Feedback exportieren
-- Am Anfang von `updateVendor()`: Wenn `isUpdatingRef.current === true`, sofort returnen (throw oder return mit Warnung)
-- `isUpdatingRef.current = true` + `setIsUpdatingVendor(true)` setzen
-- Im `finally`-Block: `isUpdatingRef.current = false` + `setIsUpdatingVendor(false)`
-- `isUpdatingVendor` im Return-Objekt exportieren
+### 2. `src/hooks/useReceiptProcessing.ts` (~280 Zeilen)
+Enthält AI-Verarbeitung und Vendor-Logik:
+- `processReceiptWithAI()` (Zeilen 347-572)
+- `createVendorForReceipt()` (Zeilen 574-611)
+- `finalizeReceiptWithVendor()` (Zeilen 613-695)
+- Exportiert `useReceiptProcessing(updateReceipt)` — nimmt `updateReceipt` als Parameter
 
-### 2. `src/components/settings/VendorManagement.tsx`
+### 3. `src/hooks/useReceiptCrud.ts` (~200 Zeilen)
+Enthält alle Datenbank-Operationen:
+- `getReceipts()` (Zeilen 816-858)
+- `getReceipt()` (Zeilen 860-877)
+- `updateReceipt()` (Zeilen 879-900)
+- `rejectReceipt()` (Zeilen 906-951)
+- `deleteReceipt()` (Zeilen 953-987)
+- `getReceiptFileUrl()` (Zeilen 989-1003)
+- Exportiert `useReceiptCrud()` Hook
 
-- `isUpdatingVendor` aus `useVendors()` destrukturieren
-- Button (Zeile 1589): `disabled`-Bedingung um `isUpdatingVendor` erweitern: `disabled={isSaving || isUpdatingVendor || !formData.display_name.trim()}`
+### 4. `src/hooks/useReceipts.ts` — Fassade (~60 Zeilen)
+- Importiert alle drei Hooks
+- Typen und Interfaces bleiben hier (werden re-exportiert)
+- `useReceipts()` ruft die drei Hooks auf, verdrahtet die Abhängigkeiten und gibt ein einziges Objekt zurück
+- **Bestehende Imports in der gesamten App brechen nicht**
 
-### Dateien
-- `src/hooks/useVendors.ts`
-- `src/components/settings/VendorManagement.tsx`
+```typescript
+export function useReceipts() {
+  const crud = useReceiptCrud();
+  const processing = useReceiptProcessing(crud.updateReceipt);
+  const upload = useReceiptUpload(processing.processReceiptWithAI, crud.updateReceipt);
+  
+  return {
+    ...crud,
+    ...processing,
+    ...upload,
+    // Constants
+    ALLOWED_TYPES, MAX_FILE_SIZE, MAX_FILES,
+  };
+}
+```
+
+## Abhängigkeitsgraph
+
+```text
+useReceipts (Fassade)
+  ├── useReceiptCrud        (eigenständig)
+  ├── useReceiptProcessing  (braucht: updateReceipt)
+  └── useReceiptUpload      (braucht: processReceiptWithAI, updateReceipt)
+```
+
+## Dateien
+- Neu: `src/hooks/useReceiptUpload.ts`
+- Neu: `src/hooks/useReceiptProcessing.ts`
+- Neu: `src/hooks/useReceiptCrud.ts`
+- Geändert: `src/hooks/useReceipts.ts` — wird zur Fassade (Types + Re-Export)
 
