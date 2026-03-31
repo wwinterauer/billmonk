@@ -121,7 +121,7 @@ export const useEmailImport = () => {
   });
 
   // Fetch IMAP email accounts
-  const { data: emailAccounts = [], isLoading: isLoadingAccounts } = useQuery({
+  const { data: emailAccounts = [], isLoading: isLoadingAccounts, isError: isErrorAccounts } = useQuery({
     queryKey: ['email-accounts', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
