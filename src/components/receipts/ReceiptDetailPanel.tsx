@@ -1474,8 +1474,8 @@ export function ReceiptDetailPanel({
                             <SelectValue placeholder="Offen" />
                           </SelectTrigger>
                           <SelectContent>
-                            {TAX_TYPES.map(t => (
-                              <SelectItem key={t.value} value={t.value}>
+                            {visibleBookingTypes.map(t => (
+                              <SelectItem key={t.name} value={t.name}>
                                 {t.label}
                               </SelectItem>
                             ))}

@@ -1608,8 +1608,8 @@ const Expenses = () => {
               <SelectItem value="all">Alle Buchungsarten</SelectItem>
               <SelectItem value="__open__">Offen</SelectItem>
               <SelectSeparator />
-              {TAX_TYPES.map(t => (
-                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              {visibleBookingTypes.map(t => (
+                <SelectItem key={t.name} value={t.name}>{t.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
