@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS booking_type_settings jsonb DEFAULT '{}';

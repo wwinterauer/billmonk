@@ -2241,6 +2241,7 @@ export type Database = {
           account_type: string | null
           admin_view_plan: string | null
           avatar_url: string | null
+          booking_type_settings: Json | null
           city: string | null
           community_opt_out: boolean
           company_name: string | null
@@ -2277,6 +2278,7 @@ export type Database = {
           account_type?: string | null
           admin_view_plan?: string | null
           avatar_url?: string | null
+          booking_type_settings?: Json | null
           city?: string | null
           community_opt_out?: boolean
           company_name?: string | null
@@ -2313,6 +2315,7 @@ export type Database = {
           account_type?: string | null
           admin_view_plan?: string | null
           avatar_url?: string | null
+          booking_type_settings?: Json | null
           city?: string | null
           community_opt_out?: boolean
           company_name?: string | null

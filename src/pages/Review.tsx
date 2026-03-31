@@ -83,7 +83,8 @@ import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
-import { TAX_TYPES, PAYMENT_METHODS } from '@/lib/constants';
+import { PAYMENT_METHODS } from '@/lib/constants';
+import { useBookingTypes } from '@/hooks/useBookingTypes';
 
 interface TaxRateDetail {
   rate: number;
@@ -114,6 +115,7 @@ const Review = () => {
   const { toast } = useToast();
   const { getReceipts, updateReceipt, getReceiptFileUrl, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
+  const { visibleBookingTypes } = useBookingTypes();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
   const { vatRateGroups } = useVatRates();
@@ -1162,8 +1164,8 @@ const Review = () => {
                             <SelectValue placeholder="Offen" />
                           </SelectTrigger>
                           <SelectContent>
-                            {TAX_TYPES.map(t => (
-                              <SelectItem key={t.value} value={t.value}>
+                            {visibleBookingTypes.map(t => (
+                              <SelectItem key={t.name} value={t.name}>
                                 {t.label}
                               </SelectItem>
                             ))}
