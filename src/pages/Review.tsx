@@ -116,7 +116,7 @@ const Review = () => {
   const { userCategories, taxCategories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
-  const { vatRateGroups } = useVatRates();
+  const { vatRateGroups, defaultVatRate } = useVatRates();
   const { trackFieldChange } = useVendorFieldDefaults();
   const queryClient = useQueryClient();
 
