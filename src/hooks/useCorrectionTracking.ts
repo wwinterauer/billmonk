@@ -4,6 +4,49 @@ import { useCallback } from 'react';
 import type { Json } from '@/integrations/supabase/types';
 import { recordVatRateCorrection } from '@/services/vatLearningService';
 
+const STOP_WORDS = new Set([
+  'und', 'oder', 'der', 'die', 'das', 'ein', 'eine', 'für', 'mit', 'von',
+  'auf', 'aus', 'bei', 'nach', 'über', 'unter', 'vor', 'zum', 'zur',
+  'inkl', 'zzgl', 'netto', 'brutto', 'stück', 'stk', 'paket',
+  'rechnung', 'beleg', 'quittung', 'datum', 'summe', 'gesamt',
+]);
+
+/** Extract keywords from receipt description + line items */
+async function extractReceiptKeywords(receiptId: string): Promise<string[]> {
+  const { data: receiptData } = await supabase
+    .from('receipts')
+    .select('description, line_items_raw')
+    .eq('id', receiptId)
+    .single();
+
+  if (!receiptData) return [];
+
+  const texts: string[] = [];
+  if (receiptData.description) texts.push(receiptData.description);
+
+  // Extract descriptions from line_items_raw
+  const lineItems = receiptData.line_items_raw;
+  if (Array.isArray(lineItems)) {
+    for (const item of lineItems) {
+      if (item && typeof item === 'object' && 'description' in item && typeof (item as any).description === 'string') {
+        texts.push((item as any).description);
+      }
+    }
+  }
+
+  if (texts.length === 0) return [];
+
+  const allWords = texts
+    .join(' ')
+    .toLowerCase()
+    .replace(/[^a-zäöüß\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= 4 && !STOP_WORDS.has(w));
+
+  // Deduplicate and limit
+  return [...new Set(allWords)].slice(0, 10);
+}
+
 interface CorrectionData {
   fieldName: string;
   detectedValue: unknown;
@@ -263,60 +306,38 @@ export function useCorrectionTracking() {
               .eq('id', vendorId);
           }
 
-          // Extract keywords from description for product-level learning
-          // Get the receipt's description
+          // Extract keywords from description + line items for product-level learning
           if (receiptId) {
-            const { data: receiptData } = await supabase
-              .from('receipts')
-              .select('description')
-              .eq('id', receiptId)
-              .single();
-            
-            if (receiptData?.description) {
-              const stopWords = new Set([
-                'und', 'oder', 'der', 'die', 'das', 'ein', 'eine', 'für', 'mit', 'von',
-                'auf', 'aus', 'bei', 'nach', 'über', 'unter', 'vor', 'zum', 'zur',
-                'inkl', 'zzgl', 'netto', 'brutto', 'stück', 'stk', 'paket',
-                'rechnung', 'beleg', 'quittung', 'datum', 'summe', 'gesamt',
-              ]);
+            const keywords = await extractReceiptKeywords(receiptId);
               
-              const keywords = receiptData.description
-                .toLowerCase()
-                .replace(/[^a-zäöüß\s-]/g, ' ')
-                .split(/\s+/)
-                .filter(w => w.length >= 4 && !stopWords.has(w))
-                .filter((w, i, arr) => arr.indexOf(w) === i) // unique
-                .slice(0, 5); // max 5 keywords per correction
+            for (const keyword of keywords) {
+              // Upsert: if keyword exists, update category_name and increment match_count
+              const { data: existing } = await supabase
+                .from('category_rules')
+                .select('id, match_count')
+                .eq('user_id', user.id)
+                .eq('keyword', keyword)
+                .maybeSingle();
               
-              for (const keyword of keywords) {
-                // Upsert: if keyword exists, update category_name and increment match_count
-                const { data: existing } = await supabase
+              if (existing) {
+                await supabase
                   .from('category_rules')
-                  .select('id, match_count')
-                  .eq('user_id', user.id)
-                  .eq('keyword', keyword)
-                  .maybeSingle();
-                
-                if (existing) {
-                  await supabase
-                    .from('category_rules')
-                    .update({
-                      category_name: String(correctedValue),
-                      match_count: (existing.match_count || 1) + 1,
-                      updated_at: new Date().toISOString(),
-                    })
-                    .eq('id', existing.id);
-                } else {
-                  await supabase
-                    .from('category_rules')
-                    .insert({
-                      user_id: user.id,
-                      keyword,
-                      category_name: String(correctedValue),
-                      match_count: 1,
-                      source: 'correction',
-                    });
-                }
+                  .update({
+                    category_name: String(correctedValue),
+                    match_count: (existing.match_count || 1) + 1,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', existing.id);
+              } else {
+                await supabase
+                  .from('category_rules')
+                  .insert({
+                    user_id: user.id,
+                    keyword,
+                    category_name: String(correctedValue),
+                    match_count: 1,
+                    source: 'correction',
+                  });
               }
             }
           }
@@ -325,7 +346,47 @@ export function useCorrectionTracking() {
         }
       }
 
-      // 3c. Special handling for VAT rate corrections
+      // 3b2. Special handling for tax_type (Buchungsart) corrections
+      if (fieldName === 'tax_type' && correctedValue && receiptId) {
+        try {
+          const keywords = await extractReceiptKeywords(receiptId);
+          
+          for (const keyword of keywords) {
+            const { data: existing } = await supabase
+              .from('category_rules')
+              .select('id, tax_type_match_count')
+              .eq('user_id', user.id)
+              .eq('keyword', keyword)
+              .maybeSingle();
+            
+            if (existing) {
+              await supabase
+                .from('category_rules')
+                .update({
+                  tax_type_name: String(correctedValue),
+                  tax_type_match_count: ((existing.tax_type_match_count as number) || 0) + 1,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existing.id);
+            } else {
+              await supabase
+                .from('category_rules')
+                .insert({
+                  user_id: user.id,
+                  keyword,
+                  category_name: '', // required column, empty since this is tax_type only
+                  tax_type_name: String(correctedValue),
+                  tax_type_match_count: 1,
+                  match_count: 0,
+                  source: 'correction',
+                });
+            }
+          }
+        } catch (taxTypeError) {
+          console.error('Error tracking tax_type correction:', taxTypeError);
+        }
+      }
+
       if (fieldName === 'vat_rate') {
         const correctedStr = String(correctedValue ?? '').replace(',', '.');
         const vatRate = correctedStr !== '' ? parseFloat(correctedStr) : 0;

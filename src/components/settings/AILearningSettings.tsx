@@ -94,6 +94,8 @@ interface CategoryRule {
   keyword: string;
   category_name: string;
   match_count: number | null;
+  tax_type_name: string | null;
+  tax_type_match_count: number | null;
   updated_at: string | null;
 }
 
@@ -661,7 +663,9 @@ export function AILearningSettings() {
                   <TableRow>
                     <TableHead>Keyword</TableHead>
                     <TableHead>Kategorie</TableHead>
-                    <TableHead className="text-center">Treffer</TableHead>
+                    <TableHead className="text-center">Kat.-Treffer</TableHead>
+                    <TableHead>Buchungsart</TableHead>
+                    <TableHead className="text-center">BA-Treffer</TableHead>
                     <TableHead className="text-right">Aktion</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -672,10 +676,16 @@ export function AILearningSettings() {
                         <code className="bg-muted px-2 py-0.5 rounded text-sm">{rule.keyword}</code>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{rule.category_name}</Badge>
+                        {rule.category_name ? <Badge variant="outline">{rule.category_name}</Badge> : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className="text-muted-foreground">{rule.match_count || 1}x</span>
+                        <span className="text-muted-foreground">{rule.match_count || 0}x</span>
+                      </TableCell>
+                      <TableCell>
+                        {rule.tax_type_name ? <Badge variant="outline">{rule.tax_type_name}</Badge> : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="text-muted-foreground">{rule.tax_type_match_count || 0}x</span>
                       </TableCell>
                       <TableCell className="text-right">
                         <Tooltip>

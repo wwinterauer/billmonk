@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 const FIELD_LABELS: Record<string, string> = {
   payment_method: 'Zahlungsart',
   category: 'Kategorie',
-  tax_type: 'Steuerart',
+  tax_type: 'Buchungsart',
   tax_rate: 'MwSt-Satz',
 };
 

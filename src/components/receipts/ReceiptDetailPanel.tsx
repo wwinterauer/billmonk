@@ -98,6 +98,7 @@ import { useTags } from '@/hooks/useTags';
 import { SplitBookingEditor } from './SplitBookingEditor';
 import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
+import { FieldDefaultSuggestion } from './FieldDefaultSuggestion';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
@@ -1361,6 +1362,12 @@ export function ReceiptDetailPanel({
                         placeholder="z.B. troii Software GmbH"
                       />
                     </LearnableField>
+
+                    {/* Field Default Suggestions */}
+                    <FieldDefaultSuggestion
+                      vendorId={selectedVendorId}
+                      vendorName={vendor}
+                    />
 
                     {/* Description with character counter */}
                     <LearnableField
