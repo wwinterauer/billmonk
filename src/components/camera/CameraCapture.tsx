@@ -39,6 +39,17 @@ export function CameraCapture({ onComplete, onClose }: CameraCaptureProps) {
   // Galerie-Ansicht
   const [showGallery, setShowGallery] = useState(false);
 
+  // Scan-App-Hinweis
+  const [showScanTip, setShowScanTip] = useState(() => {
+    return !sessionStorage.getItem('camera-scan-tip-dismissed');
+  });
+  const [showScanSteps, setShowScanSteps] = useState(false);
+
+  const dismissScanTip = () => {
+    setShowScanTip(false);
+    sessionStorage.setItem('camera-scan-tip-dismissed', 'true');
+  };
+
   useEffect(() => {
     startCamera();
     return () => stopCamera();
