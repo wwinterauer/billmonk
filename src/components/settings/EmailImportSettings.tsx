@@ -42,6 +42,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { 
   Mail, 
   Copy, 
@@ -66,6 +72,8 @@ import {
   Link2,
   Smartphone,
   ChevronDown,
+  CalendarIcon,
+  History,
 } from 'lucide-react';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { useEmailImport, EmailAccount, EmailAttachment } from '@/hooks/useEmailImport';
@@ -73,6 +81,7 @@ import { OAuthProviderButtons } from './OAuthProviderButtons';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 interface AddAccountFormData {
   email_address: string;
