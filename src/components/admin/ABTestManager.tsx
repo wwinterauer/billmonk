@@ -487,10 +487,12 @@ export function ABTestManager() {
                     <Badge variant={
                       run.status === 'completed' ? 'default' :
                       run.status === 'running' ? 'secondary' :
+                      run.status === 'stopped' ? 'outline' :
                       run.status === 'error' ? 'destructive' : 'outline'
                     }>
                       {run.status === 'completed' ? 'Fertig' :
                        run.status === 'running' ? 'Läuft...' :
+                       run.status === 'stopped' ? 'Gestoppt' :
                        run.status === 'error' ? 'Fehler' : 'Wartend'}
                     </Badge>
                     {run.status === 'pending' && (
@@ -500,6 +502,26 @@ export function ABTestManager() {
                         disabled={startTest.isPending}
                       >
                         {startTest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                      </Button>
+                    )}
+                    {run.status === 'running' && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={(e) => { e.stopPropagation(); stopTest.mutate(run.id); }}
+                        disabled={stopTest.isPending}
+                      >
+                        {stopTest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
+                      </Button>
+                    )}
+                    {(run.status === 'stopped' || run.status === 'error') && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => { e.stopPropagation(); restartTest.mutate(run.id); }}
+                        disabled={restartTest.isPending}
+                      >
+                        {restartTest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
                       </Button>
                     )}
                   </div>
