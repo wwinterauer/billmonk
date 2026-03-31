@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
@@ -37,7 +38,6 @@ const FIELD_LABELS: Record<string, string> = {
   payment_method: 'Zahlungsart',
 };
 
-// Map original_data field names to V1/V2 AI output field names
 const V1_FIELD_MAP: Record<string, string> = {
   vendor_name: 'vendor',
   total_amount: 'amount_gross',
@@ -63,7 +63,10 @@ export function ABTestManager() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [detailItem, setDetailItem] = useState<TestItem | null>(null);
 
-  // Fetch test runs
+  // Check if any test is running for polling
+  const hasRunningTest = (testRuns?: any[]) => testRuns?.some(r => r.status === 'running');
+
+  // Fetch test runs (poll every 5s if a test is running)
   const { data: testRuns, isLoading } = useQuery({
     queryKey: ['ab-test-runs'],
     queryFn: async () => {
@@ -73,6 +76,9 @@ export function ABTestManager() {
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
+    },
+    refetchInterval: (query) => {
+      return hasRunningTest(query.state.data ?? undefined) ? 5000 : false;
     },
   });
 
@@ -90,7 +96,8 @@ export function ABTestManager() {
     enabled: !!selectedRunId,
   });
 
-  // Fetch items for selected run
+  // Fetch items for selected run (poll while running)
+  const selectedRun = testRuns?.find(r => r.id === selectedRunId);
   const { data: testItems } = useQuery({
     queryKey: ['ab-test-items', selectedRunId],
     queryFn: async () => {
@@ -102,6 +109,7 @@ export function ABTestManager() {
       return (data as unknown as TestItem[]) || [];
     },
     enabled: !!selectedRunId,
+    refetchInterval: selectedRun?.status === 'running' ? 5000 : false,
   });
 
   // Count approved receipts
@@ -116,10 +124,17 @@ export function ABTestManager() {
     },
   });
 
+  // Progress for running tests
+  const getProgress = (runId: string) => {
+    if (!testItems || selectedRunId !== runId) return null;
+    const total = testItems.length;
+    const processed = testItems.filter(i => i.result_a !== null || i.result_b !== null).length;
+    return { processed, total, percent: total > 0 ? Math.round((processed / total) * 100) : 0 };
+  };
+
   // Create new test
   const createTest = useMutation({
     mutationFn: async () => {
-      // Fetch approved receipts (limit 50)
       const { data: receipts, error: rErr } = await supabase
         .from('receipts')
         .select('id, vendor, amount_gross, vat_rate, vat_amount, category, receipt_date, payment_method')
@@ -129,7 +144,6 @@ export function ABTestManager() {
       if (rErr) throw rErr;
       if (!receipts || receipts.length === 0) throw new Error('Keine approved Belege gefunden');
 
-      // Create test run
       const { data: { session } } = await supabase.auth.getSession();
       const { data: run, error: runErr } = await supabase
         .from('ab_test_runs')
@@ -146,7 +160,6 @@ export function ABTestManager() {
 
       if (runErr || !run) throw runErr;
 
-      // Create test items
       const items = receipts.map(r => ({
         test_run_id: run.id,
         receipt_id: r.id,
@@ -173,7 +186,7 @@ export function ABTestManager() {
     onError: (err: any) => toast.error(err.message),
   });
 
-  // Start test
+  // Start test (fire-and-forget)
   const startTest = useMutation({
     mutationFn: async (runId: string) => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -187,19 +200,18 @@ export function ABTestManager() {
       return data;
     },
     onSuccess: () => {
-      toast.success('Test abgeschlossen!');
+      toast.success('Test gestartet — Verarbeitung läuft im Hintergrund');
       queryClient.invalidateQueries({ queryKey: ['ab-test-runs'] });
-      queryClient.invalidateQueries({ queryKey: ['ab-test-accuracy'] });
-      queryClient.invalidateQueries({ queryKey: ['ab-test-items'] });
     },
     onError: (err: any) => toast.error(`Test fehlgeschlagen: ${err.message}`),
   });
 
-  const selectedRun = testRuns?.find(r => r.id === selectedRunId);
   const summary = selectedRun?.results_summary as Record<string, any> | null;
 
   // ── Detail View ────────────────────────────────────────────────────
   if (selectedRunId && selectedRun) {
+    const progress = getProgress(selectedRunId);
+
     return (
       <div className="space-y-4">
         <Button variant="ghost" size="sm" onClick={() => { setSelectedRunId(null); setDetailItem(null); }}>
@@ -210,101 +222,126 @@ export function ABTestManager() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>{selectedRun.name}</span>
-              <Badge variant={selectedRun.status === 'completed' ? 'default' : 'secondary'}>
-                {selectedRun.status}
+              <Badge variant={
+                selectedRun.status === 'completed' ? 'default' :
+                selectedRun.status === 'running' ? 'secondary' :
+                selectedRun.status === 'error' ? 'destructive' : 'outline'
+              }>
+                {selectedRun.status === 'completed' ? 'Fertig' :
+                 selectedRun.status === 'running' ? 'Läuft...' :
+                 selectedRun.status === 'error' ? 'Fehler' : 'Wartend'}
               </Badge>
             </CardTitle>
           </CardHeader>
-          {summary && (
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-3 rounded-lg bg-muted">
-                  <div className="text-2xl font-bold">{summary.total_items}</div>
-                  <div className="text-xs text-muted-foreground">Belege</div>
+          <CardContent className="space-y-4">
+            {/* Progress bar for running tests */}
+            {selectedRun.status === 'running' && progress && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Verarbeitung läuft...</span>
+                  <span>{progress.processed}/{progress.total} Belege ({progress.percent}%)</span>
                 </div>
-                <div className="text-center p-3 rounded-lg bg-muted">
-                  <div className="text-2xl font-bold">{summary.processed}</div>
-                  <div className="text-xs text-muted-foreground">Verarbeitet</div>
-                </div>
-                <div className="text-center p-3 rounded-lg bg-blue-50 dark:bg-blue-950">
-                  <div className="text-2xl font-bold text-blue-600">{summary.overall_accuracy_a}%</div>
-                  <div className="text-xs text-muted-foreground">V1 Accuracy</div>
-                </div>
-                <div className="text-center p-3 rounded-lg bg-green-50 dark:bg-green-950">
-                  <div className="text-2xl font-bold text-green-600">{summary.overall_accuracy_b}%</div>
-                  <div className="text-xs text-muted-foreground">V2 Accuracy</div>
-                </div>
+                <Progress value={progress.percent} className="h-2" />
               </div>
+            )}
 
-              {/* Field accuracy table */}
-              {fieldAccuracy && fieldAccuracy.length > 0 && (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Feld</TableHead>
-                      <TableHead className="text-center">V1 Korrekt</TableHead>
-                      <TableHead className="text-center">V1 %</TableHead>
-                      <TableHead className="text-center">V2 Korrekt</TableHead>
-                      <TableHead className="text-center">V2 %</TableHead>
-                      <TableHead className="text-center">Winner</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {fieldAccuracy.map(fa => {
-                      const pctA = fa.version_a_total > 0 ? Math.round((fa.version_a_correct / fa.version_a_total) * 100) : 0;
-                      const pctB = fa.version_b_total > 0 ? Math.round((fa.version_b_correct / fa.version_b_total) * 100) : 0;
-                      const winner = pctA > pctB ? 'V1' : pctB > pctA ? 'V2' : 'Gleich';
-                      return (
-                        <TableRow key={fa.field_name}>
-                          <TableCell className="font-medium">{FIELD_LABELS[fa.field_name] || fa.field_name}</TableCell>
-                          <TableCell className="text-center">{fa.version_a_correct}/{fa.version_a_total}</TableCell>
-                          <TableCell className="text-center font-mono">{pctA}%</TableCell>
-                          <TableCell className="text-center">{fa.version_b_correct}/{fa.version_b_total}</TableCell>
-                          <TableCell className="text-center font-mono">{pctB}%</TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant={winner === 'V2' ? 'default' : winner === 'V1' ? 'secondary' : 'outline'}>
-                              {winner === 'Gleich' ? '=' : winner} {winner !== 'Gleich' && <Trophy className="h-3 w-3 ml-1" />}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-
-              {/* Items list */}
-              {testItems && testItems.length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">Einzelne Belege</h3>
-                  <div className="space-y-1 max-h-[400px] overflow-y-auto">
-                    {testItems.map(item => {
-                      const scores = item.field_scores || {};
-                      const aCorrect = Object.values(scores).filter(s => s.a === true).length;
-                      const bCorrect = Object.values(scores).filter(s => s.b === true).length;
-                      const total = Object.values(scores).filter(s => s.a !== null || s.b !== null).length;
-                      return (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between p-2 rounded hover:bg-muted cursor-pointer text-sm"
-                          onClick={() => setDetailItem(item)}
-                        >
-                          <span className="truncate max-w-[200px]">
-                            {(item.original_data as any)?.vendor_name || item.receipt_id?.slice(0, 8)}
-                          </span>
-                          <div className="flex items-center gap-3">
-                            <span className="text-blue-600 font-mono">{aCorrect}/{total}</span>
-                            <span className="text-green-600 font-mono">{bCorrect}/{total}</span>
-                            <Eye className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        </div>
-                      );
-                    })}
+            {summary && (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-3 rounded-lg bg-muted">
+                    <div className="text-2xl font-bold">{summary.total_items}</div>
+                    <div className="text-xs text-muted-foreground">Belege</div>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-muted">
+                    <div className="text-2xl font-bold">{summary.processed}</div>
+                    <div className="text-xs text-muted-foreground">Verarbeitet</div>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-blue-50 dark:bg-blue-950">
+                    <div className="text-2xl font-bold text-blue-600">{summary.overall_accuracy_a}%</div>
+                    <div className="text-xs text-muted-foreground">V1 Accuracy</div>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-green-50 dark:bg-green-950">
+                    <div className="text-2xl font-bold text-green-600">{summary.overall_accuracy_b}%</div>
+                    <div className="text-xs text-muted-foreground">V2 Accuracy</div>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          )}
+
+                {fieldAccuracy && fieldAccuracy.length > 0 && (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Feld</TableHead>
+                        <TableHead className="text-center">V1 Korrekt</TableHead>
+                        <TableHead className="text-center">V1 %</TableHead>
+                        <TableHead className="text-center">V2 Korrekt</TableHead>
+                        <TableHead className="text-center">V2 %</TableHead>
+                        <TableHead className="text-center">Winner</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {fieldAccuracy.map(fa => {
+                        const pctA = fa.version_a_total > 0 ? Math.round((fa.version_a_correct / fa.version_a_total) * 100) : 0;
+                        const pctB = fa.version_b_total > 0 ? Math.round((fa.version_b_correct / fa.version_b_total) * 100) : 0;
+                        const winner = pctA > pctB ? 'V1' : pctB > pctA ? 'V2' : 'Gleich';
+                        return (
+                          <TableRow key={fa.field_name}>
+                            <TableCell className="font-medium">{FIELD_LABELS[fa.field_name] || fa.field_name}</TableCell>
+                            <TableCell className="text-center">{fa.version_a_correct}/{fa.version_a_total}</TableCell>
+                            <TableCell className="text-center font-mono">{pctA}%</TableCell>
+                            <TableCell className="text-center">{fa.version_b_correct}/{fa.version_b_total}</TableCell>
+                            <TableCell className="text-center font-mono">{pctB}%</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={winner === 'V2' ? 'default' : winner === 'V1' ? 'secondary' : 'outline'}>
+                                {winner === 'Gleich' ? '=' : winner} {winner !== 'Gleich' && <Trophy className="h-3 w-3 ml-1" />}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </>
+            )}
+
+            {/* Items list */}
+            {testItems && testItems.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">Einzelne Belege</h3>
+                <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                  {testItems.map(item => {
+                    const scores = item.field_scores || {};
+                    const aCorrect = Object.values(scores).filter(s => s.a === true).length;
+                    const bCorrect = Object.values(scores).filter(s => s.b === true).length;
+                    const total = Object.values(scores).filter(s => s.a !== null || s.b !== null).length;
+                    const isProcessed = item.result_a !== null || item.result_b !== null;
+                    return (
+                      <div
+                        key={item.id}
+                        className={`flex items-center justify-between p-2 rounded hover:bg-muted cursor-pointer text-sm ${!isProcessed ? 'opacity-50' : ''}`}
+                        onClick={() => isProcessed && setDetailItem(item)}
+                      >
+                        <span className="truncate max-w-[200px]">
+                          {(item.original_data as any)?.vendor_name || item.receipt_id?.slice(0, 8)}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          {isProcessed ? (
+                            <>
+                              <span className="text-blue-600 font-mono">{aCorrect}/{total}</span>
+                              <span className="text-green-600 font-mono">{bCorrect}/{total}</span>
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            </>
+                          ) : (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
         </Card>
 
         {/* Detail comparison dialog */}
@@ -385,7 +422,11 @@ export function ABTestManager() {
           {testRuns.map(run => {
             const s = run.results_summary as Record<string, any> | null;
             return (
-              <Card key={run.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => run.status === 'completed' && setSelectedRunId(run.id)}>
+              <Card
+                key={run.id}
+                className={`cursor-pointer hover:border-primary/50 transition-colors ${run.status === 'running' ? 'border-yellow-500/50' : ''}`}
+                onClick={() => (run.status === 'completed' || run.status === 'running') && setSelectedRunId(run.id)}
+              >
                 <CardContent className="flex items-center justify-between py-4">
                   <div>
                     <div className="font-medium">{run.name}</div>
@@ -401,11 +442,17 @@ export function ABTestManager() {
                         <div className="text-green-600 font-mono">V2: {s.overall_accuracy_b}%</div>
                       </div>
                     )}
+                    {run.status === 'running' && (
+                      <Loader2 className="h-4 w-4 animate-spin text-yellow-500" />
+                    )}
                     <Badge variant={
                       run.status === 'completed' ? 'default' :
-                      run.status === 'running' ? 'secondary' : 'outline'
+                      run.status === 'running' ? 'secondary' :
+                      run.status === 'error' ? 'destructive' : 'outline'
                     }>
-                      {run.status === 'completed' ? 'Fertig' : run.status === 'running' ? 'Läuft...' : 'Wartend'}
+                      {run.status === 'completed' ? 'Fertig' :
+                       run.status === 'running' ? 'Läuft...' :
+                       run.status === 'error' ? 'Fehler' : 'Wartend'}
                     </Badge>
                     {run.status === 'pending' && (
                       <Button
