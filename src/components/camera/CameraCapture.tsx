@@ -11,7 +11,9 @@ import {
   AlertCircle,
   Plus,
   FileText,
-  Trash2
+  Trash2,
+  Smartphone,
+  ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
