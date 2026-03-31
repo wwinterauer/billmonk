@@ -180,7 +180,7 @@ export function VendorManagement() {
       default_category_id: vendor.default_category_id || '',
       default_tag_id: vendor.default_tag_id || '',
       default_vat_rate: vendor.default_vat_rate?.toString() || '',
-      default_payment_method: vendor.default_payment_method || '',
+      default_payment_method: (vendor.field_defaults as Record<string, string>)?.payment_method || '',
       website: vendor.website || '',
       notes: vendor.notes || '',
       auto_approve: vendor.auto_approve ?? false,
