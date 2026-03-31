@@ -51,6 +51,8 @@ export function useVendors() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isUpdatingVendor, setIsUpdatingVendor] = useState(false);
+  const isUpdatingRef = useRef(false);
 
   const fetchVendors = async () => {
     if (!user) {
