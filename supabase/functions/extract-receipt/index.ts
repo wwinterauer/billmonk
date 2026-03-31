@@ -28,6 +28,7 @@ interface ExtractionResult {
   tax_rate_details?: TaxRateDetail[] | null;
   receipt_date: string | null;
   category: string | null;
+  tax_type: string | null;
   payment_method: string | null; // deprecated - no longer AI-extracted
   invoice_number: string | null;
   confidence: number;
@@ -89,6 +90,7 @@ const extractionSchema = {
     currency: { type: "string" as const },
     // payment_method removed from schema - not AI-extractable
     category: { type: "string" as const },
+    tax_type: { type: "string" as const },
     description: { type: "string" as const },
     line_items: {
       type: "array" as const,
@@ -114,12 +116,13 @@ const extractionSchema = {
   },
   required: [
     "is_financial_document", "document_type", "vendor_name", "total_amount",
-    "tax_rate", "currency", "category", "confidence",
+    "tax_rate", "currency", "confidence",
     "reason", "vendor_brand", "vendor_address", "vendor_uid",
     "vendor_legal_form", "vendor_country", "receipt_date", "due_date",
     "receipt_number", "net_amount", "tax_amount", "is_mixed_tax_rate",
     "tax_rate_details", "description", "line_items",
     "vat_confidence", "vat_detection_method", "special_vat_case", "notes",
+    "category", "tax_type",
   ],
   additionalProperties: false,
 };
@@ -149,6 +152,7 @@ function mapSchemaToResult(raw: Record<string, any>): ExtractionResult {
       ? raw.tax_rate_details : null,
     receipt_date: raw.receipt_date || null,
     category: raw.category || null,
+    tax_type: raw.tax_type || null,
     payment_method: null, // no longer AI-extracted
     invoice_number: raw.receipt_number || null,
     confidence: raw.confidence || 0,
@@ -586,6 +590,9 @@ BESCHREIBUNG: Alle Positionen zusammenfassen, max 100 Zeichen, keine Preise.
 
 KATEGORIE: Wähle passendste aus: ${categoryList}
 
+BUCHUNGSART (tax_type): Steuerliche Einordnung nach DACH-Steuerrecht.
+Mögliche Werte: Betriebsausgabe, GWG bis 1.000€, Bewirtung 50%, Bewirtung 100%, Vorsteuer abzugsfähig, Reisekosten, Kfz-Kosten, Repräsentation, Abschreibung, Sonstige.
+Regeln: Gerät/Hardware >1.000€ netto → Abschreibung. Gerät ≤1.000€ → GWG bis 1.000€. Restaurant/Bewirtung → Bewirtung 50%. Tankstelle/Mietwagen → Kfz-Kosten. Hotel/Flug/Bahn → Reisekosten. Nur wenn eindeutig erkennbar, sonst "".
 MwSt-ERKENNUNG:
 - Suche explizite %-Angaben auf dem Beleg (20%, 19%, 10%, 7% etc.)
 - Berechne: MwSt = Brutto × Satz/(100+Satz). Validiere: Netto + MwSt = Brutto (±0.05€)
@@ -866,6 +873,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           tax_rate_details: extractedData.tax_rate_details || null,
           receipt_date: extractedData.receipt_date,
           category: finalCategory,
+          tax_type: extractedData.tax_type || null,
           // payment_method no longer set from AI extraction
           invoice_number: extractedData.invoice_number,
           ai_confidence: extractedData.confidence,

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { TAX_TYPES } from '@/lib/constants';
 import { Repeat } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -187,6 +188,7 @@ export function ReceiptDetailPanel({
   const [isMixedTaxRate, setIsMixedTaxRate] = useState(false);
   const [taxRateDetails, setTaxRateDetails] = useState<TaxRateDetail[] | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('');
+  const [taxType, setTaxType] = useState('');
   const [notes, setNotes] = useState('');
   const [amountNetOverride, setAmountNetOverride] = useState('');
   const [vatAmountOverride, setVatAmountOverride] = useState('');
@@ -401,6 +403,7 @@ export function ReceiptDetailPanel({
           setIsMixedTaxRate(isMixed);
           setTaxRateDetails(taxDetails);
           setPaymentMethod(data.payment_method || '');
+          setTaxType((receiptData.tax_type as string) || '');
           setNotes(data.notes || '');
           setSelectedVendorId(data.vendor_id || null);
           
@@ -789,6 +792,7 @@ export function ReceiptDetailPanel({
         is_mixed_tax_rate: isMixedTaxRate,
         tax_rate_details: isMixedTaxRate ? taxRateDetails : null,
         payment_method: paymentMethod || null,
+        tax_type: taxType || null,
         notes: notes || null,
         user_modified_fields: Array.from(modifiedFields),
       };
@@ -1457,7 +1461,7 @@ export function ReceiptDetailPanel({
                     >
                       <Select value={category} onValueChange={setCategory}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Kategorie wählen" />
+                          <SelectValue placeholder="Nicht zugeordnet" />
                         </SelectTrigger>
                         <SelectContent>
                           {categories.map((cat) => (
@@ -1468,6 +1472,23 @@ export function ReceiptDetailPanel({
                         </SelectContent>
                       </Select>
                     </LearnableField>
+
+                    {/* Buchungsart (tax_type) */}
+                    <div className="space-y-2">
+                      <Label>Buchungsart</Label>
+                      <Select value={taxType} onValueChange={setTaxType}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Offen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TAX_TYPES.map(t => (
+                            <SelectItem key={t.value} value={t.value}>
+                              {t.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
                     {/* Split Booking Editor */}
                     {splitBookingEnabled && receiptId && (

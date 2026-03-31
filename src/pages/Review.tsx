@@ -83,6 +83,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
+import { TAX_TYPES } from '@/lib/constants';
 
 const PAYMENT_METHODS = [
   { value: 'Überweisung', label: 'Überweisung' },
@@ -110,6 +111,7 @@ interface FormData {
   description: string;
   receipt_date: Date | null;
   category: string;
+  tax_type: string;
   amount_gross: string;
   vat_rate: string;
   is_mixed_tax_rate: boolean;
@@ -149,6 +151,7 @@ const Review = () => {
     description: '',
     receipt_date: null,
     category: '',
+    tax_type: '',
     amount_gross: '',
     vat_rate: '20',
     is_mixed_tax_rate: false,
@@ -290,6 +293,7 @@ const Review = () => {
       description: receipt.description || '',
       receipt_date: receipt.receipt_date ? new Date(receipt.receipt_date) : null,
       category: receipt.category || '',
+      tax_type: (receiptData.tax_type as string) || '',
       amount_gross: receipt.amount_gross?.toString() || '',
       // IMPORTANT: 0% VAT is valid, so we need to check for null/undefined specifically
       vat_rate: receipt.vat_rate !== null && receipt.vat_rate !== undefined ? receipt.vat_rate.toString() : '20',
@@ -405,6 +409,7 @@ const Review = () => {
         description: formData.description || null,
         receipt_date: formData.receipt_date ? format(formData.receipt_date, 'yyyy-MM-dd') : null,
         category: formData.category || null,
+        tax_type: formData.tax_type || null,
         amount_gross: gross,
         amount_net: net,
         vat_rate: vatRate,
@@ -471,6 +476,9 @@ const Review = () => {
         }
         if (formData.vat_rate && !formData.is_mixed_tax_rate) {
           trackFieldChange(trackingVendorId, 'tax_rate', formData.vat_rate);
+        }
+        if (formData.tax_type) {
+          trackFieldChange(trackingVendorId, 'tax_type', formData.tax_type);
         }
       }
 
@@ -1141,12 +1149,32 @@ const Review = () => {
                         onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Kategorie wählen" />
+                          <SelectValue placeholder="Nicht zugeordnet" />
                         </SelectTrigger>
                         <SelectContent>
                           {categories.map(cat => (
                             <SelectItem key={cat.id} value={cat.name}>
                               {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Buchungsart (tax_type) */}
+                    <div className="space-y-2">
+                      <Label>Buchungsart</Label>
+                      <Select
+                        value={formData.tax_type}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, tax_type: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Offen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TAX_TYPES.map(t => (
+                            <SelectItem key={t.value} value={t.value}>
+                              {t.label}
                             </SelectItem>
                           ))}
                         </SelectContent>

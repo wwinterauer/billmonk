@@ -2576,6 +2576,7 @@ export type Database = {
           split_suggestion: Json | null
           status: string | null
           tax_rate_details: Json | null
+          tax_type: string | null
           updated_at: string | null
           user_id: string
           user_modified_fields: string[] | null
@@ -2632,6 +2633,7 @@ export type Database = {
           split_suggestion?: Json | null
           status?: string | null
           tax_rate_details?: Json | null
+          tax_type?: string | null
           updated_at?: string | null
           user_id: string
           user_modified_fields?: string[] | null
@@ -2688,6 +2690,7 @@ export type Database = {
           split_suggestion?: Json | null
           status?: string | null
           tax_rate_details?: Json | null
+          tax_type?: string | null
           updated_at?: string | null
           user_id?: string
           user_modified_fields?: string[] | null
