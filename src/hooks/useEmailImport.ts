@@ -103,7 +103,7 @@ export const useEmailImport = () => {
   const queryClient = useQueryClient();
 
   // Fetch email connection for current user (webhook-based)
-  const { data: emailConnection, isLoading: isLoadingConnection } = useQuery({
+  const { data: emailConnection, isLoading: isLoadingConnection, isError: isErrorConnection } = useQuery({
     queryKey: ['email-connection', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
