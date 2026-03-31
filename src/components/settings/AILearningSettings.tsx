@@ -145,7 +145,7 @@ function LearningLevelBadge({ level }: { level: number }) {
 export function AILearningSettings() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { categories } = useCategories();
+  const { userCategories } = useCategories();
   const [isLoading, setIsLoading] = useState(true);
   const [learningData, setLearningData] = useState<VendorLearningData[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
