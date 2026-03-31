@@ -25,6 +25,12 @@ interface CategoryData {
   color: string | null;
 }
 
+interface TaxTypeData {
+  taxType: string;
+  total: number;
+  color: string;
+}
+
 interface TagData {
   id: string;
   name: string;
