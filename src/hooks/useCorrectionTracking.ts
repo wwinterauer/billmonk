@@ -346,7 +346,47 @@ export function useCorrectionTracking() {
         }
       }
 
-      // 3c. Special handling for VAT rate corrections
+      // 3b2. Special handling for tax_type (Buchungsart) corrections
+      if (fieldName === 'tax_type' && correctedValue && receiptId) {
+        try {
+          const keywords = await extractReceiptKeywords(receiptId);
+          
+          for (const keyword of keywords) {
+            const { data: existing } = await supabase
+              .from('category_rules')
+              .select('id, tax_type_match_count')
+              .eq('user_id', user.id)
+              .eq('keyword', keyword)
+              .maybeSingle();
+            
+            if (existing) {
+              await supabase
+                .from('category_rules')
+                .update({
+                  tax_type_name: String(correctedValue),
+                  tax_type_match_count: ((existing.tax_type_match_count as number) || 0) + 1,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existing.id);
+            } else {
+              await supabase
+                .from('category_rules')
+                .insert({
+                  user_id: user.id,
+                  keyword,
+                  category_name: '', // required column, empty since this is tax_type only
+                  tax_type_name: String(correctedValue),
+                  tax_type_match_count: 1,
+                  match_count: 0,
+                  source: 'correction',
+                });
+            }
+          }
+        } catch (taxTypeError) {
+          console.error('Error tracking tax_type correction:', taxTypeError);
+        }
+      }
+
       if (fieldName === 'vat_rate') {
         const correctedStr = String(correctedValue ?? '').replace(',', '.');
         const vatRate = correctedStr !== '' ? parseFloat(correctedStr) : 0;
