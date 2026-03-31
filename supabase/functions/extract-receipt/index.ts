@@ -730,7 +730,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         const total = Number(li?.total);
         return li && Number.isFinite(total) && total !== 0 && li.tax_rate != null;
       });
-      console.log(`[LineItems Debug] Valid count: ${validLineItems.length}`);
+      
 
       if (validLineItems.length > 0) {
         const rateGroups: Record<string, { gross: number; descriptions: string[] }> = {};
