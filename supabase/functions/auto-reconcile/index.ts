@@ -114,7 +114,7 @@ serve(async (req) => {
       // Get unpaid sent/overdue invoices
       const { data: invoices } = await supabase
         .from("invoices")
-        .select("id, total, invoice_number, payment_reference, due_date")
+        .select("id, total, invoice_number, payment_reference, due_date, discount_percent")
         .eq("user_id", user.id)
         .is("paid_at", null)
         .in("status", ["sent", "overdue"]);
@@ -125,42 +125,69 @@ serve(async (req) => {
 
           const description = (tx.description || "").toLowerCase();
 
-          // Find matching invoice
+          // Find matching invoice — check both full amount and skonto amount
+          let matchedWithSkonto = false;
           const match = invoices.find((inv) => {
             if (!inv.total) return false;
-            const amountMatch = Math.abs(inv.total - tx.amount!) < 0.02;
-            if (!amountMatch) return false;
+
+            const fullAmountMatch = Math.abs(inv.total - tx.amount!) < 0.02;
+            const skontoTotal = inv.discount_percent && inv.discount_percent > 0
+              ? inv.total * (1 - inv.discount_percent / 100)
+              : null;
+            const skontoAmountMatch = skontoTotal !== null && Math.abs(skontoTotal - tx.amount!) < 0.02;
+
+            if (!fullAmountMatch && !skontoAmountMatch) return false;
 
             // Bonus: check if invoice number or payment reference appears in description
             const hasRef =
               (inv.invoice_number && description.includes(inv.invoice_number.toLowerCase())) ||
               (inv.payment_reference && description.includes(inv.payment_reference.toLowerCase()));
 
-            // If amounts match exactly AND reference found, it's a strong match
-            // If only amount matches, still match but only if amount is unique
-            if (hasRef) return true;
+            if (hasRef) {
+              matchedWithSkonto = !fullAmountMatch && skontoAmountMatch;
+              return true;
+            }
 
-            // Check for unique amount match (no other invoice with same total)
-            const sameAmountCount = invoices.filter(
-              (i) => i.total && Math.abs(i.total - tx.amount!) < 0.02
-            ).length;
-            return sameAmountCount === 1;
+            // Check for unique amount match (no other invoice with same total or skonto amount)
+            const sameAmountCount = invoices.filter((i) => {
+              if (!i.total) return false;
+              if (Math.abs(i.total - tx.amount!) < 0.02) return true;
+              const st = i.discount_percent && i.discount_percent > 0
+                ? i.total * (1 - i.discount_percent / 100) : null;
+              return st !== null && Math.abs(st - tx.amount!) < 0.02;
+            }).length;
+
+            if (sameAmountCount === 1) {
+              matchedWithSkonto = !fullAmountMatch && skontoAmountMatch;
+              return true;
+            }
+            return false;
           });
 
           if (match) {
+            // Determine if paid with skonto
+            const paidWithSkonto = matchedWithSkonto;
+            const discountAmount = paidWithSkonto && match.total && match.discount_percent
+              ? match.total * match.discount_percent / 100
+              : null;
+
             // Update transaction
             await supabase
               .from("bank_transactions")
               .update({ status: "matched", invoice_id: match.id })
               .eq("id", tx.id);
 
-            // Mark invoice as paid
+            // Mark invoice as paid (or paid_with_skonto)
+            const invoiceUpdate: Record<string, unknown> = {
+              paid_at: new Date().toISOString(),
+              status: paidWithSkonto ? "paid_with_skonto" : "paid",
+            };
+            if (discountAmount !== null) {
+              invoiceUpdate.discount_amount = discountAmount;
+            }
             await supabase
               .from("invoices")
-              .update({
-                paid_at: new Date().toISOString(),
-                status: "paid",
-              })
+              .update(invoiceUpdate)
               .eq("id", match.id);
 
             // Remove from pool

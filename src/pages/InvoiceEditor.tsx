@@ -831,10 +831,16 @@ const InvoiceEditor = () => {
                       <span>{fmt(isSmallBusiness ? totals.netAfterRabatt : totals.total)}</span>
                     </div>
                     {discountPercent > 0 && (
-                      <div className="flex justify-between text-muted-foreground text-xs pt-1">
-                        <span>Skonto ({discountPercent}% bei Zahlung innerhalb von {discountDays} Tagen)</span>
-                        <span>−{fmt(totals.discountAmount)}</span>
-                      </div>
+                      <>
+                        <div className="flex justify-between text-muted-foreground text-xs pt-1">
+                          <span>Skonto ({discountPercent}% bei Zahlung innerhalb von {discountDays} Tagen)</span>
+                          <span>−{fmt(totals.discountAmount)}</span>
+                        </div>
+                        <div className="flex justify-between font-semibold text-sm text-green-700 dark:text-green-400 pt-0.5">
+                          <span>Zahlbetrag bei Skonto</span>
+                          <span>{fmt(totals.total - totals.discountAmount)}</span>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
