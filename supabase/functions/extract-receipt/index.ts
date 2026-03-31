@@ -87,7 +87,7 @@ const extractionSchema = {
       },
     },
     currency: { type: "string" as const },
-    payment_method: { type: "string" as const },
+    // payment_method removed from schema - not AI-extractable
     category: { type: "string" as const },
     description: { type: "string" as const },
     line_items: {
