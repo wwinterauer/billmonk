@@ -1,45 +1,42 @@
 
 
-# PWA Scan-App-Tipp + Installationshinweis verbessern
+# Kategorie und Buchungsart trennen — verbleibende Stellen
 
-## Übersicht
+## Betroffene Stellen
 
-Drei Änderungen: (1) Scan-App-Tipp in Email-Import-Einstellungen, (2) Scan-Hinweis auf Upload-Seite, (3) InstallPrompt verbessern mit iOS-Fallback und nur auf Mobilgeräten + eingeloggt.
+| Datei | Stelle | Problem |
+|---|---|---|
+| **Expenses.tsx** Zeile 2045 | Bulk-Kategorie-Dropdown | `categories.map` statt `userCategories.map` — zeigt auch Buchungsarten |
+| **RecurringExpensesTab.tsx** Zeile 231-244 | Kategorie-Select pro Expense | Ein Dropdown mit `categories.map` — kein separates Buchungsart-Dropdown |
+| **VendorManagement.tsx** Zeile 827 | Kategorie-Filter | `categories.map` — mischt beide Typen |
+| **VendorManagement.tsx** Zeile 1118 | Bulk-Kategorie-Dialog | `categories.map` — mischt beide Typen |
+| **VendorManagement.tsx** Zeile 1290 | Vendor-Edit Standard-Kategorie | `categories.map` — kein zweites Dropdown für Buchungsart |
+| **AILearningSettings.tsx** Zeile 753 | Vendor-Standard-Kategorie Tabelle | `categories.map` — mischt beide Typen |
+| **BankImportKeywords.tsx** Zeile 396 | Keyword-Kategorie | Hardcoded `CATEGORIES`-Liste — eigenes Thema, nicht Teil dieser Änderung |
 
 ## Änderungen
 
-### 1. `src/components/settings/EmailImportSettings.tsx`
+### 1. `src/pages/Expenses.tsx`
+- Zeile 2045: `categories.map` → `userCategories.map` (Buchungsart-Bulk existiert bereits separat)
 
-Nach der Import-Adresse (nach Zeile 460, nach dem `<p>` mit "Leiten Sie Rechnungs-E-Mails...") einen Collapsible-Bereich einfügen:
+### 2. `src/components/expenses/RecurringExpensesTab.tsx`
+- `useCategories()` → `{ userCategories, taxCategories }` destructuren
+- Bestehendes Select (Zeile 231-244): Auf `userCategories` umstellen, Label "Kategorie"
+- Zweites Select daneben einfügen für Buchungsart mit `taxCategories`, Label "Buchungsart", speichert in `tax_type`-Feld (sofern das Feld auf `recurring_expenses` existiert — falls nicht, nur Kategorie-Dropdown auf `userCategories` einschränken)
 
-- Import: `Collapsible, CollapsibleTrigger, CollapsibleContent` aus `@/components/ui/collapsible`
-- Import: `Smartphone, ChevronDown` Icons
-- Collapsible mit Trigger "Tipp: Belege per Scan-App importieren" (mit Smartphone-Icon)
-- Content: Zwei Absätze (Android Share + Email-Methode), Email-Adresse aus `emailConnection.import_email` inline anzeigen
+### 3. `src/components/settings/VendorManagement.tsx`
+- `{ categories }` → `{ userCategories, taxCategories }` destructuren
+- **Filter** (Zeile 819-840): Auf `userCategories` einschränken. Zweiten Filter "Buchungsart" mit `taxCategories` daneben hinzufügen
+- **Bulk-Kategorie-Dialog** (Zeile 1113-1131): Auf `userCategories` einschränken
+- **Vendor-Edit** (Zeile 1279-1308): Auf `userCategories` einschränken. Zweites Select "Standard-Buchungsart" daneben einfügen (speichert in `default_tax_type` auf `vendors` — falls Spalte nicht existiert, nur Kategorie-Dropdown filtern ohne zweites Dropdown)
 
-### 2. `src/pages/Upload.tsx`
-
-Nach dem Upload-Dropzone-Card (nach Zeile 1076, nach `</Card></motion.div>`) und vor dem Cloud Import Block:
-
-- Import: `Smartphone` Icon, `useNavigate` (bereits vorhanden)
-- Dezenter Alert/Banner in muted Farben mit Smartphone-Icon
-- Text: "Du bist unterwegs? Scanne Belege mit deiner Scan-App und teile sie direkt an BillMonk."
-- Link-Button "Mehr erfahren" → `navigate('/settings?tab=email-import')`
-
-### 3. `src/components/pwa/InstallPrompt.tsx` — Erweitern
-
-- Import `useIsMobile` und `useAuth`
-- Nur anzeigen wenn: Mobile + eingeloggt + nicht standalone + nicht dismissed
-- iOS-Erkennung: Wenn `installPrompt` null ist (kein `beforeinstallprompt` auf iOS), zeige Alternativtext: "Tippe auf das Teilen-Symbol und dann 'Zum Home-Bildschirm'"
-- Erweiterte Beschreibung: "für schnelleren Zugriff und Beleg-Import per Teilen-Funktion"
-- Landing-Page ausschließen: `useLocation()`, return null wenn `pathname === '/'`
-
-### 4. `src/App.tsx` — Keine Änderung nötig
-
-`InstallPrompt` ist bereits global eingebunden (Zeile 220). Die Landing-Page-Ausschlusslogik wird intern in der Komponente behandelt.
+### 4. `src/components/settings/AILearningSettings.tsx`
+- `{ categories }` → `{ userCategories, taxCategories }` destructuren
+- Tabelle (Zeile 730-764): Spalte "Standard-Kategorie" auf `userCategories` filtern. Zweite Spalte "Buchungsart" hinzufügen mit `taxCategories`
 
 ### Dateien
-- `src/components/settings/EmailImportSettings.tsx`
-- `src/pages/Upload.tsx`
-- `src/components/pwa/InstallPrompt.tsx`
+- `src/pages/Expenses.tsx`
+- `src/components/expenses/RecurringExpensesTab.tsx`
+- `src/components/settings/VendorManagement.tsx`
+- `src/components/settings/AILearningSettings.tsx`
 
