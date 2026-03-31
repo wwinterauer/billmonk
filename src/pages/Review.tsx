@@ -83,6 +83,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
+import { TAX_TYPES } from '@/lib/constants';
 
 const PAYMENT_METHODS = [
   { value: 'Überweisung', label: 'Überweisung' },
