@@ -1,50 +1,58 @@
 
 
-# Import-Adresse benutzerfreundlicher gestalten
+# Rechnungsübersicht aufwerten — wie Ausgaben-Seite
 
 ## Problem
 
-Aktuell: `receipts+a8k3x9m2p7...@import.billmonk.ai` (32 Zeichen Zufallsstring) — nicht merkbar.
+Die Rechnungsübersicht (`Invoices.tsx`) hat aktuell nur einen Status-Dropdown-Filter und einzelne Aktionen pro Zeile. Es fehlen:
+- Checkbox-Selektion für Batch-Aktionen
+- Batch-Statusänderungen (als bezahlt markieren, bezahlt mit Skonto, stornieren)
+- Datumsfilter, Suchfeld, Spaltenauswahl
+- Status `paid_with_skonto` fehlt komplett
+- Fixierte Bulk-Aktionsleiste wie bei Expenses
 
-## Lösung
+## Geplante Änderungen
 
-Format ändern zu: `receipts+vorname.nachname.XXXX@import.billmonk.ai`
+### 1. `src/pages/Invoices.tsx` — Umfangreiche Erweiterung
 
-- Vorname + Nachname aus dem Profil (lowercase, Umlaute/Sonderzeichen bereinigt)
-- 4 Zeichen Zufalls-Suffix für Eindeutigkeit und Sicherheit
-- Beispiel: `receipts+max.mustermann.a7k2@import.billmonk.ai`
-- Falls kein Name vorhanden: Fallback auf Email-Prefix (vor dem @)
+**Neue Features nach Vorbild `Expenses.tsx`:**
 
-Der Token bleibt intern weiterhin der komplette Teil nach `receipts+` (z.B. `max.mustermann.a7k2`) — die Webhook-Funktion matcht darüber.
+- **Checkbox-Spalte**: Jede Zeile bekommt eine Checkbox, Header hat "Alle auswählen"
+- **Bulk-Aktionsleiste**: Fixierte Leiste am unteren Rand bei Selektion, mit Buttons:
+  - "Als bezahlt markieren" (grün)
+  - "Bezahlt mit Skonto" (grün, nur wenn Rechnungen mit `discount_percent > 0`)
+  - "Als versendet markieren"
+  - "Stornieren" (rot)
+  - "Löschen" (rot, mit Bestätigung)
+- **Suchfeld**: Suche nach Rechnungsnummer, Kundenname
+- **Datumsfilter**: Von/Bis-Datepicker + Preset-Select (Aktueller Monat, Letztes Quartal, etc.)
+- **Neuer Status**: `paid_with_skonto` mit Label "Bezahlt (Skonto)" und grünem Styling
+- **Spaltenauswahl**: Dropdown um Spalten ein-/auszublenden (wie Expenses)
+- **Pagination**: Wenn viele Rechnungen vorhanden
 
-## Sicherheitsaspekt
+**Batch-Logik:**
+```text
+selectedIds: Set<string>
+- handleBulkPaid(): Loop über selectedIds → updateInvoiceStatus(id, 'paid')
+- handleBulkPaidSkonto(): Loop → updateInvoiceStatus(id, 'paid_with_skonto')  
+- handleBulkSent(): Loop → updateInvoiceStatus(id, 'sent')
+- handleBulkCancel(): Loop → updateInvoiceStatus(id, 'cancelled')
+- handleBulkDelete(): Bestätigungsdialog → Loop → deleteInvoice(id)
+```
 
-Der Token wird kürzer, aber:
-- Die Webhook-Funktion validiert den Token gegen die DB
-- Rate-Limiting ist bereits implementiert
-- 4 Zeichen Suffix = 1.679.616 Kombinationen — ausreichend da kein Login-Mechanismus
+### 2. `src/hooks/useInvoices.ts` — Skonto-Status
 
-## Änderungen
+- `updateInvoiceStatus`: Bei `paid_with_skonto` den `skonto_amount` berechnen aus `total * discount_percent / 100` und `paid_at` setzen
 
-### `src/hooks/useEmailImport.ts`
+### 3. `STATUS_CONFIG` erweitern
 
-**generateToken** aufteilen in zwei Funktionen:
+```typescript
+paid_with_skonto: { label: 'Bezahlt (Skonto)', variant: 'outline' }
+```
 
-1. `generateShortSuffix()` — 4 Zeichen alphanumerisch
-2. `generateUserToken(user)` — baut `vorname.nachname.XXXX` zusammen:
-   - `user.user_metadata.first_name` + `user.user_metadata.last_name` holen
-   - Lowercase, Umlaute ersetzen (ä→ae, ö→oe, ü→ue, ß→ss), Sonderzeichen entfernen
-   - Fallback: Email-Prefix vor `@`
-   - Zusammen: `${sanitized_first}.${sanitized_last}.${suffix}`
-
-**createConnectionMutation** (Zeile 185): `generateToken()` → `generateUserToken(user)`
-
-**regenerateTokenMutation** (Zeile 239): Gleiche Änderung — beim Regenerieren wird ein neuer Suffix generiert, aber der Name bleibt
-
-### Bestehende Verbindungen
-
-Bestehende Adressen bleiben unverändert — nur neue Verbindungen und Regenerierungen verwenden das neue Format.
+- Auch im Status-Filter als Option hinzufügen
 
 ### Dateien
-- `src/hooks/useEmailImport.ts`
+- `src/pages/Invoices.tsx` — Checkboxen, Bulk-Aktionen, Suchfeld, Datumsfilter, Pagination, Spaltenauswahl
+- `src/hooks/useInvoices.ts` — `paid_with_skonto` Status-Logik
 
