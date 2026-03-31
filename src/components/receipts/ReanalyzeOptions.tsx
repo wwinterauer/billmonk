@@ -134,31 +134,27 @@ export function ReanalyzeOptions({
   const [dialogExtractionHint, setDialogExtractionHint] = useState('');
 
   // AI Re-run handler - supports selective field reanalysis
+  // Uses receiptId path to ensure vendor settings (expenses_only, keywords) are loaded
   const reanalyzeFields = async (fieldsToUpdate: string[]) => {
-    if (!fileUrl || isRerunning || !signedUrl) return;
+    if (!fileUrl || isRerunning || !receiptId) return;
     if (fieldsToUpdate.length === 0) return;
 
     setIsRerunning(true);
 
     try {
-      // 1. Fetch file as blob using the signed URL
-      const response = await fetch(signedUrl);
-      if (!response.ok) {
-        throw new Error('Datei konnte nicht geladen werden');
+      // Call edge function with receiptId so vendor settings are loaded
+      const { data, error } = await supabase.functions.invoke('extract-receipt', {
+        body: { receiptId, forceExtract: true, skipMultiCheck: true }
+      });
+
+      if (error) throw new Error(error.message || 'KI-Analyse fehlgeschlagen');
+      if (!data?.success || !data?.data) {
+        throw new Error(data?.error || 'KI-Erkennung hat keine Daten zurückgegeben');
       }
 
-      const blob = await response.blob();
-      const file = new File([blob], fileName || 'receipt', { type: blob.type });
+      const normalized = data.data;
 
-      // 2. Call AI extraction
-      const extracted = await extractReceiptData(file);
-      const normalized = normalizeExtractionResult(extracted);
-
-      if (!normalized) {
-        throw new Error('KI-Erkennung hat keine Daten zurückgegeben');
-      }
-
-      // 3. Build updates based on selected fields
+      // Build updates based on selected fields
       const updates: Parameters<typeof onFieldsUpdated>[0] = {};
       const changes: string[] = [];
 
@@ -208,12 +204,12 @@ export function ReanalyzeOptions({
 
       updates.confidence = normalized.confidence;
 
-      // 4. Call update callback
+      // Call update callback
       onFieldsUpdated(updates);
 
       toast({
         title: 'KI-Erkennung abgeschlossen',
-        description: `Konfidenz: ${Math.round(normalized.confidence * 100)}% - ${changes.length} Feld(er) aktualisiert`,
+        description: `Konfidenz: ${Math.round((normalized.confidence || 0) * 100)}% - ${changes.length} Feld(er) aktualisiert`,
       });
 
       onReanalyzeComplete?.();

@@ -1298,22 +1298,17 @@ const Expenses = () => {
           continue;
         }
 
-        // For smart/empty modes: use client-side extraction (field-selective)
-        const { data: fileData, error: downloadError } = await supabase.storage
-          .from('receipts')
-          .download(receipt.file_url.replace(/^.*\/receipts\//, ''));
+        // For smart/empty modes: use receiptId path so vendor settings are loaded
+        const { data: extractData, error: extractError } = await supabase.functions.invoke('extract-receipt', {
+          body: { receiptId: receipt.id, forceExtract: true, skipMultiCheck: true }
+        });
 
-        if (downloadError || !fileData) {
+        if (extractError || !extractData?.success || !extractData?.data) {
           results.failed++;
           continue;
         }
 
-        const file = new File([fileData], receipt.file_name || 'receipt', {
-          type: receipt.file_type || 'application/pdf',
-        });
-
-        const extracted = await extractReceiptData(file);
-        const normalized = normalizeExtractionResult(extracted);
+        const normalized = extractData.data;
 
         // Build updates only for selected fields
         const updates: Record<string, unknown> = {};
