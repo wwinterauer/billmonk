@@ -403,6 +403,7 @@ export function ReceiptDetailPanel({
           setIsMixedTaxRate(isMixed);
           setTaxRateDetails(taxDetails);
           setPaymentMethod(data.payment_method || '');
+          setTaxType((receiptData.tax_type as string) || '');
           setNotes(data.notes || '');
           setSelectedVendorId(data.vendor_id || null);
           
