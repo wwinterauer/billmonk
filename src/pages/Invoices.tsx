@@ -32,6 +32,8 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
   paid: { label: 'Bezahlt', variant: 'outline' },
   paid_with_skonto: { label: 'Bezahlt (Skonto)', variant: 'outline' },
   overdue: { label: 'Überfällig', variant: 'destructive' },
+  reminder_1: { label: '1. Mahnung', variant: 'destructive' },
+  reminder_2: { label: '2. Mahnung', variant: 'destructive' },
   cancelled: { label: 'Storniert', variant: 'secondary' },
   credited: { label: 'Gutgeschrieben', variant: 'secondary' },
   corrected: { label: 'Korrigiert', variant: 'secondary' },

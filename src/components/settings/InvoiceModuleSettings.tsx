@@ -16,6 +16,10 @@ export function InvoiceModuleSettings() {
     send_copy_to_self: true,
     overdue_reminder_enabled: false,
     overdue_reminder_days: 7,
+    reminder_stage_1_days: 7,
+    reminder_stage_2_days: 14,
+    reminder_stage_3_days: 14,
+    overdue_email_notify: false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -26,6 +30,10 @@ export function InvoiceModuleSettings() {
         send_copy_to_self: settings.send_copy_to_self ?? true,
         overdue_reminder_enabled: settings.overdue_reminder_enabled ?? false,
         overdue_reminder_days: settings.overdue_reminder_days ?? 7,
+        reminder_stage_1_days: (settings as any).reminder_stage_1_days ?? 7,
+        reminder_stage_2_days: (settings as any).reminder_stage_2_days ?? 14,
+        reminder_stage_3_days: (settings as any).reminder_stage_3_days ?? 14,
+        overdue_email_notify: (settings as any).overdue_email_notify ?? false,
       });
     }
   }, [settings]);
@@ -80,14 +88,36 @@ export function InvoiceModuleSettings() {
             <div className="flex items-center justify-between">
               <div>
                 <Label>Zahlungserinnerungen</Label>
-                <p className="text-xs text-muted-foreground">Automatisch Status auf "Überfällig" setzen</p>
+                <p className="text-xs text-muted-foreground">Automatisch Mahnstufen setzen wenn Rechnung überfällig wird</p>
               </div>
               <Switch checked={form.overdue_reminder_enabled} onCheckedChange={v => setForm(f => ({ ...f, overdue_reminder_enabled: v }))} />
             </div>
             {form.overdue_reminder_enabled && (
-              <div className="max-w-xs">
-                <Label>Tage nach Fälligkeit</Label>
-                <Input type="number" value={form.overdue_reminder_days} onChange={e => setForm(f => ({ ...f, overdue_reminder_days: parseInt(e.target.value) || 7 }))} />
+              <div className="space-y-4 pl-4 border-l-2 border-muted">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-xs">Überfällig nach (Tage)</Label>
+                    <Input type="number" value={form.reminder_stage_1_days} onChange={e => setForm(f => ({ ...f, reminder_stage_1_days: parseInt(e.target.value) || 7 }))} />
+                    <p className="text-[10px] text-muted-foreground mt-1">Status → Überfällig</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs">1. Mahnung nach (Tage)</Label>
+                    <Input type="number" value={form.reminder_stage_2_days} onChange={e => setForm(f => ({ ...f, reminder_stage_2_days: parseInt(e.target.value) || 14 }))} />
+                    <p className="text-[10px] text-muted-foreground mt-1">Status → 1. Mahnung</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs">2. Mahnung nach (Tage)</Label>
+                    <Input type="number" value={form.reminder_stage_3_days} onChange={e => setForm(f => ({ ...f, reminder_stage_3_days: parseInt(e.target.value) || 14 }))} />
+                    <p className="text-[10px] text-muted-foreground mt-1">Status → 2. Mahnung</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>E-Mail-Benachrichtigung</Label>
+                    <p className="text-xs text-muted-foreground">Mich per E-Mail benachrichtigen wenn eine Rechnung überfällig wird</p>
+                  </div>
+                  <Switch checked={form.overdue_email_notify} onCheckedChange={v => setForm(f => ({ ...f, overdue_email_notify: v }))} />
+                </div>
               </div>
             )}
           </div>
