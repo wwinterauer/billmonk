@@ -1,51 +1,70 @@
 
 
-# Plan: Prompt-Versionierung — V1 sichern
+# Plan: Structured Output Test für Lovable AI Gateway
 
-## Übersicht
-Neue Tabelle `prompt_versions` anlegen, `receipts.prompt_version` Spalte hinzufügen, und den kompletten aktuellen Prompt als V1 speichern. Damit kann später ein optimierter V2-Prompt gegengetestet werden.
+## Kontext
 
-## Schritt 1: DB-Migration
+Die Lovable AI Dokumentation empfiehlt für strukturierten Output explizit **Tool Calling** statt `response_format`. Das heißt:
+- `response_format: { type: "json_schema" }` wird möglicherweise **nicht** vom Gateway unterstützt
+- `response_format: { type: "json_object" }` könnte funktionieren, ist aber nicht dokumentiert
+- **Tool Calling** ist der dokumentierte und empfohlene Weg
 
-Eine Migration mit folgenden Änderungen:
+## Was getestet wird
 
-**Tabelle `prompt_versions`:**
-- `id` (uuid, PK, default gen_random_uuid())
-- `version` (text, unique, not null)
-- `name` (text, not null)
-- `system_prompt` (text, not null)
-- `user_prompt_template` (text, not null)
-- `expenses_only_prompt_template` (text, not null)
-- `created_at` (timestamptz, default now())
-- `is_active` (boolean, default false)
-- `metadata` (jsonb, default '{}')
+Drei Varianten in Reihenfolge, mit Fallback-Logik:
 
-RLS aktivieren:
-- SELECT: alle authentifizierten User
-- INSERT/UPDATE/DELETE: nur Admins via `has_role(auth.uid(), 'admin')`
+### Variante 1: `response_format` mit `json_schema` (dein Vorschlag)
+```text
+response_format: {
+  type: "json_schema",
+  json_schema: { name: "receipt_extraction", strict: true, schema: {...} }
+}
+```
 
-**Spalte `receipts.prompt_version`:**
-- `text`, default `'v1'`, nullable
+### Variante 2: `response_format` mit `json_object` (einfacher Fallback)
+```text
+response_format: { type: "json_object" }
+```
 
-## Schritt 2: V1-Prompt als Daten einfügen
+### Variante 3: Tool Calling (Gateway-dokumentiert)
+```text
+tools: [{
+  type: "function",
+  function: {
+    name: "extract_receipt_data",
+    parameters: { vendor_name, total_amount, currency }
+  }
+}],
+tool_choice: { type: "function", function: { name: "extract_receipt_data" } }
+```
 
-Per Insert-Tool den aktuellen Prompt aus `extract-receipt/index.ts` speichern:
+## Implementierung
 
-| Feld | Quelle (Zeilen) |
-|---|---|
-| `system_prompt` | Zeile 447-449 — der kurze System-Prompt |
-| `user_prompt_template` | Zeilen 701-996 — der gesamte User-Prompt inkl. Vendor-Regeln, MwSt-Regeln, JSON-Format |
-| `expenses_only_prompt_template` | Zeilen 475-507 (Keyword-Variante) + Zeilen 509-523 (generische Variante) — als JSON-Objekt mit beiden Varianten |
+Die Edge Function `extract-receipt/index.ts` wird so angepasst:
 
-Metadaten: `{"source_file": "extract-receipt/index.ts", "model": "gemini-3-flash-preview", "token_estimate": 5000}`
+1. **Neuer Query-Parameter** `schema_test=true` aktiviert den Testmodus (nur für manuelles Testen, normaler Betrieb bleibt unverändert)
 
-## Schritt 3: Edge Function anpassen (optional, Phase 2)
+2. Im Testmodus: Alle 3 Varianten werden **sequenziell** mit demselben Bild aufgerufen
 
-Kein sofortiger Code-Umbau nötig. Der aktuelle Prompt bleibt hardcoded im Code. Die Tabelle dient zunächst als **Archiv und Referenz** für das spätere Benchmarking. In Phase 2 kann die Edge Function dann den Prompt dynamisch aus der Tabelle laden.
+3. Jedes Ergebnis wird ausführlich in die **Console geloggt**:
+   - Status-Code der API-Antwort
+   - Ob valides JSON zurückkam
+   - Ob genau die 3 erwarteten Felder vorhanden sind
+   - Die tatsächliche Antwort
+
+4. **Response** enthält einen Vergleichsbericht aller 3 Varianten
 
 ## Technische Details
 
-- Migration nutzt `has_role()` Security-Definer-Funktion (bereits vorhanden) für Admin-RLS
-- `receipts.prompt_version` Default `'v1'` sorgt dafür, dass alle bestehenden und neuen Belege automatisch V1 zugeordnet werden
-- Kein Code-Refactoring in dieser Phase — rein DB-seitige Vorbereitung
+- Zeile ~1004-1026: Der bestehende `body: JSON.stringify({...})` Block wird im Testmodus durch 3 separate Calls ersetzt
+- Der **normale Produktiv-Pfad bleibt komplett unverändert** — der Test läuft nur bei explizitem Flag
+- Alle 3 Calls nutzen einen **vereinfachten Mini-Prompt** ("Extract vendor name, total amount, and currency from this receipt") statt dem vollen Prompt
+- Kosten: ~3 AI-Calls für einen einzigen Testbeleg
+
+## Ergebnis
+
+Nach dem Test wissen wir:
+- Welche Structured-Output-Methode das Gateway unterstützt
+- Ob wir die JSON-Formatbeschreibung aus dem Prompt entfernen können (spart ~1000 Tokens pro Call)
+- Ob Tool Calling die bessere Alternative ist
 
