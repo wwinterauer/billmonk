@@ -375,6 +375,7 @@ serve(async (req) => {
     const body = await req.json();
     accountId = body.accountId;
     const resync = body.resync === true; // Auch gelesene E-Mails erneut prüfen
+    const syncSince = body.syncSince || null; // ISO date string for historical sync
 
     if (!accountId) {
       throw new Error("accountId ist erforderlich");
