@@ -2496,15 +2496,9 @@ const Expenses = () => {
                                     {receipt.duplicate_score || 0}%
                                   </Badge>
                                 )}
-                                {/* Split Booking badge */}
+                                {/* Split Booking icon */}
                                 {splitBookingEnabled && (receipt as any).is_split_booking && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="bg-violet-50 text-violet-700 border-violet-200 text-xs"
-                                  >
-                                    <Layers className="w-3 h-3 mr-1" />
-                                    Splitbuchung
-                                  </Badge>
+                                  <Layers className="w-3.5 h-3.5 text-violet-600" title="Splitbuchung" />
                                 )}
                                 {/* Source Badge for email imports */}
                                 {receipt.source?.startsWith('email_') && (
