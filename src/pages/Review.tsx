@@ -477,6 +477,9 @@ const Review = () => {
         if (formData.vat_rate && !formData.is_mixed_tax_rate) {
           trackFieldChange(trackingVendorId, 'tax_rate', formData.vat_rate);
         }
+        if (formData.tax_type) {
+          trackFieldChange(trackingVendorId, 'tax_type', formData.tax_type);
+        }
       }
 
       if (newStatus) {
