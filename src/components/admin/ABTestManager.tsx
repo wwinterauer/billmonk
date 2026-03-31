@@ -464,7 +464,7 @@ export function ABTestManager() {
               <Card
                 key={run.id}
                 className={`cursor-pointer hover:border-primary/50 transition-colors ${run.status === 'running' ? 'border-yellow-500/50' : ''}`}
-                onClick={() => (run.status === 'completed' || run.status === 'running') && setSelectedRunId(run.id)}
+                    onClick={() => ['completed', 'running', 'stopped', 'error'].includes(run.status) && setSelectedRunId(run.id)}
               >
                 <CardContent className="flex items-center justify-between py-4">
                   <div>
