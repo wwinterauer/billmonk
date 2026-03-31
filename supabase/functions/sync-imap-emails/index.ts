@@ -425,7 +425,7 @@ serve(async (req) => {
     console.log(`Mailbox opened: ${mailbox.exists} messages`);
 
     // E-Mails verarbeiten
-    const result = await processEmails(client, supabase, account, resync);
+    const result = await processEmails(client, supabase, account, resync, syncSince);
 
     // Verbindung schließen
     await client.logout();
