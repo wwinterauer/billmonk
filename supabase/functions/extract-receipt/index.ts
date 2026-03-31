@@ -118,7 +118,7 @@ const extractionSchema = {
     "reason", "vendor_brand", "vendor_address", "vendor_uid",
     "vendor_legal_form", "vendor_country", "receipt_date", "due_date",
     "receipt_number", "net_amount", "tax_amount", "is_mixed_tax_rate",
-    "tax_rate_details", "payment_method", "description", "line_items",
+    "tax_rate_details", "description", "line_items",
     "vat_confidence", "vat_detection_method", "special_vat_case", "notes",
   ],
   additionalProperties: false,
