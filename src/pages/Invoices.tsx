@@ -386,6 +386,38 @@ const Invoices = () => {
             </div>
           </CardHeader>
           <CardContent>
+            <AnimatePresence>
+              {someSelected && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-muted/50 rounded-lg"
+                >
+                  <Badge variant="secondary">{selectedIds.size} ausgewählt</Badge>
+                  <Button size="sm" variant="outline" className="border-green-600 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950" onClick={() => handleBulk('paid')}>
+                    <CheckCircle className="h-4 w-4 mr-1" /> Als bezahlt
+                  </Button>
+                  {hasSkontoCandidates && (
+                    <Button size="sm" variant="outline" className="border-green-600 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950" onClick={() => handleBulk('paid_with_skonto')}>
+                      <Percent className="h-4 w-4 mr-1" /> Bezahlt (Skonto)
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" onClick={() => handleBulk('sent')}>
+                    <Send className="h-4 w-4 mr-1" /> Als versendet
+                  </Button>
+                  <Button size="sm" variant="outline" className="border-destructive text-destructive hover:bg-destructive/10" onClick={() => handleBulk('cancelled')}>
+                    <XCircle className="h-4 w-4 mr-1" /> Stornieren
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => setBulkDeleteOpen(true)}>
+                    <Trash2 className="h-4 w-4 mr-1" /> Löschen
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+                    Auswahl aufheben
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
             {loading ? (
               <p className="text-muted-foreground text-center py-8">Laden…</p>
             ) : filtered.length === 0 ? (
