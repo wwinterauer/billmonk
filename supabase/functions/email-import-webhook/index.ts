@@ -8,13 +8,19 @@ const corsHeaders = {
 
 // Rate limiting: Track requests per token
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+// IP-based rate limiting to prevent token enumeration
+const ipRateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const RATE_LIMIT_MAX_REQUESTS = 20; // Max 20 emails per hour per token
+const IP_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const IP_RATE_LIMIT_MAX_REQUESTS = 50; // Max 50 requests per 10 min per IP
 
 // Maximum file size per attachment (10MB)
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 // Maximum total attachments per email
 const MAX_ATTACHMENTS_PER_EMAIL = 20;
+// Minimum file size (to reject empty/corrupt files)
+const MIN_ATTACHMENT_SIZE = 64;
 
 interface EmailAttachment {
   filename: string;
@@ -30,8 +36,25 @@ interface InboundEmail {
   text?: string;
   html?: string;
   attachments?: EmailAttachment[];
-  // Token from email address like receipts+TOKEN@domain.com
   token?: string;
+}
+
+// Check IP-based rate limit
+function checkIpRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const record = ipRateLimitMap.get(ip);
+
+  if (!record || now > record.resetTime) {
+    ipRateLimitMap.set(ip, { count: 1, resetTime: now + IP_RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  if (record.count >= IP_RATE_LIMIT_MAX_REQUESTS) {
+    return false;
+  }
+
+  record.count++;
+  return true;
 }
 
 // Check rate limit for a token
@@ -52,6 +75,37 @@ function checkRateLimit(token: string): { allowed: boolean; remaining: number } 
   return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - record.count };
 }
 
+// Verify webhook signature (HMAC-SHA256)
+async function verifyWebhookSignature(
+  body: string,
+  signature: string | null,
+  secret: string
+): Promise<boolean> {
+  if (!signature) return false;
+
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(body));
+  const expectedSig = Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  // Constant-time comparison
+  if (signature.length !== expectedSig.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < signature.length; i++) {
+    mismatch |= signature.charCodeAt(i) ^ expectedSig.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
 // Validate file content type
 function isValidContentType(contentType: string | undefined, filename: string): boolean {
   const validMimeTypes = [
@@ -61,49 +115,60 @@ function isValidContentType(contentType: string | undefined, filename: string): 
     "image/gif",
     "image/webp",
   ];
-  
+
   const validExtensions = [".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp"];
   const ext = filename.toLowerCase().match(/\.[^.]+$/)?.[0] || "";
-  
+
   return validMimeTypes.includes(contentType?.toLowerCase() || "") || validExtensions.includes(ext);
 }
 
-// Verify file content matches declared type via magic bytes
+// Verify file content matches declared type via magic bytes (deep check)
 function verifyMagicBytes(content: Uint8Array, declaredType: string): boolean {
-  if (content.length < 4) return false;
-  
-  const pdfMagic = [0x25, 0x50, 0x44, 0x46]; // %PDF
-  const jpegMagic = [0xFF, 0xD8, 0xFF];
-  const pngMagic = [0x89, 0x50, 0x4E, 0x47]; // .PNG
-  const gifMagic87 = [0x47, 0x49, 0x46, 0x38, 0x37]; // GIF87
-  const gifMagic89 = [0x47, 0x49, 0x46, 0x38, 0x39]; // GIF89
-  const webpMagic = [0x52, 0x49, 0x46, 0x46]; // RIFF (WebP starts with RIFF)
-  
+  if (content.length < 8) return false;
+
   const type = declaredType.toLowerCase();
-  
+
   if (type.includes("pdf")) {
-    return content.slice(0, 4).every((b, i) => b === pdfMagic[i]);
+    // Check %PDF header
+    if (!(content[0] === 0x25 && content[1] === 0x50 && content[2] === 0x44 && content[3] === 0x46)) return false;
+    // Additional: check for %%EOF marker in last 1024 bytes (valid PDF structure)
+    const tail = content.slice(Math.max(0, content.length - 1024));
+    const tailStr = new TextDecoder("ascii", { fatal: false }).decode(tail);
+    if (!tailStr.includes("%%EOF")) {
+      console.warn("PDF missing %%EOF trailer — possibly truncated or malformed");
+      // Allow but log — some valid PDFs from scanners lack this
+    }
+    return true;
   }
   if (type.includes("jpeg") || type.includes("jpg")) {
-    return content.slice(0, 3).every((b, i) => b === jpegMagic[i]);
+    // SOI marker + check for valid JFIF/Exif APP marker
+    if (!(content[0] === 0xFF && content[1] === 0xD8 && content[2] === 0xFF)) return false;
+    // APP0 (JFIF) = 0xE0, APP1 (Exif) = 0xE1, APP2 = 0xE2, etc.
+    if (content[3] < 0xE0 && content[3] !== 0xDB && content[3] !== 0xC0) return false;
+    return true;
   }
   if (type.includes("png")) {
-    return content.slice(0, 4).every((b, i) => b === pngMagic[i]);
+    // Full 8-byte PNG signature
+    const pngSig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    return content.slice(0, 8).every((b, i) => b === pngSig[i]);
   }
   if (type.includes("gif")) {
-    return content.slice(0, 5).every((b, i) => b === gifMagic87[i]) ||
-           content.slice(0, 5).every((b, i) => b === gifMagic89[i]);
+    // GIF87a or GIF89a
+    const g = String.fromCharCode(...content.slice(0, 6));
+    return g === "GIF87a" || g === "GIF89a";
   }
   if (type.includes("webp")) {
-    return content.slice(0, 4).every((b, i) => b === webpMagic[i]);
+    // RIFF....WEBP
+    if (!(content[0] === 0x52 && content[1] === 0x49 && content[2] === 0x46 && content[3] === 0x46)) return false;
+    if (content.length < 12) return false;
+    return content[8] === 0x57 && content[9] === 0x45 && content[10] === 0x42 && content[11] === 0x50;
   }
-  
+
   return false; // Unknown type, reject
 }
 
 // Sanitize filename to prevent path traversal
 function sanitizeFilename(filename: string): string {
-  // Remove path components and special characters
   return filename
     .replace(/[\/\\:*?"<>|]/g, "_")
     .replace(/\.\./g, "_")
@@ -111,36 +176,83 @@ function sanitizeFilename(filename: string): string {
     .slice(0, 255);
 }
 
+// Extract client IP from request
+function getClientIp(req: Request): string {
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    req.headers.get("cf-connecting-ip") ||
+    "unknown"
+  );
+}
+
 serve(async (req: Request) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // IP-based rate limiting (before any processing)
+    const clientIp = getClientIp(req);
+    if (!checkIpRateLimit(clientIp)) {
+      console.warn("IP rate limit exceeded:", clientIp);
+      return new Response(JSON.stringify({ error: "Too many requests" }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "600" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const webhookSecret = Deno.env.get("EMAIL_WEBHOOK_SECRET");
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Parse incoming email webhook (format depends on email service)
+    // Read raw body for signature verification
+    const rawBody = await req.text();
+
+    // Webhook signature verification (if secret is configured)
+    if (webhookSecret) {
+      const signature = req.headers.get("x-webhook-signature");
+      const isValid = await verifyWebhookSignature(rawBody, signature, webhookSecret);
+      if (!isValid) {
+        console.error("Invalid webhook signature from IP:", clientIp);
+        return new Response(JSON.stringify({ error: "Invalid signature" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Parse incoming email webhook
     const contentType = req.headers.get("content-type") || "";
     let emailData: InboundEmail;
 
     if (contentType.includes("application/json")) {
-      emailData = await req.json();
+      try {
+        emailData = JSON.parse(rawBody);
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     } else if (contentType.includes("multipart/form-data")) {
-      // Handle form data from services like Postmark, SendGrid
-      const formData = await req.formData();
+      // Re-create request with the raw body for formData parsing
+      const formReq = new Request(req.url, {
+        method: req.method,
+        headers: req.headers,
+        body: rawBody,
+      });
+      const formData = await formReq.formData();
       emailData = {
-        from: formData.get("from") as string || formData.get("From") as string || "",
-        to: formData.get("to") as string || formData.get("To") as string || "",
-        subject: formData.get("subject") as string || formData.get("Subject") as string || "",
-        text: formData.get("text") as string || formData.get("TextBody") as string || "",
-        html: formData.get("html") as string || formData.get("HtmlBody") as string || "",
+        from: (formData.get("from") as string) || (formData.get("From") as string) || "",
+        to: (formData.get("to") as string) || (formData.get("To") as string) || "",
+        subject: (formData.get("subject") as string) || (formData.get("Subject") as string) || "",
+        text: (formData.get("text") as string) || (formData.get("TextBody") as string) || "",
+        html: (formData.get("html") as string) || (formData.get("HtmlBody") as string) || "",
         attachments: [],
       };
 
-      // Try to parse attachments from common formats
       const attachmentsJson = formData.get("attachments") || formData.get("Attachments");
       if (attachmentsJson && typeof attachmentsJson === "string") {
         try {
@@ -150,12 +262,9 @@ serve(async (req: Request) => {
         }
       }
     } else {
-      // Try to parse as JSON anyway
-      const text = await req.text();
       try {
-        emailData = JSON.parse(text);
+        emailData = JSON.parse(rawBody);
       } catch {
-        console.error("Could not parse request body");
         return new Response(JSON.stringify({ error: "Invalid request format" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -163,22 +272,33 @@ serve(async (req: Request) => {
       }
     }
 
+    // Input validation
+    if (!emailData.to || typeof emailData.to !== "string" || emailData.to.length > 500) {
+      return new Response(JSON.stringify({ error: "Invalid recipient" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (emailData.from && (typeof emailData.from !== "string" || emailData.from.length > 500)) {
+      return new Response(JSON.stringify({ error: "Invalid sender" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     console.log("Received email from:", emailData.from);
     console.log("To:", emailData.to);
-    console.log("Subject:", emailData.subject);
+    console.log("Subject:", emailData.subject?.slice(0, 100));
     console.log("Attachments count:", emailData.attachments?.length || 0);
 
     // Extract token from recipient email address
-    // Format: receipts+TOKEN@domain.com or TOKEN@receipts.domain.com
     let token = emailData.token;
     if (!token && emailData.to) {
       const toAddress = emailData.to.toLowerCase();
-      // Try format: prefix+TOKEN@domain
       const plusMatch = toAddress.match(/\+([a-z0-9]+)@/);
       if (plusMatch) {
         token = plusMatch[1];
       } else {
-        // Try format: TOKEN@subdomain
         const subdomainMatch = toAddress.match(/^([a-z0-9]+)@/);
         if (subdomainMatch) {
           token = subdomainMatch[1];
@@ -186,7 +306,7 @@ serve(async (req: Request) => {
       }
     }
 
-    if (!token || token.length < 12) {
+    if (!token || token.length < 12 || !/^[a-z0-9]+$/.test(token)) {
       console.error("No valid token found in email address");
       return new Response(JSON.stringify({ error: "Invalid import address" }), {
         status: 400,
@@ -200,8 +320,8 @@ serve(async (req: Request) => {
       console.warn("Rate limit exceeded for token:", token.slice(0, 4) + "...");
       return new Response(JSON.stringify({ error: "Rate limit exceeded. Try again later." }), {
         status: 429,
-        headers: { 
-          ...corsHeaders, 
+        headers: {
+          ...corsHeaders,
           "Content-Type": "application/json",
           "Retry-After": "3600",
         },
@@ -217,8 +337,8 @@ serve(async (req: Request) => {
       .single();
 
     if (connectionError || !connection) {
-      // Log failed attempts for security monitoring (don't expose token in logs)
       console.error("Email connection not found for token:", token.slice(0, 4) + "...");
+      // Return generic error to prevent token enumeration
       return new Response(JSON.stringify({ error: "Invalid or inactive import address" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -234,8 +354,8 @@ serve(async (req: Request) => {
       .insert({
         email_connection_id: connection.id,
         user_id: userId,
-        from_address: emailData.from,
-        subject: emailData.subject,
+        from_address: emailData.from?.slice(0, 500),
+        subject: emailData.subject?.slice(0, 1000),
         status: "processing",
         attachments_count: emailData.attachments?.length || 0,
         raw_data: {
@@ -253,28 +373,37 @@ serve(async (req: Request) => {
 
     // Process attachments with security validation
     const attachments = emailData.attachments || [];
-    
-    // Limit number of attachments
+
     if (attachments.length > MAX_ATTACHMENTS_PER_EMAIL) {
       console.warn(`Too many attachments (${attachments.length}), limiting to ${MAX_ATTACHMENTS_PER_EMAIL}`);
     }
-    
+
     const validAttachments = attachments
       .slice(0, MAX_ATTACHMENTS_PER_EMAIL)
       .filter((att) => {
-        // Validate content type and extension
+        if (!att.filename || typeof att.filename !== "string") {
+          console.log("Skipping attachment with missing filename");
+          return false;
+        }
+        if (!att.content || typeof att.content !== "string") {
+          console.log("Skipping attachment with missing content");
+          return false;
+        }
         if (!isValidContentType(att.contentType, att.filename || "")) {
-          console.log(`Skipping invalid content type: ${att.contentType} for ${att.filename}`);
+          console.log(`Skipping invalid content type: ${att.contentType} for ${sanitizeFilename(att.filename)}`);
           return false;
         }
-        
-        // Validate file size
-        const size = att.size || (att.content ? att.content.length * 0.75 : 0); // Base64 is ~4/3 of original
+
+        const size = att.size || (att.content ? att.content.length * 0.75 : 0);
         if (size > MAX_ATTACHMENT_SIZE) {
-          console.log(`Skipping oversized file: ${att.filename} (${size} bytes)`);
+          console.log(`Skipping oversized file: ${sanitizeFilename(att.filename)} (${size} bytes)`);
           return false;
         }
-        
+        if (size < MIN_ATTACHMENT_SIZE) {
+          console.log(`Skipping too-small file: ${sanitizeFilename(att.filename)} (${size} bytes)`);
+          return false;
+        }
+
         return true;
       });
 
@@ -286,20 +415,27 @@ serve(async (req: Request) => {
     for (const attachment of validAttachments) {
       try {
         // Decode base64 content
-        const binaryContent = Uint8Array.from(atob(attachment.content), (c) => c.charCodeAt(0));
-        
+        let binaryContent: Uint8Array;
+        try {
+          binaryContent = Uint8Array.from(atob(attachment.content), (c) => c.charCodeAt(0));
+        } catch {
+          console.warn(`Invalid base64 for ${sanitizeFilename(attachment.filename)}, skipping`);
+          errors.push(`Invalid encoding for ${sanitizeFilename(attachment.filename)}`);
+          continue;
+        }
+
         // Verify magic bytes match declared content type
         if (!verifyMagicBytes(binaryContent, attachment.contentType || attachment.filename)) {
           console.warn(`Magic byte mismatch for ${sanitizeFilename(attachment.filename)}, skipping`);
           errors.push(`Invalid file content for ${sanitizeFilename(attachment.filename)}`);
           continue;
         }
-        
+
         // Generate file hash for duplicate detection
-        const hashBuffer = await crypto.subtle.digest('SHA-256', binaryContent);
+        const hashBuffer = await crypto.subtle.digest("SHA-256", binaryContent);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        
+        const fileHash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
         // Generate unique filename with proper sanitization
         const timestamp = Date.now();
         const randomSuffix = crypto.randomUUID().slice(0, 8);
@@ -314,13 +450,13 @@ serve(async (req: Request) => {
             email_import_id: importLog?.id || null,
             user_id: userId,
             email_message_id: null,
-            email_subject: emailData.subject,
-            email_from: emailData.from,
+            email_subject: emailData.subject?.slice(0, 1000),
+            email_from: emailData.from?.slice(0, 500),
             email_received_at: new Date().toISOString(),
             attachment_filename: attachment.filename,
             attachment_content_type: attachment.contentType,
             attachment_size: attachment.size || binaryContent.length,
-            status: 'processing',
+            status: "processing",
             file_hash: fileHash,
             storage_path: storagePath,
           })
@@ -329,7 +465,7 @@ serve(async (req: Request) => {
 
         if (attachmentError) {
           console.error("Error creating email attachment:", attachmentError);
-          errors.push(`Attachment record failed for ${sanitizeFilename(attachment.filename)}`);
+          errors.push(`Attachment record failed for ${sanitizedFilename}`);
           continue;
         }
 
@@ -342,11 +478,11 @@ serve(async (req: Request) => {
           .maybeSingle();
 
         if (existingReceipt) {
-          console.log("Duplicate detected for:", attachment.filename);
+          console.log("Duplicate detected for:", sanitizedFilename);
           await supabase
             .from("email_attachments")
-            .update({ 
-              status: 'duplicate', 
+            .update({
+              status: "duplicate",
               is_duplicate: true,
               duplicate_of: emailAttachment.id,
               processed_at: new Date().toISOString(),
@@ -367,13 +503,13 @@ serve(async (req: Request) => {
           console.error("Upload error:", uploadError);
           await supabase
             .from("email_attachments")
-            .update({ status: 'error', error_message: 'File upload failed' })
+            .update({ status: "error", error_message: "File upload failed" })
             .eq("id", emailAttachment.id);
-          errors.push(`Upload failed for ${sanitizeFilename(attachment.filename)}`);
+          errors.push(`Upload failed for ${sanitizedFilename}`);
           continue;
         }
 
-        // Create receipt record with source and email_attachment_id
+        // Create receipt record
         const { data: receipt, error: receiptError } = await supabase
           .from("receipts")
           .insert({
@@ -385,7 +521,7 @@ serve(async (req: Request) => {
             status: "pending",
             source: "email_webhook",
             email_attachment_id: emailAttachment.id,
-            notes: `Importiert via E-Mail von ${emailData.from}${emailData.subject ? ` - Betreff: ${emailData.subject}` : ""}`,
+            notes: `Importiert via E-Mail von ${emailData.from?.slice(0, 200)}${emailData.subject ? ` - Betreff: ${emailData.subject.slice(0, 200)}` : ""}`,
           })
           .select()
           .single();
@@ -394,17 +530,17 @@ serve(async (req: Request) => {
           console.error("Error creating receipt:", receiptError);
           await supabase
             .from("email_attachments")
-            .update({ status: 'error', error_message: 'Receipt creation failed' })
+            .update({ status: "error", error_message: "Receipt creation failed" })
             .eq("id", emailAttachment.id);
-          errors.push(`Receipt creation failed for ${sanitizeFilename(attachment.filename)}`);
+          errors.push(`Receipt creation failed for ${sanitizedFilename}`);
           continue;
         }
 
         // Update email attachment with receipt reference
         await supabase
           .from("email_attachments")
-          .update({ 
-            status: 'imported', 
+          .update({
+            status: "imported",
             receipt_id: receipt.id,
             processed_at: new Date().toISOString(),
           })
@@ -412,13 +548,13 @@ serve(async (req: Request) => {
 
         console.log("Created receipt:", receipt.id, "from attachment:", emailAttachment.id);
 
-        // Trigger AI extraction (call the existing edge function)
+        // Trigger AI extraction
         try {
           const extractResponse = await fetch(`${supabaseUrl}/functions/v1/extract-receipt`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": `Bearer ${supabaseServiceKey}`,
+              Authorization: `Bearer ${supabaseServiceKey}`,
             },
             body: JSON.stringify({ receiptId: receipt.id }),
           });
@@ -446,7 +582,7 @@ serve(async (req: Request) => {
         .update({
           status: errors.length > 0 ? "partial" : "completed",
           processed_receipts: processedCount,
-          error_message: errors.length > 0 ? errors.join("; ") : null,
+          error_message: errors.length > 0 ? errors.join("; ").slice(0, 2000) : null,
         })
         .eq("id", importLog.id);
     }
