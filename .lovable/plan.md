@@ -1,67 +1,44 @@
 
 
-# Fix: Expenses-Only Prompt — V1-Logik für Netto/MwSt übernehmen
+# Fix: VAT Consistency Rule 0 zerstört Mixed-Tax-Rate Ergebnisse
 
 ## Problem
 
-Der V2 `buildExpensesOnlyPrompt` sagt nur abstrakt "Pro Treffer: Brutto, Netto, MwSt-Satz, MwSt-Betrag erfassen" mit `Netto = Brutto / (1 + MwSt-Satz/100)`. Das reicht nicht — die KI berechnet die Aufteilung falsch.
+Die Monta-Rechnung enthält sowohl 0% (Transaktionsgebühren) als auch 20% (Ladegebühr, Betreiber-Abonnement) Positionen. Das Expenses-Only-Prompt-Update funktioniert korrekt — aber die **Post-Processing VAT Consistency Rules** (Zeilen 744-785) überschreiben das Ergebnis.
 
-Der V1-Prompt (in `prompt_versions.expenses_only_prompt_template`) hatte es richtig: Er verlangt explizit pro Position Brutto, Netto, MwSt-Satz UND MwSt-Betrag und nutzt die bewährte Summenregel.
+**Rule 0** (Zeile 747-753) sucht im AI-Response-Text nach dem Pattern `0.00% USt`. Die Monta-Rechnung enthält diesen Text bei den Transaktionsgebühren. Rule 0 greift und setzt:
+- `vat_rate = 0`
+- `vat_amount = 0`
+- `amount_net = amount_gross`
 
-Zusätzlich enthält der **Hauptprompt** (Zeile 600) die korrekte Formel mit Validierung:
-> `MwSt = Brutto × Satz/(100+Satz). Validiere: Netto + MwSt = Brutto (±0.05€)`
-
-Diese fehlt im Expenses-Only-Block komplett.
+Damit werden die korrekt berechneten mixed-tax Werte komplett überschrieben.
 
 ## Lösung
 
-`buildExpensesOnlyPrompt()` (Zeilen 203-221) mit V1-Logik + Hauptprompt-Formel ersetzen:
+In `supabase/functions/extract-receipt/index.ts`, Zeilen 747-753: Rule 0 darf **nicht greifen wenn `is_mixed_tax_rate === true`**, da bei gemischten Sätzen sowohl 0% als auch andere Sätze vorkommen können.
 
-### Keyword-Variante (Zeilen 204-221)
+### Änderung
 
-```
-WICHTIG – NUR AUSGABEN EXTRAHIEREN:
-Dieser Beleg enthält sowohl Einnahmen/Gutschriften als auch Kosten.
-Extrahiere AUSSCHLIESSLICH die Positionen, die eines dieser Schlagwörter enthalten: ${keywords}
-Ignoriere alle anderen Zeilen (Einnahmen, Gutschriften, Auszahlungen).
-
-STRENGE FILTERREGEL:
-- Eine Zeile wird NUR erfasst, wenn ihr Text eines der obigen Schlagwörter wörtlich enthält
-- Wenn eine Zeile KEINES dieser Schlagwörter enthält → KOMPLETT IGNORIEREN
-- Es zählen NUR exakte Treffer — keine Synonyme
-
-FÜR JEDE gefundene Position:
-- Erfasse Bruttobetrag, Nettobetrag, MwSt-Satz und MwSt-Betrag
-- Berechne: MwSt = Brutto × Satz/(100+Satz), Validiere: Netto + MwSt = Brutto (±0.05€)
-- Bei 0% MwSt: Netto = Brutto, MwSt = 0
-- Ein Schlagwort kann MEHRFACH vorkommen → jede Zeile einzeln erfassen
-
-SUMMIERUNG:
-- amount_gross = Summe ALLER gefundenen Positionen (Brutto)
-- amount_net = Summe ALLER gefundenen Positionen (Netto)
-- vat_amount = Summe ALLER Steuerbeträge
-- Bei verschiedenen MwSt-Sätzen: is_mixed_tax_rate=true, tax_rate_details ausfüllen
-  (rate, net_amount, tax_amount, description PRO Steuersatz-Gruppe)
-
-DUPLIKAT-VERMEIDUNG:
-- Jede Zeile genau EINMAL zählen
-- Nur Einzelpositionen, NICHT Summen-/Zwischensummenzeilen
-
-BETRAGS-REGELN:
-- Alle Beträge POSITIV
-- Gutschriften/Erstattungen komplett ignorieren
-
-description: Gefundene Positionen mit Beträgen auflisten
+```typescript
+// Rule 0: Explicit 0% in document — skip for mixed tax rate receipts
+const zeroVatPattern = /0[,.]?0{0,2}\s*%\s*(USt|MwSt|Ust|mwst|umsatzsteuer)/i;
+if (zeroVatPattern.test(content) && extractedData.vat_rate !== 0 && !extractedData.is_mixed_tax_rate) {
 ```
 
-### Kernänderungen vs. aktuellem Code
+Einzige Änderung: `&& !extractedData.is_mixed_tax_rate` zur Bedingung hinzufügen.
 
-1. **V1-Filterregel** zurück: "Strenge Filterregel" mit exakten Treffern statt vager Anweisung
-2. **Hauptprompt-Formel**: `MwSt = Brutto × Satz/(100+Satz)` + Validierung `±0.05€` (Zeile 600)
-3. **0%-Sonderfall** explizit: `Netto = Brutto, MwSt = 0`
-4. **V1-Duplikat-Vermeidung** zurück: Einzelpositionen vs. Summenzeilen
-5. **tax_rate_details**: Pro Steuersatz-Gruppe mit `rate/net_amount/tax_amount/description`
+Zusätzlich sollten auch **Rules 1-4** bei `is_mixed_tax_rate === true` übersprungen werden, da diese für Single-Rate-Belege gedacht sind und bei Mixed-Rate die AI-berechneten Summen (net/vat) aus den `tax_rate_details` korrekt sein sollten.
+
+### Vollständige Änderung (Zeilen 744-785)
+
+```typescript
+// ── Post-Processing: VAT consistency (skip for mixed tax rates) ──
+if (extractedData.amount_gross != null && !extractedData.is_mixed_tax_rate) {
+  // Rule 0 ... Rule 4 bleiben unverändert, aber sind jetzt 
+  // nur aktiv wenn KEIN gemischter Steuersatz vorliegt
+}
+```
 
 ### Datei
-- `supabase/functions/extract-receipt/index.ts` — `buildExpensesOnlyPrompt()`, Zeilen 203-231
+- `supabase/functions/extract-receipt/index.ts` — Zeilen 744-786: gesamten VAT Consistency Block mit `!extractedData.is_mixed_tax_rate` Guard umschließen
 
