@@ -167,7 +167,6 @@ export function ABTestManager() {
           tax_amount: r.vat_amount,
           category: r.category,
           receipt_date: r.receipt_date,
-          payment_method: r.payment_method,
         },
       }));
 

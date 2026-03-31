@@ -263,7 +263,7 @@ async function processBatch(
       }
 
       // ── V2 Call ─────────────────────────────────────────────
-      const v2UserPrompt = v2Prompt.user_prompt_template.replace("{{categories}}", categoryList);
+      const v2UserPrompt = v2Prompt.user_prompt_template.replace("{{categories}}", categoryList) + vendorContextPrompt;
       const v2Response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
