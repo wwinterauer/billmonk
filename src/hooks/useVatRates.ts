@@ -90,7 +90,10 @@ export function useVatRates() {
   });
 
   const country = userCountry || 'AT';
-
+  const defaultVatRate = useMemo(() => {
+    const group = DACH_RATES[country];
+    return group?.rates[0]?.value || '20';
+  }, [country]);
   const vatRateGroups = useMemo<VatRateGroup[]>(() => {
     // 1. DACH groups sorted by user country first
     const dachOrder = [country, ...['AT', 'DE', 'CH'].filter(c => c !== country)];
