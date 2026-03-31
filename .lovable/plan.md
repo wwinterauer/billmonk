@@ -1,32 +1,33 @@
 
 
-# Wiederkehrende Rechnungen: Freigabe-Workflow statt Auto-Versand
+# Auto-Versand & Mahnwesen — Aktualisierter Plan
 
-## Problem
+## Umgesetzt
 
-Aktuell setzt die Cron-Funktion wiederkehrende Rechnungen bei `auto_send = true` direkt auf Status `"sent"` und versendet die E-Mail automatisch. Der User will aber, dass **alle** wiederkehrenden Rechnungen zunächst nur generiert und zur Freigabe vorgelegt werden — kein automatischer Versand ohne manuelle Bestätigung.
+### Freigabe-Workflow (statt Auto-Versand)
+- Die Cron-Funktion `cron-generate-invoices` erzeugt wiederkehrende Rechnungen **immer als Entwurf** (`status: "draft"`)
+- PDF wird automatisch generiert (für Vorschau), aber **keine E-Mail** wird verschickt
+- Der User muss jede wiederkehrende Rechnung manuell prüfen und freigeben
+- In der Rechnungsübersicht wird bei wiederkehrenden Entwürfen ein 🔄-Icon mit Tooltip "Wiederkehrend — wartet auf Freigabe" angezeigt
 
-## Änderungen
+### Mahnwesen (mehrstufig)
+- Tabelle `invoice_reminders` für Mahnstufen-Tracking
+- Spalten in `invoice_settings`: `reminder_stage_1_days`, `reminder_stage_2_days`, `reminder_stage_3_days`, `overdue_email_notify`
+- Cron-Logik: Pro User werden `overdue_reminder_enabled` und die Intervalle geprüft
+  - Stufe 1: `sent` → `overdue` (nach `reminder_stage_1_days` Tagen)
+  - Stufe 2: `overdue` → `reminder_1` (nach zusätzlich `reminder_stage_2_days` Tagen)
+  - Stufe 3: `reminder_1` → `reminder_2` (nach zusätzlich `reminder_stage_3_days` Tagen)
+- Status-Badges: "1. Mahnung" (destructive), "2. Mahnung" (destructive)
 
-### 1. `supabase/functions/cron-generate-invoices/index.ts`
+### Cron-Job
+- pg_cron: täglich um 06:00 UTC
+- Ruft `cron-generate-invoices` Edge Function auf
 
-- Zeile 87: Status immer auf `"draft"` setzen, unabhängig von `auto_send`
-- Zeile 96: `sent_at` immer auf `null`
-- Zeilen 138-200: Den gesamten Auto-Send-Block (PDF generieren + E-Mail senden) entfernen
-- PDF wird trotzdem generiert (damit der User sie in der Vorschau sehen kann), aber **keine E-Mail** wird verschickt
-- Optional: Einen Hinweis-Marker setzen (z.B. ein Feld oder die Verknüpfung über `recurring_invoice_id`), damit die Rechnungsübersicht erkennt, dass diese Rechnung aus einer wiederkehrenden Vorlage stammt und auf Freigabe wartet
-
-### 2. `src/pages/Invoices.tsx` — Visueller Hinweis
-
-- Bei Rechnungen mit `status === "draft"` und vorhandener `recurring_invoice_id`: einen kleinen Badge oder Hinweis anzeigen (z.B. "Wiederkehrend — wartet auf Freigabe")
-- Der User kann die Rechnung dann wie gewohnt über die bestehenden Aktionen prüfen, bearbeiten und manuell versenden
-
-### 3. `.lovable/plan.md` aktualisieren
-
-Den Plan anpassen: Auto-Send-Logik wird durch einen Freigabe-Workflow ersetzt. Die Cron-Funktion generiert nur noch Entwürfe.
-
-### Dateien
-- `supabase/functions/cron-generate-invoices/index.ts` — Status immer `draft`, Auto-Send-Block entfernen
-- `src/pages/Invoices.tsx` — Badge für wiederkehrende Entwürfe
-- `.lovable/plan.md` — Plan aktualisieren
-
+## Dateien
+| Datei | Status |
+|-------|--------|
+| `supabase/functions/cron-generate-invoices/index.ts` | ✅ Umgesetzt |
+| `src/pages/Invoices.tsx` | ✅ Umgesetzt |
+| `src/components/settings/InvoiceModuleSettings.tsx` | ✅ Umgesetzt |
+| DB-Migration (invoice_reminders + invoice_settings Spalten) | ✅ Umgesetzt |
+| pg_cron Job | ✅ Eingerichtet |
