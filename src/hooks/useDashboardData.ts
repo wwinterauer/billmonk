@@ -240,6 +240,31 @@ export function useDashboardData(year: number, month: number) {
         }))
         .sort((a, b) => b.total - a.total);
 
+      // Calculate tax_type totals (split-aware)
+      const taxTypeMap = new Map<string, number>();
+      billableReceipts.forEach(r => {
+        if ((r as any).is_split_booking) {
+          const lines = splitByReceipt.get(r.id);
+          if (lines && lines.length > 0) {
+            lines.forEach((line: any) => {
+              const tt = line.tax_type || 'Offen';
+              taxTypeMap.set(tt, (taxTypeMap.get(tt) || 0) + (line.amount_gross || 0));
+            });
+            return;
+          }
+        }
+        const tt = (r as any).tax_type || 'Offen';
+        taxTypeMap.set(tt, (taxTypeMap.get(tt) || 0) + (r.amount_gross || 0));
+      });
+
+      const ttData: TaxTypeData[] = Array.from(taxTypeMap.entries())
+        .map(([taxType, total]) => ({
+          taxType,
+          total,
+          color: TAX_TYPE_COLORS[taxType] || '#94A3B8',
+        }))
+        .sort((a, b) => b.total - a.total);
+
       // Calculate tag totals
       const tagMap = new Map<string, { id: string; name: string; color: string; total: number; count: number }>();
       const taggedReceiptIds = new Set<string>();
