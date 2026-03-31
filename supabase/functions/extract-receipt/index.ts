@@ -776,7 +776,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           extractedData.is_mixed_tax_rate = true;
           extractedData.amount_net = Math.round(extractedData.tax_rate_details.reduce((s: number, t: any) => s + t.net_amount, 0) * 100) / 100;
           extractedData.vat_amount = Math.round(extractedData.tax_rate_details.reduce((s: number, t: any) => s + t.tax_amount, 0) * 100) / 100;
-          console.log(`[VAT Mixed] Fallback recalc: net=${extractedData.amount_net}, vat=${extractedData.vat_amount}`);
+          
         }
       }
 
