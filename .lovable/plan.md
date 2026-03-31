@@ -1,84 +1,65 @@
 
 
-# Plan: Kategorie vs. Buchungsart (tax_type) Trennung
-
-## Übersicht
-
-Neues Feld `tax_type` (steuerliche Einordnung) zur `receipts`-Tabelle hinzufügen, von der bestehenden `category` (persönliche Organisation) trennen. AI-Extraktion wird um `tax_type` erweitert. UI in Review, ReceiptDetailPanel und Expenses wird angepasst.
+# Plan: Split-Buchungen um tax_type, payment_method und Vendor-Learning erweitern
 
 ## 1. DB-Migration
 
 ```sql
-ALTER TABLE public.receipts ADD COLUMN tax_type text DEFAULT null;
+ALTER TABLE public.receipt_split_lines 
+  ADD COLUMN IF NOT EXISTS tax_type text DEFAULT null,
+  ADD COLUMN IF NOT EXISTS payment_method text DEFAULT null;
 ```
 
-## 2. Edge Function `extract-receipt/index.ts`
+## 2. SplitBookingEditor.tsx — Interface & Logik
 
-**Schema erweitern:**
-- `tax_type: { type: "string" as const }` zum `extractionSchema.properties` hinzufügen
-- `tax_type` NICHT in die `required`-Liste aufnehmen
-- `category` aus der `required`-Liste entfernen
+**SplitLine Interface erweitern:**
+- `tax_type: string` und `payment_method: string` hinzufügen
 
-**Prompt erweitern** (nach KATEGORIE-Block):
+**Props erweitern:**
+- `vendorId?: string | null` — für Vendor-Defaults und Learning
+
+**Neue Imports:**
+- `TAX_TYPES` aus `@/lib/constants`
+- `useVendorFieldDefaults` aus `@/hooks/useVendorFieldDefaults`
+- `PAYMENT_METHODS` als lokale Konstante (gleich wie in Review.tsx)
+
+**createEmptyLine:** tax_type und payment_method mit `''` initialisieren
+
+**Laden bestehender Lines:** `tax_type` und `payment_method` aus DB mappen
+
+**Speichern:** `tax_type` und `payment_method` in Insert-Objekt aufnehmen
+
+**AI-Vorschläge (handleLoadAiSuggestions):** `tax_type` aus `item.tax_type` mappen falls vorhanden
+
+**Vendor-Defaults beim Aktivieren:** Wenn `vendorId` vorhanden, `getFieldDefaults()` aufrufen und `payment_method`, `tax_type`, `category` als Defaults für neue Lines vorausfüllen
+
+**Vendor-Learning beim Speichern:** Für jede Line `trackFieldChange` aufrufen wenn `category`, `tax_type`, `payment_method` oder `vat_rate` (als `tax_rate`) gesetzt sind
+
+## 3. UI pro Split-Zeile
+
+Zwischen Beschreibung und Brutto-Zeile eine neue Zeile mit 3 Dropdowns einfügen:
+
 ```
-BUCHUNGSART (tax_type): Steuerliche Einordnung nach DACH-Steuerrecht.
-Mögliche Werte: Betriebsausgabe, GWG bis 1.000€, Bewirtung 50%, Bewirtung 100%, Vorsteuer abzugsfähig, Reisekosten, Kfz-Kosten, Repräsentation, Abschreibung, Sonstige.
-Regeln: Gerät/Hardware >1.000€ netto → Abschreibung. Gerät ≤1.000€ → GWG bis 1.000€. Restaurant → Bewirtung 50%. Nur wenn eindeutig erkennbar, sonst "".
-```
-
-**mapSchemaToResult:** `tax_type` aus raw mappen (→ `null` wenn leer)
-
-**DB-Update:** `tax_type: extractedData.tax_type || null` in den Update-Block aufnehmen
-
-## 3. Frontend — Review.tsx
-
-**FormData erweitern:**
-- `tax_type: string` hinzufügen (default `''`)
-- `populateForm`: `tax_type` aus Receipt laden
-- `saveReceipt`: `tax_type` in `updateData` aufnehmen
-- `trackFieldChange` für `tax_type` hinzufügen
-
-**UI:** Neues Select-Feld "Buchungsart" zwischen Kategorie und Split-Booking einfügen mit den definierten Optionen und Placeholder "Offen".
-
-## 4. Frontend — ReceiptDetailPanel.tsx
-
-- Neuer State `taxType` + `setTaxType`
-- Laden aus Receipt-Daten, Speichern in Update-Objekt
-- UI: Select-Feld "Buchungsart" nach Kategorie einfügen
-- Kategorie-Placeholder von "Kategorie wählen" auf "Nicht zugeordnet" ändern
-
-## 5. Frontend — Expenses.tsx
-
-- `tax_type` als optionale Spalte in `COLUMN_CONFIG` aufnehmen (`defaultVisible: false`)
-- Badge-Darstellung in der Tabelle
-- Optional: Filter für Buchungsart
-
-## 6. Konstanten
-
-Neue Konstante `TAX_TYPES` in `src/lib/constants.ts`:
-```ts
-export const TAX_TYPES = [
-  { value: 'Betriebsausgabe', label: 'Betriebsausgabe' },
-  { value: 'GWG bis 1.000€', label: 'GWG bis 1.000€' },
-  { value: 'Bewirtung 50%', label: 'Bewirtung 50% abzugsfähig' },
-  { value: 'Bewirtung 100%', label: 'Bewirtung 100% abzugsfähig' },
-  { value: 'Vorsteuer abzugsfähig', label: 'Vorsteuer abzugsfähig' },
-  { value: 'Reisekosten', label: 'Reisekosten' },
-  { value: 'Kfz-Kosten', label: 'Kfz-Kosten' },
-  { value: 'Repräsentation', label: 'Repräsentation nicht abzugsfähig' },
-  { value: 'Abschreibung', label: 'Abschreibung' },
-  { value: 'Sonstige', label: 'Sonstige' },
-];
+[Kategorie ▼]  [Buchungsart ▼]  [Zahlungsart ▼]
 ```
 
-## 7. Vendor Field Defaults
+- **Kategorie**: Bestehend, Placeholder "Nicht zugeordnet", Leer-Option hinzufügen
+- **Buchungsart**: `TAX_TYPES` aus constants, Placeholder "Offen", Leer-Option
+- **Zahlungsart**: `PAYMENT_METHODS`, Placeholder "Keine", Leer-Option, kein AI-Vorschlag
 
-`tax_type` ist bereits in `TRACKED_FIELDS` und `FieldDefaultSuggestion` enthalten — funktioniert automatisch mit dem neuen Feld.
+Grid-Layout: `grid-cols-3` für die 3 Selects.
+
+## 4. useSplitLines.ts — Interface anpassen
+
+`tax_type` und `payment_method` zum `SplitLine` Interface hinzufügen.
+
+## 5. Aufrufer anpassen
+
+**Review.tsx & ReceiptDetailPanel.tsx:** `vendorId` als Prop an `SplitBookingEditor` übergeben (bereits verfügbar aus dem Receipt/Vendor-State).
 
 ## Technische Details
 
-- Keine Breaking Changes — `tax_type` ist nullable, bestehende Belege haben `null`
-- `category` bleibt unverändert für persönliche Organisation
-- AI kann `tax_type` optional vorschlagen, User kann es überschreiben
-- Reports/Exports: `tax_type` wird vorerst nicht in Reports eingebaut (kann als Folgeschritt ergänzt werden)
+- `PAYMENT_METHODS` wird als shared Konstante in `constants.ts` verschoben (wird in Review.tsx, ReceiptDetailPanel.tsx und SplitBookingEditor.tsx verwendet)
+- Vendor-Learning: `trackFieldChange` wird pro Line und pro geändertem Feld aufgerufen — identisches Verhalten wie beim Hauptbeleg
+- Keine Änderung an der extract-receipt Edge Function nötig — `line_items_raw` kann optional `tax_type` enthalten
 
