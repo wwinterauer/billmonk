@@ -30,6 +30,7 @@ export interface Receipt {
   receipt_date: string | null;
   category: string | null;
   payment_method: string | null;
+  tax_type: string | null;
   notes: string | null;
   invoice_number: string | null;
   ai_confidence: number | null;
