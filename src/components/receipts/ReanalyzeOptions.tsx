@@ -94,6 +94,10 @@ interface ReanalyzeOptionsProps {
     vat_rate?: string;
     category?: string;
     confidence?: number;
+    amount_net?: string;
+    vat_amount?: string;
+    is_mixed_tax_rate?: boolean;
+    tax_rate_details?: { rate: number; net_amount: number; tax_amount: number; description?: string }[] | null;
   }) => void;
   onReanalyzeComplete?: () => void;
   disabled?: boolean;
