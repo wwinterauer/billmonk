@@ -724,7 +724,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
 
       // ── Post-Processing: rebuild tax_rate_details from line_items (truth from granular data) ──
       const lineItems = Array.isArray(rawData.line_items) ? rawData.line_items : [];
-      console.log(`[LineItems Debug] Count: ${lineItems.length}, items:`, JSON.stringify(lineItems.slice(0, 5)));
+      
 
       const validLineItems = lineItems.filter((li: any) => {
         const total = Number(li?.total);
