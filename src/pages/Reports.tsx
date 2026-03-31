@@ -1422,10 +1422,32 @@ const Reports = () => {
 
         {/* Category Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Pie Chart - Expenses by Category */}
+          {/* Pie Chart - Expenses by Category/Buchungsart */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="text-lg">Ausgaben nach Kategorie</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">
+                  {expenseGroupBy === 'category' ? 'Ausgaben nach Kategorie' : 'Ausgaben nach Buchungsart'}
+                </CardTitle>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant={expenseGroupBy === 'category' ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setExpenseGroupBy('category')}
+                  >
+                    Kategorie
+                  </Button>
+                  <Button
+                    variant={expenseGroupBy === 'taxType' ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setExpenseGroupBy('taxType')}
+                  >
+                    Buchungsart
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {isLoading ? (
