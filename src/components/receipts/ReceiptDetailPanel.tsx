@@ -173,7 +173,7 @@ export function ReceiptDetailPanel({
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [category, setCategory] = useState('');
   const [amountGross, setAmountGross] = useState('');
-  const [vatRate, setVatRate] = useState('20');
+  const [vatRate, setVatRate] = useState(defaultVatRate);
   const [isMixedTaxRate, setIsMixedTaxRate] = useState(false);
   const [taxRateDetails, setTaxRateDetails] = useState<TaxRateDetail[] | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('');
