@@ -283,7 +283,10 @@ const Expenses = () => {
     const saved = localStorage.getItem('expenses-visible-columns');
     if (saved) {
       try {
-        return new Set(JSON.parse(saved) as ColumnKey[]);
+        const parsed = new Set(JSON.parse(saved) as ColumnKey[]);
+        // Migration: neue Spalten automatisch einblenden
+        if (!parsed.has('tax_type')) parsed.add('tax_type');
+        return parsed;
       } catch {
         return new Set(COLUMN_CONFIG.filter(c => c.defaultVisible).map(c => c.key));
       }
