@@ -1,40 +1,31 @@
 
 
-# Fix: Klammer-Regel aus dem Prompt entfernen — nur via Lieferanten-Hinweis
+# Fix: Expenses-Only Prompt — Netto-Beträge pro Position korrekt extrahieren
 
 ## Problem
 
-Zeile 220 enthält hardcoded `"Alle Beträge POSITIV (Klammern/Minus → positiv umwandeln)"`. Diese Regel ist Monta-spezifisch und wird dort bereits im `extraction_hint` des Lieferanten gepflegt. Im generischen Prompt führt sie bei anderen Lieferanten zu falschen Interpretationen.
+Die KI erkennt den Bruttobetrag (19,60€) jetzt korrekt, berechnet aber die Netto/MwSt-Aufteilung falsch. Die drei Positionen haben unterschiedliche MwSt-Sätze:
+- Transaktionsgebühr: 0,51€ brutto, 0,51€ netto (0%) ✓
+- Betreiber-Abonnement: 12,00€ brutto, 10,00€ netto (20%) ✗
+- Ladegebühr: 7,09€ brutto, 5,91€ netto (20%) ✗
+
+Das ist ein Mixed-Tax-Rate-Fall (0% + 20%). Der Prompt sagt zwar "Verschiedene MwSt-Sätze → is_mixed_tax_rate=true + tax_rate_details", aber gibt der KI keine explizite Anweisung, die **Netto-Beträge pro Position korrekt zu berechnen**.
+
+## Ursache
+
+Die Zeile 213 sagt nur "Pro Treffer: Brutto, Netto, MwSt-Satz, MwSt-Betrag erfassen" — aber gibt keine Berechnungsformel. Die KI kennt die Formel aus dem Hauptprompt (Zeile 599), aber bei Expenses-Only wird die Verbindung offenbar nicht hergestellt.
 
 ## Lösung
 
-In `buildExpensesOnlyPrompt()` (Zeile 200-239 in `supabase/functions/extract-receipt/index.ts`):
+In `buildExpensesOnlyPrompt()` (Zeile 200-240) die Berechnungsregel explizit einfügen:
 
-**Keywords-Pfad (Zeile 220):** Ersetze `"Alle Beträge POSITIV (Klammern/Minus → positiv umwandeln)"` durch `"Alle Beträge POSITIV"` — die Klammer-Interpretation kommt dann nur über den LIEFERANTEN-HINWEIS rein, wenn der User sie dort hinterlegt hat.
-
-**Ohne-Keywords-Pfad (Zeile 229):** Gleiche Änderung — `"Alle Beträge POSITIV. Gutschriften ignorieren."` bleibt, aber ohne Klammer-Regel.
-
-### Vorher
 ```
-- Alle Beträge POSITIV (Klammern/Minus → positiv umwandeln)
+- Pro Treffer: Brutto, Netto, MwSt-Satz, MwSt-Betrag erfassen
+- Netto = Brutto / (1 + MwSt-Satz/100), MwSt = Brutto - Netto
+- Bei verschiedenen MwSt-Sätzen: is_mixed_tax_rate=true, tax_rate_details mit rate/net_amount/tax_amount/description PRO Position
+- total_amount = Summe Brutto, net_amount = Summe Netto, tax_amount = Summe MwSt
 ```
-
-### Nachher
-```
-- Alle Beträge POSITIV
-```
-
-Die Klammer-Logik greift weiterhin bei Monta, weil dort im `extraction_hint` steht: *"Beträge in Klammern können Ausgaben sein"* — das wird als `LIEFERANTEN-HINWEIS` angehängt.
-
-## Zusätzliche Prompt-Verbesserungen (aus genehmigtem Plan)
-
-Gleichzeitig die weiteren Verbesserungen aus dem bereits genehmigten Plan umsetzen:
-
-1. Kontext hinzufügen: "Dieser Beleg enthält sowohl Einnahmen/Gutschriften als auch Kosten"
-2. "Durchsuche ALLE Seiten" explizit erwähnen
-3. Summierung klarer formulieren
-4. Selbst-Verifikation: "LISTE alle gefundenen Treffer in der description auf"
 
 ### Datei
-- `supabase/functions/extract-receipt/index.ts` — nur `buildExpensesOnlyPrompt()` (Zeilen 200-239)
+- `supabase/functions/extract-receipt/index.ts` — `buildExpensesOnlyPrompt()`, Zeilen 211-217
 
