@@ -743,19 +743,24 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
 
       // ── Post-Processing: rebuild tax_rate_details from line_items (truth from granular data) ──
       const lineItems = Array.isArray(rawData.line_items) ? rawData.line_items : [];
-      const validLineItems = lineItems.filter((li: any) => li && typeof li.total === 'number' && li.total > 0 && li.tax_rate != null);
+      console.log(`[LineItems Debug] Count: ${lineItems.length}, items:`, JSON.stringify(lineItems.slice(0, 5)));
+
+      const validLineItems = lineItems.filter((li: any) => {
+        const total = Number(li?.total);
+        return li && Number.isFinite(total) && total !== 0 && li.tax_rate != null;
+      });
+      console.log(`[LineItems Debug] Valid count: ${validLineItems.length}`);
+
       if (validLineItems.length > 0) {
-        // Group by tax_rate
         const rateGroups: Record<string, { gross: number; descriptions: string[] }> = {};
         for (const li of validLineItems) {
           const rateKey = String(parseFloat(String(li.tax_rate).replace(',', '.').replace('%', '')) || 0);
           if (!rateGroups[rateKey]) rateGroups[rateKey] = { gross: 0, descriptions: [] };
-          rateGroups[rateKey].gross += Math.abs(li.total);
+          rateGroups[rateKey].gross += Math.abs(Number(li.total));
           if (li.description) rateGroups[rateKey].descriptions.push(li.description);
         }
         const rateKeys = Object.keys(rateGroups);
         if (rateKeys.length > 1) {
-          // Multiple tax rates detected — rebuild tax_rate_details from line_items
           const newDetails = rateKeys.map(rateStr => {
             const rate = parseFloat(rateStr);
             const gross = rateGroups[rateStr].gross;
@@ -772,22 +777,25 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           extractedData.is_mixed_tax_rate = true;
           extractedData.amount_net = Math.round(newDetails.reduce((s, d) => s + d.net_amount, 0) * 100) / 100;
           extractedData.vat_amount = Math.round(newDetails.reduce((s, d) => s + d.tax_amount, 0) * 100) / 100;
-          console.log(`[VAT Mixed] Rebuilt from ${validLineItems.length} line_items: ${rateKeys.length} rate groups, net=${extractedData.amount_net}, vat=${extractedData.vat_amount}`);
+          console.log(`[VAT Mixed] Rebuilt from ${validLineItems.length} line_items: ${rateKeys.length} rate groups, net=${extractedData.amount_net}, vat=${extractedData.vat_amount}, details=`, JSON.stringify(newDetails));
         }
       }
 
-      // ── Fallback: derive is_mixed_tax_rate from tax_rate_details if line_items didn't trigger ──
-      if (!extractedData.is_mixed_tax_rate) {
-        const detailRates = Array.isArray(extractedData.tax_rate_details)
-          ? [...new Set(extractedData.tax_rate_details.map((t: any) => Number(t?.rate)).filter((r: number) => !Number.isNaN(r)))]
-          : [];
+      // ── Fallback: recalculate tax_rate_details with correct math if line_items didn't trigger ──
+      if (!extractedData.is_mixed_tax_rate && Array.isArray(extractedData.tax_rate_details) && extractedData.tax_rate_details.length > 1) {
+        const detailRates = [...new Set(extractedData.tax_rate_details.map((t: any) => Number(t?.rate)).filter((r: number) => !Number.isNaN(r)))];
         if (detailRates.length > 1) {
+          extractedData.tax_rate_details = extractedData.tax_rate_details.map((d: any) => {
+            const rate = Number(d.rate) || 0;
+            const gross = Number(d.net_amount) + Number(d.tax_amount);
+            const netAmount = rate === 0 ? gross : gross / (1 + rate / 100);
+            const taxAmount = gross - netAmount;
+            return { ...d, net_amount: Math.round(netAmount * 100) / 100, tax_amount: Math.round(taxAmount * 100) / 100 };
+          });
           extractedData.is_mixed_tax_rate = true;
-          const calcNet = extractedData.tax_rate_details!.reduce((s: number, t: any) => s + (Number(t?.net_amount) || 0), 0);
-          const calcVat = extractedData.tax_rate_details!.reduce((s: number, t: any) => s + (Number(t?.tax_amount) || 0), 0);
-          extractedData.amount_net = Math.round(calcNet * 100) / 100;
-          extractedData.vat_amount = Math.round(calcVat * 100) / 100;
-          console.log(`[VAT Mixed] Fallback from tax_rate_details: net=${extractedData.amount_net}, vat=${extractedData.vat_amount}`);
+          extractedData.amount_net = Math.round(extractedData.tax_rate_details.reduce((s: number, t: any) => s + t.net_amount, 0) * 100) / 100;
+          extractedData.vat_amount = Math.round(extractedData.tax_rate_details.reduce((s: number, t: any) => s + t.tax_amount, 0) * 100) / 100;
+          console.log(`[VAT Mixed] Fallback recalc: net=${extractedData.amount_net}, vat=${extractedData.vat_amount}`);
         }
       }
 
