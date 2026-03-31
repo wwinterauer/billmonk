@@ -292,16 +292,18 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
       }
 
       const newLines: SplitLine[] = lineItems.map((item: any, idx: number) => {
-        const vatRate = item.vat_rate ?? mainVatRate ?? 20;
-        const grossAmount = item.amount_gross ?? 0;
-        const netAmount = item.amount_net ?? +(grossAmount / (1 + vatRate / 100)).toFixed(2);
+        const vatRate = parseFloat(String(item.tax_rate ?? item.vat_rate ?? mainVatRate ?? 20).replace('%', '').replace(',', '.')) || 0;
+        const grossAmount = Math.abs(Number(item.total) || Number(item.amount_gross) || 0);
+        const netAmount = vatRate === 0
+          ? grossAmount
+          : +(grossAmount / (1 + vatRate / 100)).toFixed(2);
         const vatAmount = +(grossAmount - netAmount).toFixed(2);
         return {
           sort_order: idx,
           description: item.description || '',
           category: item.category || mainCategory || '',
           tax_type: item.tax_type || vendorDefaults.tax_type || '',
-          payment_method: vendorDefaults.payment_method || '',
+          payment_method: '',
           amount_gross: grossAmount,
           amount_net: netAmount,
           vat_rate: vatRate,
