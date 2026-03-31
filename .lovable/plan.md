@@ -1,52 +1,37 @@
 
 
-# Plan: A/B-Test Timeout-Fix — Asynchrone Batch-Verarbeitung
+# Plan: Vendor-Kontext im A/B-Test + payment_method entfernen
 
-## Problem
+## Übersicht
 
-Die Edge Function `run-ab-test` verarbeitet 50 Belege sequentiell mit je 2 AI-Calls (~12s pro Beleg = ~20 Minuten). Edge Functions haben ein Timeout von ~60s. Die Funktion wurde nach 16/50 Items gekillt.
+Zwei Änderungen: (1) Vendor-spezifische Extraktions-Einstellungen (Keywords + Freitext-Hint) in den A/B-Test injizieren. (2) `payment_method` aus Vergleich und UI entfernen.
 
-## Lösung: "Fire-and-forget" + Item-weise Verarbeitung
+## 1. Edge Function `run-ab-test/index.ts`
 
-Die Edge Function wird in zwei Teile aufgeteilt:
+**payment_method entfernen:**
+- `COMPARISON_FIELDS` (Z. 84-86): `"payment_method"` aus Array streichen → 6 Felder
 
-### 1. `run-ab-test` (Orchestrator) — sofortige Antwort
+**`buildExpensesOnlyPrompt` als lokale Funktion duplizieren** (aus `extract-receipt`, ~40 Zeilen, inkl. Keywords + Hint-Block)
 
-- Nimmt `test_run_id` entgegen
-- Setzt Status auf `running`
-- Antwortet **sofort** mit `{ success: true, message: "Test gestartet" }`
-- Startet die Item-Verarbeitung als **Background-Task** via `EdgeRuntime.waitUntil()` (Supabase Edge Functions unterstützen dies für bis zu 150s Hintergrundarbeit)
-- Alternativ: Verarbeitet Items in **Batches von 5** und ruft sich selbst rekursiv auf (mit `batch_offset` Parameter)
+**Vendor-Kontext in `processBatch` laden (Z. 168-169):**
+- Receipt-Query erweitern: `.select("file_url, file_type, file_name, user_id, vendor_id")`
+- Wenn `vendor_id` vorhanden: Query auf `vendors` für `expenses_only_extraction, extraction_keywords, extraction_hint`
+- Wenn `expenses_only_extraction === true`: `buildExpensesOnlyPrompt(keywords, hint)` aufrufen
+- Den Expenses-Only-Block an **beide** User-Prompts (V1 Z. 204, V2 Z. 233) anhängen
 
-### 2. Batch-Architektur
+## 2. Frontend `ABTestManager.tsx`
 
-**Variante: Self-calling Batches**
-- Funktion verarbeitet 5 Items pro Aufruf (~60s)
-- Am Ende jedes Batches: Ruft sich selbst mit `{ test_run_id, batch_offset: offset + 5 }` auf (fire-and-forget fetch)
-- Letzter Batch: Berechnet Summary + setzt Status `completed`
-- Zwischenergebnisse werden nach jedem Item in DB gespeichert (bereits der Fall)
-
-**Änderungen in der Edge Function:**
-- Neuer Parameter `batch_offset` (default 0)
-- Items werden mit `.range(offset, offset + 4)` geladen
-- Nach Batch: Self-call oder Finalisierung
-- Sofortige Response an Client beim ersten Call
-
-**Änderungen im Frontend (`ABTestManager.tsx`):**
-- `startTest` Mutation erwartet keine finale Antwort mehr
-- Polling auf `ab_test_runs.status` via `refetchInterval` bis Status `completed`
-- Progress-Anzeige: Zählt `ab_test_items` mit `result_a IS NOT NULL`
-
-### 3. UI-Verbesserungen
-
-- Laufender Test zeigt Progress-Bar (verarbeitete Items / Gesamt)
-- Auto-Refresh alle 5 Sekunden während Status `running`
-- Toast: "Test gestartet — Verarbeitung läuft im Hintergrund"
+**payment_method entfernen aus:**
+- `FIELD_LABELS` Map (Z. 38)
+- `V1_FIELD_MAP` (Z. 48)
+- `V2_FIELD_MAP` (Z. 58)
+- Receipt-Select-Query (Z. 140): `payment_method` weglassen
+- `original_data` beim Erstellen (Z. 173): `payment_method` Zeile entfernen
 
 ## Technische Details
 
-- Batch-Size 5 = ~60s pro Batch (sicher unter Timeout)
-- Self-call verwendet `SUPABASE_URL` + `/functions/v1/run-ab-test` mit Service-Role-Key als Authorization
-- Fehlerbehandlung: Wenn ein Batch fehlschlägt, wird Status auf `error` gesetzt
-- Bestehende Logik (Vergleich, Accuracy, Summary) bleibt identisch, nur die Orchestrierung ändert sich
+- `buildExpensesOnlyPrompt` wird dupliziert (Edge Functions können nicht cross-importieren)
+- Beide Prompt-Versionen erhalten identischen Vendor-Kontext → fairer Test
+- Bestehende Testergebnisse bleiben, neue Runs nutzen 6-Feld-Vergleich
+- `extraction_hint` (Freitext) wird als `LIEFERANTEN-HINWEIS: ...` an den Prompt angehängt — identisch zur Produktion
 
