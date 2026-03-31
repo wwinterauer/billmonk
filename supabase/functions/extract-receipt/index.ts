@@ -416,15 +416,7 @@ serve(async (req) => {
         );
       }
 
-      const arrayBuffer = await fileData.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      const chunkSize = 8192;
-      let binaryString = '';
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.slice(i, i + chunkSize);
-        binaryString += String.fromCharCode.apply(null, Array.from(chunk));
-      }
-      imageBase64 = btoa(binaryString);
+      imageBase64 = uint8ArrayToBase64(new Uint8Array(await fileData.arrayBuffer()));
       mimeType = receipt.file_type === 'pdf' ? 'application/pdf' : `image/${receipt.file_type}`;
 
       const isPdf = receipt.file_name?.endsWith('.pdf') || receipt.file_type === 'application/pdf' || receipt.file_type === 'pdf';
