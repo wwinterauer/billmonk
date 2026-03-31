@@ -2015,9 +2015,10 @@ const Expenses = () => {
               <PopoverContent className="w-56 p-3" align="start">
                 <div className="space-y-2">
                   <p className="text-sm font-medium mb-2">Kategorie für {selectedIds.size} Belege</p>
-                  <Select onValueChange={async (categoryName) => {
+                  <Select onValueChange={async (value) => {
                     try {
                       const ids = Array.from(selectedIds);
+                      const categoryName = value === '__clear__' ? null : value;
                       for (const id of ids) {
                         await supabase
                           .from('receipts')
@@ -2039,6 +2040,8 @@ const Expenses = () => {
                       <SelectValue placeholder="Kategorie wählen..." />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="__clear__">Nicht zugeordnet</SelectItem>
+                      <SelectSeparator />
                       {categories.map(c => (
                         <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
                       ))}
@@ -2047,8 +2050,59 @@ const Expenses = () => {
                 </div>
               </PopoverContent>
             </Popover>
-            
-            {/* Re-run AI with modes */}
+
+            {/* Bulk Tax Type */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  disabled={bulkActionLoading !== null}
+                  className="border-primary/50 text-primary hover:bg-primary/10"
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  Buchungsart
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-3" align="start">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium mb-2">Buchungsart für {selectedIds.size} Belege</p>
+                  <Select onValueChange={async (value) => {
+                    try {
+                      const ids = Array.from(selectedIds);
+                      const taxType = value === '__clear__' ? null : value;
+                      for (const id of ids) {
+                        await supabase
+                          .from('receipts')
+                          .update({ tax_type: taxType })
+                          .eq('id', id);
+                      }
+                      toast({ title: `Buchungsart für ${ids.length} Belege geändert` });
+                      setSelectedIds(new Set());
+                      loadReceipts();
+                    } catch (error) {
+                      toast({
+                        variant: 'destructive',
+                        title: 'Fehler',
+                        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+                      });
+                    }
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Buchungsart wählen..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__clear__">Offen</SelectItem>
+                      <SelectSeparator />
+                      {taxCategories.map(c => (
+                        <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </PopoverContent>
+            </Popover>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
