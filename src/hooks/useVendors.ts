@@ -155,6 +155,11 @@ export function useVendors() {
       throw new Error('Ein Lieferant mit diesem Namen existiert bereits');
     }
 
+    const fieldDefaults: FieldDefaults = {};
+    if (options?.defaultPaymentMethod) {
+      fieldDefaults.payment_method = options.defaultPaymentMethod;
+    }
+
     const { data, error } = await supabase
       .from('vendors')
       .insert({
@@ -165,7 +170,7 @@ export function useVendors() {
         default_category_id: options?.defaultCategoryId || null,
         default_tag_id: options?.defaultTagId || null,
         default_vat_rate: options?.defaultVatRate || null,
-        default_payment_method: options?.defaultPaymentMethod || null,
+        field_defaults: Object.keys(fieldDefaults).length > 0 ? fieldDefaults : {},
         notes: options?.notes || null,
         website: options?.website || null,
       })
