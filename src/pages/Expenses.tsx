@@ -274,6 +274,7 @@ const Expenses = () => {
     searchParams.get('status') || 'all'
   );
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [taxTypeFilter, setTaxTypeFilter] = useState<string>('all');
   const [invoiceFilter, setInvoiceFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
