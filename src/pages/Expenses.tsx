@@ -1638,7 +1638,7 @@ const Expenses = () => {
               <SelectItem value="all">Alle Kategorien</SelectItem>
               <SelectItem value="__unassigned__">Nicht zugeordnet</SelectItem>
               <SelectSeparator />
-              {categories.map(c => (
+              {userCategories.map(c => (
                 <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
               ))}
             </SelectContent>
