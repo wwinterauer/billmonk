@@ -737,6 +737,80 @@ export function CategoryManagement() {
         </div>
       </div>
 
+      {/* Edit/Create Modal */}
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {isNewCategory ? 'Neue Kategorie erstellen' : 'Kategorie bearbeiten'}
+            </DialogTitle>
+            <DialogDescription>
+              {isNewCategory 
+                ? 'Erstelle eine neue Kategorie für deine Belege.'
+                : 'Bearbeite die Kategorie-Einstellungen.'
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Name */}
+            <div className="space-y-2">
+              <Label htmlFor="cat-name">Name</Label>
+              <Input
+                id="cat-name"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="z.B. Fortbildung"
+                maxLength={50}
+                disabled={!isNewCategory && selectedCategory?.is_system}
+              />
+              {!isNewCategory && selectedCategory?.is_system ? (
+                <p className="text-xs text-muted-foreground">
+                  Steuer-Kategorien können nicht umbenannt werden
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {formData.name.length}/50 Zeichen
+                </p>
+              )}
+            </div>
+
+            {/* Color */}
+            <div className="space-y-2">
+              <Label>Farbe</Label>
+              <div className="flex flex-wrap gap-2">
+                {COLOR_PALETTE.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={cn(
+                      "h-8 w-8 rounded-full border-2 transition-all",
+                      formData.color === color ? "border-foreground scale-110" : "border-transparent"
+                    )}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setFormData(prev => ({ ...prev, color }))}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <Label htmlFor="custom-color" className="text-xs">Custom:</Label>
+                <Input
+                  id="custom-color"
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+                  className="w-12 h-8 p-1 cursor-pointer"
+                />
+                <Input
+                  value={formData.color}
+                  onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+                  placeholder="#3B82F6"
+                  className="w-24 font-mono text-sm"
+                  maxLength={7}
+                />
+              </div>
+            </div>
+
             {/* Icon */}
             <div className="space-y-2">
               <Label>Icon</Label>
