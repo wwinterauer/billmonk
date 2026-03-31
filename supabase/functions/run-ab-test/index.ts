@@ -218,8 +218,23 @@ async function processBatch(
         }
       }
 
+      // ── Load vendor context ──────────────────────────────────
+      let vendorContextPrompt = "";
+      if (receipt.vendor_id) {
+        const { data: vendor } = await supabase
+          .from("vendors")
+          .select("expenses_only_extraction, extraction_keywords, extraction_hint")
+          .eq("id", receipt.vendor_id)
+          .single();
+        if (vendor?.expenses_only_extraction) {
+          vendorContextPrompt = buildExpensesOnlyPrompt(vendor.extraction_keywords, vendor.extraction_hint);
+        } else if (vendor?.extraction_hint) {
+          vendorContextPrompt = `\n\nLIEFERANTEN-HINWEIS: ${vendor.extraction_hint.trim()}`;
+        }
+      }
+
       // ── V1 Call ─────────────────────────────────────────────
-      const v1UserPrompt = v1Prompt.user_prompt_template.replace("{{categories}}", categoryList);
+      const v1UserPrompt = v1Prompt.user_prompt_template.replace("{{categories}}", categoryList) + vendorContextPrompt;
       const v1Response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
