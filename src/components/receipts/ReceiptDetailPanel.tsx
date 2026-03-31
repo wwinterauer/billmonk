@@ -1537,7 +1537,7 @@ export function ReceiptDetailPanel({
                         originalValue={originalReceipt?.vat_rate}
                         vendorLearning={vendorLearning}
                         onReset={() => {
-                          setVatRate(originalReceipt?.vat_rate?.toString() || '20');
+                          setVatRate(originalReceipt?.vat_rate?.toString() || defaultVatRate);
                           setIsMixedTaxRate(false);
                         }}
                         vatRateSource={(receipt as unknown as Record<string, unknown>)?.vat_rate_source as 'ai' | 'learned' | 'manual' | null}
