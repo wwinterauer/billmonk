@@ -1161,7 +1161,20 @@ const Review = () => {
 
                       {/* Buchungsart (tax_type) */}
                       <div className="space-y-2">
-                        <Label>Buchungsart</Label>
+                        <div className="flex items-center gap-2">
+                          <Label>Buchungsart</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <div className={cn(
+                                'h-2 w-2 rounded-full',
+                                getConfidenceColor(getFieldConfidence(currentReceipt?.tax_type, currentReceipt?.ai_confidence))
+                              )} />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {currentReceipt?.tax_type ? 'Von KI erkannt' : 'Nicht erkannt'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
                         <Select
                           value={formData.tax_type}
                           onValueChange={(value) => setFormData(prev => ({ ...prev, tax_type: value }))}
