@@ -145,6 +145,7 @@ export const SORTABLE_FIELDS = [
   { value: 'status', label: 'Status' },
   { value: 'payment_method', label: 'Zahlungsart' },
   { value: 'invoice_number', label: 'Rechnungsnr.' },
+  { value: 'tax_type', label: 'Buchungsart' },
 ];
 
 // Available fields for grouping with icons
