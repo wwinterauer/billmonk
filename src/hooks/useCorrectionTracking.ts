@@ -4,6 +4,49 @@ import { useCallback } from 'react';
 import type { Json } from '@/integrations/supabase/types';
 import { recordVatRateCorrection } from '@/services/vatLearningService';
 
+const STOP_WORDS = new Set([
+  'und', 'oder', 'der', 'die', 'das', 'ein', 'eine', 'für', 'mit', 'von',
+  'auf', 'aus', 'bei', 'nach', 'über', 'unter', 'vor', 'zum', 'zur',
+  'inkl', 'zzgl', 'netto', 'brutto', 'stück', 'stk', 'paket',
+  'rechnung', 'beleg', 'quittung', 'datum', 'summe', 'gesamt',
+]);
+
+/** Extract keywords from receipt description + line items */
+async function extractReceiptKeywords(receiptId: string): Promise<string[]> {
+  const { data: receiptData } = await supabase
+    .from('receipts')
+    .select('description, line_items_raw')
+    .eq('id', receiptId)
+    .single();
+
+  if (!receiptData) return [];
+
+  const texts: string[] = [];
+  if (receiptData.description) texts.push(receiptData.description);
+
+  // Extract descriptions from line_items_raw
+  const lineItems = receiptData.line_items_raw;
+  if (Array.isArray(lineItems)) {
+    for (const item of lineItems) {
+      if (item && typeof item === 'object' && 'description' in item && typeof (item as any).description === 'string') {
+        texts.push((item as any).description);
+      }
+    }
+  }
+
+  if (texts.length === 0) return [];
+
+  const allWords = texts
+    .join(' ')
+    .toLowerCase()
+    .replace(/[^a-zäöüß\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= 4 && !STOP_WORDS.has(w));
+
+  // Deduplicate and limit
+  return [...new Set(allWords)].slice(0, 10);
+}
+
 interface CorrectionData {
   fieldName: string;
   detectedValue: unknown;
