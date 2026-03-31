@@ -82,8 +82,26 @@ const extractionSchema = {
 };
 
 const COMPARISON_FIELDS = [
-  "vendor_name", "total_amount", "tax_rate", "tax_amount", "category", "receipt_date", "payment_method",
+  "vendor_name", "total_amount", "tax_rate", "tax_amount", "category", "receipt_date",
 ];
+
+// ── Vendor-Kontext: Expenses-Only Prompt Builder ──────────────────
+function buildExpensesOnlyPrompt(keywords: string[] | null, hint: string | null): string {
+  let block = "";
+  if (keywords && keywords.length > 0) {
+    block += `\n\nWICHTIG – NUR AUSGABEN EXTRAHIEREN:
+Dieser Beleg enthält sowohl Einnahmen/Gutschriften als auch Kosten.
+Extrahiere AUSSCHLIESSLICH die Positionen, die eines dieser Schlagwörter enthalten: ${keywords.join(", ")}
+Ignoriere alle anderen Zeilen (Einnahmen, Gutschriften, Auszahlungen).
+Beträge in Klammern sind Kosten und sollen als positive Werte erfasst werden.
+Ignoriere Zwischen- und Gesamtsummen — nur einzelne Kostenzeilen zählen.
+Summiere alle gefundenen Kosten-Positionen zum Gesamtbetrag.`;
+  }
+  if (hint && hint.trim()) {
+    block += `\n\nLIEFERANTEN-HINWEIS: ${hint.trim()}`;
+  }
+  return block;
+}
 
 function compareField(fieldName: string, original: any, extracted: any): boolean {
   if (original == null || original === "" || original === "unknown") return true;
