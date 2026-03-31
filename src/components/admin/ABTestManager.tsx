@@ -99,7 +99,7 @@ export function ABTestManager() {
         .select('*')
         .eq('test_run_id', selectedRunId!);
       if (error) throw error;
-      return data as TestItem[];
+      return (data as unknown as TestItem[]) || [];
     },
     enabled: !!selectedRunId,
   });
