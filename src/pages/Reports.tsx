@@ -1549,10 +1549,12 @@ const Reports = () => {
           </Card>
         </div>
 
-        {/* Category Detail Table */}
+        {/* Detail Table */}
         <Card className="border-border/50 mb-6">
           <CardHeader>
-            <CardTitle className="text-lg">Detailübersicht nach Kategorie</CardTitle>
+            <CardTitle className="text-lg">
+              {expenseGroupBy === 'category' ? 'Detailübersicht nach Kategorie' : 'Detailübersicht nach Buchungsart'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -1561,7 +1563,7 @@ const Reports = () => {
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}
               </div>
-            ) : categoryData.length === 0 ? (
+            ) : activeTableData.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
                 Keine Daten für den gewählten Zeitraum
               </div>
@@ -1569,7 +1571,7 @@ const Reports = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Kategorie</TableHead>
+                    <TableHead>{expenseGroupBy === 'category' ? 'Kategorie' : 'Buchungsart'}</TableHead>
                     <TableHead className="text-right">Anzahl</TableHead>
                     <TableHead className="text-right">Brutto</TableHead>
                     <TableHead className="text-right">Netto</TableHead>
@@ -1578,30 +1580,30 @@ const Reports = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {categoryData.map((cat) => (
-                    <TableRow key={cat.name}>
+                  {activeTableData.map((item) => (
+                    <TableRow key={item.name}>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div
                             className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: cat.color }}
+                            style={{ backgroundColor: item.color }}
                           />
-                          {cat.name}
+                          {item.name}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">{cat.count}</TableCell>
+                      <TableCell className="text-right">{item.count}</TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency(cat.amount)}
+                        {formatCurrency(item.amount)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(cat.amount - cat.vat)}
+                        {formatCurrency(item.amount - item.vat)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(cat.vat)}
+                        {formatCurrency(item.vat)}
                       </TableCell>
                       <TableCell className="text-right">
                         {stats?.totalGross
-                          ? ((cat.amount / stats.totalGross) * 100).toFixed(1)
+                          ? ((item.amount / stats.totalGross) * 100).toFixed(1)
                           : 0}
                         %
                       </TableCell>
