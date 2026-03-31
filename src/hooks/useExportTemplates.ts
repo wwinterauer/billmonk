@@ -180,6 +180,8 @@ export const getGroupPreview = (groupBy: string | null): string[] => {
       return ['20%', '13%', '10%', '0%'];
     case 'payment_method':
       return ['Überweisung', 'Kreditkarte', 'Bar', '...'];
+    case 'tax_type':
+      return ['Betriebsausgabe', 'KFZ-Kosten (AT)', 'GWG bis 1.000€', '...'];
     default:
       return [];
   }
