@@ -6,6 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const BATCH_SIZE = 5;
+
 // ── Structured Output Schema (V2) ──────────────────────────────────
 const extractionSchema = {
   type: "object" as const,
@@ -84,7 +86,7 @@ const COMPARISON_FIELDS = [
 ];
 
 function compareField(fieldName: string, original: any, extracted: any): boolean {
-  if (original == null || original === "" || original === "unknown") return true; // skip if no ground truth
+  if (original == null || original === "" || original === "unknown") return true;
   if (extracted == null || extracted === "") return false;
 
   const origStr = String(original).toLowerCase().trim();
@@ -92,7 +94,6 @@ function compareField(fieldName: string, original: any, extracted: any): boolean
 
   switch (fieldName) {
     case "vendor_name":
-      // Fuzzy: one includes the other
       return origStr.includes(extStr) || extStr.includes(origStr) ||
         origStr.replace(/\s+(gmbh|ag|kg|e\.u\.|ug|ltd|llc|ohg|og)\.?$/i, '').trim() ===
         extStr.replace(/\s+(gmbh|ag|kg|e\.u\.|ug|ltd|llc|ohg|og)\.?$/i, '').trim();
@@ -134,258 +135,7 @@ function parseAiResponse(content: string): Record<string, any> | null {
   }
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-
-    const { test_run_id } = await req.json();
-    if (!test_run_id) {
-      return new Response(JSON.stringify({ error: "test_run_id required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Update status to running
-    await supabase.from("ab_test_runs").update({ status: "running" }).eq("id", test_run_id);
-
-    // Load test run
-    const { data: testRun } = await supabase
-      .from("ab_test_runs").select("*").eq("id", test_run_id).single();
-    if (!testRun) throw new Error("Test run not found");
-
-    // Load prompt versions
-    const { data: v1Prompt } = await supabase
-      .from("prompt_versions").select("*").eq("version", testRun.prompt_version_a).single();
-    const { data: v2Prompt } = await supabase
-      .from("prompt_versions").select("*").eq("version", testRun.prompt_version_b).single();
-
-    if (!v1Prompt || !v2Prompt) throw new Error("Prompt versions not found");
-
-    // Load test items with receipt data
-    const { data: items } = await supabase
-      .from("ab_test_items")
-      .select("id, receipt_id, original_data")
-      .eq("test_run_id", test_run_id);
-
-    if (!items || items.length === 0) throw new Error("No test items found");
-
-    console.log(`Starting A/B test: ${items.length} items, ${testRun.prompt_version_a} vs ${testRun.prompt_version_b}`);
-
-    const fieldAccuracy: Record<string, { a_correct: number; a_total: number; b_correct: number; b_total: number }> = {};
-    COMPARISON_FIELDS.forEach(f => { fieldAccuracy[f] = { a_correct: 0, a_total: 0, b_correct: 0, b_total: 0 }; });
-
-    let processed = 0;
-    let errors = 0;
-
-    for (const item of items) {
-      try {
-        // Load receipt
-        const { data: receipt } = await supabase
-          .from("receipts").select("file_url, file_type, file_name, user_id").eq("id", item.receipt_id).single();
-        if (!receipt?.file_url) { errors++; continue; }
-
-        // Download file
-        const { data: fileData } = await supabase.storage.from("receipts").download(receipt.file_url);
-        if (!fileData) { errors++; continue; }
-
-        const arrayBuffer = await fileData.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-        const chunkSize = 8192;
-        let binaryString = "";
-        for (let i = 0; i < uint8Array.length; i += chunkSize) {
-          const chunk = uint8Array.slice(i, i + chunkSize);
-          binaryString += String.fromCharCode.apply(null, Array.from(chunk));
-        }
-        const imageBase64 = btoa(binaryString);
-        const isPdf = receipt.file_name?.endsWith(".pdf") || receipt.file_type === "pdf" || receipt.file_type === "application/pdf";
-        const mimeType = isPdf ? "application/pdf" : `image/${receipt.file_type || "jpeg"}`;
-
-        // Load categories for the user
-        let categoryList = "Sonstiges";
-        if (receipt.user_id) {
-          const { data: cats } = await supabase
-            .from("categories").select("name").eq("is_hidden", false)
-            .or(`user_id.eq.${receipt.user_id},is_system.eq.true`);
-          if (cats && cats.length > 0) {
-            categoryList = cats.map(c => c.name).filter(n => n !== "Keine Rechnung").join(", ");
-          }
-        }
-
-        // ── V1 Call (old prompt, NO response_format) ─────────────
-        const v1UserPrompt = v1Prompt.user_prompt_template.replace("{{categories}}", categoryList);
-        const v1Response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
-            messages: [
-              { role: "system", content: v1Prompt.system_prompt },
-              { role: "user", content: [
-                { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
-                { type: "text", text: v1UserPrompt },
-              ]},
-            ],
-            max_tokens: 4096,
-            temperature: 0.1,
-          }),
-        });
-
-        let resultA: Record<string, any> | null = null;
-        if (v1Response.ok) {
-          const v1Json = await v1Response.json();
-          const v1Content = v1Json.choices?.[0]?.message?.content;
-          if (v1Content) resultA = parseAiResponse(v1Content);
-        } else {
-          console.error(`V1 call failed for item ${item.id}: ${v1Response.status}`);
-          await v1Response.text(); // consume
-        }
-
-        // ── V2 Call (compressed prompt, WITH response_format) ────
-        const v2UserPrompt = v2Prompt.user_prompt_template.replace("{{categories}}", categoryList);
-        const v2Response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
-            messages: [
-              { role: "system", content: v2Prompt.system_prompt },
-              { role: "user", content: [
-                { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
-                { type: "text", text: v2UserPrompt },
-              ]},
-            ],
-            max_tokens: 2048,
-            temperature: 0.1,
-            response_format: {
-              type: "json_schema",
-              json_schema: { name: "receipt_extraction", strict: true, schema: extractionSchema },
-            },
-          }),
-        });
-
-        let resultB: Record<string, any> | null = null;
-        if (v2Response.ok) {
-          const v2Json = await v2Response.json();
-          const v2Content = v2Json.choices?.[0]?.message?.content;
-          if (v2Content) resultB = parseAiResponse(v2Content);
-        } else {
-          console.error(`V2 call failed for item ${item.id}: ${v2Response.status}`);
-          await v2Response.text();
-        }
-
-        // ── Compare against original_data ─────────────────────────
-        const original = item.original_data as Record<string, any> || {};
-        const scores: Record<string, { a: boolean | null; b: boolean | null }> = {};
-
-        for (const field of COMPARISON_FIELDS) {
-          const origVal = original[field];
-          const hasGroundTruth = origVal != null && origVal !== "" && origVal !== "unknown";
-
-          let aMatch: boolean | null = null;
-          let bMatch: boolean | null = null;
-
-          if (hasGroundTruth) {
-            // Map field names between original (receipt columns) and AI output
-            const aiFieldA = mapFieldName(field, false);
-            const aiFieldB = mapFieldName(field, true);
-
-            if (resultA) {
-              aMatch = compareField(field, origVal, resultA[aiFieldA]);
-              fieldAccuracy[field].a_total++;
-              if (aMatch) fieldAccuracy[field].a_correct++;
-            }
-            if (resultB) {
-              bMatch = compareField(field, origVal, resultB[aiFieldB]);
-              fieldAccuracy[field].b_total++;
-              if (bMatch) fieldAccuracy[field].b_correct++;
-            }
-          }
-
-          scores[field] = { a: aMatch, b: bMatch };
-        }
-
-        // Update item with results
-        await supabase.from("ab_test_items").update({
-          result_a: resultA,
-          result_b: resultB,
-          field_scores: scores,
-        }).eq("id", item.id);
-
-        processed++;
-        console.log(`Processed ${processed}/${items.length}`);
-
-      } catch (err) {
-        console.error(`Error processing item ${item.id}:`, err);
-        errors++;
-      }
-    }
-
-    // ── Save field accuracy ──────────────────────────────────────────
-    const accuracyRows = COMPARISON_FIELDS.map(field => ({
-      test_run_id,
-      field_name: field,
-      version_a_correct: fieldAccuracy[field].a_correct,
-      version_a_total: fieldAccuracy[field].a_total,
-      version_b_correct: fieldAccuracy[field].b_correct,
-      version_b_total: fieldAccuracy[field].b_total,
-    }));
-
-    await supabase.from("ab_test_field_accuracy").insert(accuracyRows);
-
-    // ── Compute summary ──────────────────────────────────────────────
-    let totalACorrect = 0, totalATotal = 0, totalBCorrect = 0, totalBTotal = 0;
-    for (const f of COMPARISON_FIELDS) {
-      totalACorrect += fieldAccuracy[f].a_correct;
-      totalATotal += fieldAccuracy[f].a_total;
-      totalBCorrect += fieldAccuracy[f].b_correct;
-      totalBTotal += fieldAccuracy[f].b_total;
-    }
-
-    const summary = {
-      total_items: items.length,
-      processed,
-      errors,
-      overall_accuracy_a: totalATotal > 0 ? Math.round((totalACorrect / totalATotal) * 10000) / 100 : 0,
-      overall_accuracy_b: totalBTotal > 0 ? Math.round((totalBCorrect / totalBTotal) * 10000) / 100 : 0,
-      field_accuracy: Object.fromEntries(
-        COMPARISON_FIELDS.map(f => [f, {
-          a: fieldAccuracy[f].a_total > 0 ? Math.round((fieldAccuracy[f].a_correct / fieldAccuracy[f].a_total) * 10000) / 100 : null,
-          b: fieldAccuracy[f].b_total > 0 ? Math.round((fieldAccuracy[f].b_correct / fieldAccuracy[f].b_total) * 10000) / 100 : null,
-        }])
-      ),
-    };
-
-    await supabase.from("ab_test_runs").update({
-      status: "completed",
-      completed_at: new Date().toISOString(),
-      results_summary: summary,
-    }).eq("id", test_run_id);
-
-    console.log(`A/B test completed. A: ${summary.overall_accuracy_a}%, B: ${summary.overall_accuracy_b}%`);
-
-    return new Response(JSON.stringify({ success: true, summary }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-
-  } catch (err) {
-    console.error("A/B test error:", err);
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-});
-
-// Map original_data field names to AI output field names
 function mapFieldName(field: string, isV2: boolean): string {
-  // V1 uses: vendor, amount_gross, vat_rate, vat_amount, category, receipt_date, payment_method
-  // V2 uses: vendor_name, total_amount, tax_rate, tax_amount, category, receipt_date, payment_method
   if (isV2) {
     switch (field) {
       case "vendor_name": return "vendor_name";
@@ -404,3 +154,322 @@ function mapFieldName(field: string, isV2: boolean): string {
     }
   }
 }
+
+async function processBatch(
+  supabase: any,
+  lovableApiKey: string,
+  testRunId: string,
+  v1Prompt: any,
+  v2Prompt: any,
+  items: any[],
+) {
+  for (const item of items) {
+    try {
+      const { data: receipt } = await supabase
+        .from("receipts").select("file_url, file_type, file_name, user_id").eq("id", item.receipt_id).single();
+      if (!receipt?.file_url) {
+        console.error(`No file_url for receipt ${item.receipt_id}`);
+        continue;
+      }
+
+      const { data: fileData } = await supabase.storage.from("receipts").download(receipt.file_url);
+      if (!fileData) {
+        console.error(`Download failed for ${receipt.file_url}`);
+        continue;
+      }
+
+      const arrayBuffer = await fileData.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const chunkSize = 8192;
+      let binaryString = "";
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      const imageBase64 = btoa(binaryString);
+      const isPdf = receipt.file_name?.endsWith(".pdf") || receipt.file_type === "pdf" || receipt.file_type === "application/pdf";
+      const mimeType = isPdf ? "application/pdf" : `image/${receipt.file_type || "jpeg"}`;
+
+      let categoryList = "Sonstiges";
+      if (receipt.user_id) {
+        const { data: cats } = await supabase
+          .from("categories").select("name").eq("is_hidden", false)
+          .or(`user_id.eq.${receipt.user_id},is_system.eq.true`);
+        if (cats && cats.length > 0) {
+          categoryList = cats.map((c: any) => c.name).filter((n: string) => n !== "Keine Rechnung").join(", ");
+        }
+      }
+
+      // ── V1 Call ─────────────────────────────────────────────
+      const v1UserPrompt = v1Prompt.user_prompt_template.replace("{{categories}}", categoryList);
+      const v1Response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: v1Prompt.system_prompt },
+            { role: "user", content: [
+              { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+              { type: "text", text: v1UserPrompt },
+            ]},
+          ],
+          max_tokens: 4096,
+          temperature: 0.1,
+        }),
+      });
+
+      let resultA: Record<string, any> | null = null;
+      if (v1Response.ok) {
+        const v1Json = await v1Response.json();
+        const v1Content = v1Json.choices?.[0]?.message?.content;
+        if (v1Content) resultA = parseAiResponse(v1Content);
+      } else {
+        console.error(`V1 failed for ${item.id}: ${v1Response.status}`);
+        await v1Response.text();
+      }
+
+      // ── V2 Call ─────────────────────────────────────────────
+      const v2UserPrompt = v2Prompt.user_prompt_template.replace("{{categories}}", categoryList);
+      const v2Response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: v2Prompt.system_prompt },
+            { role: "user", content: [
+              { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+              { type: "text", text: v2UserPrompt },
+            ]},
+          ],
+          max_tokens: 2048,
+          temperature: 0.1,
+          response_format: {
+            type: "json_schema",
+            json_schema: { name: "receipt_extraction", strict: true, schema: extractionSchema },
+          },
+        }),
+      });
+
+      let resultB: Record<string, any> | null = null;
+      if (v2Response.ok) {
+        const v2Json = await v2Response.json();
+        const v2Content = v2Json.choices?.[0]?.message?.content;
+        if (v2Content) resultB = parseAiResponse(v2Content);
+      } else {
+        console.error(`V2 failed for ${item.id}: ${v2Response.status}`);
+        await v2Response.text();
+      }
+
+      // ── Compare ─────────────────────────────────────────────
+      const original = item.original_data as Record<string, any> || {};
+      const scores: Record<string, { a: boolean | null; b: boolean | null }> = {};
+
+      for (const field of COMPARISON_FIELDS) {
+        const origVal = original[field];
+        const hasGroundTruth = origVal != null && origVal !== "" && origVal !== "unknown";
+        let aMatch: boolean | null = null;
+        let bMatch: boolean | null = null;
+
+        if (hasGroundTruth) {
+          const aiFieldA = mapFieldName(field, false);
+          const aiFieldB = mapFieldName(field, true);
+          if (resultA) aMatch = compareField(field, origVal, resultA[aiFieldA]);
+          if (resultB) bMatch = compareField(field, origVal, resultB[aiFieldB]);
+        }
+        scores[field] = { a: aMatch, b: bMatch };
+      }
+
+      await supabase.from("ab_test_items").update({
+        result_a: resultA,
+        result_b: resultB,
+        field_scores: scores,
+      }).eq("id", item.id);
+
+      console.log(`Processed item ${item.id}`);
+    } catch (err) {
+      console.error(`Error processing item ${item.id}:`, err);
+    }
+  }
+}
+
+async function finalize(supabase: any, testRunId: string) {
+  // Load all items to compute accuracy
+  const { data: allItems } = await supabase
+    .from("ab_test_items")
+    .select("field_scores, result_a, result_b")
+    .eq("test_run_id", testRunId);
+
+  if (!allItems) return;
+
+  const fieldAccuracy: Record<string, { a_correct: number; a_total: number; b_correct: number; b_total: number }> = {};
+  COMPARISON_FIELDS.forEach(f => { fieldAccuracy[f] = { a_correct: 0, a_total: 0, b_correct: 0, b_total: 0 }; });
+
+  let processed = 0;
+  let errors = 0;
+
+  for (const item of allItems) {
+    if (!item.result_a && !item.result_b) { errors++; continue; }
+    processed++;
+    const scores = item.field_scores as Record<string, { a: boolean | null; b: boolean | null }> || {};
+    for (const field of COMPARISON_FIELDS) {
+      const s = scores[field];
+      if (!s) continue;
+      if (s.a !== null) {
+        fieldAccuracy[field].a_total++;
+        if (s.a) fieldAccuracy[field].a_correct++;
+      }
+      if (s.b !== null) {
+        fieldAccuracy[field].b_total++;
+        if (s.b) fieldAccuracy[field].b_correct++;
+      }
+    }
+  }
+
+  // Delete old accuracy rows, insert new
+  await supabase.from("ab_test_field_accuracy").delete().eq("test_run_id", testRunId);
+  const accuracyRows = COMPARISON_FIELDS.map(field => ({
+    test_run_id: testRunId,
+    field_name: field,
+    version_a_correct: fieldAccuracy[field].a_correct,
+    version_a_total: fieldAccuracy[field].a_total,
+    version_b_correct: fieldAccuracy[field].b_correct,
+    version_b_total: fieldAccuracy[field].b_total,
+  }));
+  await supabase.from("ab_test_field_accuracy").insert(accuracyRows);
+
+  let totalACorrect = 0, totalATotal = 0, totalBCorrect = 0, totalBTotal = 0;
+  for (const f of COMPARISON_FIELDS) {
+    totalACorrect += fieldAccuracy[f].a_correct;
+    totalATotal += fieldAccuracy[f].a_total;
+    totalBCorrect += fieldAccuracy[f].b_correct;
+    totalBTotal += fieldAccuracy[f].b_total;
+  }
+
+  const summary = {
+    total_items: allItems.length,
+    processed,
+    errors,
+    overall_accuracy_a: totalATotal > 0 ? Math.round((totalACorrect / totalATotal) * 10000) / 100 : 0,
+    overall_accuracy_b: totalBTotal > 0 ? Math.round((totalBCorrect / totalBTotal) * 10000) / 100 : 0,
+    field_accuracy: Object.fromEntries(
+      COMPARISON_FIELDS.map(f => [f, {
+        a: fieldAccuracy[f].a_total > 0 ? Math.round((fieldAccuracy[f].a_correct / fieldAccuracy[f].a_total) * 10000) / 100 : null,
+        b: fieldAccuracy[f].b_total > 0 ? Math.round((fieldAccuracy[f].b_correct / fieldAccuracy[f].b_total) * 10000) / 100 : null,
+      }])
+    ),
+  };
+
+  await supabase.from("ab_test_runs").update({
+    status: "completed",
+    completed_at: new Date().toISOString(),
+    results_summary: summary,
+  }).eq("id", testRunId);
+
+  console.log(`A/B test finalized. A: ${summary.overall_accuracy_a}%, B: ${summary.overall_accuracy_b}%`);
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    const { test_run_id, batch_offset } = await req.json();
+    if (!test_run_id) {
+      return new Response(JSON.stringify({ error: "test_run_id required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const offset = batch_offset || 0;
+    const isFirstCall = offset === 0;
+
+    if (isFirstCall) {
+      await supabase.from("ab_test_runs").update({ status: "running" }).eq("id", test_run_id);
+    }
+
+    // Load prompt versions
+    const { data: testRun } = await supabase
+      .from("ab_test_runs").select("prompt_version_a, prompt_version_b").eq("id", test_run_id).single();
+    if (!testRun) throw new Error("Test run not found");
+
+    const { data: v1Prompt } = await supabase
+      .from("prompt_versions").select("*").eq("version", testRun.prompt_version_a).single();
+    const { data: v2Prompt } = await supabase
+      .from("prompt_versions").select("*").eq("version", testRun.prompt_version_b).single();
+    if (!v1Prompt || !v2Prompt) throw new Error("Prompt versions not found");
+
+    // Load batch of unprocessed items
+    const { data: items } = await supabase
+      .from("ab_test_items")
+      .select("id, receipt_id, original_data")
+      .eq("test_run_id", test_run_id)
+      .is("result_a", null)
+      .order("created_at", { ascending: true })
+      .limit(BATCH_SIZE);
+
+    if (!items || items.length === 0) {
+      // No more items — finalize
+      console.log("No more items, finalizing...");
+      await finalize(supabase, test_run_id);
+      return new Response(JSON.stringify({ success: true, message: "Test abgeschlossen", done: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log(`Processing batch at offset ${offset}: ${items.length} items`);
+
+    // Process this batch
+    await processBatch(supabase, lovableApiKey, test_run_id, v1Prompt, v2Prompt, items);
+
+    // Fire-and-forget: trigger next batch
+    const nextOffset = offset + items.length;
+    console.log(`Triggering next batch at offset ${nextOffset}`);
+
+    fetch(`${supabaseUrl}/functions/v1/run-ab-test`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ test_run_id, batch_offset: nextOffset }),
+    }).catch(err => {
+      console.error("Failed to trigger next batch:", err);
+    });
+
+    if (isFirstCall) {
+      return new Response(JSON.stringify({ success: true, message: "Test gestartet — Verarbeitung läuft im Hintergrund" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ success: true, batch_offset: nextOffset }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  } catch (err) {
+    console.error("A/B test error:", err);
+
+    // Try to set error status
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, serviceRoleKey);
+      const body = await req.clone().json().catch(() => ({}));
+      if (body.test_run_id) {
+        await supabase.from("ab_test_runs").update({ status: "error" }).eq("id", body.test_run_id);
+      }
+    } catch {}
+
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
