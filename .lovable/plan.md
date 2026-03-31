@@ -1,58 +1,58 @@
 
 
-# AI-Confidence Dot für Buchungsart
+# Split-PDF Retry-Logik
 
-## Übersicht
+## Problem
 
-Der Confidence-Dot (farbiger Punkt: grün/gelb/rot/grau) wird bereits bei allen Feldern in Review.tsx angezeigt, fehlt aber beim Buchungsart-Dropdown. In ReceiptDetailPanel.tsx wird ein anderes Pattern verwendet (LearnableField), dort fehlt der Dot ebenfalls.
+Fire-and-Forget `extract-receipt`-Aufrufe (Zeilen 207-217) lassen geteilte Belege bei Fehlschlag im Status "processing" hängen.
 
-## Änderungen
+## Lösung
 
-### 1. `src/pages/Review.tsx` — Confidence-Dot bei Buchungsart ergänzen
+Die Sofort-Antwort an den Client bleibt unverändert. Die Extraktionen laufen weiterhin im Hintergrund — aber mit Retry und Fehlerbehandlung statt Fire-and-Forget.
 
-**Zeilen 1162-1164**: Das Label `<Label>Buchungsart</Label>` wird erweitert um den gleichen Tooltip+Dot wie bei Kategorie (Zeilen 1131-1143):
+## Änderung in `supabase/functions/split-pdf/index.ts`
 
-```tsx
-<div className="space-y-2">
-  <div className="flex items-center gap-2">
-    <Label>Buchungsart</Label>
-    <Tooltip>
-      <TooltipTrigger>
-        <div className={cn(
-          'h-2 w-2 rounded-full',
-          getConfidenceColor(getFieldConfidence(currentReceipt?.tax_type, currentReceipt?.ai_confidence))
-        )} />
-      </TooltipTrigger>
-      <TooltipContent>
-        {currentReceipt?.tax_type ? 'Von KI erkannt' : 'Nicht erkannt'}
-      </TooltipContent>
-    </Tooltip>
-  </div>
-  <Select ...>
+**Zeilen 207-217 ersetzen**: Statt des simplen `.then()/.catch()` wird eine Hintergrund-Funktion gestartet, die:
+
+1. `extract-receipt` aufruft und auf die Antwort wartet
+2. Bei Fehler: 2 Sekunden wartet, dann ein zweites Mal versucht
+3. Bei erneutem Fehler: den Beleg-Status auf `'error'` setzt und die Fehlermeldung in `notes` schreibt
+
+```typescript
+// Background extraction with retry
+(async () => {
+  const extractWithRetry = async (receiptId: string) => {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const { error } = await supabase.functions.invoke('extract-receipt', {
+          body: { receiptId, skipMultiCheck: true }
+        });
+        if (error) throw error;
+        console.log(`Extraction succeeded for ${receiptId} (attempt ${attempt})`);
+        return;
+      } catch (err) {
+        console.error(`Extraction attempt ${attempt} failed for ${receiptId}:`, err);
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
+    }
+    // Both attempts failed — mark as error
+    await supabase.from('receipts').update({
+      status: 'error',
+      notes: 'KI-Extraktion nach 2 Versuchen fehlgeschlagen',
+    }).eq('id', receiptId);
+    console.error(`Marked ${receiptId} as error after 2 failed extraction attempts`);
+  };
+
+  for (const r of createdReceipts) {
+    extractWithRetry(r.id);
+  }
+})();
 ```
 
-Wenn `tax_type` leer/null ist → grauer Dot ("Nicht erkannt"). Wenn AI einen Wert gesetzt hat → farbiger Dot basierend auf `ai_confidence`.
-
-### 2. `src/components/receipts/ReceiptDetailPanel.tsx` — Buchungsart in LearnableField wrappen
-
-**Zeilen 1487-1502**: Das Buchungsart-Dropdown wird analog zum Kategorie-Feld (Zeilen 1466-1485) in eine `LearnableField`-Komponente gewrappt. Das zeigt automatisch "Gelernt"/"Geändert"-Badges und den Reset-Button:
-
-```tsx
-<LearnableField
-  fieldName="tax_type"
-  label="Buchungsart"
-  value={taxType}
-  originalValue={originalReceipt?.tax_type}
-  vendorLearning={vendorLearning}
-  onReset={() => setTaxType(originalReceipt?.tax_type || '')}
->
-  <Select value={taxType} onValueChange={setTaxType}>
-    ...
-  </Select>
-</LearnableField>
-```
+Die IIFE läuft asynchron weiter nachdem die HTTP-Response an den Client gesendet wurde.
 
 ### Dateien
-- `src/pages/Review.tsx` — Confidence-Dot bei Buchungsart-Label
-- `src/components/receipts/ReceiptDetailPanel.tsx` — LearnableField-Wrapper für Buchungsart
+- `supabase/functions/split-pdf/index.ts`
 
