@@ -201,32 +201,33 @@ function buildExpensesOnlyPrompt(keywords: string[], hint: string): string {
   let prompt = '';
 
   if (keywords.length > 0) {
-    const keywordList = keywords.map(k => `- "${k}"`).join('\n');
     prompt = `
 
-GEZIELTE POSITIONS-EXTRAKTION:
-Suche NUR Zeilen mit diesen Schlagwörtern:
-${keywordList}
+WICHTIG – NUR AUSGABEN EXTRAHIEREN:
+Dieser Beleg enthält sowohl Einnahmen/Gutschriften als auch Kosten.
+Extrahiere AUSSCHLIESSLICH die Positionen, die eines dieser Schlagwörter enthalten: ${keywords.join(", ")}
+Ignoriere alle anderen Zeilen (Einnahmen, Gutschriften, Auszahlungen).
 
 REGELN:
-- NUR exakte Treffer auf Schlagwörter, keine Synonyme
-- Zeilen OHNE Schlagwort komplett ignorieren
+- Durchsuche ALLE Seiten des Dokuments, nicht nur die erste
 - Pro Treffer: Brutto, Netto, MwSt-Satz, MwSt-Betrag erfassen
-- Schlagwörter können mehrfach vorkommen → jede Zeile einzeln
-- total_amount/net_amount/tax_amount = Summe ALLER Treffer
+- Schlagwörter können mehrfach vorkommen → jede Zeile einzeln zählen
+- Ignoriere Zwischen- und Gesamtsummen — nur einzelne Kostenzeilen zählen
+- Summiere alle gefundenen Kosten-Positionen zum Gesamtbetrag (total_amount, net_amount, tax_amount)
 - Verschiedene MwSt-Sätze → is_mixed_tax_rate=true + tax_rate_details
-- description: Gefundene Positionen mit Beträgen auflisten
-- DUPLIKAT-VERMEIDUNG: Einzelposten zählen, nicht Summenzeilen
-- Alle Beträge POSITIV (Klammern/Minus → positiv umwandeln)
-- Gutschriften/Erstattungen komplett ignorieren`;
+- Alle Beträge POSITIV
+- Gutschriften/Erstattungen komplett ignorieren
+- description: Alle gefundenen Positionen mit jeweiligem Betrag auflisten, z.B.: "Transaktionsgebühr 3,50€; Betreiber-Abonnement 12,00€"`;
   } else {
     prompt = `
 
 NUR AUSGABEN EXTRAHIEREN:
-Plattform-Abrechnung → NUR Kosten erfassen (Gebühren, Abos, Transaktionskosten).
+Dieser Beleg enthält sowohl Einnahmen/Gutschriften als auch Kosten.
+Extrahiere NUR Kosten-Positionen (Gebühren, Abos, Transaktionskosten).
 Einnahmen/Erlöse/Gutschriften/Auszahlungen IGNORIEREN.
-total_amount/net_amount/tax_amount = nur aus Kosten-Positionen.
-Alle Beträge POSITIV. Gutschriften ignorieren.`;
+Ignoriere Zwischen- und Gesamtsummen — nur einzelne Kostenzeilen zählen.
+Summiere alle gefundenen Kosten-Positionen zum Gesamtbetrag.
+Alle Beträge POSITIV.`;
   }
 
   if (hint) {
