@@ -1,67 +1,40 @@
 
 
-# Fix: Duplikat-Banner zeigt alte Duplikate trotz erfolgreicher Prüfung
+# Fix: Klammer-Regel aus dem Prompt entfernen — nur via Lieferanten-Hinweis
 
 ## Problem
 
-Das Banner "5 mögliche Duplikate gefunden" zeigt Belege, die **bereits zuvor** als Duplikat markiert wurden (`is_duplicate = true` in der DB). Die heutige Duplikat-Prüfung hat nur **neue** Belege geprüft (die noch nicht als Duplikat markiert sind, Zeile 466: `.eq('is_duplicate', false)`), keine neuen gefunden, und "Keine Duplikate gefunden" gemeldet.
-
-Die 5 alten Duplikate bleiben aber in der DB markiert → das Banner bleibt sichtbar. Das ist verwirrend.
+Zeile 220 enthält hardcoded `"Alle Beträge POSITIV (Klammern/Minus → positiv umwandeln)"`. Diese Regel ist Monta-spezifisch und wird dort bereits im `extraction_hint` des Lieferanten gepflegt. Im generischen Prompt führt sie bei anderen Lieferanten zu falschen Interpretationen.
 
 ## Lösung
 
-Zwei Anpassungen:
+In `buildExpensesOnlyPrompt()` (Zeile 200-239 in `supabase/functions/extract-receipt/index.ts`):
 
-### 1. `startDuplicateCheck` — Alte Duplikate re-validieren
+**Keywords-Pfad (Zeile 220):** Ersetze `"Alle Beträge POSITIV (Klammern/Minus → positiv umwandeln)"` durch `"Alle Beträge POSITIV"` — die Klammer-Interpretation kommt dann nur über den LIEFERANTEN-HINWEIS rein, wenn der User sie dort hinterlegt hat.
 
-Nach der Prüfung der neuen Belege: Auch alle bestehenden `is_duplicate = true` Belege nochmal gegen ihr `duplicate_of` prüfen. Wenn das Original nicht mehr existiert oder der Score unter 70 liegt, wird `is_duplicate` zurückgesetzt.
+**Ohne-Keywords-Pfad (Zeile 229):** Gleiche Änderung — `"Alle Beträge POSITIV. Gutschriften ignorieren."` bleibt, aber ohne Klammer-Regel.
 
-Konkret: Am Ende von `startDuplicateCheck()` (nach Zeile 521) eine Re-Validierung der bestehenden Duplikate einfügen:
-
-```ts
-// Re-validate existing duplicates
-const { data: existingDuplicates } = await supabase
-  .from('receipts')
-  .select('id, duplicate_of, file_hash, vendor, amount_gross, receipt_date, invoice_number')
-  .eq('user_id', user.id)
-  .eq('is_duplicate', true);
-
-if (existingDuplicates) {
-  for (const dup of existingDuplicates) {
-    // Check if original still exists and is not deleted/rejected
-    const { data: original } = await supabase
-      .from('receipts')
-      .select('id, status')
-      .eq('id', dup.duplicate_of)
-      .single();
-    
-    if (!original || original.status === 'rejected') {
-      // Original gone → unmark
-      await supabase.from('receipts').update({
-        is_duplicate: false,
-        duplicate_of: null,
-        duplicate_score: null,
-        duplicate_checked_at: new Date().toISOString()
-      }).eq('id', dup.id);
-    }
-  }
-}
+### Vorher
+```
+- Alle Beträge POSITIV (Klammern/Minus → positiv umwandeln)
 ```
 
-### 2. Banner-Text verbessern
-
-Das Banner-Wording ändern von "mögliche Duplikate **gefunden**" zu "als Duplikat **markiert**", damit klar ist, dass es sich um bestehende Markierungen handelt — nicht um neue Ergebnisse:
-
+### Nachher
 ```
-"{duplicateCount} Beleg{e} als Duplikat markiert"
-"Im Duplikat-Filter überprüfen und ggf. bereinigen"
+- Alle Beträge POSITIV
 ```
 
-### 3. Receipts neu laden nach Duplikat-Prüfung
+Die Klammer-Logik greift weiterhin bei Monta, weil dort im `extraction_hint` steht: *"Beträge in Klammern können Ausgaben sein"* — das wird als `LIEFERANTEN-HINWEIS` angehängt.
 
-Nach `startDuplicateCheck` wird `loadReceipts()` aufgerufen, damit die Zähler aktuell sind — auch wenn Duplikate entfernt wurden. Dies passiert bereits (Zeile nach dem Toast), muss aber sichergestellt werden, dass es auch im "keine gefunden"-Pfad passiert.
+## Zusätzliche Prompt-Verbesserungen (aus genehmigtem Plan)
 
-## Dateien
+Gleichzeitig die weiteren Verbesserungen aus dem bereits genehmigten Plan umsetzen:
 
-- `src/pages/Expenses.tsx` — Re-Validierung + Banner-Text + loadReceipts nach Check
+1. Kontext hinzufügen: "Dieser Beleg enthält sowohl Einnahmen/Gutschriften als auch Kosten"
+2. "Durchsuche ALLE Seiten" explizit erwähnen
+3. Summierung klarer formulieren
+4. Selbst-Verifikation: "LISTE alle gefundenen Treffer in der description auf"
+
+### Datei
+- `supabase/functions/extract-receipt/index.ts` — nur `buildExpensesOnlyPrompt()` (Zeilen 200-239)
 
