@@ -1149,7 +1149,7 @@ const Review = () => {
                         onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Kategorie wählen" />
+                          <SelectValue placeholder="Nicht zugeordnet" />
                         </SelectTrigger>
                         <SelectContent>
                           {categories.map(cat => (
