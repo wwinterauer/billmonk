@@ -104,7 +104,7 @@ import { TagSelector } from '@/components/tags/TagSelector';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { NO_RECEIPT_CATEGORY, TAX_TYPES } from '@/lib/constants';
+import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
 import { Folder } from 'lucide-react';
 import { Copy, Scissors, Layers, Zap } from 'lucide-react';
 import { checkForDuplicates, type DuplicateCheckResult } from '@/services/duplicateDetectionService';
