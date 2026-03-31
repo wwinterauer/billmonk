@@ -83,7 +83,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
-import { TAX_TYPES, PAYMENT_METHODS } from '@/lib/constants';
+import { PAYMENT_METHODS } from '@/lib/constants';
 
 interface TaxRateDetail {
   rate: number;
