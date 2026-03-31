@@ -73,27 +73,21 @@ export function useVendors() {
         throw new Error(fetchError.message);
       }
 
-      // Fetch receipt statistics per vendor
-      const { data: statsData, error: statsError } = await supabase
-        .from('receipts')
-        .select('vendor_id, amount_gross')
-        .not('vendor_id', 'is', null);
+      // Fetch receipt statistics per vendor via RPC
+      const { data: statsRpcData, error: statsError } = await supabase
+        .rpc('get_vendor_stats', { p_user_id: user.id });
 
       if (statsError) {
-        console.error('Error fetching receipt stats:', statsError);
+        console.error('Error fetching vendor stats:', statsError);
       }
 
-      // Calculate stats per vendor
       const statsMap = new Map<string, { count: number; total: number }>();
-      if (statsData) {
-        for (const receipt of statsData) {
-          if (receipt.vendor_id) {
-            const existing = statsMap.get(receipt.vendor_id) || { count: 0, total: 0 };
-            statsMap.set(receipt.vendor_id, {
-              count: existing.count + 1,
-              total: existing.total + (Number(receipt.amount_gross) || 0),
-            });
-          }
+      if (statsRpcData) {
+        for (const row of statsRpcData as { vendor_id: string; receipt_count: number; total_amount: number }[]) {
+          statsMap.set(row.vendor_id, {
+            count: Number(row.receipt_count),
+            total: Number(row.total_amount),
+          });
         }
       }
 
