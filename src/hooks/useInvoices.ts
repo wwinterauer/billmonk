@@ -290,7 +290,16 @@ export function useInvoices() {
 
   const updateInvoiceStatus = async (id: string, status: string, extra?: Record<string, any>) => {
     const updates: any = { status, ...extra };
-    if (status === 'paid') updates.paid_at = new Date().toISOString();
+    if (status === 'paid' || status === 'paid_with_skonto') {
+      updates.paid_at = new Date().toISOString();
+    }
+    if (status === 'paid_with_skonto') {
+      // Calculate skonto amount from the invoice
+      const invoice = invoices.find(inv => inv.id === id);
+      if (invoice && invoice.discount_percent && invoice.total) {
+        updates.discount_amount = invoice.total * (invoice.discount_percent / 100);
+      }
+    }
     if (status === 'sent') updates.sent_at = new Date().toISOString();
 
     const { error } = await supabase.from('invoices').update(updates).eq('id', id);
