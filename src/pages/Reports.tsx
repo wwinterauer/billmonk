@@ -443,14 +443,77 @@ const Reports = () => {
       .sort((a, b) => b.amount - a.amount);
   }, [receipts, categories, splitLines, splitBookingEnabled]);
 
-  // Prepare data for Pie Chart
+  // Group data by tax_type (split-aware)
+  const taxTypeData = useMemo(() => {
+    if (!receipts) return [];
+
+    const billableReceipts = receipts.filter(r => r.category !== NO_RECEIPT_CATEGORY);
+    const taxTypeMap = new Map<string, { amount: number; count: number; vat: number }>();
+
+    // Group split lines by receipt for split-aware aggregation
+    const splitByReceipt = new Map<string, any[]>();
+    if (splitBookingEnabled && splitLines) {
+      splitLines.forEach((line) => {
+        const lines = splitByReceipt.get(line.receipt_id) || [];
+        lines.push(line);
+        splitByReceipt.set(line.receipt_id, lines);
+      });
+    }
+
+    billableReceipts.forEach(r => {
+      if (splitBookingEnabled && (r as any).is_split_booking) {
+        const lines = splitByReceipt.get(r.id);
+        if (lines && lines.length > 0) {
+          lines.forEach((line: any) => {
+            const tt = line.tax_type || 'Offen';
+            const existing = taxTypeMap.get(tt) || { amount: 0, count: 0, vat: 0 };
+            existing.amount += line.amount_gross || 0;
+            existing.vat += line.vat_amount || 0;
+            existing.count += 1;
+            taxTypeMap.set(tt, existing);
+          });
+          return;
+        }
+      }
+      const tt = (r as any).tax_type || 'Offen';
+      const existing = taxTypeMap.get(tt) || { amount: 0, count: 0, vat: 0 };
+      existing.amount += r.amount_gross || 0;
+      existing.vat += r.vat_amount || 0;
+      existing.count += 1;
+      taxTypeMap.set(tt, existing);
+    });
+
+    return Array.from(taxTypeMap.entries())
+      .map(([name, data]) => ({
+        name,
+        color: TAX_TYPE_COLORS[name] || '#94A3B8',
+        amount: data.amount,
+        count: data.count,
+        vat: data.vat,
+      }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [receipts, splitLines, splitBookingEnabled]);
+
+  // Prepare data for Pie Chart — depends on groupBy
   const pieChartData = useMemo(() => {
+    if (expenseGroupBy === 'taxType') {
+      return taxTypeData.map((tt) => ({
+        name: tt.name,
+        value: tt.amount,
+        color: tt.color,
+      }));
+    }
     return categoryData.map((cat) => ({
       name: cat.name,
       value: cat.amount,
       color: cat.color,
     }));
-  }, [categoryData]);
+  }, [categoryData, taxTypeData, expenseGroupBy]);
+
+  // Active table data for the breakdown table
+  const activeTableData = useMemo(() => {
+    return expenseGroupBy === 'taxType' ? taxTypeData : categoryData;
+  }, [expenseGroupBy, categoryData, taxTypeData]);
 
   // Time series data - grouped by month
   const timeSeriesData = useMemo(() => {
