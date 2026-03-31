@@ -1468,7 +1468,7 @@ export function ReceiptDetailPanel({
                             <SelectValue placeholder="Nicht zugeordnet" />
                           </SelectTrigger>
                           <SelectContent>
-                            {categories.map((cat) => (
+                            {userCategories.map((cat) => (
                               <SelectItem key={cat.id} value={cat.name}>
                                 {cat.name}
                               </SelectItem>
