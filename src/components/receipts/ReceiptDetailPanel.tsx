@@ -113,8 +113,6 @@ interface TaxRateDetail {
   description?: string;
 }
 
-// PAYMENT_METHODS moved to @/lib/constants
-import { TAX_TYPES, PAYMENT_METHODS } from '@/lib/constants';
 
 
 export function ReceiptDetailPanel({ 
