@@ -89,13 +89,51 @@ export interface EmailAttachment {
   storage_path: string | null;
 }
 
-// Generate a cryptographically secure random token for email addresses
-// Uses 32 characters for better security against brute force attacks
-const generateToken = () => {
+// Generate a short random suffix (4 chars alphanumeric)
+const generateShortSuffix = () => {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  const array = new Uint8Array(32);
+  const array = new Uint8Array(4);
   crypto.getRandomValues(array);
   return Array.from(array, (byte) => chars[byte % chars.length]).join('');
+};
+
+// Sanitize a string for use in email addresses
+const sanitizeForEmail = (str: string): string => {
+  return str
+    .toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]/g, '');
+};
+
+// Generate a user-friendly token: vorname.nachname.XXXX
+const generateUserToken = (user: { email?: string; user_metadata?: { first_name?: string; last_name?: string } } | null): string => {
+  const suffix = generateShortSuffix();
+  
+  const firstName = user?.user_metadata?.first_name;
+  const lastName = user?.user_metadata?.last_name;
+  
+  if (firstName && lastName) {
+    const sanitizedFirst = sanitizeForEmail(firstName);
+    const sanitizedLast = sanitizeForEmail(lastName);
+    if (sanitizedFirst && sanitizedLast) {
+      return `${sanitizedFirst}.${sanitizedLast}.${suffix}`;
+    }
+  }
+  
+  // Fallback: use email prefix
+  const emailPrefix = user?.email?.split('@')[0];
+  if (emailPrefix) {
+    const sanitized = sanitizeForEmail(emailPrefix);
+    if (sanitized) {
+      return `${sanitized}.${suffix}`;
+    }
+  }
+  
+  // Ultimate fallback: just the suffix with a generic prefix
+  return `user.${suffix}`;
 };
 
 export const useEmailImport = () => {
