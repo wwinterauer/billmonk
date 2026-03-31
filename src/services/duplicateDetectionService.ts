@@ -74,13 +74,13 @@ export async function checkForDuplicates(
 
     // 2. Invoice number + vendor match (95% - very likely)
     if (receiptData.invoice_number && receiptData.vendor) {
-      const vendorPrefix = receiptData.vendor.substring(0, 10);
-      const { data: invoiceMatch } = await supabase
+      let invoiceQuery = supabase
         .from('receipts')
         .select('id, vendor, amount_gross, receipt_date, status')
         .eq('user_id', userId)
-        .eq('invoice_number', receiptData.invoice_number)
-        .ilike('vendor', `%${vendorPrefix}%`)
+        .eq('invoice_number', receiptData.invoice_number);
+      invoiceQuery = applyVendorFilter(invoiceQuery, receiptData.vendor);
+      const { data: invoiceMatch } = await invoiceQuery
         .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
