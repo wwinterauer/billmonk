@@ -158,6 +158,7 @@ export const GROUPING_OPTIONS = [
   { value: 'year', label: 'Jahr', icon: 'CalendarRange' },
   { value: 'vat_rate', label: 'MwSt-Satz', icon: 'Percent' },
   { value: 'payment_method', label: 'Zahlungsart', icon: 'CreditCard' },
+  { value: 'tax_type', label: 'Buchungsart', icon: 'Scale' },
 ];
 
 // Group preview helper

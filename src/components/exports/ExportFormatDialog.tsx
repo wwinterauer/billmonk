@@ -600,6 +600,7 @@ export function ExportFormatDialog({
                   _split_vat_rate: line.vat_rate,
                   _split_vat_amount: line.vat_amount,
                   _split_is_private: line.is_private,
+                  _split_tax_type: line.tax_type,
                 } as any);
               });
             } else {
