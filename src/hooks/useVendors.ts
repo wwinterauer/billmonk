@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -51,6 +51,8 @@ export function useVendors() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isUpdatingVendor, setIsUpdatingVendor] = useState(false);
+  const isUpdatingRef = useRef(false);
 
   const fetchVendors = async () => {
     if (!user) {
@@ -209,6 +211,13 @@ export function useVendors() {
     updates: Partial<Pick<Vendor, 'display_name' | 'legal_names' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'field_defaults' | 'field_defaults_stats' | 'field_suggestions_dismissed' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
   ): Promise<{ vendor: Vendor; syncedReceipts: number; autoApprovedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
+    if (isUpdatingRef.current) {
+      console.warn('updateVendor already in progress, skipping');
+      return { vendor: vendors.find(v => v.id === id)!, syncedReceipts: 0, autoApprovedReceipts: 0 };
+    }
+    isUpdatingRef.current = true;
+    setIsUpdatingVendor(true);
+    try {
 
     // Check for duplicate if display_name is being updated
     if (updates.display_name) {
@@ -485,6 +494,10 @@ export function useVendors() {
       a.display_name.localeCompare(b.display_name)
     ));
     return { vendor: updated, syncedReceipts, autoApprovedReceipts };
+    } finally {
+      isUpdatingRef.current = false;
+      setIsUpdatingVendor(false);
+    }
   };
 
   const deleteVendor = async (id: string): Promise<void> => {
@@ -504,6 +517,7 @@ export function useVendors() {
     vendors,
     loading,
     error,
+    isUpdatingVendor,
     fetchVendors,
     addVendor,
     updateVendor,
