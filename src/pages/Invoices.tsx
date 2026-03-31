@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { FileText, Plus, MoreHorizontal, CheckCircle, Send, XCircle, Trash2, Euro, Clock, AlertTriangle, Download, Copy, GitBranch, ArrowRight, Receipt, Landmark, Eye, Search, CalendarIcon, Columns3, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Percent } from 'lucide-react';
+import { FileText, Plus, MoreHorizontal, CheckCircle, Send, XCircle, Trash2, Euro, Clock, AlertTriangle, Download, Copy, GitBranch, ArrowRight, Receipt, Landmark, Eye, Search, CalendarIcon, Columns3, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Percent, RefreshCw } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useInvoices, type Invoice } from '@/hooks/useInvoices';
 import { supabase } from '@/integrations/supabase/client';
