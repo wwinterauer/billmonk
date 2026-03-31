@@ -1,17 +1,21 @@
 /**
  * Shared cryptographic utilities for edge functions
  * Uses AES-GCM encryption with PBKDF2 key derivation
+ * 
+ * Format v2: "base64(salt):base64(iv+ciphertext)" — per-encryption random salt
+ * Format v1 (legacy): "base64(iv+ciphertext)" — fixed global salt
  */
 
-// Get encryption key from environment or derive from service role key
-async function getEncryptionKey(): Promise<CryptoKey> {
+const LEGACY_SALT = new TextEncoder().encode("lovable-email-encryption-v1");
+
+// Get encryption key from environment, derived with the provided salt
+async function getEncryptionKey(salt: Uint8Array): Promise<CryptoKey> {
   const encryptionSecret = Deno.env.get("ENCRYPTION_SECRET") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   
   if (!encryptionSecret) {
     throw new Error("No encryption secret available");
   }
   
-  // Use PBKDF2 to derive a proper AES key from the secret
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
@@ -20,9 +24,6 @@ async function getEncryptionKey(): Promise<CryptoKey> {
     false,
     ["deriveBits", "deriveKey"]
   );
-  
-  // Use a fixed salt (derived from project context) - in production, use a stored salt per user
-  const salt = encoder.encode("lovable-email-encryption-v1");
   
   return crypto.subtle.deriveKey(
     {
@@ -39,11 +40,13 @@ async function getEncryptionKey(): Promise<CryptoKey> {
 }
 
 /**
- * Encrypts a string using AES-GCM
- * Returns a base64 string containing IV + ciphertext
+ * Encrypts a string using AES-GCM with a random per-encryption salt.
+ * Returns "base64(salt):base64(iv+ciphertext)"
  */
 export async function encryptString(plaintext: string): Promise<string> {
-  const key = await getEncryptionKey();
+  // Generate random 16-byte salt
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await getEncryptionKey(salt);
   const encoder = new TextEncoder();
   const data = encoder.encode(plaintext);
   
@@ -61,19 +64,36 @@ export async function encryptString(plaintext: string): Promise<string> {
   combined.set(iv);
   combined.set(new Uint8Array(ciphertext), iv.length);
   
-  // Return as base64
-  return btoa(String.fromCharCode(...combined));
+  const saltB64 = btoa(String.fromCharCode(...salt));
+  const payloadB64 = btoa(String.fromCharCode(...combined));
+  
+  return `${saltB64}:${payloadB64}`;
 }
 
 /**
- * Decrypts a string encrypted with encryptString
- * Expects base64 string containing IV + ciphertext
+ * Decrypts a string encrypted with encryptString.
+ * Supports both v2 ("salt:payload") and v1 legacy ("payload") formats.
  */
 export async function decryptString(encrypted: string): Promise<string> {
-  const key = await getEncryptionKey();
+  let salt: Uint8Array;
+  let payloadB64: string;
   
-  // Decode base64
-  const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+  const colonIndex = encrypted.indexOf(':');
+  if (colonIndex > 0 && colonIndex < encrypted.length - 1) {
+    // v2 format: "base64(salt):base64(iv+ciphertext)"
+    const saltB64 = encrypted.substring(0, colonIndex);
+    payloadB64 = encrypted.substring(colonIndex + 1);
+    salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
+    console.log("[crypto] Using per-encryption salt (v2)");
+  } else {
+    // v1 legacy format: "base64(iv+ciphertext)" with fixed salt
+    payloadB64 = encrypted;
+    salt = LEGACY_SALT;
+    console.log("[crypto] Using legacy fixed salt (v1)");
+  }
+  
+  const key = await getEncryptionKey(salt);
+  const combined = Uint8Array.from(atob(payloadB64), c => c.charCodeAt(0));
   
   // Extract IV (first 12 bytes) and ciphertext
   const iv = combined.slice(0, 12);
@@ -90,13 +110,19 @@ export async function decryptString(encrypted: string): Promise<string> {
 }
 
 /**
- * Check if a string appears to be AES-GCM encrypted (has IV prefix)
- * vs simple Base64 encoding
+ * Check if a string appears to be AES-GCM encrypted
  */
 export function isAesEncrypted(value: string): boolean {
   try {
+    const colonIndex = value.indexOf(':');
+    if (colonIndex > 0 && colonIndex < value.length - 1) {
+      // v2 format — check payload part
+      const payloadB64 = value.substring(colonIndex + 1);
+      const decoded = Uint8Array.from(atob(payloadB64), c => c.charCodeAt(0));
+      return decoded.length >= 28;
+    }
+    // v1 legacy format
     const decoded = Uint8Array.from(atob(value), c => c.charCodeAt(0));
-    // AES-GCM encrypted values have 12-byte IV + at least 16-byte auth tag
     return decoded.length >= 28;
   } catch {
     return false;
@@ -107,9 +133,14 @@ export function isAesEncrypted(value: string): boolean {
  * Decrypt password with backward compatibility for Base64-encoded passwords
  */
 export async function decryptPassword(encrypted: string): Promise<string> {
-  // Check if this looks like old Base64-only encoding (no IV prefix)
-  // Old Base64 passwords decode to short strings, AES-GCM has 12-byte IV + 16-byte tag minimum
   try {
+    // v2 format always has colon — use AES-GCM
+    if (encrypted.indexOf(':') > 0) {
+      console.log("[crypto] Using AES-GCM decryption (v2)");
+      return await decryptString(encrypted);
+    }
+    
+    // v1: check payload length
     const decoded = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
     
     // If less than 28 bytes, it's likely old Base64 encoding
@@ -118,8 +149,8 @@ export async function decryptPassword(encrypted: string): Promise<string> {
       return atob(encrypted);
     }
     
-    // Try AES-GCM decryption
-    console.log("[crypto] Using AES-GCM decryption");
+    // Try AES-GCM decryption with legacy salt
+    console.log("[crypto] Using AES-GCM decryption (v1)");
     return await decryptString(encrypted);
   } catch (error) {
     // Fallback to legacy Base64 for any errors
