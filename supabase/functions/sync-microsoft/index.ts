@@ -34,6 +34,7 @@ serve(async (req) => {
   try {
     const body = await req.json();
     accountId = body.accountId;
+    const syncSince = body.syncSince || null;
 
     if (!accountId) {
       throw new Error("accountId ist erforderlich");
