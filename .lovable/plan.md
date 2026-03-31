@@ -1,47 +1,59 @@
 
 
-# Infofeld "Mehrere Steuersätze" — Beschreibungen zeilenweise auflisten
+# Buchungsart-Spalte in Export-Vorlagen + Split-Buchungs-Export
 
-## Problem
+## Aktuelle Situation
 
-Wenn mehrere Positionen zum selben MwSt-Satz gehören, werden alle Beschreibungen in einer Zeile zusammengefasst (z.B. `20% (Betreiber-Abonnement – Kauf eines benutzerdefinierten Abonnements, Ladegebühr (%) (64.25 kWh insgesamt))`). Das wird zu lang und erzeugt unschöne Zeilenumbrüche.
+In `DEFAULT_COLUMNS` und `SPLIT_COLUMNS` fehlt jeweils eine Spalte für **Buchungsart** (`tax_type`). Auch in `SORTABLE_FIELDS` und `GROUPING_OPTIONS` fehlt sie.
 
-## Lösung
+Bei Split-Buchungen werden Belege bereits korrekt aufgefächert (jede Split-Position wird zu einer eigenen Zeile), mit eigener Kategorie, Brutto/Netto/MwSt. Die Split-Spalten haben aber ebenfalls keine Buchungsart.
 
-**Datei: `src/components/receipts/ReceiptDetailPanel.tsx`**, Zeilen 1617-1626
+## Export bei Split-Buchungen
 
-Die `description` jedes `taxRateDetails`-Eintrags am Komma splitten und jede Position als eigene Zeile darstellen:
-
-```tsx
-{taxRateDetails.map((detail, idx) => (
-  <div key={idx} className="border-b border-amber-200 last:border-0 pb-1 last:pb-0 mb-1 last:mb-0">
-    <div className="flex justify-between text-sm font-medium">
-      <span className="text-amber-700">{detail.rate}% MwSt</span>
-      <span className="text-amber-800">
-        Netto: €{detail.net_amount?.toFixed(2)} / MwSt: €{detail.tax_amount?.toFixed(2)}
-      </span>
-    </div>
-    {detail.description && (
-      <div className="ml-4 mt-0.5">
-        {detail.description.split(',').map((desc, i) => (
-          <div key={i} className="text-xs text-amber-600">• {desc.trim()}</div>
-        ))}
-      </div>
-    )}
-  </div>
-))}
-```
-
-### Ergebnis
-
-Statt einer langen Zeile wird jede Position einzeln aufgelistet:
+So sieht der Export mit aktivierten Split-Spalten aus:
 
 ```text
-0% MwSt                          Netto: €0.51 / MwSt: €0.00
-  • Transaktionsgebühren (64.25 kWh insgesamt)
+Datum      | Lieferant | Kategorie    | Buchungsart        | Brutto  | Netto   | MwSt% | MwSt €
+-----------+-----------+--------------+--------------------+---------+---------+-------+-------
+15.03.2026 | Monta     | Mobilität    | KFZ-Kosten (AT)    | 19.60   | 16.42   | 20%   | 3.18   ← Hauptbeleg (wenn NICHT aufgefächert)
 
-20% MwSt                         Netto: €15.91 / MwSt: €3.18
-  • Betreiber-Abonnement – Kauf eines benutzerdefinierten Abonnements
-  • Ladegebühr (%) (64.25 kWh insgesamt)
+-- ODER aufgefächert (Split aktiviert):
+15.03.2026 | Monta     | Mobilität    | KFZ-Kosten (AT)    | 0.51    | 0.51    | 0%    | 0.00   ← Position 1
+15.03.2026 | Monta     | Mobilität    | KFZ-Kosten (AT)    | 15.91   | 13.26   | 20%   | 2.65   ← Position 2
+15.03.2026 | Monta     | Abo          | Betriebsausgabe    | 3.18    | 2.65    | 20%   | 0.53   ← Position 3
 ```
+
+Jede Split-Position hat ihre **eigene Kategorie und Buchungsart**, die Werte kommen aus `receipt_split_lines`.
+
+## Änderungen
+
+### 1. `useExportTemplates.ts` — Buchungsart überall ergänzen
+
+**DEFAULT_COLUMNS**: Neue Spalte nach Kategorie:
+```typescript
+{ id: '14', field: 'tax_type', label: 'Buchungsart', type: 'text', format: null, visible: true, order: 5, align: 'left' },
+```
+(order der nachfolgenden Spalten um 1 erhöhen)
+
+**SPLIT_COLUMNS**: Neue Spalte für Positions-Buchungsart:
+```typescript
+{ id: 's9', field: 'split_tax_type', label: 'Positions-Buchungsart', type: 'text', format: null, visible: false, order: 22.5, align: 'left' },
+```
+
+**SORTABLE_FIELDS**: `{ value: 'tax_type', label: 'Buchungsart' }` hinzufügen
+
+**GROUPING_OPTIONS**: `{ value: 'tax_type', label: 'Buchungsart', icon: 'Scale' }` hinzufügen
+
+### 2. `ExportFormatDialog.tsx` — Split-Expansion um `tax_type` erweitern
+
+In der Split-Expansion (~Zeile 592-610) wird `split_tax_type` aus `line.tax_type` gemappt, analog zu `split_category`.
+
+### 3. `useExportPreview.ts` — `tax_type` Feld in Preview-Formatierung aufnehmen
+
+Das `formatReceipt`-Mapping muss `tax_type` aus den Receipt-Daten übernehmen, damit es in der Vorschau angezeigt wird.
+
+### Dateien
+- `src/hooks/useExportTemplates.ts` — Spalten, Sort, Gruppierung
+- `src/components/exports/ExportFormatDialog.tsx` — Split-tax_type Mapping
+- `src/hooks/useExportPreview.ts` — Preview-Formatierung
 
