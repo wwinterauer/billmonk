@@ -45,14 +45,15 @@ export const DEFAULT_COLUMNS: ExportColumn[] = [
   { id: '3', field: 'description', label: 'Beschreibung', type: 'text', format: null, visible: true, order: 2, align: 'left' },
   { id: '4', field: 'invoice_number', label: 'Rechnungsnr.', type: 'text', format: null, visible: true, order: 3, align: 'left' },
   { id: '5', field: 'category', label: 'Kategorie', type: 'text', format: null, visible: true, order: 4, align: 'left' },
-  { id: '13', field: 'tags', label: 'Tags', type: 'text', format: null, visible: false, order: 5, align: 'left' },
-  { id: '6', field: 'amount_gross', label: 'Brutto', type: 'currency', format: '€ #.##0,00', visible: true, order: 6, align: 'right' },
-  { id: '7', field: 'amount_net', label: 'Netto', type: 'currency', format: '€ #.##0,00', visible: true, order: 7, align: 'right' },
-  { id: '8', field: 'vat_rate', label: 'MwSt-Satz', type: 'percent', format: '#0%', visible: true, order: 8, align: 'right' },
-  { id: '9', field: 'vat_amount', label: 'Vorsteuer', type: 'currency', format: '€ #.##0,00', visible: true, order: 9, align: 'right' },
-  { id: '10', field: 'payment_method', label: 'Zahlungsart', type: 'text', format: null, visible: false, order: 10, align: 'left' },
-  { id: '11', field: 'status', label: 'Status', type: 'text', format: null, visible: false, order: 11, align: 'left' },
-  { id: '12', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 12, align: 'left' },
+  { id: '14', field: 'tax_type', label: 'Buchungsart', type: 'text', format: null, visible: true, order: 5, align: 'left' },
+  { id: '13', field: 'tags', label: 'Tags', type: 'text', format: null, visible: false, order: 6, align: 'left' },
+  { id: '6', field: 'amount_gross', label: 'Brutto', type: 'currency', format: '€ #.##0,00', visible: true, order: 7, align: 'right' },
+  { id: '7', field: 'amount_net', label: 'Netto', type: 'currency', format: '€ #.##0,00', visible: true, order: 8, align: 'right' },
+  { id: '8', field: 'vat_rate', label: 'MwSt-Satz', type: 'percent', format: '#0%', visible: true, order: 9, align: 'right' },
+  { id: '9', field: 'vat_amount', label: 'Vorsteuer', type: 'currency', format: '€ #.##0,00', visible: true, order: 10, align: 'right' },
+  { id: '10', field: 'payment_method', label: 'Zahlungsart', type: 'text', format: null, visible: false, order: 11, align: 'left' },
+  { id: '11', field: 'status', label: 'Status', type: 'text', format: null, visible: false, order: 12, align: 'left' },
+  { id: '12', field: 'notes', label: 'Notizen', type: 'text', format: null, visible: false, order: 13, align: 'left' },
 ];
 
 // Split-specific columns (only visible when feature is enabled)
@@ -65,6 +66,7 @@ export const SPLIT_COLUMNS: ExportColumn[] = [
   { id: 's6', field: 'split_vat_rate', label: 'Positions-MwSt-Satz', type: 'percent', format: '#0%', visible: false, order: 25, align: 'right' },
   { id: 's7', field: 'split_vat_amount', label: 'Positions-MwSt-Betrag', type: 'currency', format: '€ #.##0,00', visible: false, order: 26, align: 'right' },
   { id: 's8', field: 'split_is_private', label: 'Privatanteil', type: 'text', format: null, visible: false, order: 27, align: 'left' },
+  { id: 's9', field: 'split_tax_type', label: 'Positions-Buchungsart', type: 'text', format: null, visible: false, order: 28, align: 'left' },
 ];
 
 // Default columns for invoice export templates
@@ -143,6 +145,7 @@ export const SORTABLE_FIELDS = [
   { value: 'status', label: 'Status' },
   { value: 'payment_method', label: 'Zahlungsart' },
   { value: 'invoice_number', label: 'Rechnungsnr.' },
+  { value: 'tax_type', label: 'Buchungsart' },
 ];
 
 // Available fields for grouping with icons
@@ -155,6 +158,7 @@ export const GROUPING_OPTIONS = [
   { value: 'year', label: 'Jahr', icon: 'CalendarRange' },
   { value: 'vat_rate', label: 'MwSt-Satz', icon: 'Percent' },
   { value: 'payment_method', label: 'Zahlungsart', icon: 'CreditCard' },
+  { value: 'tax_type', label: 'Buchungsart', icon: 'Scale' },
 ];
 
 // Group preview helper
@@ -176,6 +180,8 @@ export const getGroupPreview = (groupBy: string | null): string[] => {
       return ['20%', '13%', '10%', '0%'];
     case 'payment_method':
       return ['Überweisung', 'Kreditkarte', 'Bar', '...'];
+    case 'tax_type':
+      return ['Betriebsausgabe', 'KFZ-Kosten (AT)', 'GWG bis 1.000€', '...'];
     default:
       return [];
   }

@@ -94,6 +94,9 @@ export function useExportPreview() {
         const tags = receipt.tags as Array<{ name: string }> | undefined;
         value = tags && tags.length > 0 ? tags.map(t => t.name).join(', ') : '';
       }
+      if (col.field === 'tax_type') {
+        value = receipt.tax_type || '';
+      }
 
       // Apply formatting
       if (col.type === 'date' && value) {
