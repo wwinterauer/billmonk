@@ -35,7 +35,6 @@ const FIELD_LABELS: Record<string, string> = {
   tax_amount: 'MwSt-Betrag',
   category: 'Kategorie',
   receipt_date: 'Datum',
-  payment_method: 'Zahlungsart',
 };
 
 const V1_FIELD_MAP: Record<string, string> = {
@@ -45,7 +44,6 @@ const V1_FIELD_MAP: Record<string, string> = {
   tax_amount: 'vat_amount',
   category: 'category',
   receipt_date: 'receipt_date',
-  payment_method: 'payment_method',
 };
 
 const V2_FIELD_MAP: Record<string, string> = {
@@ -55,7 +53,6 @@ const V2_FIELD_MAP: Record<string, string> = {
   tax_amount: 'tax_amount',
   category: 'category',
   receipt_date: 'receipt_date',
-  payment_method: 'payment_method',
 };
 
 export function ABTestManager() {
@@ -137,7 +134,7 @@ export function ABTestManager() {
     mutationFn: async () => {
       const { data: receipts, error: rErr } = await supabase
         .from('receipts')
-        .select('id, vendor, amount_gross, vat_rate, vat_amount, category, receipt_date, payment_method')
+        .select('id, vendor, amount_gross, vat_rate, vat_amount, category, receipt_date')
         .eq('status', 'approved')
         .limit(50);
 
@@ -170,7 +167,6 @@ export function ABTestManager() {
           tax_amount: r.vat_amount,
           category: r.category,
           receipt_date: r.receipt_date,
-          payment_method: r.payment_method,
         },
       }));
 

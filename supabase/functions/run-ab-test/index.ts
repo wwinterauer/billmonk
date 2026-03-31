@@ -82,8 +82,26 @@ const extractionSchema = {
 };
 
 const COMPARISON_FIELDS = [
-  "vendor_name", "total_amount", "tax_rate", "tax_amount", "category", "receipt_date", "payment_method",
+  "vendor_name", "total_amount", "tax_rate", "tax_amount", "category", "receipt_date",
 ];
+
+// ── Vendor-Kontext: Expenses-Only Prompt Builder ──────────────────
+function buildExpensesOnlyPrompt(keywords: string[] | null, hint: string | null): string {
+  let block = "";
+  if (keywords && keywords.length > 0) {
+    block += `\n\nWICHTIG – NUR AUSGABEN EXTRAHIEREN:
+Dieser Beleg enthält sowohl Einnahmen/Gutschriften als auch Kosten.
+Extrahiere AUSSCHLIESSLICH die Positionen, die eines dieser Schlagwörter enthalten: ${keywords.join(", ")}
+Ignoriere alle anderen Zeilen (Einnahmen, Gutschriften, Auszahlungen).
+Beträge in Klammern sind Kosten und sollen als positive Werte erfasst werden.
+Ignoriere Zwischen- und Gesamtsummen — nur einzelne Kostenzeilen zählen.
+Summiere alle gefundenen Kosten-Positionen zum Gesamtbetrag.`;
+  }
+  if (hint && hint.trim()) {
+    block += `\n\nLIEFERANTEN-HINWEIS: ${hint.trim()}`;
+  }
+  return block;
+}
 
 function compareField(fieldName: string, original: any, extracted: any): boolean {
   if (original == null || original === "" || original === "unknown") return true;
@@ -166,7 +184,7 @@ async function processBatch(
   for (const item of items) {
     try {
       const { data: receipt } = await supabase
-        .from("receipts").select("file_url, file_type, file_name, user_id").eq("id", item.receipt_id).single();
+        .from("receipts").select("file_url, file_type, file_name, user_id, vendor_id").eq("id", item.receipt_id).single();
       if (!receipt?.file_url) {
         console.error(`No file_url for receipt ${item.receipt_id}`);
         continue;
@@ -200,8 +218,23 @@ async function processBatch(
         }
       }
 
+      // ── Load vendor context ──────────────────────────────────
+      let vendorContextPrompt = "";
+      if (receipt.vendor_id) {
+        const { data: vendor } = await supabase
+          .from("vendors")
+          .select("expenses_only_extraction, extraction_keywords, extraction_hint")
+          .eq("id", receipt.vendor_id)
+          .single();
+        if (vendor?.expenses_only_extraction) {
+          vendorContextPrompt = buildExpensesOnlyPrompt(vendor.extraction_keywords, vendor.extraction_hint);
+        } else if (vendor?.extraction_hint) {
+          vendorContextPrompt = `\n\nLIEFERANTEN-HINWEIS: ${vendor.extraction_hint.trim()}`;
+        }
+      }
+
       // ── V1 Call ─────────────────────────────────────────────
-      const v1UserPrompt = v1Prompt.user_prompt_template.replace("{{categories}}", categoryList);
+      const v1UserPrompt = v1Prompt.user_prompt_template.replace("{{categories}}", categoryList) + vendorContextPrompt;
       const v1Response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
@@ -230,7 +263,7 @@ async function processBatch(
       }
 
       // ── V2 Call ─────────────────────────────────────────────
-      const v2UserPrompt = v2Prompt.user_prompt_template.replace("{{categories}}", categoryList);
+      const v2UserPrompt = v2Prompt.user_prompt_template.replace("{{categories}}", categoryList) + vendorContextPrompt;
       const v2Response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
