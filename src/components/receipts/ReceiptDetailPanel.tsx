@@ -534,7 +534,7 @@ export function ReceiptDetailPanel({
     }
 
     // Apply default VAT rate if not already set
-    if (vendorData.default_vat_rate !== null && vatRate === '20') {
+    if (vendorData.default_vat_rate !== null && vatRate === defaultVatRate) {
       setVatRate(vendorData.default_vat_rate.toString());
       applied.push('MwSt-Satz');
     }
