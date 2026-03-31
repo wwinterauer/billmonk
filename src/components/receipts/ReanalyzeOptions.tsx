@@ -332,6 +332,25 @@ export function ReanalyzeOptions({
       if (error) throw error;
 
       if (data?.success) {
+        // Map extracted fields to form updates
+        if (data.data) {
+          const normalized = data.data;
+          const updates: Parameters<typeof onFieldsUpdated>[0] = {};
+          if (normalized.vendor) updates.vendor = normalized.vendor;
+          if (normalized.vendor_brand) updates.vendor_brand = normalized.vendor_brand;
+          if (normalized.description) updates.description = normalized.description;
+          if (normalized.invoice_number) updates.invoice_number = normalized.invoice_number;
+          if (normalized.receipt_date) updates.receipt_date = new Date(normalized.receipt_date);
+          if (normalized.amount_gross !== null && normalized.amount_gross !== undefined) updates.amount_gross = normalized.amount_gross.toString();
+          if (normalized.vat_rate !== null && normalized.vat_rate !== undefined) updates.vat_rate = normalized.vat_rate.toString();
+          if (normalized.category) updates.category = normalized.category;
+          if (normalized.amount_net !== null && normalized.amount_net !== undefined) updates.amount_net = normalized.amount_net.toString();
+          if (normalized.vat_amount !== null && normalized.vat_amount !== undefined) updates.vat_amount = normalized.vat_amount.toString();
+          if (normalized.is_mixed_tax_rate !== undefined) updates.is_mixed_tax_rate = normalized.is_mixed_tax_rate;
+          if (normalized.tax_rate_details) updates.tax_rate_details = normalized.tax_rate_details;
+          updates.confidence = normalized.confidence;
+          onFieldsUpdated(updates);
+        }
         toast({
           title: 'Nur-Ausgaben-Analyse abgeschlossen',
           description: 'Beleg wurde nur mit Kosten-Positionen neu analysiert.',
