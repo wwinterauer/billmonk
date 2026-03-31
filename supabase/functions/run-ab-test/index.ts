@@ -406,6 +406,16 @@ serve(async (req) => {
       .from("prompt_versions").select("*").eq("version", testRun.prompt_version_b).single();
     if (!v1Prompt || !v2Prompt) throw new Error("Prompt versions not found");
 
+    // Check if test was stopped before processing
+    const { data: currentRun } = await supabase
+      .from("ab_test_runs").select("status").eq("id", test_run_id).single();
+    if (currentRun?.status === "stopped") {
+      console.log("Test was stopped, aborting batch.");
+      return new Response(JSON.stringify({ success: true, message: "Test gestoppt", stopped: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Load batch of unprocessed items
     const { data: items } = await supabase
       .from("ab_test_items")

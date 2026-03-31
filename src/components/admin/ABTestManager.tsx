@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Play, Plus, ArrowLeft, Eye, Trophy, Loader2 } from 'lucide-react';
+import { Play, Plus, ArrowLeft, Eye, Trophy, Loader2, Square, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface FieldAccuracy {
