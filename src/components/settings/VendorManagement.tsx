@@ -72,7 +72,7 @@ export function VendorManagement() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const { vendors, loading, isUpdatingVendor, addVendor, updateVendor, deleteVendor, fetchVendors } = useVendors();
-  const { categories } = useCategories();
+  const { userCategories } = useCategories();
   const { activeTags } = useTags();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
