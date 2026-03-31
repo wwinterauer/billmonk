@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
+import { NO_RECEIPT_CATEGORY, TAX_TYPE_COLORS } from '@/lib/constants';
 
 interface DashboardStats {
   totalExpenses: number;
