@@ -213,28 +213,9 @@ STRENGE FILTERREGEL:
 - Wenn eine Zeile KEINES dieser Schlagwörter enthält → KOMPLETT IGNORIEREN
 - Es zählen NUR exakte Treffer — keine Synonyme
 - Durchsuche ALLE Seiten des Dokuments, nicht nur die erste
-
-FÜR JEDE gefundene Position:
-- Erfasse Bruttobetrag, Nettobetrag, MwSt-Satz und MwSt-Betrag
-- Berechne: MwSt = Brutto × Satz/(100+Satz), auf 2 Dezimalstellen runden
-- Validiere: Netto + MwSt = Brutto (±0.05€)
-- Bei 0% MwSt: Netto = Brutto, MwSt = 0
 - Ein Schlagwort kann MEHRFACH vorkommen → jede Zeile einzeln erfassen
-
-SUMMIERUNG:
-- amount_gross = Summe ALLER gefundenen Positionen (Brutto)
-- amount_net = Summe ALLER gefundenen Positionen (Netto)
-- vat_amount = Summe ALLER Steuerbeträge
-- Bei verschiedenen MwSt-Sätzen: is_mixed_tax_rate=true, tax_rate_details ausfüllen
-  (rate, net_amount, tax_amount, description PRO Steuersatz-Gruppe)
-
-DUPLIKAT-VERMEIDUNG:
-- Jede Zeile genau EINMAL zählen
-- Nur Einzelpositionen, NICHT Summen-/Zwischensummenzeilen
-
-BETRAGS-REGELN:
-- Alle Beträge POSITIV
-- Gutschriften/Erstattungen komplett ignorieren
+- Jede Zeile genau EINMAL zählen, NICHT Summen-/Zwischensummenzeilen
+- Alle Beträge POSITIV, Gutschriften/Erstattungen ignorieren
 
 description: Gefundene Positionen mit Beträgen auflisten, z.B.: "Transaktionsgebühr 3,50€; Betreiber-Abonnement 12,00€"`;
   } else {
@@ -743,13 +724,13 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
 
       // ── Post-Processing: rebuild tax_rate_details from line_items (truth from granular data) ──
       const lineItems = Array.isArray(rawData.line_items) ? rawData.line_items : [];
-      console.log(`[LineItems Debug] Count: ${lineItems.length}, items:`, JSON.stringify(lineItems.slice(0, 5)));
+      
 
       const validLineItems = lineItems.filter((li: any) => {
         const total = Number(li?.total);
         return li && Number.isFinite(total) && total !== 0 && li.tax_rate != null;
       });
-      console.log(`[LineItems Debug] Valid count: ${validLineItems.length}`);
+      
 
       if (validLineItems.length > 0) {
         const rateGroups: Record<string, { gross: number; descriptions: string[] }> = {};
@@ -777,7 +758,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           extractedData.is_mixed_tax_rate = true;
           extractedData.amount_net = Math.round(newDetails.reduce((s, d) => s + d.net_amount, 0) * 100) / 100;
           extractedData.vat_amount = Math.round(newDetails.reduce((s, d) => s + d.tax_amount, 0) * 100) / 100;
-          console.log(`[VAT Mixed] Rebuilt from ${validLineItems.length} line_items: ${rateKeys.length} rate groups, net=${extractedData.amount_net}, vat=${extractedData.vat_amount}, details=`, JSON.stringify(newDetails));
+          
         }
       }
 
@@ -795,7 +776,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           extractedData.is_mixed_tax_rate = true;
           extractedData.amount_net = Math.round(extractedData.tax_rate_details.reduce((s: number, t: any) => s + t.net_amount, 0) * 100) / 100;
           extractedData.vat_amount = Math.round(extractedData.tax_rate_details.reduce((s: number, t: any) => s + t.tax_amount, 0) * 100) / 100;
-          console.log(`[VAT Mixed] Fallback recalc: net=${extractedData.amount_net}, vat=${extractedData.vat_amount}`);
+          
         }
       }
 
