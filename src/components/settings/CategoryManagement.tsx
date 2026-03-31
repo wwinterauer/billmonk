@@ -73,12 +73,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useBookingTypes } from '@/hooks/useBookingTypes';
 import { usePlan } from '@/hooks/usePlan';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { TAX_CATEGORY_INFO } from '@/components/settings/taxCategoryInfo';
 
 // Icon mapping
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -127,16 +135,18 @@ export function CategoryManagement() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { effectivePlan } = usePlan();
+  const { settings: companySettings } = useCompanySettings();
   const {
     bookingTypes,
     loading: bookingTypesLoading,
-    toggleHidden,
+    toggleHidden: toggleBookingTypeHidden,
     updateBookingKey,
     addCustomType,
     removeCustomType,
   } = useBookingTypes();
 
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [personalCategories, setPersonalCategories] = useState<Category[]>([]);
+  const [taxCategories, setTaxCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -155,16 +165,16 @@ export function CategoryManagement() {
   const [bookingKeySaving, setBookingKeySaving] = useState<string | null>(null);
 
   const isBusinessPlan = effectivePlan === 'business';
+  const userCountry = companySettings?.country || 'AT';
 
-  // Fetch only personal categories (not system/tax ones)
   const fetchCategories = async () => {
     if (!user) return;
     setLoading(true);
     try {
+      // Fetch ALL categories (personal + system)
       const { data: catData, error: catError } = await supabase
         .from('categories')
         .select('*')
-        .eq('is_system', false)
         .order('sort_order', { ascending: true })
         .order('name');
 
@@ -180,7 +190,7 @@ export function CategoryManagement() {
         if (r.category) counts[r.category] = (counts[r.category] || 0) + 1;
       });
 
-      const categoriesWithCounts = (catData || []).map(cat => ({
+      const allCategories = (catData || []).map(cat => ({
         ...cat,
         is_hidden: cat.is_hidden ?? false,
         sort_order: cat.sort_order ?? 0,
@@ -189,7 +199,9 @@ export function CategoryManagement() {
         tax_code: (cat as any).tax_code ?? null,
       })) as Category[];
 
-      setCategories(categoriesWithCounts);
+      // Split: personal = not system, tax = system with country
+      setPersonalCategories(allCategories.filter(c => !c.is_system));
+      setTaxCategories(allCategories.filter(c => c.is_system && c.country));
     } catch (error) {
       toast({ variant: 'destructive', title: 'Fehler beim Laden', description: error instanceof Error ? error.message : 'Unbekannter Fehler' });
     } finally {
@@ -198,6 +210,12 @@ export function CategoryManagement() {
   };
 
   useEffect(() => { fetchCategories(); }, [user]);
+
+  // Filter tax categories by user country
+  const filteredTaxCategories = taxCategories.filter(c => c.country === userCountry);
+
+  // Custom booking types from useBookingTypes (non-system ones)
+  const customBookingTypes = bookingTypes.filter(bt => !bt.isSystem);
 
   const handleNewCategory = () => {
     setIsNewCategory(true);
@@ -223,7 +241,7 @@ export function CategoryManagement() {
       toast({ variant: 'destructive', title: 'Name zu lang', description: 'Der Name darf maximal 50 Zeichen haben.' });
       return;
     }
-    const duplicate = categories.find(c => c.name.toLowerCase() === formData.name.trim().toLowerCase() && c.id !== selectedCategory?.id);
+    const duplicate = personalCategories.find(c => c.name.toLowerCase() === formData.name.trim().toLowerCase() && c.id !== selectedCategory?.id);
     if (duplicate) {
       toast({ variant: 'destructive', title: 'Name bereits vergeben', description: 'Eine Kategorie mit diesem Namen existiert bereits.' });
       return;
@@ -232,7 +250,7 @@ export function CategoryManagement() {
     setSaving(true);
     try {
       if (isNewCategory) {
-        const maxSortOrder = Math.max(...categories.map(c => c.sort_order), 0);
+        const maxSortOrder = Math.max(...personalCategories.map(c => c.sort_order), 0);
         const { error } = await supabase.from('categories').insert({
           user_id: user.id, name: formData.name.trim(), icon: formData.icon,
           color: formData.color, is_system: false, is_hidden: formData.is_hidden, sort_order: maxSortOrder + 1,
@@ -287,8 +305,11 @@ export function CategoryManagement() {
     try {
       const { error } = await supabase.from('categories').update({ is_hidden: !category.is_hidden }).eq('id', category.id);
       if (error) throw error;
-      setCategories(prev => prev.map(c => c.id === category.id ? { ...c, is_hidden: !c.is_hidden } : c));
-      toast({ title: category.is_hidden ? 'Kategorie eingeblendet' : 'Kategorie ausgeblendet' });
+      // Update local state for both lists
+      const updateList = (list: Category[]) => list.map(c => c.id === category.id ? { ...c, is_hidden: !c.is_hidden } : c);
+      setPersonalCategories(updateList);
+      setTaxCategories(updateList);
+      toast({ title: category.is_hidden ? 'Eingeblendet' : 'Ausgeblendet' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Fehler', description: error instanceof Error ? error.message : 'Unbekannter Fehler' });
     }
@@ -359,14 +380,14 @@ export function CategoryManagement() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {categories.length === 0 ? (
+            {personalCategories.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                   Keine eigenen Kategorien vorhanden. Erstelle deine erste Kategorie.
                 </TableCell>
               </TableRow>
             ) : (
-              categories.map((category) => (
+              personalCategories.map((category) => (
                 <TableRow key={category.id} className={cn(category.is_hidden && 'opacity-50')}>
                   <TableCell>{renderIcon(category.icon, category.color)}</TableCell>
                   <TableCell className="font-medium">
@@ -399,7 +420,7 @@ export function CategoryManagement() {
       {/* ===== SEPARATOR ===== */}
       <Separator className="my-8" />
 
-      {/* ===== SECTION 2: Buchungsarten ===== */}
+      {/* ===== SECTION 2: Buchungsarten (Steuerkategorien) ===== */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Buchungsarten</h3>
@@ -413,66 +434,132 @@ export function CategoryManagement() {
         </Button>
       </div>
 
-      {bookingTypesLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        </div>
-      ) : (
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Typ</TableHead>
-                {isBusinessPlan && <TableHead>Buchungsschlüssel</TableHead>}
-                <TableHead className="text-right">Aktionen</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {bookingTypes.map((bt) => (
-                <TableRow key={bt.name} className={cn(bt.isHidden && 'opacity-50')}>
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12"></TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Steuercode</TableHead>
+              {isBusinessPlan && <TableHead>Buchungsschlüssel</TableHead>}
+              <TableHead className="text-right">Aktionen</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {/* System tax categories from DB */}
+            {filteredTaxCategories.map((cat) => {
+              const info = TAX_CATEGORY_INFO[cat.name];
+              // Get booking key from useBookingTypes if available
+              const matchingBt = bookingTypes.find(bt => bt.name === cat.name);
+              return (
+                <TableRow key={cat.id} className={cn(cat.is_hidden && 'opacity-50')}>
+                  <TableCell>{renderIcon(cat.icon, cat.color)}</TableCell>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-1.5">
-                      {bt.label}
-                      {bt.isHidden && <Badge variant="outline" className="text-xs">Ausgeblendet</Badge>}
+                      {cat.name}
+                      {cat.is_hidden && <Badge variant="outline" className="text-xs">Ausgeblendet</Badge>}
+                      {info && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
+                                <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs">
+                              <p className="font-medium text-sm">{info.short}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{info.law}</p>
+                              {info.deductibility && (
+                                <p className="text-xs mt-1">
+                                  <span className="font-medium">Absetzbarkeit:</span> {info.deductibility}
+                                </p>
+                              )}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={bt.isSystem ? 'secondary' : 'outline'}>
-                      {bt.isSystem ? 'Standard' : 'Eigene'}
-                    </Badge>
+                    {cat.tax_code && (
+                      <Badge variant="secondary" className="font-mono text-xs">
+                        {cat.tax_code}
+                      </Badge>
+                    )}
                   </TableCell>
                   {isBusinessPlan && (
                     <TableCell>
                       <Input
-                        value={bt.bookingKey}
-                        onChange={(e) => handleBookingKeyChange(bt.name, e.target.value)}
+                        value={matchingBt?.bookingKey || ''}
+                        onChange={(e) => handleBookingKeyChange(cat.name, e.target.value)}
                         placeholder="z.B. 4400"
                         className="h-8 w-32 font-mono text-sm"
-                        disabled={bookingKeySaving === bt.name}
+                        disabled={bookingKeySaving === cat.name}
                       />
                     </TableCell>
                   )}
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleHidden(bt.name)}
-                        title={bt.isHidden ? 'Einblenden' : 'Ausblenden'}>
-                        {bt.isHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                      </Button>
-                      {!bt.isSystem && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => removeCustomType(bt.name)} title="Löschen">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleToggleVisibility(cat)}
+                      title={cat.is_hidden ? 'Einblenden' : 'Ausblenden'}>
+                      {cat.is_hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                    </Button>
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+              );
+            })}
+
+            {/* Custom booking types from useBookingTypes */}
+            {customBookingTypes.map((bt) => (
+              <TableRow key={bt.name} className={cn(bt.isHidden && 'opacity-50')}>
+                <TableCell>
+                  <div className="h-6 w-6 rounded-full flex items-center justify-center bg-muted">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                </TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-1.5">
+                    {bt.label}
+                    {bt.isHidden && <Badge variant="outline" className="text-xs">Ausgeblendet</Badge>}
+                    <Badge variant="outline" className="text-xs">Eigene</Badge>
+                  </div>
+                </TableCell>
+                <TableCell></TableCell>
+                {isBusinessPlan && (
+                  <TableCell>
+                    <Input
+                      value={bt.bookingKey}
+                      onChange={(e) => handleBookingKeyChange(bt.name, e.target.value)}
+                      placeholder="z.B. 4400"
+                      className="h-8 w-32 font-mono text-sm"
+                      disabled={bookingKeySaving === bt.name}
+                    />
+                  </TableCell>
+                )}
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleBookingTypeHidden(bt.name)}
+                      title={bt.isHidden ? 'Einblenden' : 'Ausblenden'}>
+                      {bt.isHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => removeCustomType(bt.name)} title="Löschen">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+
+            {filteredTaxCategories.length === 0 && customBookingTypes.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={isBusinessPlan ? 5 : 4} className="text-center py-8 text-muted-foreground">
+                  Keine Buchungsarten für dein Land ({userCountry}) vorhanden.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       {/* ===== MODALS ===== */}
 
@@ -582,7 +669,7 @@ export function CategoryManagement() {
                     <Select value={reassignCategory} onValueChange={setReassignCategory}>
                       <SelectTrigger><SelectValue placeholder="Ziel-Kategorie wählen" /></SelectTrigger>
                       <SelectContent>
-                        {categories.filter(c => c.id !== selectedCategory.id).map((c) => (
+                        {personalCategories.filter(c => c.id !== selectedCategory.id).map((c) => (
                           <SelectItem key={c.id} value={c.name}>
                             <span className="flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color || '#64748B' }} />
