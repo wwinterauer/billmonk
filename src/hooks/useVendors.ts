@@ -494,6 +494,10 @@ export function useVendors() {
       a.display_name.localeCompare(b.display_name)
     ));
     return { vendor: updated, syncedReceipts, autoApprovedReceipts };
+    } finally {
+      isUpdatingRef.current = false;
+      setIsUpdatingVendor(false);
+    }
   };
 
   const deleteVendor = async (id: string): Promise<void> => {
