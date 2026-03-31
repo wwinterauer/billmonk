@@ -2040,6 +2040,8 @@ const Expenses = () => {
                       <SelectValue placeholder="Kategorie wählen..." />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="__clear__">Nicht zugeordnet</SelectItem>
+                      <SelectSeparator />
                       {categories.map(c => (
                         <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
                       ))}
