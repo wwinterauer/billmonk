@@ -220,7 +220,7 @@ export const useEmailImport = () => {
     mutationFn: async () => {
       if (!user?.id) throw new Error('Nicht angemeldet');
 
-      const token = generateToken();
+      const token = generateUserToken(user);
       const importEmail = `receipts+${token}@import.billmonk.ai`;
 
       const { data, error } = await supabase
