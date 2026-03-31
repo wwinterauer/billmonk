@@ -590,6 +590,9 @@ BESCHREIBUNG: Alle Positionen zusammenfassen, max 100 Zeichen, keine Preise.
 
 KATEGORIE: Wähle passendste aus: ${categoryList}
 
+BUCHUNGSART (tax_type): Steuerliche Einordnung nach DACH-Steuerrecht.
+Mögliche Werte: Betriebsausgabe, GWG bis 1.000€, Bewirtung 50%, Bewirtung 100%, Vorsteuer abzugsfähig, Reisekosten, Kfz-Kosten, Repräsentation, Abschreibung, Sonstige.
+Regeln: Gerät/Hardware >1.000€ netto → Abschreibung. Gerät ≤1.000€ → GWG bis 1.000€. Restaurant/Bewirtung → Bewirtung 50%. Tankstelle/Mietwagen → Kfz-Kosten. Hotel/Flug/Bahn → Reisekosten. Nur wenn eindeutig erkennbar, sonst "".
 MwSt-ERKENNUNG:
 - Suche explizite %-Angaben auf dem Beleg (20%, 19%, 10%, 7% etc.)
 - Berechne: MwSt = Brutto × Satz/(100+Satz). Validiere: Netto + MwSt = Brutto (±0.05€)

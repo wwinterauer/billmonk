@@ -151,6 +151,7 @@ const Review = () => {
     description: '',
     receipt_date: null,
     category: '',
+    tax_type: '',
     amount_gross: '',
     vat_rate: '20',
     is_mixed_tax_rate: false,
