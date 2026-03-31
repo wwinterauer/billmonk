@@ -2318,6 +2318,17 @@ const Expenses = () => {
                               ) : '—'}
                             </TableCell>
                           )}
+                          {visibleColumns.has('tax_type') && (
+                            <TableCell>
+                              {(receipt as any).tax_type ? (
+                                <Badge variant="outline" className="text-xs">
+                                  {(receipt as any).tax_type}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Offen</span>
+                              )}
+                            </TableCell>
+                          )}
                           {visibleColumns.has('tags') && (
                             <TableCell>
                               <Popover>
