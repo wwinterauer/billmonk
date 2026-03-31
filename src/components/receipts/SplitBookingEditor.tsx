@@ -18,7 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useVatRates } from '@/hooks/useVatRates';
-import { TAX_TYPES, PAYMENT_METHODS } from '@/lib/constants';
+
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 
 export interface SplitLine {
