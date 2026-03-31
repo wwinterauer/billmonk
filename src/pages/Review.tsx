@@ -1232,7 +1232,7 @@ const Review = () => {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {VAT_RATE_GROUPS.map(group => (
+                            {vatRateGroups.map(group => (
                               <SelectGroup key={group.label}>
                                 <SelectLabel>{group.label}</SelectLabel>
                                 {group.rates.map(rate => (

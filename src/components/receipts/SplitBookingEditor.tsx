@@ -384,7 +384,7 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {VAT_RATES.map(r => (
+                    {vatRates.map(r => (
                       <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                     ))}
                   </SelectContent>
