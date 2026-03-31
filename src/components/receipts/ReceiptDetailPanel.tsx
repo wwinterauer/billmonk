@@ -1489,6 +1489,7 @@ export function ReceiptDetailPanel({
                         mainCategory={category}
                         mainVatRate={vatRate !== '' ? parseFloat(vatRate) : 20}
                         onSplitChange={() => onUpdate()}
+                        vendorId={selectedVendorId}
                       />
                     )}
 

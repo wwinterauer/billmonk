@@ -1176,6 +1176,7 @@ const Review = () => {
                         totalGross={parseFloat(formData.amount_gross) || 0}
                         mainCategory={formData.category}
                         mainVatRate={parseFloat(formData.vat_rate) || 20}
+                        vendorId={currentReceipt.vendor_id || null}
                       />
                     )}
 
