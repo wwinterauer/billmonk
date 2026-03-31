@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { NO_RECEIPT_CATEGORY, TAX_TYPE_COLORS } from '@/lib/constants';
+import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
+import { useCategories } from '@/hooks/useCategories';
 import { useSplitLines, aggregateWithSplitLines } from '@/hooks/useSplitLines';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -90,6 +91,7 @@ import { TaxExportDialog } from '@/components/exports/TaxExportDialog';
 const Reports = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { categories: allCategories } = useCategories();
   const { effectivePlan, splitBookingEnabled } = usePlan();
   const showIncome = isPlanSufficient(effectivePlan, 'business');
   
@@ -483,10 +485,11 @@ const Reports = () => {
       taxTypeMap.set(tt, existing);
     });
 
+    const colorMap = new Map(allCategories.map(c => [c.name, c.color]));
     return Array.from(taxTypeMap.entries())
       .map(([name, data]) => ({
         name,
-        color: TAX_TYPE_COLORS[name] || '#94A3B8',
+        color: colorMap.get(name) || '#94A3B8',
         amount: data.amount,
         count: data.count,
         vat: data.vat,

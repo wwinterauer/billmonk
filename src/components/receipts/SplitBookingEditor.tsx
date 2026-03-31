@@ -18,7 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useVatRates } from '@/hooks/useVatRates';
-import { TAX_TYPES, PAYMENT_METHODS } from '@/lib/constants';
+
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 
 export interface SplitLine {
@@ -75,7 +75,7 @@ const recalcLine = (line: SplitLine, field: 'gross' | 'net' | 'vat_rate'): Split
 export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVatRate, onSplitChange, vendorId }: SplitBookingEditorProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { categories } = useCategories();
+  const { userCategories, taxCategories } = useCategories();
   const { vatRates } = useVatRates();
   const { trackFieldChange, getFieldDefaults } = useVendorFieldDefaults();
   const [lines, setLines] = useState<SplitLine[]>([]);
@@ -292,16 +292,18 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
       }
 
       const newLines: SplitLine[] = lineItems.map((item: any, idx: number) => {
-        const vatRate = item.vat_rate ?? mainVatRate ?? 20;
-        const grossAmount = item.amount_gross ?? 0;
-        const netAmount = item.amount_net ?? +(grossAmount / (1 + vatRate / 100)).toFixed(2);
+        const vatRate = parseFloat(String(item.tax_rate ?? item.vat_rate ?? mainVatRate ?? 20).replace('%', '').replace(',', '.')) || 0;
+        const grossAmount = Math.abs(Number(item.total) || Number(item.amount_gross) || 0);
+        const netAmount = vatRate === 0
+          ? grossAmount
+          : +(grossAmount / (1 + vatRate / 100)).toFixed(2);
         const vatAmount = +(grossAmount - netAmount).toFixed(2);
         return {
           sort_order: idx,
           description: item.description || '',
           category: item.category || mainCategory || '',
           tax_type: item.tax_type || vendorDefaults.tax_type || '',
-          payment_method: vendorDefaults.payment_method || '',
+          payment_method: '',
           amount_gross: grossAmount,
           amount_net: netAmount,
           vat_rate: vatRate,
@@ -379,14 +381,14 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
             />
 
             {/* Category / Tax Type / Payment Method row */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <Select value={line.category} onValueChange={v => updateLine(idx, 'category', v === '__empty__' ? '' : v)}>
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue placeholder="Nicht zugeordnet" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__empty__">Nicht zugeordnet</SelectItem>
-                  {categories.map(cat => (
+                  {userCategories.map(cat => (
                     <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -398,20 +400,8 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__empty__">Offen</SelectItem>
-                  {TAX_TYPES.map(t => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={line.payment_method} onValueChange={v => updateLine(idx, 'payment_method', v === '__empty__' ? '' : v)}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="Keine" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__empty__">Keine</SelectItem>
-                  {PAYMENT_METHODS.map(m => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  {taxCategories.map(c => (
+                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

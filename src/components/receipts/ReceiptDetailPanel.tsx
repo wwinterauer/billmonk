@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { TAX_TYPES, PAYMENT_METHODS } from '@/lib/constants';
+import { PAYMENT_METHODS } from '@/lib/constants';
 import { Repeat } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -124,7 +124,7 @@ export function ReceiptDetailPanel({
   const { toast } = useToast();
   const { user } = useAuth();
   const { getReceipt, updateReceipt, rejectReceipt, deleteReceipt } = useReceipts();
-  const { categories } = useCategories();
+  const { userCategories, taxCategories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
   const { vatRateGroups } = useVatRates();
@@ -1468,7 +1468,7 @@ export function ReceiptDetailPanel({
                             <SelectValue placeholder="Nicht zugeordnet" />
                           </SelectTrigger>
                           <SelectContent>
-                            {categories.map((cat) => (
+                            {userCategories.map((cat) => (
                               <SelectItem key={cat.id} value={cat.name}>
                                 {cat.name}
                               </SelectItem>
@@ -1485,9 +1485,9 @@ export function ReceiptDetailPanel({
                             <SelectValue placeholder="Offen" />
                           </SelectTrigger>
                           <SelectContent>
-                            {TAX_TYPES.map(t => (
-                              <SelectItem key={t.value} value={t.value}>
-                                {t.label}
+                            {taxCategories.map(c => (
+                              <SelectItem key={c.id} value={c.name}>
+                                {c.name}
                               </SelectItem>
                             ))}
                           </SelectContent>

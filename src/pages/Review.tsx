@@ -83,7 +83,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
-import { TAX_TYPES, PAYMENT_METHODS } from '@/lib/constants';
+import { PAYMENT_METHODS } from '@/lib/constants';
 
 interface TaxRateDetail {
   rate: number;
@@ -113,7 +113,7 @@ const Review = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { getReceipts, updateReceipt, getReceiptFileUrl, deleteReceipt } = useReceipts();
-  const { categories } = useCategories();
+  const { userCategories, taxCategories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
   const { vatRateGroups } = useVatRates();
@@ -1150,7 +1150,7 @@ const Review = () => {
                             <SelectValue placeholder="Nicht zugeordnet" />
                           </SelectTrigger>
                           <SelectContent>
-                            {categories.map(cat => (
+                            {userCategories.map(cat => (
                               <SelectItem key={cat.id} value={cat.name}>
                                 {cat.name}
                               </SelectItem>
@@ -1169,10 +1169,10 @@ const Review = () => {
                           <SelectTrigger>
                             <SelectValue placeholder="Offen" />
                           </SelectTrigger>
-                          <SelectContent>
-                            {TAX_TYPES.map(t => (
-                              <SelectItem key={t.value} value={t.value}>
-                                {t.label}
+                           <SelectContent>
+                            {taxCategories.map(c => (
+                              <SelectItem key={c.id} value={c.name}>
+                                {c.name}
                               </SelectItem>
                             ))}
                           </SelectContent>

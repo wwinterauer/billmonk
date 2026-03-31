@@ -104,7 +104,7 @@ import { TagSelector } from '@/components/tags/TagSelector';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { NO_RECEIPT_CATEGORY, TAX_TYPES } from '@/lib/constants';
+import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
 import { Folder } from 'lucide-react';
 import { Copy, Scissors, Layers, Zap } from 'lucide-react';
 import { checkForDuplicates, type DuplicateCheckResult } from '@/services/duplicateDetectionService';
@@ -194,7 +194,7 @@ const Expenses = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { getReceipts, updateReceipt, rejectReceipt, deleteReceipt, processReceiptWithAI } = useReceipts();
-  const { categories } = useCategories();
+  const { categories, userCategories, taxCategories } = useCategories();
   const { tags, activeTags, getTagsForReceipt, getTagsForReceipts } = useTags();
 
   // Data state
@@ -1638,7 +1638,7 @@ const Expenses = () => {
               <SelectItem value="all">Alle Kategorien</SelectItem>
               <SelectItem value="__unassigned__">Nicht zugeordnet</SelectItem>
               <SelectSeparator />
-              {categories.map(c => (
+              {userCategories.map(c => (
                 <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
               ))}
             </SelectContent>
@@ -1652,8 +1652,8 @@ const Expenses = () => {
               <SelectItem value="all">Alle Buchungsarten</SelectItem>
               <SelectItem value="__open__">Offen</SelectItem>
               <SelectSeparator />
-              {TAX_TYPES.map(t => (
-                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              {taxCategories.map(c => (
+                <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

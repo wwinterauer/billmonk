@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { NO_RECEIPT_CATEGORY, TAX_TYPE_COLORS } from '@/lib/constants';
+import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
+import { useCategories } from '@/hooks/useCategories';
 
 interface DashboardStats {
   totalExpenses: number;
@@ -50,6 +51,7 @@ interface RecentReceipt {
 
 export function useDashboardData(year: number, month: number) {
   const { user } = useAuth();
+  const { categories } = useCategories();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
@@ -257,11 +259,12 @@ export function useDashboardData(year: number, month: number) {
         taxTypeMap.set(tt, (taxTypeMap.get(tt) || 0) + (r.amount_gross || 0));
       });
 
+      const colorMap = new Map(categories.map(c => [c.name, c.color]));
       const ttData: TaxTypeData[] = Array.from(taxTypeMap.entries())
         .map(([taxType, total]) => ({
           taxType,
           total,
-          color: TAX_TYPE_COLORS[taxType] || '#94A3B8',
+          color: colorMap.get(taxType) || '#94A3B8',
         }))
         .sort((a, b) => b.total - a.total);
 
