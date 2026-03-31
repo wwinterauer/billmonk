@@ -31,7 +31,6 @@ interface ExtractionResult {
   payment_method: string | null;
   invoice_number: string | null;
   confidence: number;
-  // New international VAT fields
   vendor_country?: string | null;
   vat_confidence?: number | null;
   vat_detection_method?: 'explicit' | 'calculated' | 'learned' | 'estimated' | null;
@@ -52,7 +51,115 @@ interface MultiInvoiceResult {
   reason?: string;
 }
 
-// Country-specific category assignment hints for improved AI accuracy
+// ── Structured Output Schema (V2) ──────────────────────────────────
+const extractionSchema = {
+  type: "object" as const,
+  properties: {
+    is_financial_document: { type: "boolean" as const },
+    document_type: { type: "string" as const },
+    reason: { type: "string" as const },
+    vendor_name: { type: "string" as const },
+    vendor_brand: { type: "string" as const },
+    vendor_address: { type: "string" as const },
+    vendor_uid: { type: "string" as const },
+    vendor_legal_form: { type: "string" as const },
+    vendor_country: { type: "string" as const },
+    receipt_date: { type: "string" as const },
+    due_date: { type: "string" as const },
+    receipt_number: { type: "string" as const },
+    total_amount: { type: "number" as const },
+    net_amount: { type: "number" as const },
+    tax_amount: { type: "number" as const },
+    tax_rate: { type: "string" as const },
+    is_mixed_tax_rate: { type: "boolean" as const },
+    tax_rate_details: {
+      type: "array" as const,
+      items: {
+        type: "object" as const,
+        properties: {
+          rate: { type: "number" as const },
+          net_amount: { type: "number" as const },
+          tax_amount: { type: "number" as const },
+          description: { type: "string" as const },
+        },
+        required: ["rate", "net_amount", "tax_amount", "description"],
+        additionalProperties: false,
+      },
+    },
+    currency: { type: "string" as const },
+    payment_method: { type: "string" as const },
+    category: { type: "string" as const },
+    description: { type: "string" as const },
+    line_items: {
+      type: "array" as const,
+      items: {
+        type: "object" as const,
+        properties: {
+          description: { type: "string" as const },
+          quantity: { type: "number" as const },
+          unit_price: { type: "number" as const },
+          total: { type: "number" as const },
+          tax_rate: { type: "string" as const },
+          category: { type: "string" as const },
+        },
+        required: ["description", "quantity", "unit_price", "total", "tax_rate", "category"],
+        additionalProperties: false,
+      },
+    },
+    confidence: { type: "number" as const },
+    vat_confidence: { type: "number" as const },
+    vat_detection_method: { type: "string" as const },
+    special_vat_case: { type: "string" as const },
+    notes: { type: "string" as const },
+  },
+  required: [
+    "is_financial_document", "document_type", "vendor_name", "total_amount",
+    "tax_rate", "currency", "category", "confidence",
+    "reason", "vendor_brand", "vendor_address", "vendor_uid",
+    "vendor_legal_form", "vendor_country", "receipt_date", "due_date",
+    "receipt_number", "net_amount", "tax_amount", "is_mixed_tax_rate",
+    "tax_rate_details", "payment_method", "description", "line_items",
+    "vat_confidence", "vat_detection_method", "special_vat_case", "notes",
+  ],
+  additionalProperties: false,
+};
+
+// ── Map structured output → internal ExtractionResult ──────────────
+function mapSchemaToResult(raw: Record<string, any>): ExtractionResult {
+  const taxRateStr = raw.tax_rate || "";
+  let vatRate: number | null = null;
+  if (taxRateStr && taxRateStr !== "unknown" && taxRateStr !== "") {
+    const parsed = parseFloat(taxRateStr);
+    if (!isNaN(parsed)) vatRate = parsed;
+  }
+
+  return {
+    is_receipt: raw.is_financial_document === true,
+    document_type: raw.document_type || undefined,
+    reason: raw.reason || undefined,
+    vendor: raw.vendor_name || null,
+    vendor_brand: raw.vendor_brand || null,
+    description: raw.description || null,
+    amount_gross: raw.total_amount || null,
+    amount_net: raw.net_amount || null,
+    vat_amount: raw.tax_amount || null,
+    vat_rate: vatRate,
+    is_mixed_tax_rate: raw.is_mixed_tax_rate || false,
+    tax_rate_details: raw.tax_rate_details && raw.tax_rate_details.length > 0
+      ? raw.tax_rate_details : null,
+    receipt_date: raw.receipt_date || null,
+    category: raw.category || null,
+    payment_method: raw.payment_method || null,
+    invoice_number: raw.receipt_number || null,
+    confidence: raw.confidence || 0,
+    vendor_country: raw.vendor_country || null,
+    vat_confidence: raw.vat_confidence || null,
+    vat_detection_method: raw.vat_detection_method || null,
+    special_vat_case: raw.special_vat_case || null,
+  };
+}
+
+// ── Category hints builder ─────────────────────────────────────────
 function buildCategoryHints(country: string | null, categories: string[]): string {
   if (!country || categories.length === 0) return '';
 
@@ -61,90 +168,73 @@ function buildCategoryHints(country: string | null, categories: string[]): strin
   let hints = `
 
 KATEGORIE-ZUORDNUNGSHILFE:
+Ordne NUR Kategorien aus der obigen Liste zu. Spezifischere Kategorie bevorzugen, "Sonstiges" nur als Fallback.
 
-Verwende diese Regeln um die passendste Kategorie zu wählen. Ordne NUR Kategorien aus der obigen Liste zu.
-
-ALLGEMEINE ZUORDNUNGS-REGELN:
-- Wenn ein Lieferant eindeutig zu einer Kategorie passt, wähle diese
-- Bei Unsicherheit zwischen zwei Kategorien: wähle die spezifischere
-- "Sonstiges" nur wenn KEINE andere Kategorie passt
-
-TYPISCHE LIEFERANTEN → KATEGORIE:
-- Tankstellen (Shell, BP, OMV, Eni, Total, JET, Avanti) → KFZ/Fahrzeug-Kategorie
-- Restaurants, Gasthäuser, Hotels (Bewirtung) → Bewirtungs-Kategorie
-- Bahngesellschaften (ÖBB, DB, SBB), Fluglinien, Booking.com, Hotels → Reisekosten-Kategorie
-- Telekom-Anbieter (A1, Magenta, Drei, Telekom, Vodafone, Swisscom, Sunrise) → Telefon/Internet-Kategorie
-- Google Ads, Meta/Facebook Ads, LinkedIn, Bing Ads → Werbung/Marketing-Kategorie
-- Steuerberater, Rechtsanwalt, Notar, Wirtschaftsprüfer → Beratungs-Kategorie
-- Pagro, Bürobedarf, Papier, Stifte, Ordner, Druckerpatronen → Büromaterial-Kategorie
-- Banken (Kontoführung, Überweisungsgebühren) → Bankgebühren-Kategorie
-- Versicherungen (Generali, UNIQA, Allianz, Zurich, AXA) → Versicherungs-Kategorie
-
-BETRAGSBEZOGENE REGELN:
-- Einzelne Geräte (Laptop, Monitor, Drucker, Smartphone, Headset, Tastatur, Möbelstück) → Geringwertige WG / GWG Kategorie (wenn vorhanden)
-- Software-Abos, Cloud-Dienste (Microsoft 365, Adobe, Dropbox) → Software/EDV oder Beratungs-Kategorie
-- NUR Verbrauchsmaterial (Papier, Toner, Stifte) → Büromaterial
-- Geräte sind KEIN Büromaterial!
-
-ABGRENZUNGEN (häufige Verwechslungen):
-- Parkgebühren auf REISE → Reisekosten; tägliches Parken am Büro → KFZ-Kosten
-- Restaurant auf GESCHÄFTSREISE kann Reisekosten ODER Bewirtung sein (je nach Kontext)
-- Amazon: nach INHALT kategorisieren (Bürobedarf? Elektronik/GWG? Software?)
-`;
+TYPISCHE ZUORDNUNGEN:
+- Tankstellen → KFZ; Restaurants/Hotels → Bewirtung; Bahn/Flug/Booking → Reisekosten
+- Telekom → Telefon/Internet; Google/Meta Ads → Werbung; Steuerberater/Anwalt → Beratung
+- Bürobedarf → Büromaterial; Banken → Bankgebühren; Versicherungen → Versicherung
+- Einzelgeräte (Laptop, Monitor) → GWG; Software-Abos → Software/EDV
+- Parkgebühren auf Reise → Reisekosten; tägliches Parken → KFZ
+- Amazon: nach INHALT kategorisieren`;
 
   if (country === 'AT') {
     hints += `
-LÄNDERSPEZIFISCHE REGELN (ÖSTERREICH):
-${has('Bewirtung') ? `- Bewirtung: Geschäftsessen, Restaurant, Gasthaus, Catering (50% absetzbar in AT)
-  → NICHT für eigene Verpflegung auf Dienstreise (→ Reisekosten)` : ''}
-${has('Reisekosten') ? `- Reisekosten: ÖBB, Flixbus, WESTbahn, Airlines, Hotels, Booking.com, Taxi, Mietwagen
-  → Tagesdiäten AT: 26,40€, Nächtigungspauschale: 15€
-  → NICHT: tägliche Fahrt Wohnung-Büro (→ KFZ-Kosten)` : ''}
-${has('KFZ') ? `- KFZ-Kosten: OMV, BP, Shell, ASFINAG, ÖAMTC, Vignette, Maut, Werkstätten
-  → Kilometergeld AT: 0,42€/km` : ''}
-${has('Geringwertig') ? `- Geringwertige WG: Einzelne Wirtschaftsgüter unter 1.000€ netto (GWG-Grenze AT)
-  → NICHT: Software-Abos, Verbrauchsmaterial` : ''}
-${has('SVS') || has('Sozialversicherung') ? `- Sozialversicherung SVS: SVS-Beiträge, Sozialversicherung der Selbständigen` : ''}
-${has('WKO') || has('Kammerumlage') ? `- Kammerumlage WKO: Wirtschaftskammer, Fachgruppe, Innung` : ''}
-${has('Porto') || has('Versand') ? `- Porto & Versand: Österreichische Post, DHL, DPD, GLS, UPS` : ''}
-${has('Telefon') || has('Internet') ? `- Telefon & Internet: A1, Magenta, Drei, Fonira` : ''}
-${has('Versicherung') ? `- Versicherungen: Generali, UNIQA, Allianz, Wiener Städtische, Zürich
-  → NUR betriebliche Versicherungen, NICHT SVS (→ Sozialversicherung)` : ''}
-${has('Bankgebühr') ? `- Bankgebühren: Erste Bank, Raiffeisen, BAWAG, Sparkasse` : ''}
-`;
+AT-spezifisch:${has('Bewirtung') ? ' Bewirtung 50% absetzbar.' : ''}${has('Reisekosten') ? ' Tagesdiäten 26,40€.' : ''}${has('KFZ') ? ' Km-Geld 0,42€/km.' : ''}${has('Geringwertig') ? ' GWG-Grenze 1.000€ netto.' : ''}`;
   } else if (country === 'DE') {
     hints += `
-LÄNDERSPEZIFISCHE REGELN (DEUTSCHLAND):
-${has('Bewirtung') ? `- Bewirtung: Geschäftsessen, Restaurant, Catering (70% absetzbar in DE)
-  → NICHT für eigene Verpflegung auf Dienstreise (→ Reisekosten)` : ''}
-${has('Reisekosten') ? `- Reisekosten: Deutsche Bahn, Flixbus, Airlines, Hotels, Taxi
-  → Verpflegungspauschale: 28€ (>24h), 14€ (>8h)` : ''}
-${has('KFZ') ? `- KFZ-Kosten: Shell, Aral, Total, ADAC, Werkstätten
-  → Pendlerpauschale: 0,30€/km (ab 21. km: 0,38€)` : ''}
-${has('Geringwertig') ? `- Geringwertige WG: Einzelne Wirtschaftsgüter unter 800€ netto (GWG-Grenze DE)
-  → Computer/Peripherie: sofort absetzbar seit 2021 (unabhängig vom Preis)` : ''}
-${has('IHK') ? `- IHK-Beiträge: Industrie- und Handelskammer, Handwerkskammer (HWK)` : ''}
-${has('Telefon') || has('Internet') ? `- Telefon & Internet: Telekom, Vodafone, O2, 1&1` : ''}
-${has('Versicherung') ? `- Versicherungen: Allianz, AXA, HUK, ERGO, Generali` : ''}
-${has('Bankgebühr') ? `- Bankgebühren: Deutsche Bank, Commerzbank, Sparkasse, Volksbank` : ''}
-`;
+DE-spezifisch:${has('Bewirtung') ? ' Bewirtung 70% absetzbar.' : ''}${has('Reisekosten') ? ' Verpflegungspauschale 28€/>24h, 14€/>8h.' : ''}${has('KFZ') ? ' Pendlerpauschale 0,30€/km.' : ''}${has('Geringwertig') ? ' GWG 800€ netto. Computer sofort absetzbar.' : ''}`;
   } else if (country === 'CH') {
     hints += `
-LÄNDERSPEZIFISCHE REGELN (SCHWEIZ):
-${has('Bewirtung') ? `- Bewirtung: Geschäftsessen, Restaurant (~50% absetzbar in CH)` : ''}
-${has('Reisekosten') ? `- Reisekosten: SBB, Swiss, Hotels, Taxi
-  → Kilometerpauschale CH: 0,70 CHF/km` : ''}
-${has('KFZ') ? `- KFZ-Kosten: Migrol, Shell, Coop Pronto, TCS` : ''}
-${has('Geringwertig') ? `- Geringwertige WG: Einzelne Wirtschaftsgüter unter 1.000 CHF` : ''}
-${has('AHV') || has('Sozialversicherung') ? `- AHV/IV/ALV: Ausgleichskasse, SVA, Sozialversicherungsbeiträge` : ''}
-${has('Telefon') || has('Internet') ? `- Telefon & Internet: Swisscom, Sunrise, Salt, UPC` : ''}
-`;
+CH-spezifisch:${has('KFZ') ? ' Km-Pauschale 0,70 CHF/km.' : ''}${has('Geringwertig') ? ' GWG 1.000 CHF.' : ''}`;
   }
 
   return hints;
 }
 
-// Multi-Invoice Check Prompt
+// ── Expenses-only prompt builder (deduplicated) ────────────────────
+function buildExpensesOnlyPrompt(keywords: string[], hint: string): string {
+  let prompt = '';
+
+  if (keywords.length > 0) {
+    const keywordList = keywords.map(k => `- "${k}"`).join('\n');
+    prompt = `
+
+GEZIELTE POSITIONS-EXTRAKTION:
+Suche NUR Zeilen mit diesen Schlagwörtern:
+${keywordList}
+
+REGELN:
+- NUR exakte Treffer auf Schlagwörter, keine Synonyme
+- Zeilen OHNE Schlagwort komplett ignorieren
+- Pro Treffer: Brutto, Netto, MwSt-Satz, MwSt-Betrag erfassen
+- Schlagwörter können mehrfach vorkommen → jede Zeile einzeln
+- total_amount/net_amount/tax_amount = Summe ALLER Treffer
+- Verschiedene MwSt-Sätze → is_mixed_tax_rate=true + tax_rate_details
+- description: Gefundene Positionen mit Beträgen auflisten
+- DUPLIKAT-VERMEIDUNG: Einzelposten zählen, nicht Summenzeilen
+- Alle Beträge POSITIV (Klammern/Minus → positiv umwandeln)
+- Gutschriften/Erstattungen komplett ignorieren`;
+  } else {
+    prompt = `
+
+NUR AUSGABEN EXTRAHIEREN:
+Plattform-Abrechnung → NUR Kosten erfassen (Gebühren, Abos, Transaktionskosten).
+Einnahmen/Erlöse/Gutschriften/Auszahlungen IGNORIEREN.
+total_amount/net_amount/tax_amount = nur aus Kosten-Positionen.
+Alle Beträge POSITIV. Gutschriften ignorieren.`;
+  }
+
+  if (hint) {
+    prompt += `
+
+LIEFERANTEN-HINWEIS: ${hint}`;
+  }
+
+  return prompt;
+}
+
+// ── Multi-invoice check prompt ─────────────────────────────────────
 const multiInvoiceCheckPrompt = `Analysiere dieses Dokument sorgfältig.
 
 AUFGABE: Prüfe ob dieses PDF MEHRERE separate Rechnungen/Belege enthält.
@@ -191,49 +281,34 @@ Falls nur EINE Rechnung (auch wenn mehrseitig):
   "reason": "Einzelne mehrseitige Rechnung von [Vendor] mit einer Rechnungsnummer"
 }`;
 
-// Function to estimate page count from PDF
+// ── PDF page count estimator ───────────────────────────────────────
 function estimatePdfPageCount(pdfBytes: Uint8Array): number {
   try {
-    // Simple heuristic: search for /Type /Page patterns
     const text = new TextDecoder('latin1').decode(pdfBytes);
     const pageMatches = text.match(/\/Type\s*\/Page[^s]/g);
-    if (pageMatches) {
-      return pageMatches.length;
-    }
-    // Fallback: estimate by file size (rough: ~50KB per page for typical PDFs)
+    if (pageMatches) return pageMatches.length;
     return Math.max(1, Math.ceil(pdfBytes.length / 50000));
   } catch {
     return 1;
   }
 }
 
-// Check for multiple invoices in PDF
+// ── Multi-invoice checker ──────────────────────────────────────────
 async function checkForMultipleInvoices(
   pdfBase64: string,
   mimeType: string,
   pageCount: number,
   apiKey: string
 ): Promise<MultiInvoiceResult> {
-  // Only check if PDF has more than 1 page
   if (pageCount <= 1) {
-    return { 
-      contains_multiple_invoices: false, 
-      confidence: 1.0,
-      invoice_count: 1, 
-      invoices: [],
-      reason: "Einzelseiten-PDF"
-    };
+    return { contains_multiple_invoices: false, confidence: 1.0, invoice_count: 1, invoices: [], reason: "Einzelseiten-PDF" };
   }
 
   try {
     console.log(`Checking ${pageCount}-page PDF for multiple invoices...`);
-
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
@@ -241,16 +316,8 @@ async function checkForMultipleInvoices(
           {
             role: "user",
             content: [
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${pdfBase64}`,
-                },
-              },
-              {
-                type: "text",
-                text: multiInvoiceCheckPrompt,
-              },
+              { type: "image_url", image_url: { url: `data:${mimeType};base64,${pdfBase64}` } },
+              { type: "text", text: multiInvoiceCheckPrompt },
             ],
           },
         ],
@@ -266,17 +333,10 @@ async function checkForMultipleInvoices(
 
     const aiResponse = await response.json();
     const content = aiResponse.choices?.[0]?.message?.content || '{}';
-
-    // Clean and parse JSON
     let cleanedContent = content.trim();
-    if (cleanedContent.startsWith("```json")) {
-      cleanedContent = cleanedContent.slice(7);
-    } else if (cleanedContent.startsWith("```")) {
-      cleanedContent = cleanedContent.slice(3);
-    }
-    if (cleanedContent.endsWith("```")) {
-      cleanedContent = cleanedContent.slice(0, -3);
-    }
+    if (cleanedContent.startsWith("```json")) cleanedContent = cleanedContent.slice(7);
+    else if (cleanedContent.startsWith("```")) cleanedContent = cleanedContent.slice(3);
+    if (cleanedContent.endsWith("```")) cleanedContent = cleanedContent.slice(0, -3);
     cleanedContent = cleanedContent.trim();
 
     const parsed: MultiInvoiceResult = JSON.parse(cleanedContent);
@@ -285,17 +345,17 @@ async function checkForMultipleInvoices(
       count: parsed.invoice_count,
       confidence: parsed.confidence,
     });
-    
     return parsed;
-
   } catch (error) {
     console.error('Multi-invoice check error:', error);
     return { contains_multiple_invoices: false, confidence: 0, invoice_count: 1, invoices: [] };
   }
 }
 
+// ════════════════════════════════════════════════════════════════════
+// MAIN HANDLER
+// ════════════════════════════════════════════════════════════════════
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -307,198 +367,36 @@ serve(async (req) => {
 
     const body = await req.json();
 
-    // ========== SCHEMA TEST MODE ==========
-    if (body.schema_test === true) {
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) {
-        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not set" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Need an image to test with
-      const testImage = body.imageBase64;
-      const testMime = body.mimeType || "image/jpeg";
-      if (!testImage) {
-        return new Response(JSON.stringify({ error: "schema_test requires imageBase64" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const miniPrompt = "Extract vendor name, total amount, and currency from this receipt. Return JSON with vendor_name, total_amount, currency.";
-      const miniSchema = {
-        type: "object" as const,
-        properties: {
-          vendor_name: { type: "string" },
-          total_amount: { type: "number" },
-          currency: { type: "string" },
-        },
-        required: ["vendor_name", "total_amount", "currency"],
-        additionalProperties: false,
-      };
-
-      const baseMessages = [
-        { role: "system", content: "Extract receipt data. Return only JSON." },
-        {
-          role: "user",
-          content: [
-            { type: "image_url", image_url: { url: `data:${testMime};base64,${testImage}` } },
-            { type: "text", text: miniPrompt },
-          ],
-        },
-      ];
-
-      const results: Record<string, any> = {};
-
-      // --- Variante 1: response_format json_schema ---
-      try {
-        console.log("=== TEST V1: response_format json_schema ===");
-        const r1 = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
-            messages: baseMessages,
-            max_tokens: 512,
-            temperature: 0.1,
-            response_format: {
-              type: "json_schema",
-              json_schema: { name: "receipt_extraction", strict: true, schema: miniSchema },
-            },
-          }),
-        });
-        const status1 = r1.status;
-        const text1 = await r1.text();
-        let parsed1 = null;
-        let content1 = null;
-        try {
-          parsed1 = JSON.parse(text1);
-          content1 = parsed1?.choices?.[0]?.message?.content;
-          if (typeof content1 === "string") content1 = JSON.parse(content1);
-        } catch { /* parse failed */ }
-        const hasFields1 = content1 && "vendor_name" in content1 && "total_amount" in content1 && "currency" in content1;
-        results.json_schema = { status: status1, success: r1.ok, has_fields: !!hasFields1, content: content1, raw: text1.slice(0, 500) };
-        console.log(`V1 result: status=${status1}, ok=${r1.ok}, has_fields=${!!hasFields1}`, content1);
-      } catch (e) {
-        results.json_schema = { status: 0, success: false, error: String(e) };
-        console.error("V1 error:", e);
-      }
-
-      // --- Variante 2: response_format json_object ---
-      try {
-        console.log("=== TEST V2: response_format json_object ===");
-        const r2 = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
-            messages: baseMessages,
-            max_tokens: 512,
-            temperature: 0.1,
-            response_format: { type: "json_object" },
-          }),
-        });
-        const status2 = r2.status;
-        const text2 = await r2.text();
-        let parsed2 = null;
-        let content2 = null;
-        try {
-          parsed2 = JSON.parse(text2);
-          content2 = parsed2?.choices?.[0]?.message?.content;
-          if (typeof content2 === "string") content2 = JSON.parse(content2);
-        } catch { /* parse failed */ }
-        const hasFields2 = content2 && "vendor_name" in content2 && "total_amount" in content2 && "currency" in content2;
-        results.json_object = { status: status2, success: r2.ok, has_fields: !!hasFields2, content: content2, raw: text2.slice(0, 500) };
-        console.log(`V2 result: status=${status2}, ok=${r2.ok}, has_fields=${!!hasFields2}`, content2);
-      } catch (e) {
-        results.json_object = { status: 0, success: false, error: String(e) };
-        console.error("V2 error:", e);
-      }
-
-      // --- Variante 3: Tool Calling ---
-      try {
-        console.log("=== TEST V3: Tool Calling ===");
-        const r3 = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
-            messages: baseMessages,
-            max_tokens: 512,
-            temperature: 0.1,
-            tools: [{
-              type: "function",
-              function: {
-                name: "extract_receipt_data",
-                description: "Extract vendor name, total amount, and currency from a receipt",
-                parameters: miniSchema,
-              },
-            }],
-            tool_choice: { type: "function", function: { name: "extract_receipt_data" } },
-          }),
-        });
-        const status3 = r3.status;
-        const text3 = await r3.text();
-        let parsed3 = null;
-        let content3 = null;
-        try {
-          parsed3 = JSON.parse(text3);
-          const toolCall = parsed3?.choices?.[0]?.message?.tool_calls?.[0];
-          if (toolCall?.function?.arguments) {
-            content3 = typeof toolCall.function.arguments === "string"
-              ? JSON.parse(toolCall.function.arguments)
-              : toolCall.function.arguments;
-          }
-        } catch { /* parse failed */ }
-        const hasFields3 = content3 && "vendor_name" in content3 && "total_amount" in content3 && "currency" in content3;
-        results.tool_calling = { status: status3, success: r3.ok, has_fields: !!hasFields3, content: content3, raw: text3.slice(0, 500) };
-        console.log(`V3 result: status=${status3}, ok=${r3.ok}, has_fields=${!!hasFields3}`, content3);
-      } catch (e) {
-        results.tool_calling = { status: 0, success: false, error: String(e) };
-        console.error("V3 error:", e);
-      }
-
-      console.log("=== SCHEMA TEST COMPLETE ===");
-      console.log("Summary:", JSON.stringify({
-        json_schema: { ok: results.json_schema?.success, fields: results.json_schema?.has_fields },
-        json_object: { ok: results.json_object?.success, fields: results.json_object?.has_fields },
-        tool_calling: { ok: results.tool_calling?.success, fields: results.tool_calling?.has_fields },
-      }));
-
-      return new Response(JSON.stringify({ schema_test: true, results }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    // ========== END SCHEMA TEST MODE ==========
-
     let imageBase64: string;
     let mimeType: string;
     let receiptId: string | null = null;
+    let receipt: Record<string, any> | null = null; // Consolidated receipt data
     const forceExtract = body.forceExtract === true;
     const skipMultiCheck = body.skipMultiCheck === true;
     const expensesOnly = body.expensesOnly === true;
     const extractionKeywords: string[] = Array.isArray(body.extractionKeywords) ? body.extractionKeywords : [];
     const extractionHint: string = typeof body.extractionHint === 'string' ? body.extractionHint.trim() : '';
 
-    // Support both direct image upload and receiptId lookup
+    // ── Receipt-by-ID path ─────────────────────────────────────────
     if (body.receiptId) {
       receiptId = body.receiptId;
       console.log(`Processing receipt by ID: ${receiptId}${forceExtract ? ' (forced)' : ''}${skipMultiCheck ? ' (skip multi-check)' : ''}`);
 
-      // Fetch receipt from database
-      const { data: receipt, error: receiptError } = await supabase
+      // Single consolidated query for receipt data
+      const { data: receiptData, error: receiptError } = await supabase
         .from('receipts')
         .select('*')
         .eq('id', receiptId)
         .single();
 
-      if (receiptError || !receipt) {
+      if (receiptError || !receiptData) {
         console.error("Receipt not found:", receiptError);
         return new Response(
           JSON.stringify({ success: false, error: "The requested receipt could not be found." }),
           { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+      receipt = receiptData;
 
       // Download file from storage
       const { data: fileData, error: downloadError } = await supabase.storage
@@ -513,11 +411,8 @@ serve(async (req) => {
         );
       }
 
-      // Convert to base64 - handle large files properly
       const arrayBuffer = await fileData.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
-      
-      // Use chunked approach for large files to avoid stack overflow
       const chunkSize = 8192;
       let binaryString = '';
       for (let i = 0; i < uint8Array.length; i += chunkSize) {
@@ -526,63 +421,34 @@ serve(async (req) => {
       }
       imageBase64 = btoa(binaryString);
       mimeType = receipt.file_type === 'pdf' ? 'application/pdf' : `image/${receipt.file_type}`;
-      
-      // For PDFs, we still use application/pdf as mimeType
-      const isPdf = receipt.file_name?.endsWith('.pdf') || receipt.file_type === 'application/pdf' || receipt.file_type === 'pdf';
-      if (isPdf) {
-        mimeType = 'application/pdf';
-      }
 
+      const isPdf = receipt.file_name?.endsWith('.pdf') || receipt.file_type === 'application/pdf' || receipt.file_type === 'pdf';
+      if (isPdf) mimeType = 'application/pdf';
       console.log(`Downloaded file: ${receipt.file_name}, type: ${mimeType}`);
 
-      // Estimate page count for PDFs
+      // Page count for PDFs
       let pageCount = 1;
       if (isPdf) {
         pageCount = estimatePdfPageCount(uint8Array);
         console.log(`Estimated PDF page count: ${pageCount}`);
-        
-        // Save page count
-        await supabase
-          .from('receipts')
-          .update({ page_count: pageCount })
-          .eq('id', receiptId);
+        await supabase.from('receipts').update({ page_count: pageCount }).eq('id', receiptId);
       }
 
-      // Multi-Invoice Check (if not skipped and PDF with > 1 page)
+      // Multi-Invoice Check
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      
       if (!skipMultiCheck && isPdf && pageCount > 1 && LOVABLE_API_KEY) {
-        const multiCheck = await checkForMultipleInvoices(
-          imageBase64, 
-          mimeType, 
-          pageCount, 
-          LOVABLE_API_KEY
-        );
-
-        if (multiCheck.contains_multiple_invoices && 
-            multiCheck.confidence >= 0.7 && 
-            multiCheck.invoice_count >= 2) {
+        const multiCheck = await checkForMultipleInvoices(imageBase64, mimeType, pageCount, LOVABLE_API_KEY);
+        if (multiCheck.contains_multiple_invoices && multiCheck.confidence >= 0.7 && multiCheck.invoice_count >= 2) {
           console.log(`Multiple invoices detected: ${multiCheck.invoice_count}`);
-
-          // Set status to "needs_splitting"
-          await supabase
-            .from('receipts')
-            .update({
-              status: 'needs_splitting',
-              split_suggestion: multiCheck,
-              notes: `${multiCheck.invoice_count} separate Rechnungen erkannt. Bitte aufteilen.`,
-              ai_processed_at: new Date().toISOString(),
-            })
-            .eq('id', receiptId);
+          await supabase.from('receipts').update({
+            status: 'needs_splitting',
+            split_suggestion: multiCheck,
+            notes: `${multiCheck.invoice_count} separate Rechnungen erkannt. Bitte aufteilen.`,
+            ai_processed_at: new Date().toISOString(),
+          }).eq('id', receiptId);
 
           return new Response(
-            JSON.stringify({
-              success: true,
-              needs_splitting: true,
-              invoice_count: multiCheck.invoice_count,
-              suggestion: multiCheck,
-              receiptId: receiptId,
-            }),
+            JSON.stringify({ success: true, needs_splitting: true, invoice_count: multiCheck.invoice_count, suggestion: multiCheck, receiptId }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -607,559 +473,142 @@ serve(async (req) => {
       );
     }
 
-    console.log("Calling Lovable AI Gateway for receipt extraction...");
+    console.log("Calling Lovable AI Gateway for receipt extraction (V2 prompt)...");
 
-    const systemPrompt = `Du bist ein Experte für die Analyse von Dokumenten und Rechnungen. 
-Analysiere das Dokument und entscheide zuerst, ob es sich um einen Finanzbeleg handelt.
-Antworte IMMER und AUSSCHLIESSLICH mit validem JSON ohne zusätzliche Erklärungen oder Markdown.`;
+    // ── V2 compressed system prompt ────────────────────────────────
+    const systemPrompt = "Dokumentenanalyse-Experte. Prüfe ob Finanzbeleg. Antworte NUR mit validem JSON, kein Markdown.";
 
-    // Build expenses-only prompt addition if needed
+    // ── Build expenses-only prompt if needed ───────────────────────
     let expensesOnlyPrompt = '';
-    
-    // Check if vendor has expenses_only_extraction flag and/or extraction_keywords
-    if (receiptId && !expensesOnly) {
-      const { data: receiptCheck } = await supabase
-        .from('receipts')
-        .select('vendor_id, user_id')
-        .eq('id', receiptId)
+    let vendorData: Record<string, any> | null = null;
+
+    // Consolidated vendor lookup (single query)
+    if (receipt?.vendor_id) {
+      const { data: vd } = await supabase
+        .from('vendors')
+        .select('expenses_only_extraction, extraction_keywords, extraction_hint, display_name, legal_names, default_category_id')
+        .eq('id', receipt.vendor_id)
         .single();
-      
-      if (receiptCheck?.vendor_id) {
-        const { data: vendorCheck } = await supabase
-          .from('vendors')
-          .select('expenses_only_extraction, extraction_keywords, extraction_hint')
-          .eq('id', receiptCheck.vendor_id)
-          .single();
-        
-        if (vendorCheck?.expenses_only_extraction) {
-          const vendorKeywords: string[] = vendorCheck.extraction_keywords || [];
-          const allKeywords = [...new Set([...extractionKeywords, ...vendorKeywords])];
-          
-          if (allKeywords.length > 0) {
-            const keywordList = allKeywords.map(k => `- "${k}"`).join('\n');
-            expensesOnlyPrompt = `
-
-WICHTIGE REGEL - GEZIELTE POSITIONS-EXTRAKTION:
-Dieser Lieferant hat spezifische Kosten-Positionen.
-Suche NUR nach Zeilen/Positionen die eines der folgenden Schlagwoerter im Text enthalten:
-${keywordList}
-
-STRENGE FILTERREGEL:
-- Eine Zeile wird NUR erfasst, wenn ihr Text eines der obigen Schlagwoerter woertlich enthaelt
-- Wenn eine Zeile KEINES dieser Schlagwoerter enthaelt, wird sie KOMPLETT IGNORIERT - auch wenn sie wie eine Ausgabe/Kosten aussieht
-- Beispiel: Wenn "Transaktionsgebuehr" ein Schlagwort ist, aber "Ladevorgaenge" NICHT, dann wird "Ladevorgaenge" ignoriert
-- Es zaehlen NUR exakte Treffer auf die Schlagwoerter - keine aehnlichen Begriffe, keine Synonyme
-
-FÜR JEDE gefundene Position:
-- Erfasse den Bruttobetrag, Nettobetrag, MwSt-Satz und MwSt-Betrag
-- Ein Schlagwort kann MEHRFACH auf der Rechnung vorkommen - erfasse JEDE passende Zeile einzeln
-- amount_gross = Summe ALLER gefundenen Positionen (Brutto)
-- amount_net = Summe ALLER gefundenen Positionen (Netto)
-- vat_amount = Summe ALLER Steuerbeträge
-- Wenn verschiedene MwSt-Sätze bei den gefundenen Positionen: is_mixed_tax_rate = true und tax_rate_details ausfüllen
-- description: Gefundene Positionen mit Beträgen auflisten
-
-WICHTIG - DUPLIKAT-VERMEIDUNG:
-- Zähle jede Zeile auf der Rechnung genau EINMAL
-- Wenn der gleiche Betrag mehrfach in einer Zusammenfassung/Summenzeile wiederholt wird, erfasse nur die Einzelposition, NICHT die Summenzeile
-- Orientiere dich an den tatsächlichen Einzelposten/Detailzeilen, nicht an Zwischensummen oder Gesamtsummen die diese Positionen enthalten
-
-BETRAGS-REGELN:
-- Alle Betraege MUESSEN POSITIV sein - es gibt keine negativen Ausgaben
-- Wenn ein Betrag in Klammern steht z.B. (0,51) oder ein Minus hat z.B. -0,51, behandle ihn als POSITIVEN Kostenbetrag (also 0,51)
-- Ignoriere Gutschriften, Auszahlungen und Erstattungen komplett
-
-IGNORIERE alle anderen Zeilen/Positionen komplett (Einnahmen, Erlöse, Gutschriften, Auszahlungen, Umsätze).`;
-          } else {
-            expensesOnlyPrompt = `
-
-WICHTIGE REGEL - NUR AUSGABEN EXTRAHIEREN:
-Diese Rechnung stammt von einem Lieferanten mit gemischten Abrechnungen (z.B. Plattform-Abrechnung).
-- Erfasse NUR AUSGABEN/KOSTEN (Gebühren, Abos, Transaktionskosten, Servicegebühren)
-- IGNORIERE Einnahmen, Erlöse, Gutschriften, Auszahlungen, Umsätze
-- amount_gross = Summe NUR der Kosten-Positionen
-- amount_net und vat_amount ebenfalls nur aus Kosten-Positionen berechnen
-- Beschreibung: nur Kosten-Positionen auflisten
-- Bei gemischten MwSt-Sätzen der Kosten: is_mixed_tax_rate = true mit Details
-
-BETRAGS-REGELN:
-- Alle Betraege MUESSEN POSITIV sein - es gibt keine negativen Ausgaben
-- Wenn ein Betrag in Klammern steht z.B. (0,51) oder ein Minus hat z.B. -0,51, behandle ihn als POSITIVEN Kostenbetrag (also 0,51)
-- Ignoriere Gutschriften, Auszahlungen und Erstattungen komplett`;
-          }
-        }
-      }
+      vendorData = vd;
     }
-    
-    if (expensesOnly && !expensesOnlyPrompt) {
+
+    if (receipt?.vendor_id && !expensesOnly && vendorData?.expenses_only_extraction) {
+      const vendorKeywords: string[] = vendorData.extraction_keywords || [];
+      const allKeywords = [...new Set([...extractionKeywords, ...vendorKeywords])];
+      const hint = extractionHint || vendorData.extraction_hint || '';
+      expensesOnlyPrompt = buildExpensesOnlyPrompt(allKeywords, hint);
+    } else if (expensesOnly) {
       const allKeywords = [...new Set([...extractionKeywords])];
-      
-      if (allKeywords.length > 0) {
-        const keywordList = allKeywords.map(k => `- "${k}"`).join('\n');
-        expensesOnlyPrompt = `
-
-WICHTIGE REGEL - GEZIELTE POSITIONS-EXTRAKTION:
-Dieser Lieferant hat spezifische Kosten-Positionen.
-Suche NUR nach Zeilen/Positionen die eines der folgenden Schlagwoerter im Text enthalten:
-${keywordList}
-
-STRENGE FILTERREGEL:
-- Eine Zeile wird NUR erfasst, wenn ihr Text eines der obigen Schlagwoerter woertlich enthaelt
-- Wenn eine Zeile KEINES dieser Schlagwoerter enthaelt, wird sie KOMPLETT IGNORIERT - auch wenn sie wie eine Ausgabe/Kosten aussieht
-- Beispiel: Wenn "Transaktionsgebuehr" ein Schlagwort ist, aber "Ladevorgaenge" NICHT, dann wird "Ladevorgaenge" ignoriert
-- Es zaehlen NUR exakte Treffer auf die Schlagwoerter - keine aehnlichen Begriffe, keine Synonyme
-
-FÜR JEDE gefundene Position:
-- Erfasse den Bruttobetrag, Nettobetrag, MwSt-Satz und MwSt-Betrag
-- Ein Schlagwort kann MEHRFACH auf der Rechnung vorkommen - erfasse JEDE passende Zeile einzeln
-- amount_gross = Summe ALLER gefundenen Positionen (Brutto)
-- amount_net = Summe ALLER gefundenen Positionen (Netto)
-- vat_amount = Summe ALLER Steuerbeträge
-- Wenn verschiedene MwSt-Sätze bei den gefundenen Positionen: is_mixed_tax_rate = true und tax_rate_details ausfüllen
-- description: Gefundene Positionen mit Beträgen auflisten
-
-WICHTIG - DUPLIKAT-VERMEIDUNG:
-- Zähle jede Zeile auf der Rechnung genau EINMAL
-- Wenn der gleiche Betrag mehrfach in einer Zusammenfassung/Summenzeile wiederholt wird, erfasse nur die Einzelposition, NICHT die Summenzeile
-- Orientiere dich an den tatsächlichen Einzelposten/Detailzeilen, nicht an Zwischensummen oder Gesamtsummen die diese Positionen enthalten
-
-BETRAGS-REGELN:
-- Alle Betraege MUESSEN POSITIV sein - es gibt keine negativen Ausgaben
-- Wenn ein Betrag in Klammern steht z.B. (0,51) oder ein Minus hat z.B. -0,51, behandle ihn als POSITIVEN Kostenbetrag (also 0,51)
-- Ignoriere Gutschriften, Auszahlungen und Erstattungen komplett
-
-IGNORIERE alle anderen Zeilen/Positionen komplett (Einnahmen, Erlöse, Gutschriften, Auszahlungen, Umsätze).`;
-      } else {
-        expensesOnlyPrompt = `
-
-WICHTIGE REGEL - NUR AUSGABEN EXTRAHIEREN:
-Diese Rechnung stammt von einem Lieferanten mit gemischten Abrechnungen (z.B. Plattform-Abrechnung).
-- Erfasse NUR AUSGABEN/KOSTEN (Gebühren, Abos, Transaktionskosten, Servicegebühren)
-- IGNORIERE Einnahmen, Erlöse, Gutschriften, Auszahlungen, Umsätze
-- amount_gross = Summe NUR der Kosten-Positionen
-- amount_net und vat_amount ebenfalls nur aus Kosten-Positionen berechnen
-- Beschreibung: nur Kosten-Positionen auflisten
-- Bei gemischten MwSt-Sätzen der Kosten: is_mixed_tax_rate = true mit Details
-
-BETRAGS-REGELN:
-- Alle Betraege MUESSEN POSITIV sein - es gibt keine negativen Ausgaben
-- Wenn ein Betrag in Klammern steht z.B. (0,51) oder ein Minus hat z.B. -0,51, behandle ihn als POSITIVEN Kostenbetrag (also 0,51)
-- Ignoriere Gutschriften, Auszahlungen und Erstattungen komplett`;
-      }
+      const hint = extractionHint || (vendorData?.extraction_hint || '');
+      expensesOnlyPrompt = buildExpensesOnlyPrompt(allKeywords, hint);
     }
 
-    // Build extraction hint block
-    // Priority: body extractionHint > vendor extraction_hint from DB
-    let hintText = extractionHint;
-    if (!hintText && receiptId) {
-      // Try to load from vendor if not provided in body
-      const { data: receiptForHint } = await supabase
-        .from('receipts')
-        .select('vendor_id')
-        .eq('id', receiptId)
-        .single();
-      
-      if (receiptForHint?.vendor_id) {
-        const { data: vendorHint } = await supabase
-          .from('vendors')
-          .select('extraction_hint')
-          .eq('id', receiptForHint.vendor_id)
-          .single();
-        
-        if (vendorHint?.extraction_hint) {
-          hintText = vendorHint.extraction_hint;
-        }
-      }
-    }
-
+    // Build extraction hint (if not already included in expensesOnlyPrompt)
     let extractionHintPrompt = '';
-    if (hintText) {
-      extractionHintPrompt = `
-
-LIEFERANTEN-SPEZIFISCHER HINWEIS:
-${hintText}`;
+    if (!expensesOnlyPrompt && extractionHint) {
+      extractionHintPrompt = `\nLIEFERANTEN-HINWEIS: ${extractionHint}`;
+    } else if (!expensesOnlyPrompt && !extractionHint && vendorData?.extraction_hint) {
+      extractionHintPrompt = `\nLIEFERANTEN-HINWEIS: ${vendorData.extraction_hint}`;
     }
 
-    console.log(`Expenses-only mode: ${expensesOnlyPrompt ? 'ACTIVE' : 'inactive'} (flag: ${expensesOnly}, keywords: ${extractionKeywords.length}, hint: ${hintText ? 'yes' : 'no'})`);
+    console.log(`Expenses-only mode: ${expensesOnlyPrompt ? 'ACTIVE' : 'inactive'} (flag: ${expensesOnly}, keywords: ${extractionKeywords.length})`);
 
-    // Fetch user's categories for intelligent category matching
+    // ── Fetch categories ───────────────────────────────────────────
     let categoryList = 'Sonstiges';
-    
-    // Determine user_id: from receipt lookup or from auth header
-    let userId: string | null = null;
-    if (receiptId) {
-      const { data: receiptUser } = await supabase
-        .from('receipts')
-        .select('user_id')
-        .eq('id', receiptId)
-        .single();
-      userId = receiptUser?.user_id || null;
-    }
+    let userId: string | null = receipt?.user_id || null;
     if (!userId) {
-      // Try from auth header
       const authHeader = req.headers.get('authorization');
       if (authHeader) {
         const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
         userId = user?.id || null;
       }
     }
-    
+
     if (userId) {
-      // Get user's country to filter system categories
-      const { data: userProfile } = await supabase
-        .from('profiles')
-        .select('country')
-        .eq('id', userId)
-        .single();
+      const { data: userProfile } = await supabase.from('profiles').select('country').eq('id', userId).single();
       const userCountry = userProfile?.country?.toUpperCase() || null;
 
-      let query = supabase
-        .from('categories')
-        .select('name, country')
-        .eq('is_hidden', false)
-        .order('sort_order');
-      
+      let query = supabase.from('categories').select('name, country').eq('is_hidden', false).order('sort_order');
       if (userCountry) {
-        // User's own categories OR system categories from their country
         query = query.or(`user_id.eq.${userId},and(is_system.eq.true,country.eq.${userCountry})`);
       } else {
         query = query.or(`user_id.eq.${userId},is_system.eq.true`);
       }
 
       const { data: userCategories } = await query;
-      
       if (userCategories && userCategories.length > 0) {
         const catNames = userCategories.map(c => c.name).filter(n => n !== 'Keine Rechnung');
         if (catNames.length > 0) {
           categoryList = catNames.join(', ');
-          // Build country-specific category hints
           const categoryHints = buildCategoryHints(userCountry, catNames);
-          if (categoryHints) {
-            categoryList += categoryHints;
-          }
+          if (categoryHints) categoryList += categoryHints;
 
-          // Load verified community patterns for additional context
+          // Community patterns (limited to 15)
           const { data: communityPatterns } = await supabase
             .from('community_patterns')
             .select('vendor_name_normalized, suggested_category, contributor_count')
             .eq('is_verified', true)
             .eq('country', userCountry || '')
             .order('contributor_count', { ascending: false })
-            .limit(50);
+            .limit(15);
 
           if (communityPatterns && communityPatterns.length > 0) {
             const communityHints = communityPatterns
               .filter(cp => catNames.some(cn => cn.toLowerCase() === cp.suggested_category.toLowerCase()))
               .map(cp => `- "${cp.vendor_name_normalized}" → ${cp.suggested_category}`)
               .join('\n');
-            
             if (communityHints) {
-              categoryList += `\n\nPLATTFORM-ERFAHRUNG (verifizierte Zuordnungen anderer Nutzer):\n${communityHints}`;
+              categoryList += `\n\nVERIFIZIERTE ZUORDNUNGEN:\n${communityHints}`;
             }
           }
 
-          console.log(`Using ${catNames.length} user categories for AI matching (country: ${userCountry}, hints: ${categoryHints ? 'yes' : 'no'}, community: ${communityPatterns?.length || 0})`);
+          console.log(`Using ${catNames.length} categories (country: ${userCountry}, community: ${communityPatterns?.length || 0})`);
         }
       }
     }
 
-    const userPrompt = `Analysiere dieses Dokument in zwei Schritten:
+    // ── V2 compressed user prompt ──────────────────────────────────
+    const userPrompt = `Analysiere dieses Dokument:
 
-SCHRITT 1: DOKUMENTEN-TYP ERKENNEN
-Prüfe ob dies eine Rechnung, Quittung, Kassenbon, Gutschrift, Lieferschein mit Preisen oder ähnlicher Finanzbeleg ist.
+SCHRITT 1: Ist dies ein Finanzbeleg (Rechnung, Quittung, Kassenbon, Gutschrift)?
+Wenn NEIN: is_financial_document=false, document_type angeben, reason ausfüllen. Restliche Felder leer/""/0.
 
-WENN NEIN (z.B. Foto, Brief, Vertrag ohne Rechnung, Formular, Werbung, Angebot, Bestellung):
-Antworte NUR mit:
-{
-  "is_receipt": false,
-  "document_type": "<erkannter Dokumenttyp>",
-  "reason": "<kurze Begründung warum es kein Beleg ist>"
-}
+SCHRITT 2: Beleg-Daten extrahieren.
 
-WENN JA, weiter mit Schritt 2:
+LIEFERANT:
+- vendor_name = Offizieller Firmenname MIT Rechtsform aus Impressum/Fußbereich
+- Rechtsform erkennen: GmbH/AG/KG/OG/e.U./EU/UG/Ltd./LLC/Inc./S.à r.l./B.V./S.r.l. etc.
+- vendor_brand = Markenname falls abweichend (sonst "")
+- vendor_country = ISO-2-Code aus UID-Nr (ATU→AT, DE→DE, CHE→CH) oder Adresse
+- Bei mehreren Firmen: RECHNUNGSSTELLER nehmen, nicht Empfänger
 
-SCHRITT 2: BELEG-DATEN EXTRAHIEREN
-Extrahiere folgende Informationen im JSON-Format:
-{
-  "is_receipt": true,
-  "vendor": "Offizieller/rechtlicher Firmenname des Lieferanten",
-  "vendor_brand": "Markenname falls abweichend vom rechtlichen Namen (sonst null)",
-  "description": "Zusammenfassung aller Rechnungspositionen (max 100 Zeichen)",
-  "amount_gross": Bruttobetrag als Zahl,
-  "amount_net": Nettobetrag als Zahl (falls erkennbar, sonst null),
-  "vat_amount": MwSt-Betrag als Zahl (falls erkennbar, sonst null),
-  "vat_rate": MwSt-Satz als Zahl (z.B. 20 für 20%),
-  "receipt_date": "Datum im Format YYYY-MM-DD",
-  "category": "Wähle die passendste Kategorie aus dieser Liste: ${categoryList}",
-  "payment_method": "Zahlungsart: Überweisung, Kreditkarte, Bar, PayPal, Lastschrift (sonst null)",
-  "invoice_number": "Rechnungsnummer/Belegnummer (suche nach 'Rechnungsnummer:', 'RE-Nr.:', 'Invoice:', etc.)",
-  "confidence": Konfidenz von 0.0 bis 1.0,
-  "line_items": [
-    {
-      "description": "Positionsbeschreibung",
-      "amount_gross": Bruttobetrag,
-      "amount_net": Nettobetrag (falls erkennbar),
-      "vat_rate": MwSt-Satz,
-      "category": "Passende Kategorie aus obiger Liste"
-    }
-  ]
-}
+BESCHREIBUNG: Alle Positionen zusammenfassen, max 100 Zeichen, keine Preise.
 
-WICHTIGE REGELN FÜR LINE_ITEMS (Rechnungspositionen):
-- Extrahiere JEDE einzelne Rechnungsposition/Zeile als separates Objekt
-- Jede Position bekommt eine eigene Kategorie-Zuordnung aus der Kategorie-Liste
-- amount_gross und amount_net pro Position (nicht die Gesamtsumme)
-- Bei Kassenbons: Jede Produktzeile einzeln erfassen
-- Bei Rechnungen: Jede Positionszeile einzeln erfassen
-- Summenzeilen, Zwischensummen und Gesamtbeträge NICHT als Position erfassen
-- Wenn keine einzelnen Positionen erkennbar: leeres Array []
-- vat_rate pro Position: den jeweiligen Steuersatz (kann unterschiedlich sein)
+KATEGORIE: Wähle passendste aus: ${categoryList}
 
-WICHTIGE REGELN FÜR LIEFERANT/VENDOR:
-- "vendor" = Offizieller/rechtlicher Firmenname MIT Rechtsform. Priorisiere:
-  1. HÖCHSTE PRIORITÄT: Impressum/Fußbereich (Firmenbuchnummer, UID, Handelsregister)
-  2. MITTLERE PRIORITÄT: Rechnungskopf mit vollständigem Firmennamen
-  3. NIEDRIGE PRIORITÄT: Logo-Text
-- "vendor_brand" = Markenname wenn abweichend (z.B. Logo: "MediaMarkt" → rechtlich: "Media Markt E-Business GmbH")
+MwSt-ERKENNUNG:
+- Suche explizite %-Angaben auf dem Beleg (20%, 19%, 10%, 7% etc.)
+- Berechne: MwSt = Brutto × Satz/(100+Satz). Validiere: Netto + MwSt = Brutto (±0.05€)
+- Steuerraten DACH: AT=20/13/10%, DE=19/7%, CH=8.1/2.6/3.8%
+- Gemischte Sätze (z.B. Supermarkt): is_mixed_tax_rate=true, tax_rate_details ausfüllen, tax_rate="mixed"
+- Einzelner Satz: tax_rate="20" (als String), is_mixed_tax_rate=false
+- Wenn nicht erkennbar: tax_rate="unknown"
+- 0% ist GÜLTIG bei Kleinunternehmer/Reverse Charge/IG-Lieferung → tax_rate="0", special_vat_case setzen
 
-**ERKENNBARE RECHTSFORMEN (DACH-Raum & International):**
+VAT-KONFIDENZ:
+- vat_confidence 0.95-1.0: explizit + Berechnung stimmt
+- 0.80-0.94: explizit ODER eindeutig berechenbar
+- 0.50-0.79: aus Kontext abgeleitet
+- <0.50: geschätzt/nicht gefunden
+- vat_detection_method: "explicit"/"calculated"/"estimated"
 
-Österreich:
-- GmbH, Gesellschaft mbH, Gesellschaft mit beschränkter Haftung
-- AG, Aktiengesellschaft
-- OG, Offene Gesellschaft
-- KG, Kommanditgesellschaft
-- GmbH & Co KG, Gesellschaft mbH & Co KG
-- e.U., eingetragener Unternehmer
-- GesbR, Gesellschaft bürgerlichen Rechts
-- Gen, Genossenschaft
-- Verein
+BETRÄGE: Dezimalzahlen ohne Währungssymbol. 0 wenn nicht erkennbar. Datum: YYYY-MM-DD oder "".
+payment_method: Überweisung/Kreditkarte/Bar/PayPal/Lastschrift oder "".
+receipt_number: Rechnungsnummer suchen (RE-Nr, Invoice, Belegnummer etc.) oder "".
 
-Deutschland:
-- GmbH, Gesellschaft mit beschränkter Haftung
-- AG, Aktiengesellschaft
-- UG (haftungsbeschränkt), Unternehmergesellschaft
-- OHG, Offene Handelsgesellschaft
-- KG, Kommanditgesellschaft
-- GmbH & Co. KG
-- e.K., eingetragener Kaufmann
-- GbR, Gesellschaft bürgerlichen Rechts
-- PartG, Partnerschaftsgesellschaft
+LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenzeilen.${expensesOnlyPrompt}${extractionHintPrompt}`;
 
-Schweiz:
-- AG, Aktiengesellschaft
-- GmbH, Gesellschaft mit beschränkter Haftung
-- Sàrl (französisch für GmbH)
-- SA (französisch für AG)
-
-International:
-- Ltd., Limited
-- LLC, Limited Liability Company
-- Inc., Incorporated
-- S.à r.l., S.A.
-- B.V., N.V. (Niederlande)
-- S.r.l., S.p.A. (Italien)
-
-**Beispiele für vendor-Feld:**
-| Auf der Rechnung | vendor |
-|------------------|--------|
-| troii Software GmbH | troii Software GmbH |
-| Müller Gesellschaft mbH | Müller Gesellschaft mbH |
-| Schmidt Gesellschaft mit beschränkter Haftung | Schmidt Gesellschaft mit beschränkter Haftung |
-| Weber GmbH & Co KG | Weber GmbH & Co KG |
-| Bauer e.U. | Bauer e.U. |
-| Amazon EU S.à r.l. | Amazon EU S.à r.l. |
-| Apple Distribution International Ltd. | Apple Distribution International Ltd. |
-
-**Wichtig für vendor:**
-- Erfasse den Namen MIT der Rechtsform
-- Achte auf die korrekte Schreibweise (GmbH vs Gesellschaft mbH)
-- Bei mehreren Firmennamen: Nimm den des RECHNUNGSSTELLERS (nicht des Empfängers)
-- UID/ATU-Nummer ist NICHT Teil des Firmennamens
-
-WICHTIGE REGELN FÜR BESCHREIBUNG:
-- Fasse ALLE Rechnungspositionen zusammen (max 100 Zeichen)
-- Trenne mit Komma, keine Preise
-- Bei vielen Positionen: wichtigste zuerst, dann "u.a."
-
-WICHTIGE REGELN FÜR STEUER (MwSt./USt.) - GEZIELT NACH % SUCHEN:
-
-1. SUCHE NACH PROZENTZEICHEN (%):
-   - Scanne das GESAMTE Dokument nach allen Vorkommen von "%"
-   - Typische Muster: "20%", "20,00%", "20.00 %", "20 %"
-   - Die Zahl DIREKT VOR dem % ist oft der Steuersatz!
-
-2. KONTEXT PRÜFEN - Diese Begriffe deuten auf MwSt hin:
-   - "MwSt", "MwSt.", "Mehrwertsteuer"
-   - "USt", "USt.", "Umsatzsteuer" (häufig in Österreich!)
-   - "VAT", "Value Added Tax", "TVA"
-   - "Steuer", "Tax"
-   - "inkl.", "zzgl.", "enthält", "davon"
-
-3. TYPISCHE ZEILEN-MUSTER erkennen:
-   - "20% MwSt.: 51,84 EUR" → vat_rate: 20, vat_amount: 51.84
-   - "20.00% USt.: € 51.84" → vat_rate: 20, vat_amount: 51.84
-   - "inkl. 20% Umsatzsteuer" → vat_rate: 20
-   - "inkl. 20 % MwSt." → vat_rate: 20
-   - "davon 20% USt 51,84" → vat_rate: 20, vat_amount: 51.84
-   - "Netto 259,20 / 20% / Brutto 311,04" → vat_rate: 20
-   - "VAT 19%: €9.50" → vat_rate: 19, vat_amount: 9.50
-   - "zzgl. 19% MwSt." → vat_rate: 19
-
-4. SUMMENBLOCK AM ENDE PRÜFEN:
-   Suche am Dokumentende nach:
-   - "Netto: xxx" / "Summe netto: xxx"
-   - "20% MwSt/USt: xxx" ← HIER steht oft der Steuersatz!
-   - "Brutto: xxx" / "Gesamtbetrag: xxx"
-
-5. MEHRERE STEUERSÄTZE auf einer Rechnung (z.B. Supermarkt, Amazon):
-   
-   **WICHTIG: Österreichische Supermarkt-Kassenbons (HOFER, BILLA, SPAR, LIDL, PENNY):**
-   Am Ende des Kassenbons steht oft ein MwSt-Block in diesem Format:
-   
-   MWST.A 10.0%      5.40  Netto 54.00
-   MWST.B 20.0%     25.58  Netto 127.91
-   
-   oder:
-   
-   A=10.0%   Netto  54.00  Steuer  5.40
-   B=20.0%   Netto 127.91  Steuer 25.58
-   
-   WENN du solche Zeilen siehst → is_mixed_tax_rate = true!
-   
-   **Weitere Erkennungs-Muster für gemischte Steuersätze:**
-   - "10% MwSt: 5,00 / 20% MwSt: 12,00"
-   - "Summe 7%: ... / Summe 19%: ..."
-   - "A = 20%, B = 10%" oder "MWST.A ... MWST.B ..."
-   - Mehrere Zeilen mit unterschiedlichen %-Angaben im Summenblock
-   - Bei Produkten: Buchstaben-Kennzeichen wie "A", "B" neben Preisen
-   
-   **PRÜFUNG: Scanne den MwSt/Summenblock am Ende des Belegs:**
-   - Wenn dort MEHRERE Prozentsätze aufgelistet sind → gemischte Steuersätze!
-   - Beispiel HOFER: "MWST.A 10.0% ... MWST.B 20.0% ..." → is_mixed_tax_rate = true
-   
-   **Vorgehen bei MEHREREN Steuersätzen:**
-   - Setze is_mixed_tax_rate = true
-   - Setze vat_rate = null (da nicht eindeutig)
-   - Erfasse GESAMT-Brutto (amount_gross), GESAMT-Netto (amount_net), GESAMT-Steuer (vat_amount)
-   - Berechne: amount_net = Summe aller Netto-Beträge, vat_amount = Summe aller Steuerbeträge
-   - Speichere Details in tax_rate_details:
-     [{"rate": 10, "net_amount": 54.00, "tax_amount": 5.40, "description": "Ermäßigt (10%)"},
-      {"rate": 20, "net_amount": 127.91, "tax_amount": 25.58, "description": "Normal (20%)"}]
-   
-   **Bei NUR EINEM Steuersatz:**
-   - Setze is_mixed_tax_rate = false
-   - Setze vat_rate = der erkannte Satz (z.B. 20)
-   - tax_rate_details = null
-
-6. VALIDIERUNG - Übliche Steuersätze nach Land:
-   - Österreich (AT): 0%, 10%, 13%, 20%
-   - Deutschland (DE): 0%, 7%, 19%
-   - Schweiz (CH): 0%, 2.6%, 3.8%, 8.1% (seit 2024)
-   - Italien (IT): 0%, 4%, 5%, 10%, 22%
-   - Frankreich (FR): 0%, 2.1%, 5.5%, 10%, 20%
-   - Niederlande (NL): 0%, 9%, 21%
-   - Spanien (ES): 0%, 4%, 10%, 21%
-   - Falls unüblicher Wert (z.B. 25%, 15%): nochmal prüfen!
-
-7. BERECHNUNG ZUR KONTROLLE (wenn Netto+Brutto vorhanden):
-   - Formel: ((Brutto / Netto) - 1) * 100 = Steuersatz
-   - Beispiel: Brutto 311,04€, Netto 259,20€ → (311.04/259.20 - 1) * 100 = 20%
-   - Nutze dies zur Validierung des gefundenen Satzes
-
-**ERWEITERT: Länder-Erkennung und internationale MwSt**
-
-Schritt A: LAND DES RECHNUNGSSTELLERS ERKENNEN
-Erkenne das Land aus:
-- UID-Nummer Format: ATU=Österreich, DE=Deutschland, CHE=Schweiz, IT=Italien, FR=Frankreich
-- Adresse im Briefkopf (PLZ, Stadt, Land)
-- Währung (CHF → Schweiz)
-- Sprache und Begriffe
-
-Setze vendor_country als ISO-2-Code: AT, DE, CH, IT, FR, NL, ES, etc.
-
-Schritt B: 0% STEUERSATZ ERKENNEN
-**WICHTIG: 0% ist ein GÜLTIGER Steuersatz!**
-Wenn auf der Rechnung explizit steht:
-- "0% USt", "0,00% USt", "0.00% USt", "0% MwSt", "0,00% MwSt"
-- "USt 0%", "MwSt 0%", "VAT 0%"
-- "Steuersatz: 0%", "Steuersatz: 0.00%"
-- "USt.-Betrag: 0,00" oder "MwSt: € 0,00" (mit Steuersatz 0%)
-
-Dann setze:
-- vat_rate: 0 (NICHT null!)
-- vat_amount: 0
-- amount_net = amount_gross (da keine Steuer)
-
-Schritt C: SONDERFÄLLE ERKENNEN
-Setze special_vat_case NUR wenn einer dieser EXPLIZITEN Hinweise gefunden wird:
-- "Kleinunternehmer gemäß § 6 UStG" (AT) → special_vat_case: "kleinunternehmer", vat_rate: 0
-- "Kleinunternehmerregelung § 19 UStG" (DE) → special_vat_case: "kleinunternehmer", vat_rate: 0
-- "Reverse Charge" / "Steuerschuldnerschaft" → special_vat_case: "reverse_charge", vat_rate: 0
-- "Innergemeinschaftliche Lieferung" / "innergemeinschaftl. Lieferung" → special_vat_case: "ig_lieferung", vat_rate: 0
-- "Steuerfreie Ausfuhrlieferung" / "Ausfuhr" → special_vat_case: "export", vat_rate: 0
-- "Differenzbesteuerung" / "§ 25a UStG" → special_vat_case: null, vat_rate: 0 (Gebrauchtwarenhandel)
-
-**WENN 0% USt EXPLIZIT STEHT ABER KEIN SONDERFALL-HINWEIS:**
-- Setze vat_rate: 0, vat_amount: 0
-- Setze special_vat_case: null (kein Sonderfall erkennbar)
-- Dies ist trotzdem ein gültiger 0%-Beleg!
-
-Schritt C: VAT KONFIDENZ BEWERTEN
-Setze vat_confidence (0.00 - 1.00):
-- 0.95-1.00: MwSt explizit angegeben UND Berechnung stimmt (Brutto = Netto + MwSt)
-- 0.80-0.94: MwSt explizit angegeben ODER aus Berechnung eindeutig
-- 0.50-0.79: MwSt aus Kontext abgeleitet, nicht explizit
-- 0.20-0.49: MwSt geschätzt basierend auf Land/Branche
-- 0.00-0.19: Keine MwSt-Information gefunden
-
-Setze vat_detection_method:
-- "explicit": MwSt-Satz stand explizit auf der Rechnung
-- "calculated": Aus Brutto/Netto-Differenz berechnet
-- "estimated": Geschätzt basierend auf Land/Kontext
-
-WEITERE REGELN:
-- Antworte NUR mit JSON, keine Markdown-Codeblöcke
-- Unerkennbare Felder auf null setzen
-- Beträge als Dezimalzahlen ohne Währungssymbol
-- Datum im Format YYYY-MM-DD
-
-**JSON-Ausgabeformat:**
-{
-  "is_receipt": true,
-  "vendor": "...",
-  "vendor_brand": "..." oder null,
-  "description": "...",
-  "amount_gross": 150.00,
-  "amount_net": 132.50,
-  "vat_amount": 17.50,
-  "vat_rate": 20 oder null (bei gemischt),
-  "is_mixed_tax_rate": false oder true,
-  "tax_rate_details": null oder [...],
-  "receipt_date": "YYYY-MM-DD",
-  "category": "...",
-  "payment_method": "...",
-  "invoice_number": "...",
-  "confidence": 0.95,
-  "vendor_country": "AT",
-  "vat_confidence": 0.92,
-  "vat_detection_method": "explicit",
-  "special_vat_case": null,
-  "line_items": [
-    {"description": "Büromaterial", "amount_gross": 120.00, "amount_net": 100.00, "vat_rate": 20, "category": "Bürobedarf"},
-    {"description": "Druckerpatronen", "amount_gross": 30.00, "amount_net": 25.00, "vat_rate": 20, "category": "Bürobedarf"}
-  ]
-}
-
-Beispiel Kleinunternehmer:
-{
-  "vat_rate": 0,
-  "vendor_country": "AT",
-  "vat_confidence": 0.95,
-  "vat_detection_method": "explicit",
-  "special_vat_case": "kleinunternehmer"
-}`;
-
+    // ── AI API Call with structured output ─────────────────────────
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -1173,28 +622,27 @@ Beispiel Kleinunternehmer:
           {
             role: "user",
             content: [
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${imageBase64}`,
-                },
-              },
-              {
-                type: "text",
-                text: userPrompt + expensesOnlyPrompt + extractionHintPrompt,
-              },
+              { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+              { type: "text", text: userPrompt },
             ],
           },
         ],
-        max_tokens: 4096,
+        max_tokens: 2048,
         temperature: 0.1,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "receipt_extraction",
+            strict: true,
+            schema: extractionSchema,
+          },
+        },
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("AI Gateway error:", response.status, errorText);
-      
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ success: false, error: "Rate limit exceeded. Please try again later." }),
@@ -1207,7 +655,6 @@ Beispiel Kleinunternehmer:
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      
       return new Response(
         JSON.stringify({ success: false, error: "AI processing failed" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -1215,7 +662,7 @@ Beispiel Kleinunternehmer:
     }
 
     const aiResponse = await response.json();
-    console.log("AI Response received");
+    console.log("AI Response received (V2)");
 
     const content = aiResponse.choices?.[0]?.message?.content;
     if (!content) {
@@ -1226,239 +673,179 @@ Beispiel Kleinunternehmer:
       );
     }
 
-    // Clean the response - remove markdown code blocks if present
+    // Parse JSON (structured output should be clean, but handle edge cases)
     let cleanedContent = content.trim();
-    if (cleanedContent.startsWith("```json")) {
-      cleanedContent = cleanedContent.slice(7);
-    } else if (cleanedContent.startsWith("```")) {
-      cleanedContent = cleanedContent.slice(3);
-    }
-    if (cleanedContent.endsWith("```")) {
-      cleanedContent = cleanedContent.slice(0, -3);
-    }
+    if (cleanedContent.startsWith("```json")) cleanedContent = cleanedContent.slice(7);
+    else if (cleanedContent.startsWith("```")) cleanedContent = cleanedContent.slice(3);
+    if (cleanedContent.endsWith("```")) cleanedContent = cleanedContent.slice(0, -3);
     cleanedContent = cleanedContent.trim();
 
     try {
-      const extractedData: ExtractionResult = JSON.parse(cleanedContent);
+      const rawData = JSON.parse(cleanedContent);
+      const extractedData = mapSchemaToResult(rawData);
 
-      // Post-Processing: Ensure all amounts are positive (no negative expenses)
+      // ── Post-Processing: amounts positive ────────────────────────
       if (extractedData.amount_gross != null && extractedData.amount_gross < 0) {
         console.log(`[Amount Fix] amount_gross ${extractedData.amount_gross} → ${Math.abs(extractedData.amount_gross)}`);
         extractedData.amount_gross = Math.abs(extractedData.amount_gross);
       }
-      if (extractedData.amount_net != null && extractedData.amount_net < 0) {
-        extractedData.amount_net = Math.abs(extractedData.amount_net);
-      }
-      if (extractedData.vat_amount != null && extractedData.vat_amount < 0) {
-        extractedData.vat_amount = Math.abs(extractedData.vat_amount);
-      }
+      if (extractedData.amount_net != null && extractedData.amount_net < 0) extractedData.amount_net = Math.abs(extractedData.amount_net);
+      if (extractedData.vat_amount != null && extractedData.vat_amount < 0) extractedData.vat_amount = Math.abs(extractedData.vat_amount);
       if (extractedData.tax_rate_details && Array.isArray(extractedData.tax_rate_details)) {
-        extractedData.tax_rate_details = extractedData.tax_rate_details.map(detail => ({
-          ...detail,
-          net_amount: Math.abs(detail.net_amount),
-          tax_amount: Math.abs(detail.tax_amount),
+        extractedData.tax_rate_details = extractedData.tax_rate_details.map(d => ({
+          ...d, net_amount: Math.abs(d.net_amount), tax_amount: Math.abs(d.tax_amount),
         }));
       }
 
-      // === POST-PROCESSING: MwSt-Konsistenzprüfung ===
+      // ── Post-Processing: VAT consistency ─────────────────────────
       if (extractedData.amount_gross != null) {
-        // Regel 0: Explizite 0% USt. im Dokument-Text respektieren
+        // Rule 0: Explicit 0% in document
         const zeroVatPattern = /0[,.]?0{0,2}\s*%\s*(USt|MwSt|Ust|mwst|umsatzsteuer)/i;
         if (zeroVatPattern.test(content) && extractedData.vat_rate !== 0) {
-          console.log(`[VAT Consistency] Rule 0: Explicit 0% USt found in document text, correcting vat_rate from ${extractedData.vat_rate}% to 0%`);
+          console.log(`[VAT Consistency] Rule 0: Explicit 0% found, correcting from ${extractedData.vat_rate}%`);
           extractedData.vat_rate = 0;
           extractedData.vat_amount = 0;
           extractedData.amount_net = extractedData.amount_gross;
         }
 
-        // Regel 1: Brutto == Netto und kein MwSt-Betrag → Satz muss 0 sein
+        // Rule 1: Gross == Net and no VAT
         if (extractedData.amount_gross === extractedData.amount_net && (!extractedData.vat_amount || extractedData.vat_amount === 0)) {
           if (extractedData.vat_rate && extractedData.vat_rate > 0) {
-            console.log(`[VAT Consistency] Rule 1: Gross=Net and no VAT amount, correcting vat_rate from ${extractedData.vat_rate}% to 0%`);
+            console.log(`[VAT Consistency] Rule 1: Gross=Net, correcting vat_rate to 0`);
           }
           extractedData.vat_rate = 0;
           extractedData.vat_amount = 0;
         }
 
-        // Regel 2: Satz > 0 mit MwSt-Betrag, aber Netto fehlt oder gleich Brutto
+        // Rule 2: Rate > 0, VAT amount exists, but Net missing/equal Gross
         if (extractedData.vat_rate != null && extractedData.vat_rate > 0 && extractedData.vat_amount != null && extractedData.vat_amount > 0
             && (!extractedData.amount_net || extractedData.amount_net === extractedData.amount_gross)) {
           extractedData.amount_net = Math.round((extractedData.amount_gross - extractedData.vat_amount) * 100) / 100;
-          console.log(`[VAT Consistency] Rule 2: Net calculated from Gross-VAT: ${extractedData.amount_net}`);
+          console.log(`[VAT Consistency] Rule 2: Net=${extractedData.amount_net}`);
         }
 
-        // Regel 3: Satz > 0, aber MwSt-Betrag fehlt und Netto fehlt/gleich Brutto
+        // Rule 3: Rate > 0, no VAT amount, no Net
         if (extractedData.vat_rate != null && extractedData.vat_rate > 0
             && (!extractedData.vat_amount || extractedData.vat_amount === 0)
             && (!extractedData.amount_net || extractedData.amount_net === extractedData.amount_gross)) {
           extractedData.amount_net = Math.round((extractedData.amount_gross / (1 + extractedData.vat_rate / 100)) * 100) / 100;
           extractedData.vat_amount = Math.round((extractedData.amount_gross - extractedData.amount_net) * 100) / 100;
-          console.log(`[VAT Consistency] Rule 3: Net=${extractedData.amount_net}, VAT=${extractedData.vat_amount} calculated from Gross+Rate`);
+          console.log(`[VAT Consistency] Rule 3: Net=${extractedData.amount_net}, VAT=${extractedData.vat_amount}`);
         }
 
-        // Regel 4: Netto < Brutto, aber MwSt-Betrag fehlt
+        // Rule 4: Net < Gross, no VAT amount
         if (extractedData.amount_net != null && extractedData.amount_net < extractedData.amount_gross
             && (!extractedData.vat_amount || extractedData.vat_amount === 0)) {
           extractedData.vat_amount = Math.round((extractedData.amount_gross - extractedData.amount_net) * 100) / 100;
-          console.log(`[VAT Consistency] Rule 4: VAT amount=${extractedData.vat_amount} from Gross-Net difference`);
+          console.log(`[VAT Consistency] Rule 4: VAT=${extractedData.vat_amount}`);
         }
       }
 
-      // Check if document is NOT a receipt - save it with "Keine Rechnung" category
-      // These can be supplementary documents (detail pages, attachments, etc.)
+      // ── Non-receipt document handling ─────────────────────────────
       if (extractedData.is_receipt === false) {
-        console.log("Document is NOT a receipt - saving as supplementary document:", {
-          document_type: extractedData.document_type,
-          reason: extractedData.reason,
-        });
+        console.log("Document is NOT a receipt:", { document_type: extractedData.document_type, reason: extractedData.reason });
 
-        // Save as normal document with "Keine Rechnung" category instead of rejecting
         if (receiptId) {
-          const documentDescription = extractedData.document_type 
+          const documentDescription = extractedData.document_type
             ? `${extractedData.document_type}${extractedData.reason ? `: ${extractedData.reason}` : ''}`
             : 'Kein Rechnungsdokument';
 
-          const { error: updateError } = await supabase
-            .from('receipts')
-            .update({
-              status: 'review', // Set to review so user can process it
-              category: 'Keine Rechnung', // Special category for non-receipt documents
-              description: documentDescription.substring(0, 100), // Truncate to max length
-              ai_confidence: 0.5, // Medium confidence as it's a valid document, just not a receipt
-              notes: `Dokumenttyp: ${extractedData.document_type || 'Unbekannt'}. ${extractedData.reason || 'Kann als Hilfsdokument verwendet werden.'}`,
-              ai_raw_response: extractedData,
-              ai_processed_at: new Date().toISOString(),
-            })
-            .eq('id', receiptId);
-
-          if (updateError) {
-            console.error("Failed to update receipt:", updateError);
-          } else {
-            console.log(`Receipt ${receiptId} saved with category 'Keine Rechnung' for review`);
-          }
+          await supabase.from('receipts').update({
+            status: 'review',
+            category: 'Keine Rechnung',
+            description: documentDescription.substring(0, 100),
+            ai_confidence: 0.5,
+            notes: `Dokumenttyp: ${extractedData.document_type || 'Unbekannt'}. ${extractedData.reason || 'Kann als Hilfsdokument verwendet werden.'}`,
+            ai_raw_response: extractedData,
+            ai_processed_at: new Date().toISOString(),
+            prompt_version: 'v2',
+          }).eq('id', receiptId);
         }
 
         return new Response(
-          JSON.stringify({ 
-            success: true, 
-            is_receipt: false,
-            saved_as_supplementary: true,
-            document_type: extractedData.document_type,
-            reason: extractedData.reason,
-            receiptId: receiptId,
-          }),
+          JSON.stringify({ success: true, is_receipt: false, saved_as_supplementary: true, document_type: extractedData.document_type, reason: extractedData.reason, receiptId }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Document IS a receipt - proceed with normal extraction
-      console.log("Successfully extracted receipt data:", {
-        vendor: extractedData.vendor,
-        vendor_brand: extractedData.vendor_brand,
-        amount_gross: extractedData.amount_gross,
-        invoice_number: extractedData.invoice_number,
-        confidence: extractedData.confidence,
-      });
+      // ── Receipt data: learning & DB update ───────────────────────
+      console.log("Extracted receipt:", { vendor: extractedData.vendor, amount_gross: extractedData.amount_gross, invoice_number: extractedData.invoice_number, confidence: extractedData.confidence });
 
-      // If receiptId was provided, update the receipt in database
       if (receiptId) {
-        // Check for learned VAT rate
         let finalVatRate = extractedData.vat_rate;
         let vatRateSource: 'ai' | 'learned' = 'ai';
         let finalCategory = extractedData.category;
 
-        // First get the receipt to find user_id and vendor_id
-        const { data: receiptInfo } = await supabase
-          .from('receipts')
-          .select('user_id, vendor_id')
-          .eq('id', receiptId)
-          .single();
+        const receiptUserId = receipt?.user_id || null;
 
-        if (receiptInfo?.user_id && extractedData.vendor) {
-          // Try to find vendor by name for VAT learning
+        if (receiptUserId && extractedData.vendor) {
+          // Vendor matching
           const { data: vendorMatch } = await supabase
             .from('vendors')
             .select('id, expenses_only_extraction, legal_names, default_category_id')
-            .eq('user_id', receiptInfo.user_id)
+            .eq('user_id', receiptUserId)
             .or(`display_name.ilike.${extractedData.vendor}`)
             .maybeSingle();
 
-          // If no match by display_name, check legal_names arrays
           let finalVendorMatch = vendorMatch;
           if (!finalVendorMatch) {
             const { data: allVendors } = await supabase
               .from('vendors')
               .select('id, expenses_only_extraction, legal_names, default_category_id')
-              .eq('user_id', receiptInfo.user_id);
-            
+              .eq('user_id', receiptUserId);
             if (allVendors) {
-              finalVendorMatch = allVendors.find(v => 
-                (v.legal_names || []).some((ln: string) => 
-                  ln.toLowerCase() === extractedData.vendor.toLowerCase()
-                )
+              finalVendorMatch = allVendors.find(v =>
+                (v.legal_names || []).some((ln: string) => ln.toLowerCase() === extractedData.vendor!.toLowerCase())
               ) || null;
             }
           }
 
-          const vendorId = receiptInfo.vendor_id || finalVendorMatch?.id;
-          const _vendorExpensesOnly = finalVendorMatch?.expenses_only_extraction === true;
+          const vendorId = receipt?.vendor_id || finalVendorMatch?.id;
 
-          // === CATEGORY LEARNING: Apply learned rules ===
-          // Priority: Product rule (keyword match) > Vendor default > AI suggestion
-          
-          // 1. Check product-based category rules (keyword matching)
+          // Category learning: product rule > vendor default > AI
           if (extractedData.description) {
             const { data: categoryRules } = await supabase
               .from('category_rules')
               .select('keyword, category_name, match_count')
-              .eq('user_id', receiptInfo.user_id)
+              .eq('user_id', receiptUserId)
               .order('match_count', { ascending: false });
-            
+
             if (categoryRules && categoryRules.length > 0) {
               const descLower = extractedData.description.toLowerCase();
-              const matchedRule = categoryRules.find(rule => 
-                descLower.includes(rule.keyword.toLowerCase())
-              );
-              
+              const matchedRule = categoryRules.find(rule => descLower.includes(rule.keyword.toLowerCase()));
               if (matchedRule) {
-                console.log(`[Category Learning] Product rule matched: keyword="${matchedRule.keyword}" → category="${matchedRule.category_name}" (match_count: ${matchedRule.match_count}, AI suggested: "${finalCategory}")`);
+                console.log(`[Category Learning] Product rule: "${matchedRule.keyword}" → "${matchedRule.category_name}"`);
                 finalCategory = matchedRule.category_name;
               }
             }
           }
 
-          // 2. If no product rule matched, check vendor default category
           if (finalCategory === extractedData.category && finalVendorMatch?.default_category_id) {
             const { data: vendorCategory } = await supabase
               .from('categories')
               .select('name')
               .eq('id', finalVendorMatch.default_category_id)
               .maybeSingle();
-            
             if (vendorCategory?.name) {
-              console.log(`[Category Learning] Vendor default category: "${vendorCategory.name}" (AI suggested: "${finalCategory}")`);
+              console.log(`[Category Learning] Vendor default: "${vendorCategory.name}"`);
               finalCategory = vendorCategory.name;
             }
           }
 
+          // VAT learning
           if (vendorId) {
-            // Check for learned VAT rate
             const { data: learning } = await supabase
               .from('vendor_learning')
               .select('default_vat_rate, vat_rate_confidence, vat_rate_corrections')
               .eq('vendor_id', vendorId)
-              .eq('user_id', receiptInfo.user_id)
+              .eq('user_id', receiptUserId)
               .eq('is_active', true)
               .maybeSingle();
 
-            // Use learned rate if confidence >= 70% or at least 3 corrections
             if (learning?.default_vat_rate !== null && learning?.default_vat_rate !== undefined) {
-              const shouldUseLearned = 
-                (learning.vat_rate_confidence ?? 0) >= 70 || 
-                (learning.vat_rate_corrections ?? 0) >= 3;
-
+              const shouldUseLearned = (learning.vat_rate_confidence ?? 0) >= 70 || (learning.vat_rate_corrections ?? 0) >= 3;
               if (shouldUseLearned) {
-                console.log(`[VAT Learning] Using learned rate ${learning.default_vat_rate}% for vendor (AI: ${extractedData.vat_rate}%, confidence: ${learning.vat_rate_confidence}%)`);
+                console.log(`[VAT Learning] Using learned rate ${learning.default_vat_rate}% (AI: ${extractedData.vat_rate}%)`);
                 finalVatRate = Number(learning.default_vat_rate);
                 vatRateSource = 'learned';
               }
@@ -1466,71 +853,55 @@ Beispiel Kleinunternehmer:
           }
         }
 
-        const { error: updateError } = await supabase
-          .from('receipts')
-          .update({
-            vendor: extractedData.vendor,
-            vendor_brand: extractedData.vendor_brand,
-            description: extractedData.description,
-            amount_gross: extractedData.amount_gross,
-            amount_net: extractedData.amount_net,
-            vat_amount: extractedData.vat_amount,
-            vat_rate: finalVatRate,
-            vat_rate_source: vatRateSource,
-            is_mixed_tax_rate: extractedData.is_mixed_tax_rate || false,
-            tax_rate_details: extractedData.tax_rate_details || null,
-            receipt_date: extractedData.receipt_date,
-            category: finalCategory,
-            payment_method: extractedData.payment_method,
-            invoice_number: extractedData.invoice_number,
-            ai_confidence: extractedData.confidence,
-            ai_raw_response: extractedData,
-            ai_processed_at: new Date().toISOString(),
-            status: 'review',
-            // New international VAT fields
-            vendor_country: extractedData.vendor_country || null,
-            vat_confidence: vatRateSource === 'learned' ? 1.0 : (extractedData.vat_confidence || null),
-            vat_detection_method: vatRateSource === 'learned' ? 'learned' : (extractedData.vat_detection_method || null),
-            special_vat_case: extractedData.special_vat_case || null,
-            line_items_raw: (extractedData as any).line_items || null,
-          })
-          .eq('id', receiptId);
+        const { error: updateError } = await supabase.from('receipts').update({
+          vendor: extractedData.vendor,
+          vendor_brand: extractedData.vendor_brand,
+          description: extractedData.description,
+          amount_gross: extractedData.amount_gross,
+          amount_net: extractedData.amount_net,
+          vat_amount: extractedData.vat_amount,
+          vat_rate: finalVatRate,
+          vat_rate_source: vatRateSource,
+          is_mixed_tax_rate: extractedData.is_mixed_tax_rate || false,
+          tax_rate_details: extractedData.tax_rate_details || null,
+          receipt_date: extractedData.receipt_date,
+          category: finalCategory,
+          payment_method: extractedData.payment_method,
+          invoice_number: extractedData.invoice_number,
+          ai_confidence: extractedData.confidence,
+          ai_raw_response: extractedData,
+          ai_processed_at: new Date().toISOString(),
+          status: 'review',
+          vendor_country: extractedData.vendor_country || null,
+          vat_confidence: vatRateSource === 'learned' ? 1.0 : (extractedData.vat_confidence || null),
+          vat_detection_method: vatRateSource === 'learned' ? 'learned' : (extractedData.vat_detection_method || null),
+          special_vat_case: extractedData.special_vat_case || null,
+          line_items_raw: (rawData as any).line_items || null,
+          prompt_version: 'v2',
+        }).eq('id', receiptId);
 
         if (updateError) {
           console.error("Failed to update receipt:", updateError);
         } else {
-          console.log(`Receipt ${receiptId} updated with extracted data (VAT source: ${vatRateSource}), status set to 'review'`);
+          console.log(`Receipt ${receiptId} updated (V2, VAT: ${vatRateSource})`);
         }
       }
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          is_receipt: true,
-          data: extractedData,
-          raw_response: content,
-          receiptId: receiptId,
-        }),
+        JSON.stringify({ success: true, is_receipt: true, data: extractedData, raw_response: content, receiptId }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } catch (parseError) {
-      console.error("Failed to parse AI response as JSON:", cleanedContent);
+      console.error("Failed to parse AI response:", cleanedContent);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Failed to parse AI response", 
-          raw: content 
-        }),
+        JSON.stringify({ success: false, error: "Failed to parse AI response", raw: content }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
   } catch (error) {
     console.error("Extract receipt error:", error);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error instanceof Error ? error.message : "Unknown error" 
-      }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
