@@ -127,5 +127,5 @@ export function useVatRates() {
     [vatRateGroups]
   );
 
-  return { vatRateGroups, vatRates, loading: isLoading };
+  return { vatRateGroups, vatRates, defaultVatRate, loading: isLoading };
 }
