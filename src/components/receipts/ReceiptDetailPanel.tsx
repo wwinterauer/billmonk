@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { PAYMENT_METHODS } from '@/lib/constants';
-import { useBookingTypes } from '@/hooks/useBookingTypes';
+import { TAX_TYPES, PAYMENT_METHODS } from '@/lib/constants';
 import { Repeat } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -126,7 +125,6 @@ export function ReceiptDetailPanel({
   const { user } = useAuth();
   const { getReceipt, updateReceipt, rejectReceipt, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
-  const { visibleBookingTypes } = useBookingTypes();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
   const { vatRateGroups } = useVatRates();
@@ -1474,8 +1472,8 @@ export function ReceiptDetailPanel({
                             <SelectValue placeholder="Offen" />
                           </SelectTrigger>
                           <SelectContent>
-                            {visibleBookingTypes.map(t => (
-                              <SelectItem key={t.name} value={t.name}>
+                            {TAX_TYPES.map(t => (
+                              <SelectItem key={t.value} value={t.value}>
                                 {t.label}
                               </SelectItem>
                             ))}

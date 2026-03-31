@@ -32,14 +32,14 @@ import {
   Zap,
   FileText,
   Flower2,
+  Globe,
   Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -73,26 +73,42 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { useBookingTypes } from '@/hooks/useBookingTypes';
-import { usePlan } from '@/hooks/usePlan';
-import { useCompanySettings } from '@/hooks/useCompanySettings';
-import { TAX_CATEGORY_INFO } from '@/components/settings/taxCategoryInfo';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TAX_CATEGORY_INFO } from './taxCategoryInfo';
 
 // Icon mapping
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  Paperclip, Monitor, Plane, Coffee, Phone, Shield, Building, Car, Megaphone,
-  MoreHorizontal, ShoppingCart, Wrench, Heart, Book, Briefcase, CreditCard,
-  Gift, Home, Package, Truck, Utensils, Wifi, Zap, FileText, FolderOpen, Flower2,
+  Paperclip,
+  Monitor,
+  Plane,
+  Coffee,
+  Phone,
+  Shield,
+  Building,
+  Car,
+  Megaphone,
+  MoreHorizontal,
+  ShoppingCart,
+  Wrench,
+  Heart,
+  Book,
+  Briefcase,
+  CreditCard,
+  Gift,
+  Home,
+  Package,
+  Truck,
+  Utensils,
+  Wifi,
+  Zap,
+  FileText,
+  FolderOpen,
+  Flower2,
 };
 
 const AVAILABLE_ICONS = Object.keys(ICON_MAP);
@@ -101,6 +117,18 @@ const COLOR_PALETTE = [
   '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EC4899', '#6366F1',
   '#64748B', '#EF4444', '#F97316', '#14B8A6', '#84CC16', '#A855F7',
 ];
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  AT: '🇦🇹',
+  DE: '🇩🇪',
+  CH: '🇨🇭',
+};
+
+const COUNTRY_LABELS: Record<string, string> = {
+  AT: 'Österreich',
+  DE: 'Deutschland',
+  CH: 'Schweiz',
+};
 
 interface Category {
   id: string;
@@ -134,44 +162,53 @@ const DEFAULT_FORM_DATA: CategoryFormData = {
 export function CategoryManagement() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { effectivePlan } = usePlan();
-  const { settings: companySettings } = useCompanySettings();
-  const {
-    bookingTypes,
-    loading: bookingTypesLoading,
-    toggleHidden: toggleBookingTypeHidden,
-    updateBookingKey,
-    addCustomType,
-    removeCustomType,
-  } = useBookingTypes();
-
-  const [personalCategories, setPersonalCategories] = useState<Category[]>([]);
-  const [taxCategories, setTaxCategories] = useState<Category[]>([]);
+  
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
+  const [showTaxCodes, setShowTaxCodes] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<string>('AT');
+  const [togglingTax, setTogglingTax] = useState(false);
+  
   // Modal states
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState<CategoryFormData>(DEFAULT_FORM_DATA);
   const [isNewCategory, setIsNewCategory] = useState(true);
+  
+  // Info dialog for tax categories
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [infoCategory, setInfoCategory] = useState<Category | null>(null);
+
+  // Delete with reassignment
   const [reassignCategory, setReassignCategory] = useState<string>('');
 
-  // Booking type add modal
-  const [addBookingTypeOpen, setAddBookingTypeOpen] = useState(false);
-  const [newBookingTypeName, setNewBookingTypeName] = useState('');
-  const [newBookingTypeKey, setNewBookingTypeKey] = useState('');
-  const [bookingKeySaving, setBookingKeySaving] = useState<string | null>(null);
+  // Load user's country from profile
+  useEffect(() => {
+    const loadUserCountry = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('country')
+        .eq('id', user.id)
+        .single();
+      if (data?.country) {
+        const c = data.country.toUpperCase();
+        if (['AT', 'DE', 'CH'].includes(c)) {
+          setSelectedCountry(c);
+        }
+      }
+    };
+    loadUserCountry();
+  }, [user]);
 
-  const isBusinessPlan = effectivePlan === 'business';
-  const userCountry = companySettings?.country || 'AT';
-
+  // Fetch categories with receipt counts
   const fetchCategories = async () => {
     if (!user) return;
+    
     setLoading(true);
     try {
-      // Fetch ALL categories (personal + system)
       const { data: catData, error: catError } = await supabase
         .from('categories')
         .select('*')
@@ -180,97 +217,198 @@ export function CategoryManagement() {
 
       if (catError) throw catError;
 
-      const { data: countData } = await supabase
+      const { data: countData, error: countError } = await supabase
         .from('receipts')
         .select('category')
         .eq('user_id', user.id);
 
+      if (countError) throw countError;
+
       const counts: Record<string, number> = {};
       countData?.forEach(r => {
-        if (r.category) counts[r.category] = (counts[r.category] || 0) + 1;
+        if (r.category) {
+          counts[r.category] = (counts[r.category] || 0) + 1;
+        }
       });
 
-      const allCategories = (catData || []).map(cat => ({
-        ...cat,
-        is_hidden: cat.is_hidden ?? false,
-        sort_order: cat.sort_order ?? 0,
-        receipt_count: counts[cat.name] || 0,
-        country: (cat as any).country ?? null,
-        tax_code: (cat as any).tax_code ?? null,
-      })) as Category[];
+      const categoriesWithCounts = (catData || [])
+        .filter(cat => {
+          // Only show tax categories from user's country, hide other countries
+          const catCountry = (cat as any).country;
+          if (catCountry && catCountry !== selectedCountry) return false;
+          return true;
+        })
+        .map(cat => ({
+          ...cat,
+          is_hidden: cat.is_hidden ?? false,
+          sort_order: cat.sort_order ?? 0,
+          receipt_count: counts[cat.name] || 0,
+          country: (cat as any).country ?? null,
+          tax_code: (cat as any).tax_code ?? null,
+        })) as Category[];
 
-      // Split: personal = not system, tax = system with country
-      setPersonalCategories(allCategories.filter(c => !c.is_system));
-      setTaxCategories(allCategories.filter(c => c.is_system && c.country));
+      setCategories(categoriesWithCounts);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Fehler beim Laden', description: error instanceof Error ? error.message : 'Unbekannter Fehler' });
+      toast({
+        variant: 'destructive',
+        title: 'Fehler beim Laden',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchCategories(); }, [user]);
+  useEffect(() => {
+    fetchCategories();
+  }, [user, selectedCountry]);
 
-  // Filter tax categories by user country
-  const filteredTaxCategories = taxCategories.filter(c => c.country === userCountry);
+  // Toggle tax categories for selected country
+  const handleToggleTaxCategories = async (show: boolean) => {
+    setTogglingTax(true);
+    try {
+      // Get all tax categories for the selected country
+      const taxCats = categories.filter(c => c.country === selectedCountry && c.is_system);
+      
+      if (taxCats.length === 0) {
+        toast({ title: `Keine Steuer-Kategorien für ${COUNTRY_LABELS[selectedCountry]} gefunden` });
+        return;
+      }
 
-  // Custom booking types from useBookingTypes (non-system ones)
-  const customBookingTypes = bookingTypes.filter(bt => !bt.isSystem);
+      const ids = taxCats.map(c => c.id);
+      const { error } = await supabase
+        .from('categories')
+        .update({ is_hidden: !show })
+        .in('id', ids);
+
+      if (error) throw error;
+
+      toast({
+        title: show
+          ? `${COUNTRY_FLAGS[selectedCountry]} ${taxCats.length} Steuer-Kategorien eingeblendet`
+          : `${COUNTRY_FLAGS[selectedCountry]} ${taxCats.length} Steuer-Kategorien ausgeblendet`,
+      });
+      
+      await fetchCategories();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setTogglingTax(false);
+    }
+  };
 
   const handleNewCategory = () => {
     setIsNewCategory(true);
     setSelectedCategory(null);
-    setFormData({ ...DEFAULT_FORM_DATA, color: COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)] });
+    setFormData({
+      ...DEFAULT_FORM_DATA,
+      color: COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)],
+    });
     setEditModalOpen(true);
   };
 
   const handleEdit = (category: Category) => {
     setIsNewCategory(false);
     setSelectedCategory(category);
-    setFormData({ name: category.name, icon: category.icon || 'FileText', color: category.color || '#3B82F6', is_hidden: category.is_hidden });
+    setFormData({
+      name: category.name,
+      icon: category.icon || 'FileText',
+      color: category.color || '#3B82F6',
+      is_hidden: category.is_hidden,
+    });
     setEditModalOpen(true);
   };
 
   const handleSave = async () => {
     if (!user) return;
+    
     if (formData.name.trim().length < 2) {
-      toast({ variant: 'destructive', title: 'Name zu kurz', description: 'Der Name muss mindestens 2 Zeichen haben.' });
+      toast({
+        variant: 'destructive',
+        title: 'Name zu kurz',
+        description: 'Der Name muss mindestens 2 Zeichen haben.',
+      });
       return;
     }
+
     if (formData.name.length > 50) {
-      toast({ variant: 'destructive', title: 'Name zu lang', description: 'Der Name darf maximal 50 Zeichen haben.' });
+      toast({
+        variant: 'destructive',
+        title: 'Name zu lang',
+        description: 'Der Name darf maximal 50 Zeichen haben.',
+      });
       return;
     }
-    const duplicate = personalCategories.find(c => c.name.toLowerCase() === formData.name.trim().toLowerCase() && c.id !== selectedCategory?.id);
+
+    const duplicate = categories.find(
+      c => c.name.toLowerCase() === formData.name.trim().toLowerCase() && c.id !== selectedCategory?.id
+    );
     if (duplicate) {
-      toast({ variant: 'destructive', title: 'Name bereits vergeben', description: 'Eine Kategorie mit diesem Namen existiert bereits.' });
+      toast({
+        variant: 'destructive',
+        title: 'Name bereits vergeben',
+        description: 'Eine Kategorie mit diesem Namen existiert bereits.',
+      });
       return;
     }
 
     setSaving(true);
     try {
       if (isNewCategory) {
-        const maxSortOrder = Math.max(...personalCategories.map(c => c.sort_order), 0);
-        const { error } = await supabase.from('categories').insert({
-          user_id: user.id, name: formData.name.trim(), icon: formData.icon,
-          color: formData.color, is_system: false, is_hidden: formData.is_hidden, sort_order: maxSortOrder + 1,
-        });
+        const maxSortOrder = Math.max(...categories.map(c => c.sort_order), 0);
+        const { error } = await supabase
+          .from('categories')
+          .insert({
+            user_id: user.id,
+            name: formData.name.trim(),
+            icon: formData.icon,
+            color: formData.color,
+            is_system: false,
+            is_hidden: formData.is_hidden,
+            sort_order: maxSortOrder + 1,
+          });
+
         if (error) throw error;
         toast({ title: 'Kategorie erstellt' });
       } else if (selectedCategory) {
-        const { error } = await supabase.from('categories')
-          .update({ name: formData.name.trim(), icon: formData.icon, color: formData.color, is_hidden: formData.is_hidden })
+        // For system categories, only update icon, color, is_hidden (not name)
+        const updateData = selectedCategory.is_system
+          ? { icon: formData.icon, color: formData.color, is_hidden: formData.is_hidden }
+          : { name: formData.name.trim(), icon: formData.icon, color: formData.color, is_hidden: formData.is_hidden };
+
+        const { error } = await supabase
+          .from('categories')
+          .update(updateData)
           .eq('id', selectedCategory.id);
+
         if (error) throw error;
-        if (selectedCategory.name !== formData.name.trim()) {
-          await supabase.from('receipts').update({ category: formData.name.trim() }).eq('category', selectedCategory.name).eq('user_id', user.id);
+
+        // Rename receipts only for non-system categories
+        if (!selectedCategory.is_system && selectedCategory.name !== formData.name.trim()) {
+          const { error: updateError } = await supabase
+            .from('receipts')
+            .update({ category: formData.name.trim() })
+            .eq('category', selectedCategory.name)
+            .eq('user_id', user.id);
+
+          if (updateError) throw updateError;
         }
+
         toast({ title: 'Kategorie aktualisiert' });
       }
+
       setEditModalOpen(false);
       fetchCategories();
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Fehler beim Speichern', description: error instanceof Error ? error.message : 'Unbekannter Fehler' });
+      toast({
+        variant: 'destructive',
+        title: 'Fehler beim Speichern',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
     } finally {
       setSaving(false);
     }
@@ -284,18 +422,35 @@ export function CategoryManagement() {
 
   const handleDelete = async () => {
     if (!selectedCategory || !user) return;
+
     setSaving(true);
     try {
       if (selectedCategory.receipt_count && selectedCategory.receipt_count > 0 && reassignCategory) {
-        await supabase.from('receipts').update({ category: reassignCategory }).eq('category', selectedCategory.name).eq('user_id', user.id);
+        const { error: reassignError } = await supabase
+          .from('receipts')
+          .update({ category: reassignCategory })
+          .eq('category', selectedCategory.name)
+          .eq('user_id', user.id);
+
+        if (reassignError) throw reassignError;
       }
-      const { error } = await supabase.from('categories').delete().eq('id', selectedCategory.id);
+
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', selectedCategory.id);
+
       if (error) throw error;
+
       toast({ title: 'Kategorie gelöscht' });
       setDeleteDialogOpen(false);
       fetchCategories();
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Fehler beim Löschen', description: error instanceof Error ? error.message : 'Unbekannter Fehler' });
+      toast({
+        variant: 'destructive',
+        title: 'Fehler beim Löschen',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
     } finally {
       setSaving(false);
     }
@@ -303,49 +458,47 @@ export function CategoryManagement() {
 
   const handleToggleVisibility = async (category: Category) => {
     try {
-      const { error } = await supabase.from('categories').update({ is_hidden: !category.is_hidden }).eq('id', category.id);
+      const { error } = await supabase
+        .from('categories')
+        .update({ is_hidden: !category.is_hidden })
+        .eq('id', category.id);
+
       if (error) throw error;
-      // Update local state for both lists
-      const updateList = (list: Category[]) => list.map(c => c.id === category.id ? { ...c, is_hidden: !c.is_hidden } : c);
-      setPersonalCategories(updateList);
-      setTaxCategories(updateList);
-      toast({ title: category.is_hidden ? 'Eingeblendet' : 'Ausgeblendet' });
+
+      setCategories(prev => prev.map(c => 
+        c.id === category.id ? { ...c, is_hidden: !c.is_hidden } : c
+      ));
+
+      toast({
+        title: category.is_hidden ? 'Kategorie eingeblendet' : 'Kategorie ausgeblendet',
+      });
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Fehler', description: error instanceof Error ? error.message : 'Unbekannter Fehler' });
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
     }
   };
+
 
   const renderIcon = (iconName: string | null, color: string | null) => {
     const IconComponent = iconName ? ICON_MAP[iconName] : FileText;
     if (!IconComponent) return <FileText className="h-4 w-4" />;
     return (
-      <div className="h-6 w-6 rounded-full flex items-center justify-center" style={{ backgroundColor: `${color}20` }}>
+      <div 
+        className="h-6 w-6 rounded-full flex items-center justify-center"
+        style={{ backgroundColor: `${color}20` }}
+      >
         <IconComponent className="h-3.5 w-3.5" style={{ color: color || '#64748B' }} />
       </div>
     );
   };
 
-  const handleAddBookingType = async () => {
-    if (!newBookingTypeName.trim()) return;
-    const exists = bookingTypes.some(bt => bt.name.toLowerCase() === newBookingTypeName.trim().toLowerCase());
-    if (exists) {
-      toast({ variant: 'destructive', title: 'Name bereits vergeben' });
-      return;
-    }
-    const success = await addCustomType(newBookingTypeName.trim(), newBookingTypeKey.trim());
-    if (success) {
-      toast({ title: 'Buchungsart hinzugefügt' });
-      setAddBookingTypeOpen(false);
-      setNewBookingTypeName('');
-      setNewBookingTypeKey('');
-    }
-  };
-
-  const handleBookingKeyChange = async (name: string, key: string) => {
-    setBookingKeySaving(name);
-    await updateBookingKey(name, key);
-    setBookingKeySaving(null);
-  };
+  // Count how many tax categories for selected country are currently visible
+  const taxCatsForCountry = categories.filter(c => c.country === selectedCountry && c.is_system);
+  const visibleTaxCats = taxCatsForCountry.filter(c => !c.is_hidden);
+  const allTaxVisible = taxCatsForCountry.length > 0 && visibleTaxCats.length === taxCatsForCountry.length;
 
   if (loading) {
     return (
@@ -357,11 +510,11 @@ export function CategoryManagement() {
 
   return (
     <div className="space-y-4">
-      {/* ===== SECTION 1: Meine Kategorien ===== */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Meine Kategorien</h3>
-          <p className="text-sm text-muted-foreground">Deine persönlichen Kategorien zur Organisation deiner Belege.</p>
+          <h3 className="text-lg font-semibold">Ausgaben-Kategorien</h3>
+          <p className="text-sm text-muted-foreground">Verwalte die Kategorien für deine Belege</p>
         </div>
         <Button onClick={handleNewCategory}>
           <Plus className="h-4 w-4 mr-2" />
@@ -369,45 +522,181 @@ export function CategoryManagement() {
         </Button>
       </div>
 
+      {/* Tax categories control */}
+      <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
+        <div className="flex items-center gap-2">
+          <Globe className="h-4 w-4 text-muted-foreground" />
+          <h4 className="font-medium text-sm">Steuerliche Kategorien</h4>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-sm">
+            <span>{COUNTRY_FLAGS[selectedCountry]}</span>
+            <span className="font-medium">{COUNTRY_LABELS[selectedCountry]}</span>
+            <span className="text-muted-foreground text-xs">(aus deinem Profil)</span>
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleToggleTaxCategories(!allTaxVisible)}
+            disabled={togglingTax}
+          >
+            {togglingTax && <Loader2 className="h-3 w-3 mr-2 animate-spin" />}
+            {allTaxVisible ? (
+              <>
+                <EyeOff className="h-3.5 w-3.5 mr-1.5" />
+                Steuer-Kategorien ausblenden
+              </>
+            ) : (
+              <>
+                <Eye className="h-3.5 w-3.5 mr-1.5" />
+                Steuer-Kategorien einblenden
+              </>
+            )}
+          </Button>
+
+          <div className="flex items-center gap-2 ml-auto">
+            <Label htmlFor="show-tax-codes" className="text-xs text-muted-foreground cursor-pointer">
+              Steuernummern anzeigen
+            </Label>
+            <Switch
+              id="show-tax-codes"
+              checked={showTaxCodes}
+              onCheckedChange={setShowTaxCodes}
+            />
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          {visibleTaxCats.length} von {taxCatsForCountry.length} {COUNTRY_LABELS[selectedCountry]}-Kategorien aktiv
+        </p>
+      </div>
+
+      {/* Table */}
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-12"></TableHead>
               <TableHead>Name</TableHead>
+              {showTaxCodes && <TableHead>Steuernr.</TableHead>}
+              <TableHead>Typ</TableHead>
               <TableHead className="text-right">Belege</TableHead>
               <TableHead className="text-right">Aktionen</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {personalCategories.length === 0 ? (
+            {categories.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                  Keine eigenen Kategorien vorhanden. Erstelle deine erste Kategorie.
+                <TableCell colSpan={showTaxCodes ? 6 : 5} className="text-center py-8 text-muted-foreground">
+                  Keine Kategorien vorhanden
                 </TableCell>
               </TableRow>
             ) : (
-              personalCategories.map((category) => (
-                <TableRow key={category.id} className={cn(category.is_hidden && 'opacity-50')}>
-                  <TableCell>{renderIcon(category.icon, category.color)}</TableCell>
+              categories.map((category) => (
+                <TableRow 
+                  key={category.id}
+                  className={cn(category.is_hidden && 'opacity-50')}
+                >
+                  <TableCell>
+                    {renderIcon(category.icon, category.color)}
+                  </TableCell>
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       {category.name}
-                      {category.is_hidden && <Badge variant="outline" className="text-xs">Ausgeblendet</Badge>}
+                      {category.country && (
+                        <span className="text-xs" title={COUNTRY_LABELS[category.country]}>
+                          {COUNTRY_FLAGS[category.country]}
+                        </span>
+                      )}
+                      {category.is_system && category.country && TAX_CATEGORY_INFO[category.name] && (
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex items-center justify-center h-5 w-5 rounded-full hover:bg-muted transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInfoCategory(category);
+                                  setInfoDialogOpen(true);
+                                }}
+                              >
+                                <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs">
+                              <p className="text-xs">{TAX_CATEGORY_INFO[category.name].short}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      {category.is_hidden && (
+                        <Badge variant="outline" className="text-xs">Ausgeblendet</Badge>
+                      )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">{category.receipt_count || 0}</TableCell>
+                  {showTaxCodes && (
+                    <TableCell>
+                      {category.tax_code ? (
+                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">
+                          {category.tax_code}
+                        </code>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  )}
+                  <TableCell>
+                    <Badge variant={category.is_system ? 'secondary' : 'outline'}>
+                      {category.is_system ? 'Steuer' : 'Eigene'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {category.receipt_count || 0} Belege
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleToggleVisibility(category)}>
-                        {category.is_hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(category)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClick(category)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {category.name === 'Keine Rechnung' ? (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">
+                          Geschützt
+                        </Badge>
+                      ) : (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleToggleVisibility(category)}
+                            title={category.is_hidden ? 'Einblenden' : 'Ausblenden'}
+                          >
+                            {category.is_hidden ? (
+                              <Eye className="h-4 w-4" />
+                            ) : (
+                              <EyeOff className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleEdit(category)}
+                            title="Bearbeiten"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleDeleteClick(category)}
+                            title="Löschen"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -417,232 +706,128 @@ export function CategoryManagement() {
         </Table>
       </div>
 
-      {/* ===== SEPARATOR ===== */}
-      <Separator className="my-8" />
 
-      {/* ===== SECTION 2: Buchungsarten (Steuerkategorien) ===== */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Buchungsarten</h3>
-          <p className="text-sm text-muted-foreground">
-            Steuerliche Einordnung deiner Belege. Wird in Exporten und für den Steuerberater verwendet.
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => setAddBookingTypeOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Buchungsart hinzufügen
-        </Button>
-      </div>
-
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12"></TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Steuercode</TableHead>
-              {isBusinessPlan && <TableHead>Buchungsschlüssel</TableHead>}
-              <TableHead className="text-right">Aktionen</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {/* System tax categories from DB */}
-            {filteredTaxCategories.map((cat) => {
-              const info = TAX_CATEGORY_INFO[cat.name];
-              // Get booking key from useBookingTypes if available
-              const matchingBt = bookingTypes.find(bt => bt.name === cat.name);
-              return (
-                <TableRow key={cat.id} className={cn(cat.is_hidden && 'opacity-50')}>
-                  <TableCell>{renderIcon(cat.icon, cat.color)}</TableCell>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-1.5">
-                      {cat.name}
-                      {cat.is_hidden && <Badge variant="outline" className="text-xs">Ausgeblendet</Badge>}
-                      {info && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
-                                <Info className="h-3.5 w-3.5 text-muted-foreground" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="max-w-xs">
-                              <p className="font-medium text-sm">{info.short}</p>
-                              <p className="text-xs text-muted-foreground mt-1">{info.law}</p>
-                              {info.deductibility && (
-                                <p className="text-xs mt-1">
-                                  <span className="font-medium">Absetzbarkeit:</span> {info.deductibility}
-                                </p>
-                              )}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {cat.tax_code && (
-                      <Badge variant="secondary" className="font-mono text-xs">
-                        {cat.tax_code}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  {isBusinessPlan && (
-                    <TableCell>
-                      <Input
-                        value={matchingBt?.bookingKey || ''}
-                        onChange={(e) => handleBookingKeyChange(cat.name, e.target.value)}
-                        placeholder="z.B. 4400"
-                        className="h-8 w-32 font-mono text-sm"
-                        disabled={bookingKeySaving === cat.name}
-                      />
-                    </TableCell>
-                  )}
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleToggleVisibility(cat)}
-                      title={cat.is_hidden ? 'Einblenden' : 'Ausblenden'}>
-                      {cat.is_hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-
-            {/* Custom booking types from useBookingTypes */}
-            {customBookingTypes.map((bt) => (
-              <TableRow key={bt.name} className={cn(bt.isHidden && 'opacity-50')}>
-                <TableCell>
-                  <div className="h-6 w-6 rounded-full flex items-center justify-center bg-muted">
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                  </div>
-                </TableCell>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-1.5">
-                    {bt.label}
-                    {bt.isHidden && <Badge variant="outline" className="text-xs">Ausgeblendet</Badge>}
-                    <Badge variant="outline" className="text-xs">Eigene</Badge>
-                  </div>
-                </TableCell>
-                <TableCell></TableCell>
-                {isBusinessPlan && (
-                  <TableCell>
-                    <Input
-                      value={bt.bookingKey}
-                      onChange={(e) => handleBookingKeyChange(bt.name, e.target.value)}
-                      placeholder="z.B. 4400"
-                      className="h-8 w-32 font-mono text-sm"
-                      disabled={bookingKeySaving === bt.name}
-                    />
-                  </TableCell>
-                )}
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleBookingTypeHidden(bt.name)}
-                      title={bt.isHidden ? 'Einblenden' : 'Ausblenden'}>
-                      {bt.isHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => removeCustomType(bt.name)} title="Löschen">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-
-            {filteredTaxCategories.length === 0 && customBookingTypes.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={isBusinessPlan ? 5 : 4} className="text-center py-8 text-muted-foreground">
-                  Keine Buchungsarten für dein Land ({userCountry}) vorhanden.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* ===== MODALS ===== */}
-
-      {/* Add Booking Type Modal */}
-      <Dialog open={addBookingTypeOpen} onOpenChange={setAddBookingTypeOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Neue Buchungsart</DialogTitle>
-            <DialogDescription>Füge eine eigene Buchungsart für deine steuerliche Einordnung hinzu.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input value={newBookingTypeName} onChange={(e) => setNewBookingTypeName(e.target.value)} placeholder="z.B. Privatentnahme" maxLength={50} />
-            </div>
-            {isBusinessPlan && (
-              <div className="space-y-2">
-                <Label>Buchungsschlüssel (optional)</Label>
-                <Input value={newBookingTypeKey} onChange={(e) => setNewBookingTypeKey(e.target.value)} placeholder="z.B. 1800" className="font-mono" maxLength={20} />
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setAddBookingTypeOpen(false)}>Abbrechen</Button>
-            <Button onClick={handleAddBookingType} disabled={!newBookingTypeName.trim()}>Hinzufügen</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit/Create Category Modal */}
+      {/* Edit/Create Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{isNewCategory ? 'Neue Kategorie erstellen' : 'Kategorie bearbeiten'}</DialogTitle>
+            <DialogTitle>
+              {isNewCategory ? 'Neue Kategorie erstellen' : 'Kategorie bearbeiten'}
+            </DialogTitle>
             <DialogDescription>
-              {isNewCategory ? 'Erstelle eine neue Kategorie für deine Belege.' : 'Bearbeite die Kategorie-Einstellungen.'}
+              {isNewCategory 
+                ? 'Erstelle eine neue Kategorie für deine Belege.'
+                : 'Bearbeite die Kategorie-Einstellungen.'
+              }
             </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4">
+            {/* Name */}
             <div className="space-y-2">
               <Label htmlFor="cat-name">Name</Label>
-              <Input id="cat-name" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="z.B. Fortbildung" maxLength={50} />
-              <p className="text-xs text-muted-foreground">{formData.name.length}/50 Zeichen</p>
+              <Input
+                id="cat-name"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="z.B. Fortbildung"
+                maxLength={50}
+                disabled={!isNewCategory && selectedCategory?.is_system}
+              />
+              {!isNewCategory && selectedCategory?.is_system ? (
+                <p className="text-xs text-muted-foreground">
+                  Steuer-Kategorien können nicht umbenannt werden
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {formData.name.length}/50 Zeichen
+                </p>
+              )}
             </div>
+
+            {/* Color */}
             <div className="space-y-2">
               <Label>Farbe</Label>
               <div className="flex flex-wrap gap-2">
                 {COLOR_PALETTE.map((color) => (
-                  <button key={color} type="button"
-                    className={cn("h-8 w-8 rounded-full border-2 transition-all", formData.color === color ? "border-foreground scale-110" : "border-transparent")}
-                    style={{ backgroundColor: color }} onClick={() => setFormData(prev => ({ ...prev, color }))} />
+                  <button
+                    key={color}
+                    type="button"
+                    className={cn(
+                      "h-8 w-8 rounded-full border-2 transition-all",
+                      formData.color === color ? "border-foreground scale-110" : "border-transparent"
+                    )}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setFormData(prev => ({ ...prev, color }))}
+                  />
                 ))}
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <Label htmlFor="custom-color" className="text-xs">Custom:</Label>
-                <Input id="custom-color" type="color" value={formData.color} onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))} className="w-12 h-8 p-1 cursor-pointer" />
-                <Input value={formData.color} onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))} placeholder="#3B82F6" className="w-24 font-mono text-sm" maxLength={7} />
+                <Input
+                  id="custom-color"
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+                  className="w-12 h-8 p-1 cursor-pointer"
+                />
+                <Input
+                  value={formData.color}
+                  onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+                  placeholder="#3B82F6"
+                  className="w-24 font-mono text-sm"
+                  maxLength={7}
+                />
               </div>
             </div>
+
+            {/* Icon */}
             <div className="space-y-2">
               <Label>Icon</Label>
               <div className="grid grid-cols-8 gap-2 max-h-[160px] overflow-y-auto p-1">
                 {AVAILABLE_ICONS.map((iconName) => {
                   const IconComponent = ICON_MAP[iconName];
                   return (
-                    <button key={iconName} type="button"
-                      className={cn("h-9 w-9 rounded-lg border flex items-center justify-center transition-all", formData.icon === iconName ? "border-primary bg-primary/10" : "border-border hover:bg-muted")}
-                      onClick={() => setFormData(prev => ({ ...prev, icon: iconName }))} title={iconName}>
+                    <button
+                      key={iconName}
+                      type="button"
+                      className={cn(
+                        "h-9 w-9 rounded-lg border flex items-center justify-center transition-all",
+                        formData.icon === iconName 
+                          ? "border-primary bg-primary/10" 
+                          : "border-border hover:bg-muted"
+                      )}
+                      onClick={() => setFormData(prev => ({ ...prev, icon: iconName }))}
+                      title={iconName}
+                    >
                       <IconComponent className="h-4 w-4" />
                     </button>
                   );
                 })}
               </div>
             </div>
+
+            {/* Hidden checkbox (only for existing categories) */}
             {!isNewCategory && (
               <div className="flex items-center space-x-2">
-                <Checkbox id="is-hidden" checked={formData.is_hidden} onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_hidden: checked as boolean }))} />
-                <Label htmlFor="is-hidden" className="text-sm">Diese Kategorie ausblenden</Label>
+                <Checkbox
+                  id="is-hidden"
+                  checked={formData.is_hidden}
+                  onCheckedChange={(checked) => 
+                    setFormData(prev => ({ ...prev, is_hidden: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="is-hidden" className="text-sm">
+                  Diese Kategorie ausblenden
+                </Label>
               </div>
             )}
           </div>
+
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditModalOpen(false)}>Abbrechen</Button>
+            <Button variant="ghost" onClick={() => setEditModalOpen(false)}>
+              Abbrechen
+            </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {isNewCategory ? 'Erstellen' : 'Speichern'}
@@ -658,25 +843,36 @@ export function CategoryManagement() {
             <AlertDialogTitle>
               {selectedCategory?.receipt_count && selectedCategory.receipt_count > 0
                 ? `Kategorie "${selectedCategory?.name}" wird verwendet`
-                : `Kategorie "${selectedCategory?.name}" löschen?`}
+                : `Kategorie "${selectedCategory?.name}" löschen?`
+              }
             </AlertDialogTitle>
             <AlertDialogDescription>
               {selectedCategory?.receipt_count && selectedCategory.receipt_count > 0 ? (
                 <div className="space-y-3">
-                  <p>Diese Kategorie wird von <strong>{selectedCategory.receipt_count} Beleg(en)</strong> verwendet.</p>
+                  <p>
+                    Diese Kategorie wird von <strong>{selectedCategory.receipt_count} Beleg(en)</strong> verwendet.
+                  </p>
                   <div className="space-y-2">
                     <Label>Belege verschieben zu:</Label>
                     <Select value={reassignCategory} onValueChange={setReassignCategory}>
-                      <SelectTrigger><SelectValue placeholder="Ziel-Kategorie wählen" /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Ziel-Kategorie wählen" />
+                      </SelectTrigger>
                       <SelectContent>
-                        {personalCategories.filter(c => c.id !== selectedCategory.id).map((c) => (
-                          <SelectItem key={c.id} value={c.name}>
-                            <span className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color || '#64748B' }} />
-                              {c.name}
-                            </span>
-                          </SelectItem>
-                        ))}
+                        {categories
+                          .filter(c => c.id !== selectedCategory.id)
+                          .map((c) => (
+                            <SelectItem key={c.id} value={c.name}>
+                              <span className="flex items-center gap-2">
+                                <span 
+                                  className="w-2 h-2 rounded-full"
+                                  style={{ backgroundColor: c.color || '#64748B' }}
+                                />
+                                {c.name}
+                              </span>
+                            </SelectItem>
+                          ))
+                        }
                       </SelectContent>
                     </Select>
                   </div>
@@ -688,14 +884,75 @@ export function CategoryManagement() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90"
-              disabled={saving || (selectedCategory?.receipt_count && selectedCategory.receipt_count > 0 && !reassignCategory)}>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={
+                saving || 
+                (selectedCategory?.receipt_count && selectedCategory.receipt_count > 0 && !reassignCategory)
+              }
+            >
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {selectedCategory?.receipt_count && selectedCategory.receipt_count > 0 ? 'Verschieben & Löschen' : 'Löschen'}
+              {selectedCategory?.receipt_count && selectedCategory.receipt_count > 0 
+                ? 'Verschieben & Löschen' 
+                : 'Löschen'
+              }
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Tax Category Info Dialog */}
+      <Dialog open={infoDialogOpen} onOpenChange={setInfoDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {infoCategory?.country && (
+                <span>{COUNTRY_FLAGS[infoCategory.country]}</span>
+              )}
+              {infoCategory?.name}
+            </DialogTitle>
+            {infoCategory?.tax_code && (
+              <div className="pt-1">
+                <code className="text-xs bg-muted px-2 py-1 rounded font-mono text-muted-foreground">
+                  {infoCategory.tax_code}
+                </code>
+              </div>
+            )}
+          </DialogHeader>
+
+          {infoCategory && TAX_CATEGORY_INFO[infoCategory.name] && (() => {
+            const info = TAX_CATEGORY_INFO[infoCategory.name];
+            return (
+              <div className="space-y-4 text-sm">
+                <p className="text-muted-foreground">{info.long}</p>
+
+                <div>
+                  <h4 className="font-medium mb-1.5">Was gehört hierher?</h4>
+                  <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                    {info.examples.map((ex, i) => (
+                      <li key={i}>{ex}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-1 border-t">
+                  <div className="flex items-start gap-2">
+                    <span className="font-medium shrink-0">Gesetzliche Grundlage:</span>
+                    <span className="text-muted-foreground">{info.law}</span>
+                  </div>
+                  {info.deductibility && (
+                    <div className="flex items-start gap-2">
+                      <span className="font-medium shrink-0">Absetzbarkeit:</span>
+                      <Badge variant="secondary" className="text-xs">{info.deductibility}</Badge>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
