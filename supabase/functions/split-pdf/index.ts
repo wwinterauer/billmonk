@@ -33,31 +33,41 @@ serve(async (req) => {
     // Auth prüfen
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      throw new Error("Nicht authentifiziert");
+      return new Response(JSON.stringify({ error: "Nicht authentifiziert" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
     if (authError || !user) {
-      throw new Error("Ungültiger Token");
+      return new Response(JSON.stringify({ error: "Ungültiger Token" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const { receiptId, splits }: SplitRequest = await req.json();
 
     // Validierung
     if (!receiptId) {
-      throw new Error("receiptId ist erforderlich");
+      return new Response(JSON.stringify({ error: "receiptId ist erforderlich" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (!splits || !Array.isArray(splits) || splits.length < 2) {
-      throw new Error("Mindestens 2 Splits erforderlich");
+      return new Response(JSON.stringify({ error: "Mindestens 2 Splits erforderlich" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Prüfe ob alle Splits Seiten haben
     const validSplits = splits.filter(s => s.pages && s.pages.length > 0);
     if (validSplits.length < 2) {
-      throw new Error("Mindestens 2 Splits mit Seiten erforderlich");
+      return new Response(JSON.stringify({ error: "Mindestens 2 Splits mit Seiten erforderlich" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     console.log(`Splitting PDF ${receiptId} into ${validSplits.length} parts`);
