@@ -612,7 +612,6 @@ VAT-KONFIDENZ:
 
 BETRÄGE: Dezimalzahlen ohne Währungssymbol. 0 wenn nicht erkennbar. Datum: YYYY-MM-DD oder "".
 receipt_number: Rechnungsnummer suchen (RE-Nr, Invoice, Belegnummer etc.) oder "".
-receipt_number: Rechnungsnummer suchen (RE-Nr, Invoice, Belegnummer etc.) oder "".
 
 LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenzeilen.${expensesOnlyPrompt}${extractionHintPrompt}`;
 
