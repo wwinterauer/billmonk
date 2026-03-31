@@ -521,6 +521,41 @@ const Expenses = () => {
         }
       }
 
+      // Re-validate existing duplicates — check if originals still exist
+      const { data: existingDuplicates } = await supabase
+        .from('receipts')
+        .select('id, duplicate_of')
+        .eq('user_id', user.id)
+        .eq('is_duplicate', true);
+
+      if (existingDuplicates) {
+        for (const dup of existingDuplicates) {
+          if (!dup.duplicate_of) {
+            await supabase.from('receipts').update({
+              is_duplicate: false,
+              duplicate_of: null,
+              duplicate_score: null,
+              duplicate_checked_at: new Date().toISOString()
+            }).eq('id', dup.id);
+            continue;
+          }
+          const { data: original } = await supabase
+            .from('receipts')
+            .select('id, status')
+            .eq('id', dup.duplicate_of)
+            .single();
+
+          if (!original || original.status === 'rejected') {
+            await supabase.from('receipts').update({
+              is_duplicate: false,
+              duplicate_of: null,
+              duplicate_score: null,
+              duplicate_checked_at: new Date().toISOString()
+            }).eq('id', dup.id);
+          }
+        }
+      }
+
       setFoundDuplicates(duplicatesFound);
 
       if (duplicatesFound.length > 0) {
