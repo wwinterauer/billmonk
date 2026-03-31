@@ -792,6 +792,7 @@ export function ReceiptDetailPanel({
         is_mixed_tax_rate: isMixedTaxRate,
         tax_rate_details: isMixedTaxRate ? taxRateDetails : null,
         payment_method: paymentMethod || null,
+        tax_type: taxType || null,
         notes: notes || null,
         user_modified_fields: Array.from(modifiedFields),
       };
