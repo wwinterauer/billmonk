@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
               notes: rec.notes,
               footer_text: rec.footer_text,
               recurring_invoice_id: rec.id,
-              sent_at: rec.auto_send ? new Date().toISOString() : null,
+              sent_at: null,
             })
             .select()
             .single();
