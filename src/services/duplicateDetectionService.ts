@@ -131,15 +131,15 @@ export async function checkForDuplicates(
       const dateTo = new Date(date);
       dateTo.setDate(date.getDate() + 3);
 
-      const vendorPrefix = receiptData.vendor.substring(0, 10);
-      const { data: nearMatch } = await supabase
+      let nearQuery = supabase
         .from('receipts')
         .select('id, vendor, amount_gross, receipt_date, status')
         .eq('user_id', userId)
         .eq('amount_gross', receiptData.amount_gross)
         .gte('receipt_date', dateFrom.toISOString().split('T')[0])
-        .lte('receipt_date', dateTo.toISOString().split('T')[0])
-        .ilike('vendor', `%${vendorPrefix}%`)
+        .lte('receipt_date', dateTo.toISOString().split('T')[0]);
+      nearQuery = applyVendorFilter(nearQuery, receiptData.vendor);
+      const { data: nearMatch } = await nearQuery
         .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
