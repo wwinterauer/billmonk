@@ -134,50 +134,16 @@ Deno.serve(async (req) => {
               .eq("id", settings.id);
           }
 
-          // Auto-send email if enabled
-          if (rec.auto_send && rec.customers?.email) {
-            try {
-              // Generate PDF first
-              const pdfRes = await supabase.functions.invoke("generate-invoice-pdf", {
-                body: { invoiceId: newInvoice.id },
-              });
-
-              if (pdfRes.error) {
-                console.error(`PDF generation failed for ${newInvoice.id}:`, pdfRes.error);
-              } else {
-                // Find user's email account
-                const { data: emailAccounts } = await supabase
-                  .from("email_accounts")
-                  .select("id")
-                  .eq("user_id", rec.user_id)
-                  .eq("is_active", true)
-                  .limit(1);
-
-                if (emailAccounts && emailAccounts.length > 0) {
-                  const sendRes = await supabase.functions.invoke("send-document-email", {
-                    body: {
-                      invoiceId: newInvoice.id,
-                      recipientEmail: rec.customers.email,
-                      emailAccountId: emailAccounts[0].id,
-                      subject: `Rechnung ${invoiceNumber}`,
-                      body: `Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie die Rechnung ${invoiceNumber}.\n\nMit freundlichen Grüßen`,
-                      sendCopyToSelf: settings?.send_copy_to_self ?? true,
-                    },
-                  });
-
-                  if (sendRes.error) {
-                    console.error(`Email send failed for ${newInvoice.id}:`, sendRes.error);
-                  } else {
-                    emailsSent++;
-                    console.log(`Email sent for invoice ${invoiceNumber} to ${rec.customers.email}`);
-                  }
-                } else {
-                  console.log(`No active email account for user ${rec.user_id}, skipping email send`);
-                }
-              }
-            } catch (emailErr) {
-              console.error(`Email process error for ${newInvoice.id}:`, emailErr);
+          // Generate PDF for preview (but don't send email)
+          try {
+            const pdfRes = await supabase.functions.invoke("generate-invoice-pdf", {
+              body: { invoiceId: newInvoice.id },
+            });
+            if (pdfRes.error) {
+              console.error(`PDF generation failed for ${newInvoice.id}:`, pdfRes.error);
             }
+          } catch (pdfErr) {
+            console.error(`PDF process error for ${newInvoice.id}:`, pdfErr);
           }
 
           // Calculate next invoice date
