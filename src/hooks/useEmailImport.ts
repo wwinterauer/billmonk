@@ -274,7 +274,7 @@ export const useEmailImport = () => {
     mutationFn: async () => {
       if (!emailConnection?.id || !user?.id) throw new Error('Keine Verbindung vorhanden');
 
-      const newToken = generateToken();
+      const newToken = generateUserToken(user);
       const newEmail = `receipts+${newToken}@import.billmonk.ai`;
 
       const { error } = await supabase
