@@ -110,7 +110,7 @@ import { Copy, Scissors, Layers, Zap } from 'lucide-react';
 import { checkForDuplicates, type DuplicateCheckResult } from '@/services/duplicateDetectionService';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { extractReceiptData, normalizeExtractionResult } from '@/services/aiService';
+import { useAuth } from '@/contexts/AuthContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { SplitSuggestionDialog } from '@/components/receipts/SplitSuggestionDialog';
 import { SourceBadge, NoReceiptBadge } from '@/components/receipts/SourceBadge';
