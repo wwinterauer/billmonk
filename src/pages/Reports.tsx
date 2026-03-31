@@ -91,6 +91,7 @@ import { TaxExportDialog } from '@/components/exports/TaxExportDialog';
 const Reports = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { categories: allCategories } = useCategories();
   const { effectivePlan, splitBookingEnabled } = usePlan();
   const showIncome = isPlanSufficient(effectivePlan, 'business');
   
