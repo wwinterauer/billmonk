@@ -263,60 +263,38 @@ export function useCorrectionTracking() {
               .eq('id', vendorId);
           }
 
-          // Extract keywords from description for product-level learning
-          // Get the receipt's description
+          // Extract keywords from description + line items for product-level learning
           if (receiptId) {
-            const { data: receiptData } = await supabase
-              .from('receipts')
-              .select('description')
-              .eq('id', receiptId)
-              .single();
-            
-            if (receiptData?.description) {
-              const stopWords = new Set([
-                'und', 'oder', 'der', 'die', 'das', 'ein', 'eine', 'für', 'mit', 'von',
-                'auf', 'aus', 'bei', 'nach', 'über', 'unter', 'vor', 'zum', 'zur',
-                'inkl', 'zzgl', 'netto', 'brutto', 'stück', 'stk', 'paket',
-                'rechnung', 'beleg', 'quittung', 'datum', 'summe', 'gesamt',
-              ]);
+            const keywords = await extractReceiptKeywords(receiptId);
               
-              const keywords = receiptData.description
-                .toLowerCase()
-                .replace(/[^a-zäöüß\s-]/g, ' ')
-                .split(/\s+/)
-                .filter(w => w.length >= 4 && !stopWords.has(w))
-                .filter((w, i, arr) => arr.indexOf(w) === i) // unique
-                .slice(0, 5); // max 5 keywords per correction
+            for (const keyword of keywords) {
+              // Upsert: if keyword exists, update category_name and increment match_count
+              const { data: existing } = await supabase
+                .from('category_rules')
+                .select('id, match_count')
+                .eq('user_id', user.id)
+                .eq('keyword', keyword)
+                .maybeSingle();
               
-              for (const keyword of keywords) {
-                // Upsert: if keyword exists, update category_name and increment match_count
-                const { data: existing } = await supabase
+              if (existing) {
+                await supabase
                   .from('category_rules')
-                  .select('id, match_count')
-                  .eq('user_id', user.id)
-                  .eq('keyword', keyword)
-                  .maybeSingle();
-                
-                if (existing) {
-                  await supabase
-                    .from('category_rules')
-                    .update({
-                      category_name: String(correctedValue),
-                      match_count: (existing.match_count || 1) + 1,
-                      updated_at: new Date().toISOString(),
-                    })
-                    .eq('id', existing.id);
-                } else {
-                  await supabase
-                    .from('category_rules')
-                    .insert({
-                      user_id: user.id,
-                      keyword,
-                      category_name: String(correctedValue),
-                      match_count: 1,
-                      source: 'correction',
-                    });
-                }
+                  .update({
+                    category_name: String(correctedValue),
+                    match_count: (existing.match_count || 1) + 1,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', existing.id);
+              } else {
+                await supabase
+                  .from('category_rules')
+                  .insert({
+                    user_id: user.id,
+                    keyword,
+                    category_name: String(correctedValue),
+                    match_count: 1,
+                    source: 'correction',
+                  });
               }
             }
           }

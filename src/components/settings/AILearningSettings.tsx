@@ -94,6 +94,8 @@ interface CategoryRule {
   keyword: string;
   category_name: string;
   match_count: number | null;
+  tax_type_name: string | null;
+  tax_type_match_count: number | null;
   updated_at: string | null;
 }
 
