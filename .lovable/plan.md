@@ -1,49 +1,50 @@
 
 
-# Manuelle Abfrage bis Datum X für E-Mail-Sync
+# Import-Adresse benutzerfreundlicher gestalten
 
-## Übersicht
+## Problem
 
-Der User möchte bei einem E-Mail-Konto (IMAP/Gmail/Microsoft) eine einmalige manuelle Abfrage starten, die alle E-Mails bis zu einem frei wählbaren Datum durchsucht. Duplikate werden über den bestehenden `file_hash`-Mechanismus automatisch übersprungen.
+Aktuell: `receipts+a8k3x9m2p7...@import.billmonk.ai` (32 Zeichen Zufallsstring) — nicht merkbar.
+
+## Lösung
+
+Format ändern zu: `receipts+vorname.nachname.XXXX@import.billmonk.ai`
+
+- Vorname + Nachname aus dem Profil (lowercase, Umlaute/Sonderzeichen bereinigt)
+- 4 Zeichen Zufalls-Suffix für Eindeutigkeit und Sicherheit
+- Beispiel: `receipts+max.mustermann.a7k2@import.billmonk.ai`
+- Falls kein Name vorhanden: Fallback auf Email-Prefix (vor dem @)
+
+Der Token bleibt intern weiterhin der komplette Teil nach `receipts+` (z.B. `max.mustermann.a7k2`) — die Webhook-Funktion matcht darüber.
+
+## Sicherheitsaspekt
+
+Der Token wird kürzer, aber:
+- Die Webhook-Funktion validiert den Token gegen die DB
+- Rate-Limiting ist bereits implementiert
+- 4 Zeichen Suffix = 1.679.616 Kombinationen — ausreichend da kein Login-Mechanismus
 
 ## Änderungen
 
-### 1. Edge Functions: `syncSince`-Parameter akzeptieren
+### `src/hooks/useEmailImport.ts`
 
-**`supabase/functions/sync-imap-emails/index.ts`**
-- Body-Parameter `syncSince` (ISO-Datum-String) akzeptieren neben `accountId` und `resync`
-- In `processEmails`: Wenn `syncSince` gesetzt, IMAP-Suchkriterium `SINCE {datum}` verwenden (statt 7-Tage-Resync oder UNSEEN)
-- Mehr Nachrichten verarbeiten: `maxToProcess = 100` bei `syncSince`
-- Duplikate werden bereits über `file_hash` in der Import-Pipeline gefiltert
+**generateToken** aufteilen in zwei Funktionen:
 
-**`supabase/functions/sync-gmail/index.ts`**
-- Body-Parameter `syncSince` akzeptieren
-- In `buildGmailQuery`: Wenn `syncSince` gesetzt, `after:{datum}` verwenden statt `last_sync_at`
-- Mehr Messages fetchen: `maxResults=100`
+1. `generateShortSuffix()` — 4 Zeichen alphanumerisch
+2. `generateUserToken(user)` — baut `vorname.nachname.XXXX` zusammen:
+   - `user.user_metadata.first_name` + `user.user_metadata.last_name` holen
+   - Lowercase, Umlaute ersetzen (ä→ae, ö→oe, ü→ue, ß→ss), Sonderzeichen entfernen
+   - Fallback: Email-Prefix vor `@`
+   - Zusammen: `${sanitized_first}.${sanitized_last}.${suffix}`
 
-**`supabase/functions/sync-microsoft/index.ts`**
-- Body-Parameter `syncSince` akzeptieren
-- In `buildGraphFilter`: Wenn `syncSince` gesetzt, `receivedDateTime` Filter auf das Datum setzen
+**createConnectionMutation** (Zeile 185): `generateToken()` → `generateUserToken(user)`
 
-### 2. `src/hooks/useEmailImport.ts`
+**regenerateTokenMutation** (Zeile 239): Gleiche Änderung — beim Regenerieren wird ein neuer Suffix generiert, aber der Name bleibt
 
-- `syncEmailAccount` Mutation: `syncSince?: string` Parameter zum Body hinzufügen
-- An Edge Function weitreichen: `body: { accountId, resync, syncSince }`
+### Bestehende Verbindungen
 
-### 3. `src/components/settings/EmailImportSettings.tsx`
-
-- Pro Account-Karte: Neben "Sync" und "Resync" einen dritten Button "Historisch abrufen" (Calendar-Icon)
-- Klick öffnet ein Popover mit:
-  - Text: "Alle E-Mails seit einem bestimmten Datum durchsuchen. Bereits importierte Belege werden übersprungen."
-  - Datepicker (Calendar-Komponente) für das Start-Datum
-  - "Abrufen"-Button
-- Bei Klick auf "Abrufen": `syncEmailAccount({ accountId, syncSince: date.toISOString() })` aufrufen
-- Popover schließt sich, normaler Sync-Status wird angezeigt
+Bestehende Adressen bleiben unverändert — nur neue Verbindungen und Regenerierungen verwenden das neue Format.
 
 ### Dateien
-- `supabase/functions/sync-imap-emails/index.ts`
-- `supabase/functions/sync-gmail/index.ts`
-- `supabase/functions/sync-microsoft/index.ts`
 - `src/hooks/useEmailImport.ts`
-- `src/components/settings/EmailImportSettings.tsx`
 
