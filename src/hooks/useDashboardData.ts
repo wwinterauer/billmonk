@@ -51,6 +51,7 @@ interface RecentReceipt {
 
 export function useDashboardData(year: number, month: number) {
   const { user } = useAuth();
+  const { categories } = useCategories();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
