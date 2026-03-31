@@ -1161,6 +1161,26 @@ const Review = () => {
                       </Select>
                     </div>
 
+                    {/* Buchungsart (tax_type) */}
+                    <div className="space-y-2">
+                      <Label>Buchungsart</Label>
+                      <Select
+                        value={formData.tax_type}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, tax_type: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Offen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TAX_TYPES.map(t => (
+                            <SelectItem key={t.value} value={t.value}>
+                              {t.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     {/* Split Booking Editor */}
                     {splitBookingEnabled && currentReceipt && (
                       <SplitBookingEditor
