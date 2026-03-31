@@ -591,6 +591,8 @@ export type Database = {
           keyword: string
           match_count: number | null
           source: string | null
+          tax_type_match_count: number
+          tax_type_name: string | null
           updated_at: string | null
           user_id: string
         }
@@ -601,6 +603,8 @@ export type Database = {
           keyword: string
           match_count?: number | null
           source?: string | null
+          tax_type_match_count?: number
+          tax_type_name?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -611,6 +615,8 @@ export type Database = {
           keyword?: string
           match_count?: number | null
           source?: string | null
+          tax_type_match_count?: number
+          tax_type_name?: string | null
           updated_at?: string | null
           user_id?: string
         }
