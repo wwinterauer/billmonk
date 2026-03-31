@@ -313,8 +313,8 @@ export function useVendors() {
           receiptUpdate.vat_rate = updates.default_vat_rate;
         }
 
-        if (updates.default_payment_method !== undefined) {
-          receiptUpdate.payment_method = updates.default_payment_method;
+        if (updates.field_defaults?.payment_method !== undefined) {
+          receiptUpdate.payment_method = updates.field_defaults.payment_method || null;
         }
 
         // Apply batch update if there are fields to update
