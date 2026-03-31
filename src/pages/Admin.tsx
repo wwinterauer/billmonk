@@ -105,6 +105,10 @@ export default function Admin() {
               <Brain className="h-4 w-4" />
               KI-Plattform
             </TabsTrigger>
+            <TabsTrigger value="ab-test" className="gap-2">
+              <FlaskConical className="h-4 w-4" />
+              A/B Tests
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
