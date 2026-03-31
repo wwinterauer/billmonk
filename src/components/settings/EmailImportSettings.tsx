@@ -345,6 +345,21 @@ export const EmailImportSettings: React.FC = () => {
     );
   }
 
+  if (isError) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-8 gap-4">
+          <AlertCircle className="h-6 w-6 text-destructive" />
+          <p className="text-sm text-muted-foreground">Einstellungen konnten nicht geladen werden.</p>
+          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Erneut laden
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const handleSwitchToImap = () => {
     setActiveTab("imap");
     setShowAddAccountDialog(true);
