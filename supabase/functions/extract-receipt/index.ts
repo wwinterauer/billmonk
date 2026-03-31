@@ -151,6 +151,7 @@ function mapSchemaToResult(raw: Record<string, any>): ExtractionResult {
       ? raw.tax_rate_details : null,
     receipt_date: raw.receipt_date || null,
     category: raw.category || null,
+    tax_type: raw.tax_type || null,
     payment_method: null, // no longer AI-extracted
     invoice_number: raw.receipt_number || null,
     confidence: raw.confidence || 0,
