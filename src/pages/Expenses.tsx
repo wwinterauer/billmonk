@@ -111,7 +111,6 @@ import { checkForDuplicates, type DuplicateCheckResult } from '@/services/duplic
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { SplitSuggestionDialog } from '@/components/receipts/SplitSuggestionDialog';
 import { SourceBadge, NoReceiptBadge } from '@/components/receipts/SourceBadge';
 
