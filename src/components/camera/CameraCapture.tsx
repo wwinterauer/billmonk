@@ -11,7 +11,9 @@ import {
   AlertCircle,
   Plus,
   FileText,
-  Trash2
+  Trash2,
+  Smartphone,
+  ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +38,17 @@ export function CameraCapture({ onComplete, onClose }: CameraCaptureProps) {
   
   // Galerie-Ansicht
   const [showGallery, setShowGallery] = useState(false);
+
+  // Scan-App-Hinweis
+  const [showScanTip, setShowScanTip] = useState(() => {
+    return !sessionStorage.getItem('camera-scan-tip-dismissed');
+  });
+  const [showScanSteps, setShowScanSteps] = useState(false);
+
+  const dismissScanTip = () => {
+    setShowScanTip(false);
+    sessionStorage.setItem('camera-scan-tip-dismissed', 'true');
+  };
 
   useEffect(() => {
     startCamera();
@@ -171,6 +184,33 @@ export function CameraCapture({ onComplete, onClose }: CameraCaptureProps) {
               muted 
               className="absolute inset-0 w-full h-full object-cover"
             />
+            {state.isActive && capturedPages.length === 0 && !currentPreview && showScanTip && (
+              <div className="absolute top-2 left-2 right-2 z-10 rounded-lg bg-black/70 backdrop-blur-sm p-3 text-white">
+                <div className="flex items-start gap-2">
+                  <Smartphone className="h-5 w-5 shrink-0 mt-0.5 text-primary" />
+                  <div className="flex-1 text-xs space-y-1">
+                    <p>Für beste Scan-Qualität empfehlen wir <strong>Google Drive Scan</strong> oder <strong>Adobe Scan</strong>. Teile den gescannten Beleg dann direkt an BillMonk.</p>
+                    {showScanSteps ? (
+                      <ol className="list-decimal list-inside space-y-0.5 text-white/80">
+                        <li>Scanne deinen Beleg mit deiner Scan-App</li>
+                        <li>Tippe auf Teilen</li>
+                        <li>Wähle BillMonk</li>
+                      </ol>
+                    ) : (
+                      <button
+                        onClick={() => setShowScanSteps(true)}
+                        className="flex items-center gap-1 text-primary hover:underline"
+                      >
+                        So geht's <ArrowRight className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                  <button onClick={dismissScanTip} className="shrink-0 text-white/60 hover:text-white">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
             {state.isActive && (
               <div className="absolute inset-0 pointer-events-none">
                 {/* Dokument-Rahmen */}
