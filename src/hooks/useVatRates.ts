@@ -69,16 +69,16 @@ export function useVatRates() {
       if (!user?.id) return [];
       const { data } = await supabase
         .from('receipts')
-        .select('tax_rate')
+        .select('vat_rate')
         .eq('user_id', user.id)
         .in('status', ['approved', 'completed'])
-        .not('tax_rate', 'is', null);
+        .not('vat_rate', 'is', null);
       
       if (!data) return [];
       
       const unique = new Set<string>();
       data.forEach(r => {
-        const rate = String(r.tax_rate).trim();
+        const rate = String(r.vat_rate).trim();
         if (rate && rate !== 'unknown' && rate !== 'mixed' && rate !== '0') {
           unique.add(rate);
         }
