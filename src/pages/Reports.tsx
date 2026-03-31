@@ -485,10 +485,11 @@ const Reports = () => {
       taxTypeMap.set(tt, existing);
     });
 
+    const colorMap = new Map(allCategories.map(c => [c.name, c.color]));
     return Array.from(taxTypeMap.entries())
       .map(([name, data]) => ({
         name,
-        color: TAX_TYPE_COLORS[name] || '#94A3B8',
+        color: colorMap.get(name) || '#94A3B8',
         amount: data.amount,
         count: data.count,
         vat: data.vat,

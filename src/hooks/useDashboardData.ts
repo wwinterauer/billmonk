@@ -259,11 +259,12 @@ export function useDashboardData(year: number, month: number) {
         taxTypeMap.set(tt, (taxTypeMap.get(tt) || 0) + (r.amount_gross || 0));
       });
 
+      const colorMap = new Map(categories.map(c => [c.name, c.color]));
       const ttData: TaxTypeData[] = Array.from(taxTypeMap.entries())
         .map(([taxType, total]) => ({
           taxType,
           total,
-          color: TAX_TYPE_COLORS[taxType] || '#94A3B8',
+          color: colorMap.get(taxType) || '#94A3B8',
         }))
         .sort((a, b) => b.total - a.total);
 
