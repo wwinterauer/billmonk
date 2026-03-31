@@ -1461,7 +1461,7 @@ export function ReceiptDetailPanel({
                     >
                       <Select value={category} onValueChange={setCategory}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Kategorie wählen" />
+                          <SelectValue placeholder="Nicht zugeordnet" />
                         </SelectTrigger>
                         <SelectContent>
                           {categories.map((cat) => (
