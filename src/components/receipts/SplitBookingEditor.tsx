@@ -75,7 +75,7 @@ const recalcLine = (line: SplitLine, field: 'gross' | 'net' | 'vat_rate'): Split
 export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVatRate, onSplitChange, vendorId }: SplitBookingEditorProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { categories } = useCategories();
+  const { userCategories, taxCategories } = useCategories();
   const { vatRates } = useVatRates();
   const { trackFieldChange, getFieldDefaults } = useVendorFieldDefaults();
   const [lines, setLines] = useState<SplitLine[]>([]);
