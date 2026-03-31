@@ -116,7 +116,7 @@ const Review = () => {
   const { userCategories, taxCategories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
-  const { vatRateGroups } = useVatRates();
+  const { vatRateGroups, defaultVatRate } = useVatRates();
   const { trackFieldChange } = useVendorFieldDefaults();
   const queryClient = useQueryClient();
 
@@ -141,7 +141,7 @@ const Review = () => {
     category: '',
     tax_type: '',
     amount_gross: '',
-    vat_rate: '20',
+    vat_rate: defaultVatRate,
     is_mixed_tax_rate: false,
     tax_rate_details: null,
     payment_method: '',
@@ -284,7 +284,7 @@ const Review = () => {
       tax_type: (receiptData.tax_type as string) || '',
       amount_gross: receipt.amount_gross?.toString() || '',
       // IMPORTANT: 0% VAT is valid, so we need to check for null/undefined specifically
-      vat_rate: receipt.vat_rate !== null && receipt.vat_rate !== undefined ? receipt.vat_rate.toString() : '20',
+      vat_rate: receipt.vat_rate !== null && receipt.vat_rate !== undefined ? receipt.vat_rate.toString() : defaultVatRate,
       is_mixed_tax_rate: isMixed,
       tax_rate_details: taxDetails,
       payment_method: receipt.payment_method || '',

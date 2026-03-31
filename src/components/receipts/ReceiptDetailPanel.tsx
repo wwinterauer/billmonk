@@ -127,7 +127,7 @@ export function ReceiptDetailPanel({
   const { userCategories, taxCategories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
-  const { vatRateGroups } = useVatRates();
+  const { vatRateGroups, defaultVatRate } = useVatRates();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -173,7 +173,7 @@ export function ReceiptDetailPanel({
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [category, setCategory] = useState('');
   const [amountGross, setAmountGross] = useState('');
-  const [vatRate, setVatRate] = useState('20');
+  const [vatRate, setVatRate] = useState(defaultVatRate);
   const [isMixedTaxRate, setIsMixedTaxRate] = useState(false);
   const [taxRateDetails, setTaxRateDetails] = useState<TaxRateDetail[] | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -384,7 +384,7 @@ export function ReceiptDetailPanel({
           setInvoiceNumber(data.invoice_number || '');
           setCategory(data.category || '');
           setAmountGross(data.amount_gross?.toString() || '');
-          setVatRate(data.vat_rate !== null && data.vat_rate !== undefined ? data.vat_rate.toString() : '20');
+          setVatRate(data.vat_rate !== null && data.vat_rate !== undefined ? data.vat_rate.toString() : defaultVatRate);
           // Handle mixed tax rate fields (may not be in types yet)
           const receiptData = data as unknown as Record<string, unknown>;
           const isMixed = (receiptData.is_mixed_tax_rate as boolean) || false;
@@ -534,7 +534,7 @@ export function ReceiptDetailPanel({
     }
 
     // Apply default VAT rate if not already set
-    if (vendorData.default_vat_rate !== null && vatRate === '20') {
+    if (vendorData.default_vat_rate !== null && vatRate === defaultVatRate) {
       setVatRate(vendorData.default_vat_rate.toString());
       applied.push('MwSt-Satz');
     }
@@ -1537,7 +1537,7 @@ export function ReceiptDetailPanel({
                         originalValue={originalReceipt?.vat_rate}
                         vendorLearning={vendorLearning}
                         onReset={() => {
-                          setVatRate(originalReceipt?.vat_rate?.toString() || '20');
+                          setVatRate(originalReceipt?.vat_rate?.toString() || defaultVatRate);
                           setIsMixedTaxRate(false);
                         }}
                         vatRateSource={(receipt as unknown as Record<string, unknown>)?.vat_rate_source as 'ai' | 'learned' | 'manual' | null}
