@@ -498,6 +498,14 @@ const Invoices = () => {
                                 <Badge variant={sc.variant} className={inv.status === 'paid_with_skonto' ? 'border-green-500 text-green-700 dark:text-green-400' : ''}>
                                   {sc.label}
                                 </Badge>
+                                {inv.status === 'draft' && (inv as any).recurring_invoice_id && (
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <RefreshCw className="h-3.5 w-3.5 text-amber-500" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Wiederkehrend — wartet auf Freigabe</TooltipContent>
+                                  </Tooltip>
+                                )}
                                 {inv.paid_at && (inv.status === 'paid' || inv.status === 'paid_with_skonto') && (
                                   <Tooltip>
                                     <TooltipTrigger>
