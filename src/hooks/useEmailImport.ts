@@ -103,7 +103,7 @@ export const useEmailImport = () => {
   const queryClient = useQueryClient();
 
   // Fetch email connection for current user (webhook-based)
-  const { data: emailConnection, isLoading: isLoadingConnection } = useQuery({
+  const { data: emailConnection, isLoading: isLoadingConnection, isError: isErrorConnection } = useQuery({
     queryKey: ['email-connection', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -121,7 +121,7 @@ export const useEmailImport = () => {
   });
 
   // Fetch IMAP email accounts
-  const { data: emailAccounts = [], isLoading: isLoadingAccounts } = useQuery({
+  const { data: emailAccounts = [], isLoading: isLoadingAccounts, isError: isErrorAccounts } = useQuery({
     queryKey: ['email-accounts', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -635,6 +635,7 @@ export const useEmailImport = () => {
     skipAttachment: skipAttachmentMutation.mutate,
     
     // Loading states
-    isLoading: isLoadingConnection || isLoadingAccounts || isLoadingHistory || isLoadingAttachments,
+    isLoading: isLoadingConnection || isLoadingAccounts,
+    isError: isErrorConnection || isErrorAccounts,
   };
 };
