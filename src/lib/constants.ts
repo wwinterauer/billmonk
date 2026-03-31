@@ -24,3 +24,17 @@ export const PAYMENT_METHODS = [
   { value: 'Lastschrift', label: 'Lastschrift' },
   { value: 'Sonstige', label: 'Sonstige' },
 ];
+
+export const TAX_TYPE_COLORS: Record<string, string> = {
+  'Betriebsausgabe': '#3B82F6',
+  'GWG bis 1.000€': '#10B981',
+  'Bewirtung 50%': '#F59E0B',
+  'Bewirtung 100%': '#EAB308',
+  'Vorsteuer abzugsfähig': '#6366F1',
+  'Reisekosten': '#EC4899',
+  'Kfz-Kosten': '#14B8A6',
+  'Repräsentation': '#EF4444',
+  'Abschreibung': '#8B5CF6',
+  'Sonstige': '#94A3B8',
+  'Offen': '#D1D5DB',
+};
