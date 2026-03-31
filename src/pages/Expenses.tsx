@@ -704,8 +704,17 @@ const Expenses = () => {
     }
 
     // Category filter
-    if (categoryFilter !== 'all') {
+    if (categoryFilter === '__unassigned__') {
+      result = result.filter(r => !r.category);
+    } else if (categoryFilter !== 'all') {
       result = result.filter(r => r.category === categoryFilter);
+    }
+
+    // Tax type filter
+    if (taxTypeFilter === '__open__') {
+      result = result.filter(r => !(r as any).tax_type);
+    } else if (taxTypeFilter !== 'all') {
+      result = result.filter(r => (r as any).tax_type === taxTypeFilter);
     }
 
     // Invoice number filter
