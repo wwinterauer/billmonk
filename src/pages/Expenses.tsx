@@ -194,7 +194,7 @@ const Expenses = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { getReceipts, updateReceipt, rejectReceipt, deleteReceipt, processReceiptWithAI } = useReceipts();
-  const { categories } = useCategories();
+  const { categories, userCategories, taxCategories } = useCategories();
   const { tags, activeTags, getTagsForReceipt, getTagsForReceipts } = useTags();
 
   // Data state
