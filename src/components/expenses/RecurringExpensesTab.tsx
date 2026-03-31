@@ -237,7 +237,7 @@ export function RecurringExpensesTab() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Keine</SelectItem>
-                        {categories.map(c => (
+                        {userCategories.map(c => (
                           <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                         ))}
                       </SelectContent>

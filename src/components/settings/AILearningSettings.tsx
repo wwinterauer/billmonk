@@ -750,7 +750,7 @@ export function AILearningSettings() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__none__">Keine Standard-Kategorie</SelectItem>
-                            {categories.map((cat) => (
+                            {userCategories.map((cat) => (
                               <SelectItem key={cat.id} value={cat.id}>
                                 {cat.name}
                               </SelectItem>
