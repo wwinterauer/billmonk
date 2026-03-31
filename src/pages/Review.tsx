@@ -1324,12 +1324,11 @@ const Review = () => {
                         <Tooltip>
                           <TooltipTrigger>
                             <div className={cn(
-                              'h-2 w-2 rounded-full',
-                              getConfidenceColor(getFieldConfidence(currentReceipt?.payment_method, currentReceipt?.ai_confidence))
+                              'h-2 w-2 rounded-full bg-muted-foreground/30'
                             )} />
                           </TooltipTrigger>
                           <TooltipContent>
-                            {currentReceipt?.payment_method ? 'Von KI erkannt' : 'Nicht erkannt'}
+                            Manuell vom Benutzer gesetzt
                           </TooltipContent>
                         </Tooltip>
                       </div>
