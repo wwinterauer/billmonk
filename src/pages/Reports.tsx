@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { NO_RECEIPT_CATEGORY, TAX_TYPE_COLORS } from '@/lib/constants';
+import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
+import { useCategories } from '@/hooks/useCategories';
 import { useSplitLines, aggregateWithSplitLines } from '@/hooks/useSplitLines';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';

@@ -381,14 +381,14 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
             />
 
             {/* Category / Tax Type / Payment Method row */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <Select value={line.category} onValueChange={v => updateLine(idx, 'category', v === '__empty__' ? '' : v)}>
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue placeholder="Nicht zugeordnet" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__empty__">Nicht zugeordnet</SelectItem>
-                  {categories.map(cat => (
+                  {userCategories.map(cat => (
                     <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -400,20 +400,8 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__empty__">Offen</SelectItem>
-                  {TAX_TYPES.map(t => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={line.payment_method} onValueChange={v => updateLine(idx, 'payment_method', v === '__empty__' ? '' : v)}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="Keine" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__empty__">Keine</SelectItem>
-                  {PAYMENT_METHODS.map(m => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  {taxCategories.map(c => (
+                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
