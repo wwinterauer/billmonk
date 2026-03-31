@@ -3188,7 +3188,6 @@ export type Database = {
           correction_count: number | null
           created_at: string | null
           default_category_id: string | null
-          default_payment_method: string | null
           default_tag_id: string | null
           default_vat_rate: number | null
           detected_names: string[] | null
@@ -3196,6 +3195,9 @@ export type Database = {
           expenses_only_extraction: boolean
           extraction_hint: string | null
           extraction_keywords: string[]
+          field_defaults: Json
+          field_defaults_stats: Json
+          field_suggestions_dismissed: Json
           id: string
           learning_enabled: boolean | null
           learning_level: number | null
@@ -3214,7 +3216,6 @@ export type Database = {
           correction_count?: number | null
           created_at?: string | null
           default_category_id?: string | null
-          default_payment_method?: string | null
           default_tag_id?: string | null
           default_vat_rate?: number | null
           detected_names?: string[] | null
@@ -3222,6 +3223,9 @@ export type Database = {
           expenses_only_extraction?: boolean
           extraction_hint?: string | null
           extraction_keywords?: string[]
+          field_defaults?: Json
+          field_defaults_stats?: Json
+          field_suggestions_dismissed?: Json
           id?: string
           learning_enabled?: boolean | null
           learning_level?: number | null
@@ -3240,7 +3244,6 @@ export type Database = {
           correction_count?: number | null
           created_at?: string | null
           default_category_id?: string | null
-          default_payment_method?: string | null
           default_tag_id?: string | null
           default_vat_rate?: number | null
           detected_names?: string[] | null
@@ -3248,6 +3251,9 @@ export type Database = {
           expenses_only_extraction?: boolean
           extraction_hint?: string | null
           extraction_keywords?: string[]
+          field_defaults?: Json
+          field_defaults_stats?: Json
+          field_suggestions_dismissed?: Json
           id?: string
           learning_enabled?: boolean | null
           learning_level?: number | null

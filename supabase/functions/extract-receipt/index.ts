@@ -28,7 +28,7 @@ interface ExtractionResult {
   tax_rate_details?: TaxRateDetail[] | null;
   receipt_date: string | null;
   category: string | null;
-  payment_method: string | null;
+  payment_method: string | null; // deprecated - no longer AI-extracted
   invoice_number: string | null;
   confidence: number;
   vendor_country?: string | null;
@@ -87,7 +87,7 @@ const extractionSchema = {
       },
     },
     currency: { type: "string" as const },
-    payment_method: { type: "string" as const },
+    // payment_method removed from schema - not AI-extractable
     category: { type: "string" as const },
     description: { type: "string" as const },
     line_items: {
@@ -118,7 +118,7 @@ const extractionSchema = {
     "reason", "vendor_brand", "vendor_address", "vendor_uid",
     "vendor_legal_form", "vendor_country", "receipt_date", "due_date",
     "receipt_number", "net_amount", "tax_amount", "is_mixed_tax_rate",
-    "tax_rate_details", "payment_method", "description", "line_items",
+    "tax_rate_details", "description", "line_items",
     "vat_confidence", "vat_detection_method", "special_vat_case", "notes",
   ],
   additionalProperties: false,
@@ -149,7 +149,7 @@ function mapSchemaToResult(raw: Record<string, any>): ExtractionResult {
       ? raw.tax_rate_details : null,
     receipt_date: raw.receipt_date || null,
     category: raw.category || null,
-    payment_method: raw.payment_method || null,
+    payment_method: null, // no longer AI-extracted
     invoice_number: raw.receipt_number || null,
     confidence: raw.confidence || 0,
     vendor_country: raw.vendor_country || null,
@@ -603,7 +603,7 @@ VAT-KONFIDENZ:
 - vat_detection_method: "explicit"/"calculated"/"estimated"
 
 BETRÄGE: Dezimalzahlen ohne Währungssymbol. 0 wenn nicht erkennbar. Datum: YYYY-MM-DD oder "".
-payment_method: Überweisung/Kreditkarte/Bar/PayPal/Lastschrift oder "".
+receipt_number: Rechnungsnummer suchen (RE-Nr, Invoice, Belegnummer etc.) oder "".
 receipt_number: Rechnungsnummer suchen (RE-Nr, Invoice, Belegnummer etc.) oder "".
 
 LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenzeilen.${expensesOnlyPrompt}${extractionHintPrompt}`;
@@ -866,7 +866,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           tax_rate_details: extractedData.tax_rate_details || null,
           receipt_date: extractedData.receipt_date,
           category: finalCategory,
-          payment_method: extractedData.payment_method,
+          // payment_method no longer set from AI extraction
           invoice_number: extractedData.invoice_number,
           ai_confidence: extractedData.confidence,
           ai_raw_response: extractedData,

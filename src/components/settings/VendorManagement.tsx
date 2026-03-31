@@ -180,7 +180,7 @@ export function VendorManagement() {
       default_category_id: vendor.default_category_id || '',
       default_tag_id: vendor.default_tag_id || '',
       default_vat_rate: vendor.default_vat_rate?.toString() || '',
-      default_payment_method: vendor.default_payment_method || '',
+      default_payment_method: (vendor.field_defaults as Record<string, string>)?.payment_method || '',
       website: vendor.website || '',
       notes: vendor.notes || '',
       auto_approve: vendor.auto_approve ?? false,
@@ -247,7 +247,10 @@ export function VendorManagement() {
           default_category_id: formData.default_category_id || null,
           default_tag_id: formData.default_tag_id || null,
           default_vat_rate: formData.default_vat_rate ? parseFloat(formData.default_vat_rate) : null,
-          default_payment_method: formData.default_payment_method || null,
+          field_defaults: {
+            ...(editingVendor.field_defaults || {}),
+            ...(formData.default_payment_method ? { payment_method: formData.default_payment_method } : {}),
+          },
           website: formData.website.trim() || null,
           notes: formData.notes.trim() || null,
           auto_approve: formData.auto_approve,
@@ -409,7 +412,7 @@ export function VendorManagement() {
     setIsCheckingDuplicates(true);
 
     try {
-      const duplicates = findVendorDuplicates(filteredVendors, duplicateSensitivity);
+      const duplicates = findVendorDuplicates(filteredVendors as any, duplicateSensitivity);
       setVendorDuplicates(duplicates);
       setShowDuplicateResults(true);
 
@@ -1841,7 +1844,7 @@ export function VendorManagement() {
                         <div className="flex flex-col gap-2 ml-4">
                           <Button
                             size="sm"
-                            onClick={() => openMergePairDialog(item.vendor, item.matchingVendor)}
+                            onClick={() => openMergePairDialog(item.vendor as any, item.matchingVendor as any)}
                           >
                             <Merge className="w-4 h-4 mr-1" />
                             Zusammenführen

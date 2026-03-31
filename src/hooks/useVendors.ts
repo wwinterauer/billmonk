@@ -2,6 +2,18 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+export interface FieldDefaultsStats {
+  [field: string]: { [value: string]: number };
+}
+
+export interface FieldDefaults {
+  [field: string]: string;
+}
+
+export interface FieldSuggestionsDismissed {
+  [field: string]: string[];
+}
+
 export interface Vendor {
   id: string;
   user_id: string;
@@ -11,7 +23,9 @@ export interface Vendor {
   default_category_id: string | null;
   default_tag_id: string | null;
   default_vat_rate: number | null;
-  default_payment_method: string | null;
+  field_defaults: FieldDefaults;
+  field_defaults_stats: FieldDefaultsStats;
+  field_suggestions_dismissed: FieldSuggestionsDismissed;
   notes: string | null;
   website: string | null;
   receipt_count: number;
@@ -87,9 +101,12 @@ export function useVendors() {
         const stats = statsMap.get(v.id);
         return {
           ...v,
-      legal_names: v.legal_names || [],
-      detected_names: v.detected_names || [],
-      receipt_count: stats?.count ?? v.receipt_count ?? 0,
+          legal_names: v.legal_names || [],
+          detected_names: v.detected_names || [],
+          field_defaults: (v.field_defaults as FieldDefaults) || {},
+          field_defaults_stats: (v.field_defaults_stats as FieldDefaultsStats) || {},
+          field_suggestions_dismissed: (v.field_suggestions_dismissed as FieldSuggestionsDismissed) || {},
+          receipt_count: stats?.count ?? v.receipt_count ?? 0,
           total_amount: stats?.total ?? Number(v.total_amount) ?? 0,
           learning_enabled: v.learning_enabled ?? true,
           learning_level: v.learning_level ?? 0,
@@ -138,6 +155,11 @@ export function useVendors() {
       throw new Error('Ein Lieferant mit diesem Namen existiert bereits');
     }
 
+    const fieldDefaults: FieldDefaults = {};
+    if (options?.defaultPaymentMethod) {
+      fieldDefaults.payment_method = options.defaultPaymentMethod;
+    }
+
     const { data, error } = await supabase
       .from('vendors')
       .insert({
@@ -148,7 +170,7 @@ export function useVendors() {
         default_category_id: options?.defaultCategoryId || null,
         default_tag_id: options?.defaultTagId || null,
         default_vat_rate: options?.defaultVatRate || null,
-        default_payment_method: options?.defaultPaymentMethod || null,
+        field_defaults: Object.keys(fieldDefaults).length > 0 ? fieldDefaults : {},
         notes: options?.notes || null,
         website: options?.website || null,
       })
@@ -166,6 +188,9 @@ export function useVendors() {
       ...data,
       legal_names: data.legal_names || [],
       detected_names: data.detected_names || [],
+      field_defaults: (data.field_defaults as FieldDefaults) || {},
+      field_defaults_stats: (data.field_defaults_stats as FieldDefaultsStats) || {},
+      field_suggestions_dismissed: (data.field_suggestions_dismissed as FieldSuggestionsDismissed) || {},
       receipt_count: data.receipt_count || 0,
       total_amount: Number(data.total_amount) || 0,
       learning_enabled: data.learning_enabled ?? true,
@@ -187,7 +212,7 @@ export function useVendors() {
 
   const updateVendor = async (
     id: string,
-    updates: Partial<Pick<Vendor, 'display_name' | 'legal_names' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_payment_method' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
+    updates: Partial<Pick<Vendor, 'display_name' | 'legal_names' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'field_defaults' | 'field_defaults_stats' | 'field_suggestions_dismissed' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
   ): Promise<{ vendor: Vendor; syncedReceipts: number; autoApprovedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
 
@@ -246,7 +271,7 @@ export function useVendors() {
     const hasDefaultUpdates =
       updates.default_category_id !== undefined ||
       updates.default_vat_rate !== undefined ||
-      updates.default_payment_method !== undefined ||
+      updates.field_defaults !== undefined ||
       updates.default_tag_id !== undefined;
 
     if (hasDefaultUpdates) {
@@ -288,8 +313,8 @@ export function useVendors() {
           receiptUpdate.vat_rate = updates.default_vat_rate;
         }
 
-        if (updates.default_payment_method !== undefined) {
-          receiptUpdate.payment_method = updates.default_payment_method;
+        if (updates.field_defaults?.payment_method !== undefined) {
+          receiptUpdate.payment_method = updates.field_defaults.payment_method || null;
         }
 
         // Apply batch update if there are fields to update
@@ -446,6 +471,9 @@ export function useVendors() {
       ...data,
       legal_names: data.legal_names || [],
       detected_names: data.detected_names || [],
+      field_defaults: (data.field_defaults as FieldDefaults) || {},
+      field_defaults_stats: (data.field_defaults_stats as FieldDefaultsStats) || {},
+      field_suggestions_dismissed: (data.field_suggestions_dismissed as FieldSuggestionsDismissed) || {},
       receipt_count: data.receipt_count || 0,
       total_amount: Number(data.total_amount) || 0,
       learning_enabled: data.learning_enabled ?? true,

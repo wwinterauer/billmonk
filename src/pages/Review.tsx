@@ -81,6 +81,8 @@ import { TagSelector } from '@/components/tags/TagSelector';
 import { SplitBookingEditor } from '@/components/receipts/SplitBookingEditor';
 import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
+import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
+import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
 
 const PAYMENT_METHODS = [
   { value: 'Überweisung', label: 'Überweisung' },
@@ -125,6 +127,7 @@ const Review = () => {
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
   const { vatRateGroups } = useVatRates();
+  const { trackFieldChange } = useVendorFieldDefaults();
   const queryClient = useQueryClient();
 
   // State
@@ -457,6 +460,17 @@ const Review = () => {
           trackCorrections(corrections);
         } else {
           trackSuccessfulPrediction(currentReceipt.id, trackingVendorId);
+        }
+
+        // Track field defaults stats for vendor learning
+        if (formData.payment_method) {
+          trackFieldChange(trackingVendorId, 'payment_method', formData.payment_method);
+        }
+        if (formData.category) {
+          trackFieldChange(trackingVendorId, 'category', formData.category);
+        }
+        if (formData.vat_rate && !formData.is_mixed_tax_rate) {
+          trackFieldChange(trackingVendorId, 'tax_rate', formData.vat_rate);
         }
       }
 
@@ -1317,6 +1331,12 @@ const Review = () => {
                       </div>
                     </div>
 
+                    {/* Field Default Suggestions */}
+                    <FieldDefaultSuggestion
+                      vendorId={currentReceipt?.vendor_id || null}
+                      vendorName={formData.vendor}
+                    />
+
                     {/* Payment Method */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
@@ -1324,12 +1344,11 @@ const Review = () => {
                         <Tooltip>
                           <TooltipTrigger>
                             <div className={cn(
-                              'h-2 w-2 rounded-full',
-                              getConfidenceColor(getFieldConfidence(currentReceipt?.payment_method, currentReceipt?.ai_confidence))
+                              'h-2 w-2 rounded-full bg-muted-foreground/30'
                             )} />
                           </TooltipTrigger>
                           <TooltipContent>
-                            {currentReceipt?.payment_method ? 'Von KI erkannt' : 'Nicht erkannt'}
+                            Manuell vom Benutzer gesetzt
                           </TooltipContent>
                         </Tooltip>
                       </div>
