@@ -283,7 +283,10 @@ const Expenses = () => {
     const saved = localStorage.getItem('expenses-visible-columns');
     if (saved) {
       try {
-        return new Set(JSON.parse(saved) as ColumnKey[]);
+        const parsed = new Set(JSON.parse(saved) as ColumnKey[]);
+        // Migration: neue Spalten automatisch einblenden
+        if (!parsed.has('tax_type')) parsed.add('tax_type');
+        return parsed;
       } catch {
         return new Set(COLUMN_CONFIG.filter(c => c.defaultVisible).map(c => c.key));
       }
@@ -2493,15 +2496,9 @@ const Expenses = () => {
                                     {receipt.duplicate_score || 0}%
                                   </Badge>
                                 )}
-                                {/* Split Booking badge */}
+                                {/* Split Booking icon */}
                                 {splitBookingEnabled && (receipt as any).is_split_booking && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="bg-violet-50 text-violet-700 border-violet-200 text-xs"
-                                  >
-                                    <Layers className="w-3 h-3 mr-1" />
-                                    Splitbuchung
-                                  </Badge>
+                                  <Layers className="w-3.5 h-3.5 text-violet-600" />
                                 )}
                                 {/* Source Badge for email imports */}
                                 {receipt.source?.startsWith('email_') && (
