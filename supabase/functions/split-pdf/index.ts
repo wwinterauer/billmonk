@@ -111,7 +111,9 @@ serve(async (req) => {
     for (const split of validSplits) {
       for (const page of split.pages) {
         if (page < 1 || page > totalPages) {
-          throw new Error(`Ungültige Seitenzahl: ${page}. PDF hat nur ${totalPages} Seiten.`);
+          return new Response(JSON.stringify({ error: `Ungültige Seitenzahl: ${page}. PDF hat nur ${totalPages} Seiten.` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
       }
     }

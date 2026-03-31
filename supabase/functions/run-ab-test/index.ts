@@ -433,7 +433,11 @@ serve(async (req) => {
       .from("prompt_versions").select("*").eq("version", testRun.prompt_version_a).single();
     const { data: v2Prompt } = await supabase
       .from("prompt_versions").select("*").eq("version", testRun.prompt_version_b).single();
-    if (!v1Prompt || !v2Prompt) throw new Error("Prompt versions not found");
+    if (!v1Prompt || !v2Prompt) {
+      return new Response(JSON.stringify({ error: "Prompt versions not found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Check if test was stopped before processing
     const { data: currentRun } = await supabase
