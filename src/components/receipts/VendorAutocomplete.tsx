@@ -15,7 +15,7 @@ interface VendorWithCategory {
   default_category_id: string | null;
   default_tag_id: string | null;
   default_vat_rate: number | null;
-  default_payment_method: string | null;
+  field_defaults: Record<string, string> | null;
   receipt_count: number | null;
   default_category: {
     id: string;
