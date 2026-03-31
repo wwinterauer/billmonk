@@ -2222,6 +2222,42 @@ export type Database = {
         }
         Relationships: []
       }
+      prompt_versions: {
+        Row: {
+          created_at: string | null
+          expenses_only_prompt_template: string
+          id: string
+          is_active: boolean | null
+          metadata: Json | null
+          name: string
+          system_prompt: string
+          user_prompt_template: string
+          version: string
+        }
+        Insert: {
+          created_at?: string | null
+          expenses_only_prompt_template: string
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          name: string
+          system_prompt: string
+          user_prompt_template: string
+          version: string
+        }
+        Update: {
+          created_at?: string | null
+          expenses_only_prompt_template?: string
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          name?: string
+          system_prompt?: string
+          user_prompt_template?: string
+          version?: string
+        }
+        Relationships: []
+      }
       quote_settings: {
         Row: {
           created_at: string | null
@@ -2407,6 +2443,7 @@ export type Database = {
           original_pages: number[] | null
           page_count: number | null
           payment_method: string | null
+          prompt_version: string | null
           receipt_date: string | null
           source: string | null
           special_vat_case: string | null
@@ -2462,6 +2499,7 @@ export type Database = {
           original_pages?: number[] | null
           page_count?: number | null
           payment_method?: string | null
+          prompt_version?: string | null
           receipt_date?: string | null
           source?: string | null
           special_vat_case?: string | null
@@ -2517,6 +2555,7 @@ export type Database = {
           original_pages?: number[] | null
           page_count?: number | null
           payment_method?: string | null
+          prompt_version?: string | null
           receipt_date?: string | null
           source?: string | null
           special_vat_case?: string | null
