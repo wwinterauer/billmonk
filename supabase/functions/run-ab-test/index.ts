@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { uint8ArrayToBase64 } from "../_shared/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -195,15 +196,7 @@ async function processBatch(
         continue;
       }
 
-      const arrayBuffer = await fileData.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      const chunkSize = 8192;
-      let binaryString = "";
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.slice(i, i + chunkSize);
-        binaryString += String.fromCharCode.apply(null, Array.from(chunk));
-      }
-      const imageBase64 = btoa(binaryString);
+      const imageBase64 = uint8ArrayToBase64(new Uint8Array(await fileData.arrayBuffer()));
       const isPdf = receipt.file_name?.endsWith(".pdf") || receipt.file_type === "pdf" || receipt.file_type === "application/pdf";
       const mimeType = isPdf ? "application/pdf" : `image/${receipt.file_type || "jpeg"}`;
 
