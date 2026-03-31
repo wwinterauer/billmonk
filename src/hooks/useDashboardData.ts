@@ -315,6 +315,7 @@ export function useDashboardData(year: number, month: number) {
       });
 
       setCategoryData(catData);
+      setTaxTypeData(ttData);
       setTagData(tagDataArray);
       setUntaggedTotal(untaggedAmount);
       setRecentReceipts((recent || []) as RecentReceipt[]);
