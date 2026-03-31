@@ -188,6 +188,7 @@ export function ReceiptDetailPanel({
   const [isMixedTaxRate, setIsMixedTaxRate] = useState(false);
   const [taxRateDetails, setTaxRateDetails] = useState<TaxRateDetail[] | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('');
+  const [taxType, setTaxType] = useState('');
   const [notes, setNotes] = useState('');
   const [amountNetOverride, setAmountNetOverride] = useState('');
   const [vatAmountOverride, setVatAmountOverride] = useState('');
