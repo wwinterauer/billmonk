@@ -147,6 +147,9 @@ export default function Admin() {
           <TabsContent value="community">
             <CommunityLearning />
           </TabsContent>
+          <TabsContent value="ab-test">
+            <ABTestManager />
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
