@@ -423,7 +423,11 @@ serve(async (req) => {
     // Load prompt versions
     const { data: testRun } = await supabase
       .from("ab_test_runs").select("prompt_version_a, prompt_version_b").eq("id", test_run_id).single();
-    if (!testRun) throw new Error("Test run not found");
+    if (!testRun) {
+      return new Response(JSON.stringify({ error: "Test run not found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { data: v1Prompt } = await supabase
       .from("prompt_versions").select("*").eq("version", testRun.prompt_version_a).single();
