@@ -1586,7 +1586,7 @@ export function VendorManagement() {
             <Button variant="ghost" onClick={closeDialogs}>
               Abbrechen
             </Button>
-            <Button onClick={handleSave} disabled={isSaving || !formData.display_name.trim()}>
+            <Button onClick={handleSave} disabled={isSaving || isUpdatingVendor || !formData.display_name.trim()}>
               {isSaving ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
               ) : editingVendor ? (

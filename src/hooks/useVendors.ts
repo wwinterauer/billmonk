@@ -511,6 +511,7 @@ export function useVendors() {
     vendors,
     loading,
     error,
+    isUpdatingVendor,
     fetchVendors,
     addVendor,
     updateVendor,
