@@ -1819,6 +1819,41 @@ export type Database = {
           },
         ]
       }
+      invoice_reminders: {
+        Row: {
+          created_at: string | null
+          id: string
+          invoice_id: string
+          reminder_level: number
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          invoice_id: string
+          reminder_level?: number
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          invoice_id?: string
+          reminder_level?: number
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_reminders_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_settings: {
         Row: {
           auto_send_enabled: boolean | null
@@ -1843,8 +1878,12 @@ export type Database = {
           next_customer_number: number | null
           next_sequence_number: number | null
           order_confirmation_prefix: string | null
+          overdue_email_notify: boolean | null
           overdue_reminder_days: number | null
           overdue_reminder_enabled: boolean | null
+          reminder_stage_1_days: number | null
+          reminder_stage_2_days: number | null
+          reminder_stage_3_days: number | null
           send_copy_to_self: boolean | null
           updated_at: string | null
           user_id: string
@@ -1872,8 +1911,12 @@ export type Database = {
           next_customer_number?: number | null
           next_sequence_number?: number | null
           order_confirmation_prefix?: string | null
+          overdue_email_notify?: boolean | null
           overdue_reminder_days?: number | null
           overdue_reminder_enabled?: boolean | null
+          reminder_stage_1_days?: number | null
+          reminder_stage_2_days?: number | null
+          reminder_stage_3_days?: number | null
           send_copy_to_self?: boolean | null
           updated_at?: string | null
           user_id: string
@@ -1901,8 +1944,12 @@ export type Database = {
           next_customer_number?: number | null
           next_sequence_number?: number | null
           order_confirmation_prefix?: string | null
+          overdue_email_notify?: boolean | null
           overdue_reminder_days?: number | null
           overdue_reminder_enabled?: boolean | null
+          reminder_stage_1_days?: number | null
+          reminder_stage_2_days?: number | null
+          reminder_stage_3_days?: number | null
           send_copy_to_self?: boolean | null
           updated_at?: string | null
           user_id?: string
