@@ -1,35 +1,45 @@
 
 
-# Bulk-Zuweisung für Buchungsart (tax_type)
+# PWA Scan-App-Tipp + Installationshinweis verbessern
 
-## Analyse
+## Übersicht
 
-Die Bulk-Aktionsleiste in `Expenses.tsx` (Zeilen 1884-2170) hat bereits:
-- Freigeben, Überprüfen, Ablehnen, Abschließen
-- Tags bearbeiten (Popover)
-- **Kategorie zuweisen** (Popover mit Select, Zeilen 2002-2049)
-- KI-Analyse, Duplikate prüfen, Vergleichen, Löschen
+Drei Änderungen: (1) Scan-App-Tipp in Email-Import-Einstellungen, (2) Scan-Hinweis auf Upload-Seite, (3) InstallPrompt verbessern mit iOS-Fallback und nur auf Mobilgeräten + eingeloggt.
 
-**Was fehlt:** Bulk-Buchungsart-Zuweisung. Die Buchungsarten kommen aus `taxCategories` (via `useCategories()`), dasselbe was der Filter nutzt (Zeile 1658).
+## Änderungen
 
-**Kategorie-Bulk hat kein "Nicht zugeordnet"** — das ergänze ich ebenfalls.
+### 1. `src/components/settings/EmailImportSettings.tsx`
 
-## Änderungen in `src/pages/Expenses.tsx`
+Nach der Import-Adresse (nach Zeile 460, nach dem `<p>` mit "Leiten Sie Rechnungs-E-Mails...") einen Collapsible-Bereich einfügen:
 
-### 1. Bulk-Buchungsart-Button nach dem Kategorie-Button (nach Zeile 2049)
+- Import: `Collapsible, CollapsibleTrigger, CollapsibleContent` aus `@/components/ui/collapsible`
+- Import: `Smartphone, ChevronDown` Icons
+- Collapsible mit Trigger "Tipp: Belege per Scan-App importieren" (mit Smartphone-Icon)
+- Content: Zwei Absätze (Android Share + Email-Methode), Email-Adresse aus `emailConnection.import_email` inline anzeigen
 
-Neuer Popover-Block analog zum Kategorie-Block:
-- Button: `<FileText /> Buchungsart`
-- Select mit:
-  - `"__clear__"` → "Offen" (setzt `tax_type` auf `null`)
-  - Separator
-  - Alle `taxCategories` aus `useCategories()`
-- `onValueChange`: Loop über `selectedIds`, `supabase.update({ tax_type })`, Toast, clear selection, reload
+### 2. `src/pages/Upload.tsx`
 
-### 2. Kategorie-Select erweitern (Zeile 2041)
+Nach dem Upload-Dropzone-Card (nach Zeile 1076, nach `</Card></motion.div>`) und vor dem Cloud Import Block:
 
-Vor den Kategorien ein `"__clear__"` → "Nicht zugeordnet" Option + Separator einfügen. Bei `__clear__` wird `category: null` gesetzt.
+- Import: `Smartphone` Icon, `useNavigate` (bereits vorhanden)
+- Dezenter Alert/Banner in muted Farben mit Smartphone-Icon
+- Text: "Du bist unterwegs? Scanne Belege mit deiner Scan-App und teile sie direkt an BillMonk."
+- Link-Button "Mehr erfahren" → `navigate('/settings?tab=email-import')`
+
+### 3. `src/components/pwa/InstallPrompt.tsx` — Erweitern
+
+- Import `useIsMobile` und `useAuth`
+- Nur anzeigen wenn: Mobile + eingeloggt + nicht standalone + nicht dismissed
+- iOS-Erkennung: Wenn `installPrompt` null ist (kein `beforeinstallprompt` auf iOS), zeige Alternativtext: "Tippe auf das Teilen-Symbol und dann 'Zum Home-Bildschirm'"
+- Erweiterte Beschreibung: "für schnelleren Zugriff und Beleg-Import per Teilen-Funktion"
+- Landing-Page ausschließen: `useLocation()`, return null wenn `pathname === '/'`
+
+### 4. `src/App.tsx` — Keine Änderung nötig
+
+`InstallPrompt` ist bereits global eingebunden (Zeile 220). Die Landing-Page-Ausschlusslogik wird intern in der Komponente behandelt.
 
 ### Dateien
-- `src/pages/Expenses.tsx`
+- `src/components/settings/EmailImportSettings.tsx`
+- `src/pages/Upload.tsx`
+- `src/components/pwa/InstallPrompt.tsx`
 
