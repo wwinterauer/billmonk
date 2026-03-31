@@ -63,11 +63,14 @@ const Dashboard = () => {
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
 
+  const [chartView, setChartView] = useState<'category' | 'taxType'>('category');
+
   const { 
     loading, 
     error, 
     stats, 
     categoryData,
+    taxTypeData,
     tagData,
     untaggedTotal,
     recentReceipts, 
@@ -110,12 +113,18 @@ const Dashboard = () => {
     setDetailPanelOpen(true);
   };
 
-  // Prepare chart data
-  const chartData = categoryData.map((cat, index) => ({
-    name: cat.category,
-    value: cat.total,
-    color: cat.color || DEFAULT_COLORS[index % DEFAULT_COLORS.length],
-  }));
+  // Prepare chart data based on view
+  const chartData = chartView === 'category'
+    ? categoryData.map((cat, index) => ({
+        name: cat.category,
+        value: cat.total,
+        color: cat.color || DEFAULT_COLORS[index % DEFAULT_COLORS.length],
+      }))
+    : taxTypeData.map((tt) => ({
+        name: tt.taxType,
+        value: tt.total,
+        color: tt.color,
+      }));
 
   const totalCategorySum = chartData.reduce((sum, d) => sum + d.value, 0);
 
@@ -483,8 +492,28 @@ const Dashboard = () => {
 
             {/* Category Chart */}
             <Card className="border-border/50">
-              <CardHeader>
-                <CardTitle className="text-lg">Ausgaben nach Kategorie</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-lg">
+                  {chartView === 'category' ? 'Nach Kategorie' : 'Nach Buchungsart'}
+                </CardTitle>
+                <div className="flex gap-1">
+                  <Button
+                    variant={chartView === 'category' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="text-xs h-7 px-2"
+                    onClick={() => setChartView('category')}
+                  >
+                    Kategorie
+                  </Button>
+                  <Button
+                    variant={chartView === 'taxType' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="text-xs h-7 px-2"
+                    onClick={() => setChartView('taxType')}
+                  >
+                    Buchungsart
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {loading ? (

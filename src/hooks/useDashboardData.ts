@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
+import { NO_RECEIPT_CATEGORY, TAX_TYPE_COLORS } from '@/lib/constants';
 
 interface DashboardStats {
   totalExpenses: number;
@@ -23,6 +23,12 @@ interface CategoryData {
   category: string;
   total: number;
   color: string | null;
+}
+
+interface TaxTypeData {
+  taxType: string;
+  total: number;
+  color: string;
 }
 
 interface TagData {
@@ -61,6 +67,7 @@ export function useDashboardData(year: number, month: number) {
     paidThisMonth: 0,
   });
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [taxTypeData, setTaxTypeData] = useState<TaxTypeData[]>([]);
   const [tagData, setTagData] = useState<TagData[]>([]);
   const [untaggedTotal, setUntaggedTotal] = useState(0);
   const [recentReceipts, setRecentReceipts] = useState<RecentReceipt[]>([]);
@@ -84,7 +91,7 @@ export function useDashboardData(year: number, month: number) {
       // Fetch current month receipts
       const { data: currentMonthReceipts, error: currentError } = await supabase
         .from('receipts')
-        .select('id, amount_gross, vat_amount, status, ai_confidence, category, is_split_booking')
+        .select('id, amount_gross, vat_amount, status, ai_confidence, category, tax_type, is_split_booking')
         .eq('user_id', user.id)
         .gte('created_at', startOfMonth.toISOString())
         .lte('created_at', endOfMonth.toISOString());
@@ -233,6 +240,31 @@ export function useDashboardData(year: number, month: number) {
         }))
         .sort((a, b) => b.total - a.total);
 
+      // Calculate tax_type totals (split-aware)
+      const taxTypeMap = new Map<string, number>();
+      billableReceipts.forEach(r => {
+        if ((r as any).is_split_booking) {
+          const lines = splitByReceipt.get(r.id);
+          if (lines && lines.length > 0) {
+            lines.forEach((line: any) => {
+              const tt = line.tax_type || 'Offen';
+              taxTypeMap.set(tt, (taxTypeMap.get(tt) || 0) + (line.amount_gross || 0));
+            });
+            return;
+          }
+        }
+        const tt = (r as any).tax_type || 'Offen';
+        taxTypeMap.set(tt, (taxTypeMap.get(tt) || 0) + (r.amount_gross || 0));
+      });
+
+      const ttData: TaxTypeData[] = Array.from(taxTypeMap.entries())
+        .map(([taxType, total]) => ({
+          taxType,
+          total,
+          color: TAX_TYPE_COLORS[taxType] || '#94A3B8',
+        }))
+        .sort((a, b) => b.total - a.total);
+
       // Calculate tag totals
       const tagMap = new Map<string, { id: string; name: string; color: string; total: number; count: number }>();
       const taggedReceiptIds = new Set<string>();
@@ -283,6 +315,7 @@ export function useDashboardData(year: number, month: number) {
       });
 
       setCategoryData(catData);
+      setTaxTypeData(ttData);
       setTagData(tagDataArray);
       setUntaggedTotal(untaggedAmount);
       setRecentReceipts((recent || []) as RecentReceipt[]);
@@ -310,6 +343,7 @@ export function useDashboardData(year: number, month: number) {
     error,
     stats,
     categoryData,
+    taxTypeData,
     tagData,
     untaggedTotal,
     recentReceipts,
