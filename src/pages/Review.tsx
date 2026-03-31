@@ -141,7 +141,7 @@ const Review = () => {
     category: '',
     tax_type: '',
     amount_gross: '',
-    vat_rate: '20',
+    vat_rate: defaultVatRate,
     is_mixed_tax_rate: false,
     tax_rate_details: null,
     payment_method: '',
