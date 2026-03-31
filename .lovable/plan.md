@@ -1,59 +1,46 @@
 
 
-# Buchungsart-Spalte in Export-Vorlagen + Split-Buchungs-Export
+# Buchungsart-Spalte sichtbar machen + Split-Symbol bei Status
 
-## Aktuelle Situation
+## Problem
 
-In `DEFAULT_COLUMNS` und `SPLIT_COLUMNS` fehlt jeweils eine Spalte für **Buchungsart** (`tax_type`). Auch in `SORTABLE_FIELDS` und `GROUPING_OPTIONS` fehlt sie.
+1. **Buchungsart-Spalte fehlt visuell**: Die Spalte ist im Code vorhanden (`tax_type` in `COLUMN_CONFIG`), aber bei bestehenden Usern nicht sichtbar, weil `localStorage` die alte Spalten-Auswahl (ohne `tax_type`) gespeichert hat. Neue Spalten werden bei existierendem localStorage-Eintrag ignoriert.
 
-Bei Split-Buchungen werden Belege bereits korrekt aufgefächert (jede Split-Position wird zu einer eigenen Zeile), mit eigener Kategorie, Brutto/Netto/MwSt. Die Split-Spalten haben aber ebenfalls keine Buchungsart.
-
-## Export bei Split-Buchungen
-
-So sieht der Export mit aktivierten Split-Spalten aus:
-
-```text
-Datum      | Lieferant | Kategorie    | Buchungsart        | Brutto  | Netto   | MwSt% | MwSt €
------------+-----------+--------------+--------------------+---------+---------+-------+-------
-15.03.2026 | Monta     | Mobilität    | KFZ-Kosten (AT)    | 19.60   | 16.42   | 20%   | 3.18   ← Hauptbeleg (wenn NICHT aufgefächert)
-
--- ODER aufgefächert (Split aktiviert):
-15.03.2026 | Monta     | Mobilität    | KFZ-Kosten (AT)    | 0.51    | 0.51    | 0%    | 0.00   ← Position 1
-15.03.2026 | Monta     | Mobilität    | KFZ-Kosten (AT)    | 15.91   | 13.26   | 20%   | 2.65   ← Position 2
-15.03.2026 | Monta     | Abo          | Betriebsausgabe    | 3.18    | 2.65    | 20%   | 0.53   ← Position 3
-```
-
-Jede Split-Position hat ihre **eigene Kategorie und Buchungsart**, die Werte kommen aus `receipt_split_lines`.
+2. **Splitbuchung-Symbol**: Aktuell wird ein großes "Splitbuchung"-Badge in der Status-Spalte angezeigt. Stattdessen soll nur ein kompaktes `Layers`-Icon (ohne Text) neben dem Status-Badge erscheinen.
 
 ## Änderungen
 
-### 1. `useExportTemplates.ts` — Buchungsart überall ergänzen
+### 1. `src/pages/Expenses.tsx` — localStorage-Migration für neue Spalten
 
-**DEFAULT_COLUMNS**: Neue Spalte nach Kategorie:
+In der `useState`-Initialisierung (Zeile 282-292): Wenn `tax_type` nicht im gespeicherten Set enthalten ist, automatisch hinzufügen. So sehen bestehende User die neue Spalte sofort.
+
 ```typescript
-{ id: '14', field: 'tax_type', label: 'Buchungsart', type: 'text', format: null, visible: true, order: 5, align: 'left' },
+const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(() => {
+  const saved = localStorage.getItem('expenses-visible-columns');
+  if (saved) {
+    try {
+      const parsed = new Set(JSON.parse(saved) as ColumnKey[]);
+      // Migration: neue Spalten automatisch einblenden
+      if (!parsed.has('tax_type')) parsed.add('tax_type');
+      return parsed;
+    } catch {
+      return new Set(COLUMN_CONFIG.filter(c => c.defaultVisible).map(c => c.key));
+    }
+  }
+  return new Set(COLUMN_CONFIG.filter(c => c.defaultVisible).map(c => c.key));
+});
 ```
-(order der nachfolgenden Spalten um 1 erhöhen)
 
-**SPLIT_COLUMNS**: Neue Spalte für Positions-Buchungsart:
-```typescript
-{ id: 's9', field: 'split_tax_type', label: 'Positions-Buchungsart', type: 'text', format: null, visible: false, order: 22.5, align: 'left' },
+### 2. `src/pages/Expenses.tsx` — Splitbuchung-Badge zu kompaktem Icon
+
+Das bestehende Badge (Zeilen 2496-2505) wird ersetzt durch ein einfaches `Layers`-Icon mit Tooltip, das platzsparend neben dem Status-Badge steht:
+
+```tsx
+{splitBookingEnabled && (receipt as any).is_split_booking && (
+  <Layers className="w-3.5 h-3.5 text-violet-600" title="Splitbuchung" />
+)}
 ```
-
-**SORTABLE_FIELDS**: `{ value: 'tax_type', label: 'Buchungsart' }` hinzufügen
-
-**GROUPING_OPTIONS**: `{ value: 'tax_type', label: 'Buchungsart', icon: 'Scale' }` hinzufügen
-
-### 2. `ExportFormatDialog.tsx` — Split-Expansion um `tax_type` erweitern
-
-In der Split-Expansion (~Zeile 592-610) wird `split_tax_type` aus `line.tax_type` gemappt, analog zu `split_category`.
-
-### 3. `useExportPreview.ts` — `tax_type` Feld in Preview-Formatierung aufnehmen
-
-Das `formatReceipt`-Mapping muss `tax_type` aus den Receipt-Daten übernehmen, damit es in der Vorschau angezeigt wird.
 
 ### Dateien
-- `src/hooks/useExportTemplates.ts` — Spalten, Sort, Gruppierung
-- `src/components/exports/ExportFormatDialog.tsx` — Split-tax_type Mapping
-- `src/hooks/useExportPreview.ts` — Preview-Formatierung
+- `src/pages/Expenses.tsx` — localStorage-Migration + Split-Icon-Vereinfachung
 
