@@ -1362,6 +1362,12 @@ export function ReceiptDetailPanel({
                       />
                     </LearnableField>
 
+                    {/* Field Default Suggestions */}
+                    <FieldDefaultSuggestion
+                      vendorId={selectedVendorId}
+                      vendorName={vendor}
+                    />
+
                     {/* Description with character counter */}
                     <LearnableField
                       fieldName="description"
