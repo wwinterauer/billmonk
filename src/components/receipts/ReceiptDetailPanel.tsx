@@ -98,6 +98,7 @@ import { useTags } from '@/hooks/useTags';
 import { SplitBookingEditor } from './SplitBookingEditor';
 import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
+import { FieldDefaultSuggestion } from './FieldDefaultSuggestion';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
