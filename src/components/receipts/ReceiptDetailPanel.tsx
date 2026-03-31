@@ -96,6 +96,7 @@ import { TagSelector } from '@/components/tags/TagSelector';
 import { useTags } from '@/hooks/useTags';
 import { SplitBookingEditor } from './SplitBookingEditor';
 import { usePlan } from '@/hooks/usePlan';
+import { useVatRates } from '@/hooks/useVatRates';
 
 interface ReceiptDetailPanelProps {
   receiptId: string | null;
