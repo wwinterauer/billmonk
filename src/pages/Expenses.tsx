@@ -2216,6 +2216,9 @@ const Expenses = () => {
                         {visibleColumns.has('category') && (
                           <TableHead>Kategorie</TableHead>
                         )}
+                        {visibleColumns.has('tax_type') && (
+                          <TableHead>Buchungsart</TableHead>
+                        )}
                         {visibleColumns.has('tags') && (
                           <TableHead>Tags</TableHead>
                         )}
