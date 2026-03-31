@@ -134,7 +134,7 @@ export function ABTestManager() {
     mutationFn: async () => {
       const { data: receipts, error: rErr } = await supabase
         .from('receipts')
-        .select('id, vendor, amount_gross, vat_rate, vat_amount, category, receipt_date, payment_method')
+        .select('id, vendor, amount_gross, vat_rate, vat_amount, category, receipt_date')
         .eq('status', 'approved')
         .limit(50);
 
