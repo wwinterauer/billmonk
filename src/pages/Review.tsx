@@ -1116,57 +1116,60 @@ const Review = () => {
                       </div>
                     </div>
 
-                    {/* Category */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label>Kategorie</Label>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <div className={cn(
-                              'h-2 w-2 rounded-full',
-                              getConfidenceColor(getFieldConfidence(currentReceipt?.category, currentReceipt?.ai_confidence))
-                            )} />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {currentReceipt?.category ? 'Von KI erkannt' : 'Nicht erkannt'}
-                          </TooltipContent>
-                        </Tooltip>
+                    {/* Category + Buchungsart side-by-side */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Category */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label>Kategorie</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <div className={cn(
+                                'h-2 w-2 rounded-full',
+                                getConfidenceColor(getFieldConfidence(currentReceipt?.category, currentReceipt?.ai_confidence))
+                              )} />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {currentReceipt?.category ? 'Von KI erkannt' : 'Nicht erkannt'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Select
+                          value={formData.category}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Nicht zugeordnet" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map(cat => (
+                              <SelectItem key={cat.id} value={cat.name}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <Select
-                        value={formData.category}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Nicht zugeordnet" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map(cat => (
-                            <SelectItem key={cat.id} value={cat.name}>
-                              {cat.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
 
-                    {/* Buchungsart (tax_type) */}
-                    <div className="space-y-2">
-                      <Label>Buchungsart</Label>
-                      <Select
-                        value={formData.tax_type}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, tax_type: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Offen" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TAX_TYPES.map(t => (
-                            <SelectItem key={t.value} value={t.value}>
-                              {t.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {/* Buchungsart (tax_type) */}
+                      <div className="space-y-2">
+                        <Label>Buchungsart</Label>
+                        <Select
+                          value={formData.tax_type}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, tax_type: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Offen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TAX_TYPES.map(t => (
+                              <SelectItem key={t.value} value={t.value}>
+                                {t.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
 
                     {/* Split Booking Editor */}
