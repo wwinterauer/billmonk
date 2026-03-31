@@ -1,58 +1,31 @@
 
 
-# Rechnungsübersicht aufwerten — wie Ausgaben-Seite
+# Bulk-Aktionsleiste: Invoices an Expenses angleichen
 
 ## Problem
 
-Die Rechnungsübersicht (`Invoices.tsx`) hat aktuell nur einen Status-Dropdown-Filter und einzelne Aktionen pro Zeile. Es fehlen:
-- Checkbox-Selektion für Batch-Aktionen
-- Batch-Statusänderungen (als bezahlt markieren, bezahlt mit Skonto, stornieren)
-- Datumsfilter, Suchfeld, Spaltenauswahl
-- Status `paid_with_skonto` fehlt komplett
-- Fixierte Bulk-Aktionsleiste wie bei Expenses
+In **Expenses** ist die Bulk-Aktionsleiste ein inline-Element oberhalb der Tabelle (`bg-muted/50 rounded-lg, mb-4`), das sanft eingeblendet wird wenn Belege markiert sind. In **Invoices** ist sie dagegen als `fixed bottom-0` am unteren Bildschirmrand fixiert — inkonsistentes UI.
 
-## Geplante Änderungen
+## Änderung
 
-### 1. `src/pages/Invoices.tsx` — Umfangreiche Erweiterung
+### `src/pages/Invoices.tsx` — Zeile 584-609
 
-**Neue Features nach Vorbild `Expenses.tsx`:**
+Die fixierte Leiste (`fixed bottom-0 left-0 right-0 z-50 bg-background border-t shadow-lg`) wird ersetzt durch das Expenses-Pattern:
 
-- **Checkbox-Spalte**: Jede Zeile bekommt eine Checkbox, Header hat "Alle auswählen"
-- **Bulk-Aktionsleiste**: Fixierte Leiste am unteren Rand bei Selektion, mit Buttons:
-  - "Als bezahlt markieren" (grün)
-  - "Bezahlt mit Skonto" (grün, nur wenn Rechnungen mit `discount_percent > 0`)
-  - "Als versendet markieren"
-  - "Stornieren" (rot)
-  - "Löschen" (rot, mit Bestätigung)
-- **Suchfeld**: Suche nach Rechnungsnummer, Kundenname
-- **Datumsfilter**: Von/Bis-Datepicker + Preset-Select (Aktueller Monat, Letztes Quartal, etc.)
-- **Neuer Status**: `paid_with_skonto` mit Label "Bezahlt (Skonto)" und grünem Styling
-- **Spaltenauswahl**: Dropdown um Spalten ein-/auszublenden (wie Expenses)
-- **Pagination**: Wenn viele Rechnungen vorhanden
-
-**Batch-Logik:**
 ```text
-selectedIds: Set<string>
-- handleBulkPaid(): Loop über selectedIds → updateInvoiceStatus(id, 'paid')
-- handleBulkPaidSkonto(): Loop → updateInvoiceStatus(id, 'paid_with_skonto')  
-- handleBulkSent(): Loop → updateInvoiceStatus(id, 'sent')
-- handleBulkCancel(): Loop → updateInvoiceStatus(id, 'cancelled')
-- handleBulkDelete(): Bestätigungsdialog → Loop → deleteInvoice(id)
+Vorher:  <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t shadow-lg p-3">
+Nachher: <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+           className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-muted/50 rounded-lg">
 ```
 
-### 2. `src/hooks/useInvoices.ts` — Skonto-Status
+- `Badge variant="secondary"` mit Anzahl statt einfachem `<span>`
+- Gleiche Button-Größen und Farbgebung wie bei Expenses (grün für positive Aktionen, orange/rot für destruktive)
+- Positionierung: direkt über der Tabelle, nach den Stats-Cards
+- Animation: `motion.div` mit height-Animation wie bei Expenses
+- Import `motion` von `framer-motion` hinzufügen
 
-- `updateInvoiceStatus`: Bei `paid_with_skonto` den `skonto_amount` berechnen aus `total * discount_percent / 100` und `paid_at` setzen
-
-### 3. `STATUS_CONFIG` erweitern
-
-```typescript
-paid_with_skonto: { label: 'Bezahlt (Skonto)', variant: 'outline' }
-```
-
-- Auch im Status-Filter als Option hinzufügen
+Gleiche Anpassung wird dann auch bei `Quotes.tsx`, `OrderConfirmations.tsx` und `DeliveryNotes.tsx` im nächsten Schritt übernommen.
 
 ### Dateien
-- `src/pages/Invoices.tsx` — Checkboxen, Bulk-Aktionen, Suchfeld, Datumsfilter, Pagination, Spaltenauswahl
-- `src/hooks/useInvoices.ts` — `paid_with_skonto` Status-Logik
+- `src/pages/Invoices.tsx`
 
