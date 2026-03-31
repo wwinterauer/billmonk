@@ -118,7 +118,7 @@ import { SourceBadge, NoReceiptBadge } from '@/components/receipts/SourceBadge';
 type SortField = 'receipt_date' | 'vendor' | 'invoice_number' | 'amount_gross';
 type SortDirection = 'asc' | 'desc';
 
-type ColumnKey = 'date' | 'vendor' | 'invoice_number' | 'description' | 'category' | 'tags' | 'amount' | 'ai' | 'status';
+type ColumnKey = 'date' | 'vendor' | 'invoice_number' | 'description' | 'category' | 'tax_type' | 'tags' | 'amount' | 'ai' | 'status';
 
 const COLUMN_CONFIG: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
   { key: 'date', label: 'Datum', defaultVisible: true },
