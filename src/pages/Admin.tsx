@@ -13,7 +13,8 @@ import { SupportManagement } from '@/components/admin/SupportManagement';
 import { FAQManagement } from '@/components/admin/FAQManagement';
 import { BetaCodeManagement } from '@/components/admin/BetaCodeManagement';
 import { CommunityLearning } from '@/components/admin/CommunityLearning';
-import { Shield, Users, CreditCard, BarChart3, Mail, HeartPulse, Blocks, Activity, Megaphone, MessageSquare, HelpCircle, KeyRound, Brain } from 'lucide-react';
+import { ABTestManager } from '@/components/admin/ABTestManager';
+import { Shield, Users, CreditCard, BarChart3, Mail, HeartPulse, Blocks, Activity, Megaphone, MessageSquare, HelpCircle, KeyRound, Brain, FlaskConical } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Admin() {
