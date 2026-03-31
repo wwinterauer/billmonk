@@ -17,6 +17,16 @@ export interface ReceiptData {
 }
 
 /**
+ * Apply vendor filter: exact match for short names (<6 chars), ilike prefix for longer names
+ */
+function applyVendorFilter(query: any, vendor: string) {
+  if (vendor.length < 6) {
+    return query.eq('vendor', vendor);
+  }
+  return query.ilike('vendor', `%${vendor.substring(0, 10)}%`);
+}
+
+/**
  * Generate SHA-256 hash of a file
  */
 export async function generateFileHash(file: File): Promise<string> {
