@@ -1331,6 +1331,12 @@ const Review = () => {
                       </div>
                     </div>
 
+                    {/* Field Default Suggestions */}
+                    <FieldDefaultSuggestion
+                      vendorId={currentReceipt?.vendor_id || null}
+                      vendorName={formData.vendor}
+                    />
+
                     {/* Payment Method */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
