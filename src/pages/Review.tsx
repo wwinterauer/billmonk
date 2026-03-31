@@ -80,44 +80,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { TagSelector } from '@/components/tags/TagSelector';
 import { SplitBookingEditor } from '@/components/receipts/SplitBookingEditor';
 import { usePlan } from '@/hooks/usePlan';
-// International VAT rates grouped by country
-const VAT_RATE_GROUPS = [
-  {
-    label: 'Österreich',
-    rates: [
-      { value: '20', label: '20% (Normal)' },
-      { value: '13', label: '13% (Ermäßigt)' },
-      { value: '10', label: '10% (Ermäßigt)' },
-    ],
-  },
-  {
-    label: 'Deutschland',
-    rates: [
-      { value: '19', label: '19% (Normal)' },
-      { value: '7', label: '7% (Ermäßigt)' },
-    ],
-  },
-  {
-    label: 'Schweiz',
-    rates: [
-      { value: '8.1', label: '8.1% (Normal)' },
-      { value: '3.8', label: '3.8% (Beherbergung)' },
-      { value: '2.6', label: '2.6% (Ermäßigt)' },
-    ],
-  },
-  {
-    label: 'EU / Sonstige',
-    rates: [
-      { value: '22', label: '22% (IT)' },
-      { value: '21', label: '21% (ES/NL)' },
-      { value: '0', label: '0% (Steuerfrei)' },
-      { value: 'mixed', label: 'Gemischt (mehrere)' },
-    ],
-  },
-];
-
-// Flattened list for backward compatibility
-const VAT_RATES = VAT_RATE_GROUPS.flatMap(g => g.rates);
+import { useVatRates } from '@/hooks/useVatRates';
 
 const PAYMENT_METHODS = [
   { value: 'Überweisung', label: 'Überweisung' },
@@ -161,6 +124,7 @@ const Review = () => {
   const { categories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
+  const { vatRateGroups } = useVatRates();
   const queryClient = useQueryClient();
 
   // State
@@ -1268,7 +1232,7 @@ const Review = () => {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {VAT_RATE_GROUPS.map(group => (
+                            {vatRateGroups.map(group => (
                               <SelectGroup key={group.label}>
                                 <SelectLabel>{group.label}</SelectLabel>
                                 {group.rates.map(rate => (
