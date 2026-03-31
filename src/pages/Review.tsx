@@ -461,6 +461,17 @@ const Review = () => {
         } else {
           trackSuccessfulPrediction(currentReceipt.id, trackingVendorId);
         }
+
+        // Track field defaults stats for vendor learning
+        if (formData.payment_method) {
+          trackFieldChange(trackingVendorId, 'payment_method', formData.payment_method);
+        }
+        if (formData.category) {
+          trackFieldChange(trackingVendorId, 'category', formData.category);
+        }
+        if (formData.vat_rate && !formData.is_mixed_tax_rate) {
+          trackFieldChange(trackingVendorId, 'tax_rate', formData.vat_rate);
+        }
       }
 
       if (newStatus) {
