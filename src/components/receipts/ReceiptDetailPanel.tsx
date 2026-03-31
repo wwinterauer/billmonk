@@ -516,7 +516,7 @@ export function ReceiptDetailPanel({
     default_category_id: string | null;
     default_tag_id?: string | null;
     default_vat_rate: number | null;
-    default_payment_method?: string | null;
+    field_defaults?: Record<string, string> | null;
     default_category: { id: string; name: string; color: string | null } | null;
   }) => {
     // Set primary legal name as the main vendor field (or display_name as fallback)
@@ -526,6 +526,7 @@ export function ReceiptDetailPanel({
     setSelectedVendorId(vendorData.id);
 
     const applied: string[] = ['Lieferant'];
+    const defaults = vendorData.field_defaults || {};
 
     // Set brand name only if different from legal name
     if (primaryLegalName && vendorData.display_name !== primaryLegalName) {
@@ -555,9 +556,9 @@ export function ReceiptDetailPanel({
       }
     }
 
-    // Apply default payment method if not already set
-    if (vendorData.default_payment_method && !paymentMethod) {
-      setPaymentMethod(vendorData.default_payment_method);
+    // Apply default payment method from field_defaults if not already set
+    if (defaults.payment_method && !paymentMethod) {
+      setPaymentMethod(defaults.payment_method);
       applied.push('Zahlungsart');
     }
 
