@@ -71,7 +71,7 @@ export function RecurringExpensesTab() {
     updateNotes,
     updateCategory,
   } = useRecurringExpenses();
-  const { categories } = useCategories();
+  const { userCategories } = useCategories();
 
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [noteTarget, setNoteTarget] = useState<RecurringExpense | null>(null);
