@@ -247,7 +247,10 @@ export function VendorManagement() {
           default_category_id: formData.default_category_id || null,
           default_tag_id: formData.default_tag_id || null,
           default_vat_rate: formData.default_vat_rate ? parseFloat(formData.default_vat_rate) : null,
-          default_payment_method: formData.default_payment_method || null,
+          field_defaults: {
+            ...(editingVendor.field_defaults || {}),
+            ...(formData.default_payment_method ? { payment_method: formData.default_payment_method } : {}),
+          },
           website: formData.website.trim() || null,
           notes: formData.notes.trim() || null,
           auto_approve: formData.auto_approve,
