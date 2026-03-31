@@ -1077,6 +1077,22 @@ const Upload = () => {
           </motion.div>
         )}
 
+        {/* Scan-App Hint */}
+        {uploadPhase === 'idle' && (
+          <div className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/50 p-3 mb-4 text-sm text-muted-foreground">
+            <Smartphone className="h-5 w-5 shrink-0" />
+            <span>Du bist unterwegs? Scanne Belege mit deiner Scan-App und teile sie direkt an BillMonk.</span>
+            <Button
+              variant="link"
+              size="sm"
+              className="shrink-0 text-primary"
+              onClick={() => navigate('/settings?tab=email-import')}
+            >
+              Mehr erfahren
+            </Button>
+          </div>
+        )}
+
         {/* Cloud Import */}
         {(uploadPhase === 'idle' || uploadPhase === 'uploading') && (
           <motion.div
