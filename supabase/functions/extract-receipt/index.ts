@@ -213,28 +213,9 @@ STRENGE FILTERREGEL:
 - Wenn eine Zeile KEINES dieser Schlagwörter enthält → KOMPLETT IGNORIEREN
 - Es zählen NUR exakte Treffer — keine Synonyme
 - Durchsuche ALLE Seiten des Dokuments, nicht nur die erste
-
-FÜR JEDE gefundene Position:
-- Erfasse Bruttobetrag, Nettobetrag, MwSt-Satz und MwSt-Betrag
-- Berechne: MwSt = Brutto × Satz/(100+Satz), auf 2 Dezimalstellen runden
-- Validiere: Netto + MwSt = Brutto (±0.05€)
-- Bei 0% MwSt: Netto = Brutto, MwSt = 0
 - Ein Schlagwort kann MEHRFACH vorkommen → jede Zeile einzeln erfassen
-
-SUMMIERUNG:
-- amount_gross = Summe ALLER gefundenen Positionen (Brutto)
-- amount_net = Summe ALLER gefundenen Positionen (Netto)
-- vat_amount = Summe ALLER Steuerbeträge
-- Bei verschiedenen MwSt-Sätzen: is_mixed_tax_rate=true, tax_rate_details ausfüllen
-  (rate, net_amount, tax_amount, description PRO Steuersatz-Gruppe)
-
-DUPLIKAT-VERMEIDUNG:
-- Jede Zeile genau EINMAL zählen
-- Nur Einzelpositionen, NICHT Summen-/Zwischensummenzeilen
-
-BETRAGS-REGELN:
-- Alle Beträge POSITIV
-- Gutschriften/Erstattungen komplett ignorieren
+- Jede Zeile genau EINMAL zählen, NICHT Summen-/Zwischensummenzeilen
+- Alle Beträge POSITIV, Gutschriften/Erstattungen ignorieren
 
 description: Gefundene Positionen mit Beträgen auflisten, z.B.: "Transaktionsgebühr 3,50€; Betreiber-Abonnement 12,00€"`;
   } else {
