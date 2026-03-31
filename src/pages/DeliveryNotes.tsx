@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Truck, Plus, MoreHorizontal, CheckCircle, Send, Trash2, Eye, Search, CalendarIcon, Columns3, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, ArrowRight, Copy } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useInvoices, type Invoice } from '@/hooks/useInvoices';
+import { useToast } from '@/hooks/use-toast';
 import { PdfPreviewDialog } from '@/components/invoices/PdfPreviewDialog';
 import { format, startOfMonth, endOfMonth, subMonths, startOfQuarter, endOfQuarter, subQuarters, startOfYear, endOfYear, subYears } from 'date-fns';
 import { de } from 'date-fns/locale';
