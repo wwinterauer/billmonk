@@ -81,10 +81,11 @@ serve(async (req) => {
     }
 
     // Gmail API: Nachrichten suchen
-    const query = buildGmailQuery(account);
+    const query = buildGmailQuery(account, syncSince);
     console.log(`Gmail search query: ${query}`);
     
-    const messagesUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=50`;
+    const maxResults = syncSince ? 100 : 50;
+    const messagesUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`;
     
     const messagesResponse = await fetch(messagesUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
