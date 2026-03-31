@@ -412,7 +412,7 @@ export function VendorManagement() {
     setIsCheckingDuplicates(true);
 
     try {
-      const duplicates = findVendorDuplicates(filteredVendors, duplicateSensitivity);
+      const duplicates = findVendorDuplicates(filteredVendors as any, duplicateSensitivity);
       setVendorDuplicates(duplicates);
       setShowDuplicateResults(true);
 
