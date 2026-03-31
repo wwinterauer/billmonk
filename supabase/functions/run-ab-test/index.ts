@@ -184,7 +184,7 @@ async function processBatch(
   for (const item of items) {
     try {
       const { data: receipt } = await supabase
-        .from("receipts").select("file_url, file_type, file_name, user_id").eq("id", item.receipt_id).single();
+        .from("receipts").select("file_url, file_type, file_name, user_id, vendor_id").eq("id", item.receipt_id).single();
       if (!receipt?.file_url) {
         console.error(`No file_url for receipt ${item.receipt_id}`);
         continue;
