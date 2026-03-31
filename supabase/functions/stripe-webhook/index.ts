@@ -50,16 +50,11 @@ serve(async (req) => {
     let event: Stripe.Event;
     const body = await req.text();
 
-    if (webhookSecret) {
-      const signature = req.headers.get("stripe-signature");
-      if (!signature) {
-        return new Response("Missing stripe-signature header", { status: 400 });
-      }
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    } else {
-      // Fallback: parse without signature verification (dev mode)
-      event = JSON.parse(body) as Stripe.Event;
+    const signature = req.headers.get("stripe-signature");
+    if (!signature) {
+      return new Response("Missing stripe-signature header", { status: 400 });
     }
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
 
     logStep("Event received", { type: event.type, id: event.id });
 
