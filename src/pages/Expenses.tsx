@@ -197,6 +197,7 @@ const Expenses = () => {
   const { user } = useAuth();
   const { getReceipts, updateReceipt, rejectReceipt, deleteReceipt, processReceiptWithAI } = useReceipts();
   const { categories } = useCategories();
+  const { visibleBookingTypes } = useBookingTypes();
   const { tags, activeTags, getTagsForReceipt, getTagsForReceipts } = useTags();
 
   // Data state
