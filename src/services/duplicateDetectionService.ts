@@ -99,14 +99,14 @@ export async function checkForDuplicates(
 
     // 3. Amount + date + vendor match (90% - very likely)
     if (receiptData.amount_gross && receiptData.receipt_date && receiptData.vendor) {
-      const vendorPrefix = receiptData.vendor.substring(0, 10);
-      const { data: amountMatch } = await supabase
+      let amountQuery = supabase
         .from('receipts')
         .select('id, vendor, amount_gross, receipt_date, invoice_number, status')
         .eq('user_id', userId)
         .eq('amount_gross', receiptData.amount_gross)
-        .eq('receipt_date', receiptData.receipt_date)
-        .ilike('vendor', `%${vendorPrefix}%`)
+        .eq('receipt_date', receiptData.receipt_date);
+      amountQuery = applyVendorFilter(amountQuery, receiptData.vendor);
+      const { data: amountMatch } = await amountQuery
         .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
