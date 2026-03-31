@@ -209,6 +209,13 @@ export function useVendors() {
     updates: Partial<Pick<Vendor, 'display_name' | 'legal_names' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'field_defaults' | 'field_defaults_stats' | 'field_suggestions_dismissed' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
   ): Promise<{ vendor: Vendor; syncedReceipts: number; autoApprovedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
+    if (isUpdatingRef.current) {
+      console.warn('updateVendor already in progress, skipping');
+      return { vendor: vendors.find(v => v.id === id)!, syncedReceipts: 0, autoApprovedReceipts: 0 };
+    }
+    isUpdatingRef.current = true;
+    setIsUpdatingVendor(true);
+    try {
 
     // Check for duplicate if display_name is being updated
     if (updates.display_name) {
