@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { TAX_TYPES, PAYMENT_METHODS } from '@/lib/constants';
+import { PAYMENT_METHODS } from '@/lib/constants';
 import { Repeat } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
