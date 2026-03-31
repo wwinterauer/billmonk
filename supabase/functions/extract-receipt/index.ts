@@ -758,7 +758,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           extractedData.is_mixed_tax_rate = true;
           extractedData.amount_net = Math.round(newDetails.reduce((s, d) => s + d.net_amount, 0) * 100) / 100;
           extractedData.vat_amount = Math.round(newDetails.reduce((s, d) => s + d.tax_amount, 0) * 100) / 100;
-          console.log(`[VAT Mixed] Rebuilt from ${validLineItems.length} line_items: ${rateKeys.length} rate groups, net=${extractedData.amount_net}, vat=${extractedData.vat_amount}, details=`, JSON.stringify(newDetails));
+          
         }
       }
 
