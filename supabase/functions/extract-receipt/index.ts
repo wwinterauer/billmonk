@@ -28,7 +28,7 @@ interface ExtractionResult {
   tax_rate_details?: TaxRateDetail[] | null;
   receipt_date: string | null;
   category: string | null;
-  payment_method: string | null;
+  payment_method: string | null; // deprecated - no longer AI-extracted
   invoice_number: string | null;
   confidence: number;
   vendor_country?: string | null;
