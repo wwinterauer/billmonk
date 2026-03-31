@@ -113,12 +113,18 @@ const Dashboard = () => {
     setDetailPanelOpen(true);
   };
 
-  // Prepare chart data
-  const chartData = categoryData.map((cat, index) => ({
-    name: cat.category,
-    value: cat.total,
-    color: cat.color || DEFAULT_COLORS[index % DEFAULT_COLORS.length],
-  }));
+  // Prepare chart data based on view
+  const chartData = chartView === 'category'
+    ? categoryData.map((cat, index) => ({
+        name: cat.category,
+        value: cat.total,
+        color: cat.color || DEFAULT_COLORS[index % DEFAULT_COLORS.length],
+      }))
+    : taxTypeData.map((tt) => ({
+        name: tt.taxType,
+        value: tt.total,
+        color: tt.color,
+      }));
 
   const totalCategorySum = chartData.reduce((sum, d) => sum + d.value, 0);
 
