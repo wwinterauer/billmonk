@@ -492,8 +492,28 @@ const Dashboard = () => {
 
             {/* Category Chart */}
             <Card className="border-border/50">
-              <CardHeader>
-                <CardTitle className="text-lg">Ausgaben nach Kategorie</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-lg">
+                  {chartView === 'category' ? 'Nach Kategorie' : 'Nach Buchungsart'}
+                </CardTitle>
+                <div className="flex gap-1">
+                  <Button
+                    variant={chartView === 'category' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="text-xs h-7 px-2"
+                    onClick={() => setChartView('category')}
+                  >
+                    Kategorie
+                  </Button>
+                  <Button
+                    variant={chartView === 'taxType' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="text-xs h-7 px-2"
+                    onClick={() => setChartView('taxType')}
+                  >
+                    Buchungsart
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {loading ? (
