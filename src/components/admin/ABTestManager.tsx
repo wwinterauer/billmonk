@@ -122,7 +122,7 @@ export function ABTestManager() {
       // Fetch approved receipts (limit 50)
       const { data: receipts, error: rErr } = await supabase
         .from('receipts')
-        .select('id, vendor_name, amount_gross, vat_rate, vat_amount, category, receipt_date, payment_method')
+        .select('id, vendor, amount_gross, vat_rate, vat_amount, category, receipt_date, payment_method')
         .eq('status', 'approved')
         .limit(50);
 
@@ -151,7 +151,7 @@ export function ABTestManager() {
         test_run_id: run.id,
         receipt_id: r.id,
         original_data: {
-          vendor_name: r.vendor_name,
+          vendor_name: r.vendor,
           total_amount: r.amount_gross,
           tax_rate: r.vat_rate,
           tax_amount: r.vat_amount,
