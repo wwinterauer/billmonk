@@ -663,7 +663,9 @@ export function AILearningSettings() {
                   <TableRow>
                     <TableHead>Keyword</TableHead>
                     <TableHead>Kategorie</TableHead>
-                    <TableHead className="text-center">Treffer</TableHead>
+                    <TableHead className="text-center">Kat.-Treffer</TableHead>
+                    <TableHead>Buchungsart</TableHead>
+                    <TableHead className="text-center">BA-Treffer</TableHead>
                     <TableHead className="text-right">Aktion</TableHead>
                   </TableRow>
                 </TableHeader>

@@ -884,20 +884,37 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
 
           const vendorId = receipt?.vendor_id || finalVendorMatch?.id;
 
-          // Category learning: product rule > vendor default > AI
+          // Category & tax_type learning: product rule > vendor default > AI
           if (extractedData.description) {
             const { data: categoryRules } = await supabase
               .from('category_rules')
-              .select('keyword, category_name, match_count')
+              .select('keyword, category_name, match_count, tax_type_name, tax_type_match_count')
               .eq('user_id', receiptUserId)
               .order('match_count', { ascending: false });
 
             if (categoryRules && categoryRules.length > 0) {
               const descLower = extractedData.description.toLowerCase();
-              const matchedRule = categoryRules.find(rule => descLower.includes(rule.keyword.toLowerCase()));
+              
+              // Also check line items
+              const lineItemDescs: string[] = [];
+              if ((rawData as any).line_items && Array.isArray((rawData as any).line_items)) {
+                for (const item of (rawData as any).line_items) {
+                  if (item?.description) lineItemDescs.push(item.description.toLowerCase());
+                }
+              }
+              
+              const allText = [descLower, ...lineItemDescs].join(' ');
+              
+              const matchedRule = categoryRules.find(rule => allText.includes(rule.keyword.toLowerCase()));
               if (matchedRule) {
-                console.log(`[Category Learning] Product rule: "${matchedRule.keyword}" → "${matchedRule.category_name}"`);
-                finalCategory = matchedRule.category_name;
+                if (matchedRule.category_name && (matchedRule.match_count || 0) >= 3) {
+                  console.log(`[Category Learning] Product rule: "${matchedRule.keyword}" → "${matchedRule.category_name}"`);
+                  finalCategory = matchedRule.category_name;
+                }
+                if (matchedRule.tax_type_name && (matchedRule.tax_type_match_count || 0) >= 3) {
+                  console.log(`[Tax Type Learning] Product rule: "${matchedRule.keyword}" → "${matchedRule.tax_type_name}"`);
+                  extractedData.tax_type = matchedRule.tax_type_name;
+                }
               }
             }
           }
