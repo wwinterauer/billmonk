@@ -1590,8 +1590,24 @@ const Expenses = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle Kategorien</SelectItem>
+              <SelectItem value="__unassigned__">Nicht zugeordnet</SelectItem>
+              <SelectSeparator />
               {categories.map(c => (
                 <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={taxTypeFilter} onValueChange={setTaxTypeFilter}>
+            <SelectTrigger className="w-[170px]">
+              <SelectValue placeholder="Buchungsart" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle Buchungsarten</SelectItem>
+              <SelectItem value="__open__">Offen</SelectItem>
+              <SelectSeparator />
+              {TAX_TYPES.map(t => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
