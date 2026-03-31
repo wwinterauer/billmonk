@@ -1115,7 +1115,7 @@ export function VendorManagement() {
                 <SelectValue placeholder="Kategorie auswählen..." />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((cat) => (
+                {userCategories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     <span className="flex items-center">
                       {cat.color && (
