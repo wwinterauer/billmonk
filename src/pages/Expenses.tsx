@@ -2015,9 +2015,10 @@ const Expenses = () => {
               <PopoverContent className="w-56 p-3" align="start">
                 <div className="space-y-2">
                   <p className="text-sm font-medium mb-2">Kategorie für {selectedIds.size} Belege</p>
-                  <Select onValueChange={async (categoryName) => {
+                  <Select onValueChange={async (value) => {
                     try {
                       const ids = Array.from(selectedIds);
+                      const categoryName = value === '__clear__' ? null : value;
                       for (const id of ids) {
                         await supabase
                           .from('receipts')
