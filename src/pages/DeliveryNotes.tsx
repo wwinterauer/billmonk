@@ -118,8 +118,6 @@ const DeliveryNotes = () => {
     setSelectedIds(new Set());
   };
 
-  // Need toast for bulk actions
-  const { toast } = useToast();
 
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedIds);
