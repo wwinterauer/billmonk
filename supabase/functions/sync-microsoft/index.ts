@@ -83,11 +83,12 @@ serve(async (req) => {
     }
 
     // Microsoft Graph API: Nachrichten mit Anhängen abrufen
-    const filterQuery = buildGraphFilter(account);
+    const filterQuery = buildGraphFilter(account, syncSince);
     console.log(`Graph API filter: ${filterQuery}`);
 
     // Nachrichten abrufen
-    const messagesUrl = `https://graph.microsoft.com/v1.0/me/messages?$filter=${encodeURIComponent(filterQuery)}&$select=id,subject,from,receivedDateTime,hasAttachments&$top=50&$orderby=receivedDateTime desc`;
+    const top = syncSince ? 100 : 50;
+    const messagesUrl = `https://graph.microsoft.com/v1.0/me/messages?$filter=${encodeURIComponent(filterQuery)}&$select=id,subject,from,receivedDateTime,hasAttachments&$top=${top}&$orderby=receivedDateTime desc`;
 
     const messagesResponse = await fetch(messagesUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
