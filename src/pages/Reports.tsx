@@ -1493,10 +1493,12 @@ const Reports = () => {
             </CardContent>
           </Card>
 
-          {/* Bar Chart - Top Categories */}
+          {/* Bar Chart - Top Categories/Buchungsarten */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="text-lg">Top Kategorien</CardTitle>
+              <CardTitle className="text-lg">
+                {expenseGroupBy === 'category' ? 'Top Kategorien' : 'Top Buchungsarten'}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -1505,14 +1507,14 @@ const Reports = () => {
                     <Skeleton key={i} className="h-8 w-full" />
                   ))}
                 </div>
-              ) : categoryData.length === 0 ? (
+              ) : activeTableData.length === 0 ? (
                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                   Keine Daten für den gewählten Zeitraum
                 </div>
               ) : (
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={categoryData.slice(0, 5)} layout="vertical">
+                    <BarChart data={activeTableData.slice(0, 5)} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis
                         type="number"
@@ -1535,7 +1537,7 @@ const Reports = () => {
                         }}
                       />
                       <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
-                        {categoryData.slice(0, 5).map((entry, index) => (
+                        {activeTableData.slice(0, 5).map((entry, index) => (
                           <Cell key={index} fill={entry.color} />
                         ))}
                       </Bar>
