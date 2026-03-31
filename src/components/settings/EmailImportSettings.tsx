@@ -110,7 +110,7 @@ const defaultFormData: AddAccountFormData = {
 };
 
 // Historical sync date picker component
-function HistoricalSyncButton({ accountId, disabled, onSync }: { 
+function HistoricalSyncButton({ disabled, onSync }: { 
   accountId: string; 
   disabled: boolean; 
   onSync: (date: Date) => void;
