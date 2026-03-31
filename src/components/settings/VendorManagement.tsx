@@ -71,7 +71,7 @@ type AdditionalFilter = 'all' | 'with_category' | 'without_category' | 'with_vat
 export function VendorManagement() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { vendors, loading, addVendor, updateVendor, deleteVendor, fetchVendors } = useVendors();
+  const { vendors, loading, isUpdatingVendor, addVendor, updateVendor, deleteVendor, fetchVendors } = useVendors();
   const { categories } = useCategories();
   const { activeTags } = useTags();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
