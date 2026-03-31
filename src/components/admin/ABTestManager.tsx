@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Play, Plus, ArrowLeft, Eye, Trophy, Loader2 } from 'lucide-react';
+import { Play, Plus, ArrowLeft, Eye, Trophy, Loader2, Square, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface FieldAccuracy {
@@ -206,6 +206,45 @@ export function ABTestManager() {
     onError: (err: any) => toast.error(`Test fehlgeschlagen: ${err.message}`),
   });
 
+  // Stop test
+  const stopTest = useMutation({
+    mutationFn: async (runId: string) => {
+      const { error } = await supabase
+        .from('ab_test_runs')
+        .update({ status: 'stopped' })
+        .eq('id', runId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Test gestoppt');
+      queryClient.invalidateQueries({ queryKey: ['ab-test-runs'] });
+    },
+    onError: (err: any) => toast.error(`Stoppen fehlgeschlagen: ${err.message}`),
+  });
+
+  // Restart test (continues from unprocessed items)
+  const restartTest = useMutation({
+    mutationFn: async (runId: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      // Reset status to running, then invoke edge function
+      await supabase.from('ab_test_runs').update({ status: 'pending' }).eq('id', runId);
+
+      const { data, error } = await supabase.functions.invoke('run-ab-test', {
+        body: { test_run_id: runId },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Test neu gestartet — Verarbeitung läuft weiter');
+      queryClient.invalidateQueries({ queryKey: ['ab-test-runs'] });
+    },
+    onError: (err: any) => toast.error(`Neustart fehlgeschlagen: ${err.message}`),
+  });
+
   const summary = selectedRun?.results_summary as Record<string, any> | null;
 
   // ── Detail View ────────────────────────────────────────────────────
@@ -222,15 +261,31 @@ export function ABTestManager() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>{selectedRun.name}</span>
-              <Badge variant={
-                selectedRun.status === 'completed' ? 'default' :
-                selectedRun.status === 'running' ? 'secondary' :
-                selectedRun.status === 'error' ? 'destructive' : 'outline'
-              }>
-                {selectedRun.status === 'completed' ? 'Fertig' :
-                 selectedRun.status === 'running' ? 'Läuft...' :
-                 selectedRun.status === 'error' ? 'Fehler' : 'Wartend'}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {selectedRun.status === 'running' && (
+                  <Button size="sm" variant="destructive" onClick={() => stopTest.mutate(selectedRunId!)} disabled={stopTest.isPending}>
+                    {stopTest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4 mr-1" />}
+                    Stoppen
+                  </Button>
+                )}
+                {(selectedRun.status === 'stopped' || selectedRun.status === 'error') && (
+                  <Button size="sm" variant="outline" onClick={() => restartTest.mutate(selectedRunId!)} disabled={restartTest.isPending}>
+                    {restartTest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-1" />}
+                    Fortsetzen
+                  </Button>
+                )}
+                <Badge variant={
+                  selectedRun.status === 'completed' ? 'default' :
+                  selectedRun.status === 'running' ? 'secondary' :
+                  selectedRun.status === 'stopped' ? 'outline' :
+                  selectedRun.status === 'error' ? 'destructive' : 'outline'
+                }>
+                  {selectedRun.status === 'completed' ? 'Fertig' :
+                   selectedRun.status === 'running' ? 'Läuft...' :
+                   selectedRun.status === 'stopped' ? 'Gestoppt' :
+                   selectedRun.status === 'error' ? 'Fehler' : 'Wartend'}
+                </Badge>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -425,7 +480,7 @@ export function ABTestManager() {
               <Card
                 key={run.id}
                 className={`cursor-pointer hover:border-primary/50 transition-colors ${run.status === 'running' ? 'border-yellow-500/50' : ''}`}
-                onClick={() => (run.status === 'completed' || run.status === 'running') && setSelectedRunId(run.id)}
+                    onClick={() => ['completed', 'running', 'stopped', 'error'].includes(run.status) && setSelectedRunId(run.id)}
               >
                 <CardContent className="flex items-center justify-between py-4">
                   <div>
@@ -448,10 +503,12 @@ export function ABTestManager() {
                     <Badge variant={
                       run.status === 'completed' ? 'default' :
                       run.status === 'running' ? 'secondary' :
+                      run.status === 'stopped' ? 'outline' :
                       run.status === 'error' ? 'destructive' : 'outline'
                     }>
                       {run.status === 'completed' ? 'Fertig' :
                        run.status === 'running' ? 'Läuft...' :
+                       run.status === 'stopped' ? 'Gestoppt' :
                        run.status === 'error' ? 'Fehler' : 'Wartend'}
                     </Badge>
                     {run.status === 'pending' && (
@@ -461,6 +518,26 @@ export function ABTestManager() {
                         disabled={startTest.isPending}
                       >
                         {startTest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                      </Button>
+                    )}
+                    {run.status === 'running' && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={(e) => { e.stopPropagation(); stopTest.mutate(run.id); }}
+                        disabled={stopTest.isPending}
+                      >
+                        {stopTest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
+                      </Button>
+                    )}
+                    {(run.status === 'stopped' || run.status === 'error') && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => { e.stopPropagation(); restartTest.mutate(run.id); }}
+                        disabled={restartTest.isPending}
+                      >
+                        {restartTest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
                       </Button>
                     )}
                   </div>
