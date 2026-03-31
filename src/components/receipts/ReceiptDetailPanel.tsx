@@ -126,6 +126,7 @@ export function ReceiptDetailPanel({
   const { user } = useAuth();
   const { getReceipt, updateReceipt, rejectReceipt, deleteReceipt } = useReceipts();
   const { categories } = useCategories();
+  const { visibleBookingTypes } = useBookingTypes();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
   const { vatRateGroups } = useVatRates();
