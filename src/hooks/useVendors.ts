@@ -2,6 +2,18 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+export interface FieldDefaultsStats {
+  [field: string]: { [value: string]: number };
+}
+
+export interface FieldDefaults {
+  [field: string]: string;
+}
+
+export interface FieldSuggestionsDismissed {
+  [field: string]: string[];
+}
+
 export interface Vendor {
   id: string;
   user_id: string;
@@ -11,7 +23,9 @@ export interface Vendor {
   default_category_id: string | null;
   default_tag_id: string | null;
   default_vat_rate: number | null;
-  default_payment_method: string | null;
+  field_defaults: FieldDefaults;
+  field_defaults_stats: FieldDefaultsStats;
+  field_suggestions_dismissed: FieldSuggestionsDismissed;
   notes: string | null;
   website: string | null;
   receipt_count: number;
