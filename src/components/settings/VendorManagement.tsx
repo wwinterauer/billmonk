@@ -1844,7 +1844,7 @@ export function VendorManagement() {
                         <div className="flex flex-col gap-2 ml-4">
                           <Button
                             size="sm"
-                            onClick={() => openMergePairDialog(item.vendor, item.matchingVendor)}
+                            onClick={() => openMergePairDialog(item.vendor as any, item.matchingVendor as any)}
                           >
                             <Merge className="w-4 h-4 mr-1" />
                             Zusammenführen
