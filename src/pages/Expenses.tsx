@@ -1223,6 +1223,7 @@ const Expenses = () => {
     } finally {
       setBulkActionLoading(null);
       setAiProgress(null);
+      loadReceipts();
     }
   };
 
