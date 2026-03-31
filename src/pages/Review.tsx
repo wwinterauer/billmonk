@@ -409,6 +409,7 @@ const Review = () => {
         description: formData.description || null,
         receipt_date: formData.receipt_date ? format(formData.receipt_date, 'yyyy-MM-dd') : null,
         category: formData.category || null,
+        tax_type: formData.tax_type || null,
         amount_gross: gross,
         amount_net: net,
         vat_rate: vatRate,
