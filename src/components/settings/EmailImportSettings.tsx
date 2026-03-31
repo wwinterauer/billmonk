@@ -64,7 +64,10 @@ import {
   AlertCircle,
   CheckCircle,
   Link2,
+  Smartphone,
+  ChevronDown,
 } from 'lucide-react';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { useEmailImport, EmailAccount, EmailAttachment } from '@/hooks/useEmailImport';
 import { OAuthProviderButtons } from './OAuthProviderButtons';
 import { toast } from 'sonner';
