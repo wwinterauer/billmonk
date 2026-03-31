@@ -1298,6 +1298,8 @@ const Expenses = () => {
         }
 
         // For smart/empty modes: use receiptId path so vendor settings are loaded
+        // The edge function will overwrite all fields in DB, so we need to restore
+        // fields that should NOT be updated back to their original values
         const { data: extractData, error: extractError } = await supabase.functions.invoke('extract-receipt', {
           body: { receiptId: receipt.id, forceExtract: true, skipMultiCheck: true }
         });
@@ -1309,7 +1311,30 @@ const Expenses = () => {
 
         const normalized = extractData.data;
 
-        // Build updates only for selected fields
+        // The edge function already updated ALL fields in DB.
+        // Now restore original values for fields NOT in fieldsToAnalyze
+        const restoreFields: Record<string, unknown> = {};
+        const allFields = ['vendor', 'vendor_brand', 'description', 'amount_gross', 'amount_net', 
+          'vat_amount', 'vat_rate', 'receipt_date', 'category', 'tax_type', 'invoice_number',
+          'is_mixed_tax_rate', 'tax_rate_details', 'vat_rate_source', 'vat_confidence', 
+          'vat_detection_method', 'special_vat_case', 'vendor_country'];
+        
+        for (const field of allFields) {
+          if (!fieldsToAnalyze.includes(field)) {
+            restoreFields[field] = (receipt as any)[field] ?? null;
+          }
+        }
+        // Restore status (edge function sets it to 'review')
+        restoreFields.status = receipt.status;
+
+        if (Object.keys(restoreFields).length > 0) {
+          await supabase
+            .from('receipts')
+            .update({ ...restoreFields, updated_at: new Date().toISOString() })
+            .eq('id', receipt.id);
+        }
+
+        // Build the actual updates for local state
         const updates: Record<string, unknown> = {};
         for (const fieldId of fieldsToAnalyze) {
           const newValue = normalized[fieldId as keyof typeof normalized];
@@ -1319,17 +1344,6 @@ const Expenses = () => {
         }
 
         if (Object.keys(updates).length > 0) {
-          // Update database
-          await supabase
-            .from('receipts')
-            .update({
-              ...updates,
-              ai_confidence: normalized.confidence,
-              ai_processed_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', receipt.id);
-
           // Update local state
           setReceipts(prev => prev.map(r =>
             r.id === receipt.id 
