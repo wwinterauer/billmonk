@@ -1845,10 +1845,10 @@ const Expenses = () => {
                     </div>
                     <div>
                       <p className="font-medium text-warning">
-                        {duplicateCount} mögliche{duplicateCount === 1 ? 's' : ''} Duplikat{duplicateCount === 1 ? '' : 'e'} gefunden
+                        {duplicateCount} Beleg{duplicateCount === 1 ? '' : 'e'} als Duplikat markiert
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Überprüfe diese Belege und lösche Duplikate
+                        Im Duplikat-Filter überprüfen und ggf. bereinigen
                       </p>
                     </div>
                   </div>
