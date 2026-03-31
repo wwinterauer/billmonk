@@ -14,6 +14,131 @@ export type Database = {
   }
   public: {
     Tables: {
+      ab_test_field_accuracy: {
+        Row: {
+          field_name: string
+          id: string
+          test_run_id: string
+          version_a_correct: number
+          version_a_total: number
+          version_b_correct: number
+          version_b_total: number
+        }
+        Insert: {
+          field_name: string
+          id?: string
+          test_run_id: string
+          version_a_correct?: number
+          version_a_total?: number
+          version_b_correct?: number
+          version_b_total?: number
+        }
+        Update: {
+          field_name?: string
+          id?: string
+          test_run_id?: string
+          version_a_correct?: number
+          version_a_total?: number
+          version_b_correct?: number
+          version_b_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ab_test_field_accuracy_test_run_id_fkey"
+            columns: ["test_run_id"]
+            isOneToOne: false
+            referencedRelation: "ab_test_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ab_test_items: {
+        Row: {
+          created_at: string
+          field_scores: Json | null
+          id: string
+          original_data: Json | null
+          receipt_id: string | null
+          result_a: Json | null
+          result_b: Json | null
+          test_run_id: string
+        }
+        Insert: {
+          created_at?: string
+          field_scores?: Json | null
+          id?: string
+          original_data?: Json | null
+          receipt_id?: string | null
+          result_a?: Json | null
+          result_b?: Json | null
+          test_run_id: string
+        }
+        Update: {
+          created_at?: string
+          field_scores?: Json | null
+          id?: string
+          original_data?: Json | null
+          receipt_id?: string | null
+          result_a?: Json | null
+          result_b?: Json | null
+          test_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ab_test_items_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ab_test_items_test_run_id_fkey"
+            columns: ["test_run_id"]
+            isOneToOne: false
+            referencedRelation: "ab_test_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ab_test_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          prompt_version_a: string
+          prompt_version_b: string
+          results_summary: Json | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          prompt_version_a?: string
+          prompt_version_b?: string
+          results_summary?: Json | null
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          prompt_version_a?: string
+          prompt_version_b?: string
+          results_summary?: Json | null
+          status?: string
+        }
+        Relationships: []
+      }
       admin_activity_log: {
         Row: {
           created_at: string
