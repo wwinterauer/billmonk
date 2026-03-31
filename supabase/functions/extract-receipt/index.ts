@@ -208,17 +208,35 @@ Dieser Beleg enthält sowohl Einnahmen/Gutschriften als auch Kosten.
 Extrahiere AUSSCHLIESSLICH die Positionen, die eines dieser Schlagwörter enthalten: ${keywords.join(", ")}
 Ignoriere alle anderen Zeilen (Einnahmen, Gutschriften, Auszahlungen).
 
-REGELN:
+STRENGE FILTERREGEL:
+- Eine Zeile wird NUR erfasst, wenn ihr Text eines der obigen Schlagwörter wörtlich enthält
+- Wenn eine Zeile KEINES dieser Schlagwörter enthält → KOMPLETT IGNORIEREN
+- Es zählen NUR exakte Treffer — keine Synonyme
 - Durchsuche ALLE Seiten des Dokuments, nicht nur die erste
-- Pro Treffer: Brutto, Netto, MwSt-Satz, MwSt-Betrag erfassen
-- Netto = Brutto / (1 + MwSt-Satz/100), MwSt = Brutto - Netto
-- Schlagwörter können mehrfach vorkommen → jede Zeile einzeln zählen
-- Ignoriere Zwischen- und Gesamtsummen — nur einzelne Kostenzeilen zählen
-- Bei verschiedenen MwSt-Sätzen: is_mixed_tax_rate=true, tax_rate_details mit rate/net_amount/tax_amount/description PRO Position
-- total_amount = Summe aller Brutto, net_amount = Summe aller Netto, tax_amount = Summe aller MwSt
+
+FÜR JEDE gefundene Position:
+- Erfasse Bruttobetrag, Nettobetrag, MwSt-Satz und MwSt-Betrag
+- Berechne: MwSt = Brutto × Satz/(100+Satz), auf 2 Dezimalstellen runden
+- Validiere: Netto + MwSt = Brutto (±0.05€)
+- Bei 0% MwSt: Netto = Brutto, MwSt = 0
+- Ein Schlagwort kann MEHRFACH vorkommen → jede Zeile einzeln erfassen
+
+SUMMIERUNG:
+- amount_gross = Summe ALLER gefundenen Positionen (Brutto)
+- amount_net = Summe ALLER gefundenen Positionen (Netto)
+- vat_amount = Summe ALLER Steuerbeträge
+- Bei verschiedenen MwSt-Sätzen: is_mixed_tax_rate=true, tax_rate_details ausfüllen
+  (rate, net_amount, tax_amount, description PRO Steuersatz-Gruppe)
+
+DUPLIKAT-VERMEIDUNG:
+- Jede Zeile genau EINMAL zählen
+- Nur Einzelpositionen, NICHT Summen-/Zwischensummenzeilen
+
+BETRAGS-REGELN:
 - Alle Beträge POSITIV
 - Gutschriften/Erstattungen komplett ignorieren
-- description: Alle gefundenen Positionen mit jeweiligem Betrag auflisten, z.B.: "Transaktionsgebühr 3,50€; Betreiber-Abonnement 12,00€"`;
+
+description: Gefundene Positionen mit Beträgen auflisten, z.B.: "Transaktionsgebühr 3,50€; Betreiber-Abonnement 12,00€"`;
   } else {
     prompt = `
 
