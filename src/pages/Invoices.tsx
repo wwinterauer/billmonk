@@ -582,36 +582,6 @@ const Invoices = () => {
           </CardContent>
         </Card>
 
-        {/* Bulk Action Bar */}
-        {someSelected && (
-          <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t shadow-lg p-3">
-            <div className="max-w-screen-xl mx-auto flex items-center justify-between gap-3">
-              <span className="text-sm font-medium">{selectedIds.size} ausgewählt</span>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button size="sm" variant="outline" className="border-green-500 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950" onClick={() => handleBulk('paid')}>
-                  <CheckCircle className="h-4 w-4 mr-1" /> Als bezahlt
-                </Button>
-                {hasSkontoCandidates && (
-                  <Button size="sm" variant="outline" className="border-green-500 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950" onClick={() => handleBulk('paid_with_skonto')}>
-                    <Percent className="h-4 w-4 mr-1" /> Bezahlt (Skonto)
-                  </Button>
-                )}
-                <Button size="sm" variant="outline" onClick={() => handleBulk('sent')}>
-                  <Send className="h-4 w-4 mr-1" /> Als versendet
-                </Button>
-                <Button size="sm" variant="outline" className="border-destructive text-destructive hover:bg-destructive/10" onClick={() => handleBulk('cancelled')}>
-                  <XCircle className="h-4 w-4 mr-1" /> Stornieren
-                </Button>
-                <Button size="sm" variant="destructive" onClick={() => setBulkDeleteOpen(true)}>
-                  <Trash2 className="h-4 w-4 mr-1" /> Löschen
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
-                  Auswahl aufheben
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
       </FeatureGate>
 
