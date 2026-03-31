@@ -106,6 +106,7 @@ const Reports = () => {
   const [customerSearch, setCustomerSearch] = useState('');
   const [viewMode, setViewMode] = useState<'expenses' | 'income'>('expenses');
   const [taxExportOpen, setTaxExportOpen] = useState(false);
+  const [expenseGroupBy, setExpenseGroupBy] = useState<'category' | 'taxType'>('category');
 
   const months = [
     'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
