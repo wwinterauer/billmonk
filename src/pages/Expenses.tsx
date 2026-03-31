@@ -1177,38 +1177,21 @@ const Expenses = () => {
         current++;
         setAiProgress({ current, total });
 
-        if (!receipt.file_url) {
-          failCount++;
-          continue;
-        }
-
         try {
-          // Fetch the file from storage
-          const { data: fileData, error: downloadError } = await supabase.storage
+          // Use receiptId path so edge function loads vendor settings (expenses_only, keywords, etc.)
+          await supabase
             .from('receipts')
-            .download(receipt.file_url.replace(/^.*\/receipts\//, ''));
+            .update({ status: 'processing', notes: null })
+            .eq('id', receipt.id);
 
-          if (downloadError || !fileData) {
-            failCount++;
-            continue;
-          }
-
-          // Create a File object from the blob
-          const file = new File([fileData], receipt.file_name || 'receipt', {
-            type: receipt.file_type || 'application/pdf',
+          const { data, error } = await supabase.functions.invoke('extract-receipt', {
+            body: { receiptId: receipt.id, forceExtract: true, skipMultiCheck: true }
           });
 
-          // Process with AI (file first, then receiptId)
-          const result = await processReceiptWithAI(file, receipt.id);
-          
-          if (result.aiSuccess) {
-            // Update local state with new data
-            setReceipts(prev => prev.map(r => 
-              r.id === receipt.id ? result.receipt : r
-            ));
-            successCount++;
-          } else {
+          if (error || !data?.success) {
             failCount++;
+          } else {
+            successCount++;
           }
         } catch (err) {
           console.error('AI re-run failed for receipt:', receipt.id, err);
@@ -1240,6 +1223,7 @@ const Expenses = () => {
     } finally {
       setBulkActionLoading(null);
       setAiProgress(null);
+      loadReceipts();
     }
   };
 
@@ -1293,7 +1277,28 @@ const Expenses = () => {
           continue;
         }
 
-        // Fetch the file from storage
+        // For full mode, use receiptId path to get vendor settings
+        if (mode === 'full') {
+          await supabase
+            .from('receipts')
+            .update({ status: 'processing', notes: null })
+            .eq('id', receipt.id);
+
+          const { data: extractData, error: extractError } = await supabase.functions.invoke('extract-receipt', {
+            body: { receiptId: receipt.id, forceExtract: true, skipMultiCheck: true }
+          });
+
+          if (extractError || !extractData?.success) {
+            results.failed++;
+            continue;
+          }
+
+          // For full mode, the edge function handles the DB update
+          results.success++;
+          continue;
+        }
+
+        // For smart/empty modes: use client-side extraction (field-selective)
         const { data: fileData, error: downloadError } = await supabase.storage
           .from('receipts')
           .download(receipt.file_url.replace(/^.*\/receipts\//, ''));
@@ -1303,12 +1308,10 @@ const Expenses = () => {
           continue;
         }
 
-        // Create a File object from the blob
         const file = new File([fileData], receipt.file_name || 'receipt', {
           type: receipt.file_type || 'application/pdf',
         });
 
-        // Run AI extraction
         const extracted = await extractReceiptData(file);
         const normalized = normalizeExtractionResult(extracted);
 
