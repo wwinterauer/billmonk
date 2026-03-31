@@ -1,61 +1,49 @@
 
 
-# Email-Einstellungen laden nicht — RLS-Policy fehlt
+# Manuelle Abfrage bis Datum X für E-Mail-Sync
 
-## Ursache
+## Übersicht
 
-Die Tabelle `email_accounts` hat keine RLS-Policy für `SELECT` mit der `authenticated`-Rolle. Jeder Request gibt 403 zurück:
+Der User möchte bei einem E-Mail-Konto (IMAP/Gmail/Microsoft) eine einmalige manuelle Abfrage starten, die alle E-Mails bis zu einem frei wählbaren Datum durchsucht. Duplikate werden über den bestehenden `file_hash`-Mechanismus automatisch übersprungen.
 
-```
-"permission denied for table email_accounts"
-```
+## Änderungen
 
-Da `isLoading` in `useEmailImport` ein OR aus allen 4 Queries ist (Zeile 638), blockiert die endlos retry'ende `email_accounts`-Query das gesamte UI.
+### 1. Edge Functions: `syncSince`-Parameter akzeptieren
 
-## Lösung (2 Teile)
+**`supabase/functions/sync-imap-emails/index.ts`**
+- Body-Parameter `syncSince` (ISO-Datum-String) akzeptieren neben `accountId` und `resync`
+- In `processEmails`: Wenn `syncSince` gesetzt, IMAP-Suchkriterium `SINCE {datum}` verwenden (statt 7-Tage-Resync oder UNSEEN)
+- Mehr Nachrichten verarbeiten: `maxToProcess = 100` bei `syncSince`
+- Duplikate werden bereits über `file_hash` in der Import-Pipeline gefiltert
 
-### 1. RLS-Policy für `email_accounts` erstellen (Migration)
+**`supabase/functions/sync-gmail/index.ts`**
+- Body-Parameter `syncSince` akzeptieren
+- In `buildGmailQuery`: Wenn `syncSince` gesetzt, `after:{datum}` verwenden statt `last_sync_at`
+- Mehr Messages fetchen: `maxResults=100`
 
-```sql
-ALTER TABLE public.email_accounts ENABLE ROW LEVEL SECURITY;
+**`supabase/functions/sync-microsoft/index.ts`**
+- Body-Parameter `syncSince` akzeptieren
+- In `buildGraphFilter`: Wenn `syncSince` gesetzt, `receivedDateTime` Filter auf das Datum setzen
 
-CREATE POLICY "Users can view own email accounts"
-  ON public.email_accounts FOR SELECT
-  TO authenticated
-  USING (user_id = auth.uid());
+### 2. `src/hooks/useEmailImport.ts`
 
-CREATE POLICY "Users can insert own email accounts"
-  ON public.email_accounts FOR INSERT
-  TO authenticated
-  WITH CHECK (user_id = auth.uid());
+- `syncEmailAccount` Mutation: `syncSince?: string` Parameter zum Body hinzufügen
+- An Edge Function weitreichen: `body: { accountId, resync, syncSince }`
 
-CREATE POLICY "Users can update own email accounts"
-  ON public.email_accounts FOR UPDATE
-  TO authenticated
-  USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
+### 3. `src/components/settings/EmailImportSettings.tsx`
 
-CREATE POLICY "Users can delete own email accounts"
-  ON public.email_accounts FOR DELETE
-  TO authenticated
-  USING (user_id = auth.uid());
-```
-
-### 2. `useEmailImport.ts` — Loading-State robuster machen
-
-Zeile 638: `isLoading` nur auf die zwei primären Queries beschränken, damit ein 403 auf `email_accounts` nicht alles blockiert. Zusätzlich `isError` exposen.
-
-```typescript
-isLoading: isLoadingConnection,
-isError: isErrorAccounts || isErrorConnection,
-```
-
-### 3. `EmailImportSettings.tsx` — Fehlerbehandlung
-
-Zeile 337-345: Bei `isError` statt endlosem Spinner eine Fehlermeldung mit "Erneut laden"-Button anzeigen.
+- Pro Account-Karte: Neben "Sync" und "Resync" einen dritten Button "Historisch abrufen" (Calendar-Icon)
+- Klick öffnet ein Popover mit:
+  - Text: "Alle E-Mails seit einem bestimmten Datum durchsuchen. Bereits importierte Belege werden übersprungen."
+  - Datepicker (Calendar-Komponente) für das Start-Datum
+  - "Abrufen"-Button
+- Bei Klick auf "Abrufen": `syncEmailAccount({ accountId, syncSince: date.toISOString() })` aufrufen
+- Popover schließt sich, normaler Sync-Status wird angezeigt
 
 ### Dateien
-- Migration: RLS-Policies für `email_accounts`
+- `supabase/functions/sync-imap-emails/index.ts`
+- `supabase/functions/sync-gmail/index.ts`
+- `supabase/functions/sync-microsoft/index.ts`
 - `src/hooks/useEmailImport.ts`
 - `src/components/settings/EmailImportSettings.tsx`
 
