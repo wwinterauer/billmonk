@@ -306,6 +306,171 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json();
+
+    // ========== SCHEMA TEST MODE ==========
+    if (body.schema_test === true) {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) {
+        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not set" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Need an image to test with
+      const testImage = body.imageBase64;
+      const testMime = body.mimeType || "image/jpeg";
+      if (!testImage) {
+        return new Response(JSON.stringify({ error: "schema_test requires imageBase64" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const miniPrompt = "Extract vendor name, total amount, and currency from this receipt. Return JSON with vendor_name, total_amount, currency.";
+      const miniSchema = {
+        type: "object" as const,
+        properties: {
+          vendor_name: { type: "string" },
+          total_amount: { type: "number" },
+          currency: { type: "string" },
+        },
+        required: ["vendor_name", "total_amount", "currency"],
+        additionalProperties: false,
+      };
+
+      const baseMessages = [
+        { role: "system", content: "Extract receipt data. Return only JSON." },
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: `data:${testMime};base64,${testImage}` } },
+            { type: "text", text: miniPrompt },
+          ],
+        },
+      ];
+
+      const results: Record<string, any> = {};
+
+      // --- Variante 1: response_format json_schema ---
+      try {
+        console.log("=== TEST V1: response_format json_schema ===");
+        const r1 = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: baseMessages,
+            max_tokens: 512,
+            temperature: 0.1,
+            response_format: {
+              type: "json_schema",
+              json_schema: { name: "receipt_extraction", strict: true, schema: miniSchema },
+            },
+          }),
+        });
+        const status1 = r1.status;
+        const text1 = await r1.text();
+        let parsed1 = null;
+        let content1 = null;
+        try {
+          parsed1 = JSON.parse(text1);
+          content1 = parsed1?.choices?.[0]?.message?.content;
+          if (typeof content1 === "string") content1 = JSON.parse(content1);
+        } catch { /* parse failed */ }
+        const hasFields1 = content1 && "vendor_name" in content1 && "total_amount" in content1 && "currency" in content1;
+        results.json_schema = { status: status1, success: r1.ok, has_fields: !!hasFields1, content: content1, raw: text1.slice(0, 500) };
+        console.log(`V1 result: status=${status1}, ok=${r1.ok}, has_fields=${!!hasFields1}`, content1);
+      } catch (e) {
+        results.json_schema = { status: 0, success: false, error: String(e) };
+        console.error("V1 error:", e);
+      }
+
+      // --- Variante 2: response_format json_object ---
+      try {
+        console.log("=== TEST V2: response_format json_object ===");
+        const r2 = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: baseMessages,
+            max_tokens: 512,
+            temperature: 0.1,
+            response_format: { type: "json_object" },
+          }),
+        });
+        const status2 = r2.status;
+        const text2 = await r2.text();
+        let parsed2 = null;
+        let content2 = null;
+        try {
+          parsed2 = JSON.parse(text2);
+          content2 = parsed2?.choices?.[0]?.message?.content;
+          if (typeof content2 === "string") content2 = JSON.parse(content2);
+        } catch { /* parse failed */ }
+        const hasFields2 = content2 && "vendor_name" in content2 && "total_amount" in content2 && "currency" in content2;
+        results.json_object = { status: status2, success: r2.ok, has_fields: !!hasFields2, content: content2, raw: text2.slice(0, 500) };
+        console.log(`V2 result: status=${status2}, ok=${r2.ok}, has_fields=${!!hasFields2}`, content2);
+      } catch (e) {
+        results.json_object = { status: 0, success: false, error: String(e) };
+        console.error("V2 error:", e);
+      }
+
+      // --- Variante 3: Tool Calling ---
+      try {
+        console.log("=== TEST V3: Tool Calling ===");
+        const r3 = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: baseMessages,
+            max_tokens: 512,
+            temperature: 0.1,
+            tools: [{
+              type: "function",
+              function: {
+                name: "extract_receipt_data",
+                description: "Extract vendor name, total amount, and currency from a receipt",
+                parameters: miniSchema,
+              },
+            }],
+            tool_choice: { type: "function", function: { name: "extract_receipt_data" } },
+          }),
+        });
+        const status3 = r3.status;
+        const text3 = await r3.text();
+        let parsed3 = null;
+        let content3 = null;
+        try {
+          parsed3 = JSON.parse(text3);
+          const toolCall = parsed3?.choices?.[0]?.message?.tool_calls?.[0];
+          if (toolCall?.function?.arguments) {
+            content3 = typeof toolCall.function.arguments === "string"
+              ? JSON.parse(toolCall.function.arguments)
+              : toolCall.function.arguments;
+          }
+        } catch { /* parse failed */ }
+        const hasFields3 = content3 && "vendor_name" in content3 && "total_amount" in content3 && "currency" in content3;
+        results.tool_calling = { status: status3, success: r3.ok, has_fields: !!hasFields3, content: content3, raw: text3.slice(0, 500) };
+        console.log(`V3 result: status=${status3}, ok=${r3.ok}, has_fields=${!!hasFields3}`, content3);
+      } catch (e) {
+        results.tool_calling = { status: 0, success: false, error: String(e) };
+        console.error("V3 error:", e);
+      }
+
+      console.log("=== SCHEMA TEST COMPLETE ===");
+      console.log("Summary:", JSON.stringify({
+        json_schema: { ok: results.json_schema?.success, fields: results.json_schema?.has_fields },
+        json_object: { ok: results.json_object?.success, fields: results.json_object?.has_fields },
+        tool_calling: { ok: results.tool_calling?.success, fields: results.tool_calling?.has_fields },
+      }));
+
+      return new Response(JSON.stringify({ schema_test: true, results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // ========== END SCHEMA TEST MODE ==========
+
     let imageBase64: string;
     let mimeType: string;
     let receiptId: string | null = null;
