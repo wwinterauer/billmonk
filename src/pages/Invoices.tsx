@@ -480,7 +480,16 @@ const Invoices = () => {
                               )}
                             </TableCell>
                           )}
-                          {columns.amount && <TableCell className="text-right font-medium">{fmt(inv.total || 0)}</TableCell>}
+                          {columns.amount && (
+                            <TableCell className="text-right font-medium">
+                              <div>{fmt(inv.total || 0)}</div>
+                              {(inv.discount_percent ?? 0) > 0 && inv.total && (
+                                <div className="text-xs text-muted-foreground font-normal">
+                                  Skonto: {fmt(inv.total * (1 - (inv.discount_percent || 0) / 100))}
+                                </div>
+                              )}
+                            </TableCell>
+                          )}
                           {columns.status && (
                             <TableCell>
                               <div className="flex items-center gap-1.5">
