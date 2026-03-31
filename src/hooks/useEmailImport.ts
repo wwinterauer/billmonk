@@ -635,6 +635,7 @@ export const useEmailImport = () => {
     skipAttachment: skipAttachmentMutation.mutate,
     
     // Loading states
-    isLoading: isLoadingConnection || isLoadingAccounts || isLoadingHistory || isLoadingAttachments,
+    isLoading: isLoadingConnection || isLoadingAccounts,
+    isError: isErrorConnection || isErrorAccounts,
   };
 };
