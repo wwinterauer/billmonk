@@ -125,6 +125,7 @@ const Review = () => {
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
   const { vatRateGroups } = useVatRates();
+  const { trackFieldChange } = useVendorFieldDefaults();
   const queryClient = useQueryClient();
 
   // State
