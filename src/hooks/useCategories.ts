@@ -143,8 +143,20 @@ export function useCategories(options?: { includeHidden?: boolean }) {
     setCategories(prev => prev.filter(c => c.id !== id));
   };
 
+  const userCategories = useMemo(
+    () => categories.filter(c => !c.is_system || !c.country),
+    [categories]
+  );
+
+  const taxCategories = useMemo(
+    () => categories.filter(c => c.is_system && !!c.country),
+    [categories]
+  );
+
   return {
     categories,
+    userCategories,
+    taxCategories,
     loading,
     error,
     fetchCategories,
