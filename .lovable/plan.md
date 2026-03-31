@@ -1,93 +1,78 @@
 
 
-# Fix: line_items Recalculation greift nicht — robustere Validierung
+# Fix: Mixed-Tax Fields fehlen im Reanalyse-Rückkanal
 
-## Root Cause
+## Problem
 
-Der Code auf Zeile 746 filtert `rawData.line_items` mit `typeof li.total === 'number' && li.total > 0`. Zwei mögliche Probleme:
+Die Edge Function berechnet die Werte korrekt (`net=16.42, vat=3.18`) und speichert sie in der Datenbank. Aber der **Client-seitige Rückkanal** gibt diese Werte nie an das Formular weiter:
 
-1. **Negative Totals**: Bei Monta-Rechnungen können Beträge in Klammern als negative Zahlen zurückkommen → `li.total > 0` filtert sie raus
-2. **String statt Number**: Das Schema definiert `total` als `number`, aber die KI könnte trotzdem Strings liefern → `typeof li.total === 'number'` schlägt fehl
-3. **tax_rate als String "0%"**: Wird zu NaN bei `parseFloat("0%".replace('%',''))` — nein, das sollte funktionieren
+1. `ReanalyzeOptions.onFieldsUpdated` Interface akzeptiert nur: `vendor`, `vendor_brand`, `description`, `invoice_number`, `receipt_date`, `amount_gross`, `vat_rate`, `category`, `confidence`
+2. Die Mapping-Logik in `reanalyzeFields()` mappt nie: `amount_net`, `vat_amount`, `is_mixed_tax_rate`, `tax_rate_details`
+3. `handleReanalysisUpdate` in Review.tsx setzt diese Felder nie im FormData
+
+Das Formular zeigt daher immer die **alten** Werte. Die DB hat die richtigen Werte, aber das Formular wird nie aktualisiert.
 
 ## Lösung
 
-**Datei: `supabase/functions/extract-receipt/index.ts`**, Zeilen 745-777
+### 1. `ReanalyzeOptions.tsx` — Interface und Mapping erweitern
 
-1. **Robustere Parsing**: `Number(li.total)` statt `typeof === 'number'`-Check, `Math.abs()` anwenden
-2. **Debug-Logging**: `console.log` für `rawData.line_items` um zu sehen was die KI tatsächlich liefert
-3. **Fallback auf tax_rate_details**: Wenn line_items nicht greifen, TROTZDEM die `tax_rate_details` mit korrekter Mathematik neu berechnen (Netto = Brutto / (1 + Satz/100))
-
-### Konkrete Änderungen
-
+**onFieldsUpdated Interface** (Zeile 87-97): Felder hinzufügen:
 ```typescript
-// Zeile 745-777 ersetzen:
+onFieldsUpdated: (updates: {
+  // ... bestehende Felder ...
+  amount_net?: string;
+  vat_amount?: string;
+  is_mixed_tax_rate?: boolean;
+  tax_rate_details?: { rate: number; net_amount: number; tax_amount: number; description?: string }[] | null;
+}) => void;
+```
 
-// ── Post-Processing: rebuild tax_rate_details from line_items ──
-const lineItems = Array.isArray(rawData.line_items) ? rawData.line_items : [];
-console.log(`[LineItems Debug] Count: ${lineItems.length}, items:`, JSON.stringify(lineItems.slice(0, 5)));
-
-const validLineItems = lineItems.filter((li: any) => {
-  const total = Number(li?.total);
-  return li && Number.isFinite(total) && total !== 0 && li.tax_rate != null;
-});
-console.log(`[LineItems Debug] Valid count: ${validLineItems.length}`);
-
-if (validLineItems.length > 0) {
-  const rateGroups: Record<string, { gross: number; descriptions: string[] }> = {};
-  for (const li of validLineItems) {
-    const rateKey = String(parseFloat(String(li.tax_rate).replace(',', '.').replace('%', '')) || 0);
-    if (!rateGroups[rateKey]) rateGroups[rateKey] = { gross: 0, descriptions: [] };
-    rateGroups[rateKey].gross += Math.abs(Number(li.total));
-    if (li.description) rateGroups[rateKey].descriptions.push(li.description);
-  }
-  const rateKeys = Object.keys(rateGroups);
-  if (rateKeys.length > 1) {
-    // Multiple tax rates — rebuild
-    const newDetails = rateKeys.map(rateStr => {
-      const rate = parseFloat(rateStr);
-      const gross = rateGroups[rateStr].gross;
-      const netAmount = rate === 0 ? gross : gross / (1 + rate / 100);
-      const taxAmount = gross - netAmount;
-      return {
-        rate,
-        net_amount: Math.round(netAmount * 100) / 100,
-        tax_amount: Math.round(taxAmount * 100) / 100,
-        description: rateGroups[rateStr].descriptions.join(', '),
-      };
-    });
-    extractedData.tax_rate_details = newDetails;
-    extractedData.is_mixed_tax_rate = true;
-    extractedData.amount_net = Math.round(newDetails.reduce((s, d) => s + d.net_amount, 0) * 100) / 100;
-    extractedData.vat_amount = Math.round(newDetails.reduce((s, d) => s + d.tax_amount, 0) * 100) / 100;
-    console.log(`[VAT Mixed] Rebuilt: net=${extractedData.amount_net}, vat=${extractedData.vat_amount}, details=`, JSON.stringify(newDetails));
-  }
+**reanalyzeFields Mapping** (nach Zeile 202): Neue Felder mappen:
+```typescript
+if (normalized.amount_net !== null && normalized.amount_net !== undefined) {
+  updates.amount_net = normalized.amount_net.toString();
 }
-
-// ── Fallback: recalculate tax_rate_details with correct math ──
-if (!extractedData.is_mixed_tax_rate && Array.isArray(extractedData.tax_rate_details) && extractedData.tax_rate_details.length > 1) {
-  const detailRates = [...new Set(extractedData.tax_rate_details.map((t: any) => Number(t?.rate)).filter((r: number) => !Number.isNaN(r)))];
-  if (detailRates.length > 1) {
-    // Recalculate each detail's net/vat from its gross (if available) or from the existing values
-    extractedData.tax_rate_details = extractedData.tax_rate_details.map((d: any) => {
-      const rate = Number(d.rate) || 0;
-      const gross = Number(d.net_amount) + Number(d.tax_amount); // reconstruct gross from AI values
-      const netAmount = rate === 0 ? gross : gross / (1 + rate / 100);
-      const taxAmount = gross - netAmount;
-      return { ...d, net_amount: Math.round(netAmount * 100) / 100, tax_amount: Math.round(taxAmount * 100) / 100 };
-    });
-    extractedData.is_mixed_tax_rate = true;
-    extractedData.amount_net = Math.round(extractedData.tax_rate_details.reduce((s: number, t: any) => s + t.net_amount, 0) * 100) / 100;
-    extractedData.vat_amount = Math.round(extractedData.tax_rate_details.reduce((s: number, t: any) => s + t.tax_amount, 0) * 100) / 100;
-    console.log(`[VAT Mixed] Fallback recalc: net=${extractedData.amount_net}, vat=${extractedData.vat_amount}`);
-  }
+if (normalized.vat_amount !== null && normalized.vat_amount !== undefined) {
+  updates.vat_amount = normalized.vat_amount.toString();
+}
+if (normalized.is_mixed_tax_rate !== undefined) {
+  updates.is_mixed_tax_rate = normalized.is_mixed_tax_rate;
+}
+if (normalized.tax_rate_details) {
+  updates.tax_rate_details = normalized.tax_rate_details;
 }
 ```
 
-### Warum das hilft
+Dasselbe auch in `handleExpensesOnlyReanalyze()` (ca. Zeile 310-337).
 
-- `Number(li.total)` statt `typeof === 'number'` akzeptiert auch Strings
-- `total !== 0` statt `total > 0` akzeptiert negative Beträge (werden dann mit `Math.abs` korrigiert)
-- Debug-Logs zeigen exakt was die KI in `line_items` liefert
-- Fallback recalculated die `tax_rate_details` mit korrekter Mathematik, auch wenn keine line_items vorhanden
+### 2. `Review.tsx` — handleReanalysisUpdate erweitern
+
+**Callback** (Zeile 298-323): Neue Felder akzeptieren und in formData setzen:
+```typescript
+const handleReanalysisUpdate = useCallback((updates: {
+  // ... bestehende Felder ...
+  amount_net?: string;
+  vat_amount?: string;
+  is_mixed_tax_rate?: boolean;
+  tax_rate_details?: TaxRateDetail[] | null;
+}) => {
+  setFormData(prev => ({
+    ...prev,
+    // ... bestehende Zuweisungen ...
+    is_mixed_tax_rate: updates.is_mixed_tax_rate ?? prev.is_mixed_tax_rate,
+    tax_rate_details: updates.tax_rate_details ?? prev.tax_rate_details,
+    amount_net_override: updates.amount_net ?? prev.amount_net_override,
+    vat_amount_override: updates.vat_amount ?? prev.vat_amount_override,
+  }));
+});
+```
+
+### 3. `ReceiptDetailPanel.tsx` — Dasselbe Muster anwenden
+
+Auch hier den `onFieldsUpdated` Callback erweitern, damit gemischte Steuersätze in der Detailansicht korrekt aktualisiert werden.
+
+### Dateien
+- `src/components/receipts/ReanalyzeOptions.tsx` — Interface + Mapping
+- `src/pages/Review.tsx` — handleReanalysisUpdate
+- `src/components/receipts/ReceiptDetailPanel.tsx` — handleReanalysisUpdate (gleiche Änderung)
 
