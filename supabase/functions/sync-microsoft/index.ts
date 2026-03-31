@@ -325,14 +325,16 @@ serve(async (req) => {
 
 // === HELPER FUNCTIONS ===
 
-function buildGraphFilter(account: any): string {
+function buildGraphFilter(account: any, syncSince: string | null = null): string {
   const filters: string[] = [];
 
   // Nur E-Mails mit Anhängen
   filters.push("hasAttachments eq true");
 
   // Zeitfilter
-  if (account.last_sync_at) {
+  if (syncSince) {
+    filters.push(`receivedDateTime ge ${new Date(syncSince).toISOString()}`);
+  } else if (account.last_sync_at) {
     const lastSync = new Date(account.last_sync_at).toISOString();
     filters.push(`receivedDateTime ge ${lastSync}`);
   } else {

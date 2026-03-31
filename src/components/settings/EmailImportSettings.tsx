@@ -787,6 +787,12 @@ export const EmailImportSettings: React.FC = () => {
                               >
                                 <RotateCcw className="h-4 w-4" />
                               </Button>
+                              {/* Historical sync button */}
+                              <HistoricalSyncButton
+                                accountId={account.id}
+                                disabled={isSyncingThis || !account.is_active}
+                                onSync={(date) => syncEmailAccount({ accountId: account.id, syncSince: date.toISOString() })}
+                              />
                             </div>
                             {/* Löschen */}
                             <AlertDialog>

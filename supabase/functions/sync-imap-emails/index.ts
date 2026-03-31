@@ -490,7 +490,8 @@ async function processEmails(
   client: SimpleImapClient, 
   supabase: any, 
   account: any,
-  resync: boolean = false
+  resync: boolean = false,
+  syncSince: string | null = null
 ): Promise<SyncResult> {
   const result: SyncResult = {
     processed: 0,
@@ -501,16 +502,20 @@ async function processEmails(
   };
 
   try {
-    // E-Mails suchen - bei Resync auch gelesene E-Mails prüfen
+    // E-Mails suchen
     let searchCriteria: string;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
-    if (resync) {
+    if (syncSince) {
+      // Historical sync: alle E-Mails seit dem gewählten Datum
+      const d = new Date(syncSince);
+      const imapDate = `${d.getDate()}-${months[d.getMonth()]}-${d.getFullYear()}`;
+      searchCriteria = `SINCE ${imapDate}`;
+      console.log(`Historical sync mode: searching emails since ${imapDate}`);
+    } else if (resync) {
       // Resync: Alle E-Mails der letzten 7 Tage prüfen (auch gelesene)
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const dateStr = sevenDaysAgo.toISOString().split('T')[0].replace(/-/g, '');
-      // Format: SINCE 01-Feb-2026
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const d = sevenDaysAgo;
       const imapDate = `${d.getDate()}-${months[d.getMonth()]}-${d.getFullYear()}`;
       searchCriteria = `SINCE ${imapDate}`;
@@ -530,8 +535,8 @@ async function processEmails(
       return result;
     }
 
-    // Bei Resync mehr E-Mails verarbeiten, da wir nach fehlenden suchen
-    const maxToProcess = resync ? 50 : 20;
+    // Historical sync: mehr E-Mails verarbeiten
+    const maxToProcess = syncSince ? 100 : (resync ? 50 : 20);
     // Neueste zuerst (höchste Message-Nummer = neueste)
     const sortedNums = [...messageNums].sort((a, b) => b - a);
     const toProcess = sortedNums.slice(0, maxToProcess);

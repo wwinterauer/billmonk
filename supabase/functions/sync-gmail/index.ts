@@ -275,7 +275,7 @@ serve(async (req) => {
 
 // === HELPER FUNCTIONS ===
 
-function buildGmailQuery(account: any): string {
+function buildGmailQuery(account: any, syncSince: string | null = null): string {
   const parts: string[] = [];
   
   // Nur mit Anhängen
@@ -287,8 +287,12 @@ function buildGmailQuery(account: any): string {
     parts.push("in:inbox");
   }
   
-  // Zeitfilter: nur seit letztem Sync oder letzte 30 Tage
-  if (account.last_sync_at) {
+  // Zeitfilter
+  if (syncSince) {
+    // Historical sync: ab gewähltem Datum
+    const d = new Date(syncSince);
+    parts.push(`after:${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`);
+  } else if (account.last_sync_at) {
     const lastSync = new Date(account.last_sync_at);
     const year = lastSync.getFullYear();
     const month = lastSync.getMonth() + 1;
