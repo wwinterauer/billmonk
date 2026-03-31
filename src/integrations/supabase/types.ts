@@ -2442,8 +2442,10 @@ export type Database = {
           description: string | null
           id: string
           is_private: boolean
+          payment_method: string | null
           receipt_id: string
           sort_order: number
+          tax_type: string | null
           updated_at: string | null
           user_id: string
           vat_amount: number
@@ -2457,8 +2459,10 @@ export type Database = {
           description?: string | null
           id?: string
           is_private?: boolean
+          payment_method?: string | null
           receipt_id: string
           sort_order?: number
+          tax_type?: string | null
           updated_at?: string | null
           user_id: string
           vat_amount?: number
@@ -2472,8 +2476,10 @@ export type Database = {
           description?: string | null
           id?: string
           is_private?: boolean
+          payment_method?: string | null
           receipt_id?: string
           sort_order?: number
+          tax_type?: string | null
           updated_at?: string | null
           user_id?: string
           vat_amount?: number

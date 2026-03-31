@@ -17,14 +17,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-
 import { useVatRates } from '@/hooks/useVatRates';
+import { TAX_TYPES, PAYMENT_METHODS } from '@/lib/constants';
+import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 
 export interface SplitLine {
   id?: string;
   sort_order: number;
   description: string;
   category: string;
+  tax_type: string;
+  payment_method: string;
   amount_gross: number;
   amount_net: number;
   vat_rate: number;
@@ -39,12 +42,15 @@ interface SplitBookingEditorProps {
   mainCategory?: string;
   mainVatRate?: number;
   onSplitChange?: (isSplit: boolean) => void;
+  vendorId?: string | null;
 }
 
-const createEmptyLine = (sortOrder: number, category = '', vatRate = 20): SplitLine => ({
+const createEmptyLine = (sortOrder: number, category = '', vatRate = 20, taxType = '', paymentMethod = ''): SplitLine => ({
   sort_order: sortOrder,
   description: '',
   category,
+  tax_type: taxType,
+  payment_method: paymentMethod,
   amount_gross: 0,
   amount_net: 0,
   vat_rate: vatRate,
@@ -66,23 +72,35 @@ const recalcLine = (line: SplitLine, field: 'gross' | 'net' | 'vat_rate'): Split
   return updated;
 };
 
-export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVatRate, onSplitChange }: SplitBookingEditorProps) {
+export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVatRate, onSplitChange, vendorId }: SplitBookingEditorProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { categories } = useCategories();
   const { vatRates } = useVatRates();
+  const { trackFieldChange, getFieldDefaults } = useVendorFieldDefaults();
   const [lines, setLines] = useState<SplitLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [loadingAiSuggestions, setLoadingAiSuggestions] = useState(false);
+  const [vendorDefaults, setVendorDefaults] = useState<Record<string, string>>({});
+
+  // Load vendor defaults
+  useEffect(() => {
+    if (!vendorId) {
+      setVendorDefaults({});
+      return;
+    }
+    getFieldDefaults(vendorId).then(defaults => {
+      setVendorDefaults(defaults || {});
+    });
+  }, [vendorId, getFieldDefaults]);
 
   // Load existing split lines
   useEffect(() => {
     if (!receiptId || !user) return;
     const load = async () => {
       setLoading(true);
-      // Check if receipt is split
       const { data: receipt } = await supabase
         .from('receipts')
         .select('is_split_booking')
@@ -100,11 +118,13 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
           .order('sort_order');
 
         if (splitLines && splitLines.length > 0) {
-          setLines(splitLines.map(sl => ({
+          setLines(splitLines.map((sl: any) => ({
             id: sl.id,
             sort_order: sl.sort_order,
             description: sl.description || '',
             category: sl.category || '',
+            tax_type: sl.tax_type || '',
+            payment_method: sl.payment_method || '',
             amount_gross: Number(sl.amount_gross) || 0,
             amount_net: Number(sl.amount_net) || 0,
             vat_rate: Number(sl.vat_rate) || 20,
@@ -121,16 +141,28 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
 
   const activateSplit = useCallback(() => {
     const vatRate = mainVatRate ?? 20;
-    const firstLine = createEmptyLine(0, mainCategory || '', vatRate);
+    const firstLine = createEmptyLine(
+      0,
+      mainCategory || '',
+      vatRate,
+      vendorDefaults.tax_type || '',
+      vendorDefaults.payment_method || ''
+    );
     firstLine.amount_gross = totalGross;
     const recalced = recalcLine(firstLine, 'gross');
     setLines([recalced]);
     setIsActive(true);
-  }, [totalGross, mainCategory, mainVatRate]);
+  }, [totalGross, mainCategory, mainVatRate, vendorDefaults]);
 
   const addLine = useCallback(() => {
-    setLines(prev => [...prev, createEmptyLine(prev.length, '', mainVatRate ?? 20)]);
-  }, [mainVatRate]);
+    setLines(prev => [...prev, createEmptyLine(
+      prev.length,
+      '',
+      mainVatRate ?? 20,
+      vendorDefaults.tax_type || '',
+      vendorDefaults.payment_method || ''
+    )]);
+  }, [mainVatRate, vendorDefaults]);
 
   const removeLine = useCallback((idx: number) => {
     setLines(prev => prev.filter((_, i) => i !== idx).map((l, i) => ({ ...l, sort_order: i })));
@@ -168,19 +200,19 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
     if (!user || !receiptId) return;
     setSaving(true);
     try {
-      // Delete existing split lines
       await supabase
         .from('receipt_split_lines')
         .delete()
         .eq('receipt_id', receiptId);
 
-      // Insert new lines
       const inserts = lines.map((l, i) => ({
         receipt_id: receiptId,
         user_id: user.id,
         sort_order: i,
         description: l.description || null,
         category: l.category || null,
+        tax_type: l.tax_type || null,
+        payment_method: l.payment_method || null,
         amount_gross: l.amount_gross,
         amount_net: l.amount_net,
         vat_rate: l.vat_rate,
@@ -194,11 +226,20 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
 
       if (insertError) throw insertError;
 
-      // Mark receipt as split
       await supabase
         .from('receipts')
         .update({ is_split_booking: true } as any)
         .eq('id', receiptId);
+
+      // Vendor learning: track field changes per split line
+      if (vendorId) {
+        for (const line of lines) {
+          if (line.category) trackFieldChange(vendorId, 'category', line.category);
+          if (line.tax_type) trackFieldChange(vendorId, 'tax_type', line.tax_type);
+          if (line.payment_method) trackFieldChange(vendorId, 'payment_method', line.payment_method);
+          if (line.vat_rate) trackFieldChange(vendorId, 'tax_rate', line.vat_rate.toString());
+        }
+      }
 
       onSplitChange?.(true);
       toast({ title: 'Splitbuchung gespeichert', description: `${lines.length} Positionen gespeichert.` });
@@ -238,7 +279,6 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
     if (!receiptId) return;
     setLoadingAiSuggestions(true);
     try {
-      // Load line_items_raw from receipt
       const { data: receipt } = await supabase
         .from('receipts')
         .select('line_items_raw')
@@ -260,6 +300,8 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
           sort_order: idx,
           description: item.description || '',
           category: item.category || mainCategory || '',
+          tax_type: item.tax_type || vendorDefaults.tax_type || '',
+          payment_method: vendorDefaults.payment_method || '',
           amount_gross: grossAmount,
           amount_net: netAmount,
           vat_rate: vatRate,
@@ -328,29 +370,51 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
               )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {/* Description */}
-              <div className="col-span-2">
-                <Input
-                  placeholder="Beschreibung"
-                  value={line.description}
-                  onChange={e => updateLine(idx, 'description', e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              {/* Category */}
-              <div className="col-span-2">
-                <Select value={line.category} onValueChange={v => updateLine(idx, 'category', v)}>
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue placeholder="Kategorie" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Description */}
+            <Input
+              placeholder="Beschreibung"
+              value={line.description}
+              onChange={e => updateLine(idx, 'description', e.target.value)}
+              className="h-8 text-sm"
+            />
+
+            {/* Category / Tax Type / Payment Method row */}
+            <div className="grid grid-cols-3 gap-2">
+              <Select value={line.category} onValueChange={v => updateLine(idx, 'category', v === '__empty__' ? '' : v)}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Nicht zugeordnet" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__empty__">Nicht zugeordnet</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={line.tax_type} onValueChange={v => updateLine(idx, 'tax_type', v === '__empty__' ? '' : v)}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Offen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__empty__">Offen</SelectItem>
+                  {TAX_TYPES.map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={line.payment_method} onValueChange={v => updateLine(idx, 'payment_method', v === '__empty__' ? '' : v)}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Keine" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__empty__">Keine</SelectItem>
+                  {PAYMENT_METHODS.map(m => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end">

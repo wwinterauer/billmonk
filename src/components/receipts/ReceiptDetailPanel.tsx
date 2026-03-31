@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { TAX_TYPES } from '@/lib/constants';
+import { TAX_TYPES, PAYMENT_METHODS } from '@/lib/constants';
 import { Repeat } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -113,17 +113,6 @@ interface TaxRateDetail {
   description?: string;
 }
 
-const PAYMENT_METHODS = [
-  { value: 'Überweisung', label: 'Überweisung' },
-  { value: 'Kreditkarte', label: 'Kreditkarte' },
-  { value: 'Debitkarte', label: 'Karte Debitzahlung' },
-  { value: 'Bar', label: 'Barzahlung' },
-  { value: 'PayPal', label: 'PayPal' },
-  { value: 'Apple Pay', label: 'Apple Pay' },
-  { value: 'Google Pay', label: 'Google Pay' },
-  { value: 'Lastschrift', label: 'Lastschrift' },
-  { value: 'Sonstige', label: 'Sonstige' },
-];
 
 
 export function ReceiptDetailPanel({ 
@@ -1498,6 +1487,7 @@ export function ReceiptDetailPanel({
                         mainCategory={category}
                         mainVatRate={vatRate !== '' ? parseFloat(vatRate) : 20}
                         onSplitChange={() => onUpdate()}
+                        vendorId={selectedVendorId}
                       />
                     )}
 

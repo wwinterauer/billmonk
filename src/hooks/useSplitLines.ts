@@ -7,6 +7,8 @@ export interface SplitLine {
   receipt_id: string;
   description: string | null;
   category: string | null;
+  tax_type: string | null;
+  payment_method: string | null;
   amount_gross: number;
   amount_net: number;
   vat_rate: number;
