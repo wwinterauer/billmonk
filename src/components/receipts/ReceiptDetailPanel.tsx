@@ -1478,7 +1478,7 @@ export function ReceiptDetailPanel({
                       </LearnableField>
 
                       {/* Buchungsart (tax_type) */}
-                      <div className="space-y-2">
+                      <div className="space-y-2 flex flex-col justify-end">
                         <Label>Buchungsart</Label>
                         <Select value={taxType} onValueChange={setTaxType}>
                           <SelectTrigger>
