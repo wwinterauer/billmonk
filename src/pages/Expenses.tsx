@@ -2498,7 +2498,7 @@ const Expenses = () => {
                                 )}
                                 {/* Split Booking icon */}
                                 {splitBookingEnabled && (receipt as any).is_split_booking && (
-                                  <Layers className="w-3.5 h-3.5 text-violet-600" title="Splitbuchung" />
+                                  <Layers className="w-3.5 h-3.5 text-violet-600" />
                                 )}
                                 {/* Source Badge for email imports */}
                                 {receipt.source?.startsWith('email_') && (
