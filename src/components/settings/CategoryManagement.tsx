@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Plus,
   Pencil,
@@ -79,6 +79,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Separator } from '@/components/ui/separator';
 import { TAX_CATEGORY_INFO } from './taxCategoryInfo';
 
 // Icon mapping
@@ -500,6 +501,113 @@ export function CategoryManagement() {
   const visibleTaxCats = taxCatsForCountry.filter(c => !c.is_hidden);
   const allTaxVisible = taxCatsForCountry.length > 0 && visibleTaxCats.length === taxCatsForCountry.length;
 
+  // Split into two groups
+  const userCategories = useMemo(() => categories.filter(c => !c.is_system || !c.country), [categories]);
+  const taxCategories = useMemo(() => categories.filter(c => c.is_system && !!c.country), [categories]);
+
+  const renderCategoryRow = (category: Category, showTaxCodeCol: boolean) => (
+    <TableRow 
+      key={category.id}
+      className={cn(category.is_hidden && 'opacity-50')}
+    >
+      <TableCell>
+        {renderIcon(category.icon, category.color)}
+      </TableCell>
+      <TableCell className="font-medium">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {category.name}
+          {category.country && (
+            <span className="text-xs" title={COUNTRY_LABELS[category.country]}>
+              {COUNTRY_FLAGS[category.country]}
+            </span>
+          )}
+          {category.is_system && category.country && TAX_CATEGORY_INFO[category.name] && (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center h-5 w-5 rounded-full hover:bg-muted transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setInfoCategory(category);
+                      setInfoDialogOpen(true);
+                    }}
+                  >
+                    <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-xs">
+                  <p className="text-xs">{TAX_CATEGORY_INFO[category.name].short}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {category.is_hidden && (
+            <Badge variant="outline" className="text-xs">Ausgeblendet</Badge>
+          )}
+        </div>
+      </TableCell>
+      {showTaxCodeCol && (
+        <TableCell>
+          {category.tax_code ? (
+            <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">
+              {category.tax_code}
+            </code>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          )}
+        </TableCell>
+      )}
+      <TableCell className="text-right text-muted-foreground">
+        {category.receipt_count || 0} Belege
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-1">
+          {category.name === 'Keine Rechnung' ? (
+            <Badge variant="outline" className="text-xs text-muted-foreground">
+              Geschützt
+            </Badge>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => handleToggleVisibility(category)}
+                title={category.is_hidden ? 'Einblenden' : 'Ausblenden'}
+              >
+                {category.is_hidden ? (
+                  <Eye className="h-4 w-4" />
+                ) : (
+                  <EyeOff className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => handleEdit(category)}
+                title="Bearbeiten"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                onClick={() => handleDeleteClick(category)}
+                title="Löschen"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -509,203 +617,125 @@ export function CategoryManagement() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Ausgaben-Kategorien</h3>
-          <p className="text-sm text-muted-foreground">Verwalte die Kategorien für deine Belege</p>
-        </div>
-        <Button onClick={handleNewCategory}>
-          <Plus className="h-4 w-4 mr-2" />
-          Neue Kategorie
-        </Button>
-      </div>
-
-      {/* Tax categories control */}
-      <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
-        <div className="flex items-center gap-2">
-          <Globe className="h-4 w-4 text-muted-foreground" />
-          <h4 className="font-medium text-sm">Steuerliche Kategorien</h4>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 text-sm">
-            <span>{COUNTRY_FLAGS[selectedCountry]}</span>
-            <span className="font-medium">{COUNTRY_LABELS[selectedCountry]}</span>
-            <span className="text-muted-foreground text-xs">(aus deinem Profil)</span>
+    <div className="space-y-6">
+      {/* Section 1: Meine Kategorien */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">Meine Kategorien</h3>
+            <p className="text-sm text-muted-foreground">Deine persönlichen Kategorien zur Organisation deiner Belege.</p>
           </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleToggleTaxCategories(!allTaxVisible)}
-            disabled={togglingTax}
-          >
-            {togglingTax && <Loader2 className="h-3 w-3 mr-2 animate-spin" />}
-            {allTaxVisible ? (
-              <>
-                <EyeOff className="h-3.5 w-3.5 mr-1.5" />
-                Steuer-Kategorien ausblenden
-              </>
-            ) : (
-              <>
-                <Eye className="h-3.5 w-3.5 mr-1.5" />
-                Steuer-Kategorien einblenden
-              </>
-            )}
+          <Button onClick={handleNewCategory}>
+            <Plus className="h-4 w-4 mr-2" />
+            Neue Kategorie
           </Button>
-
-          <div className="flex items-center gap-2 ml-auto">
-            <Label htmlFor="show-tax-codes" className="text-xs text-muted-foreground cursor-pointer">
-              Steuernummern anzeigen
-            </Label>
-            <Switch
-              id="show-tax-codes"
-              checked={showTaxCodes}
-              onCheckedChange={setShowTaxCodes}
-            />
-          </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">
-          {visibleTaxCats.length} von {taxCatsForCountry.length} {COUNTRY_LABELS[selectedCountry]}-Kategorien aktiv
-        </p>
-      </div>
-
-      {/* Table */}
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12"></TableHead>
-              <TableHead>Name</TableHead>
-              {showTaxCodes && <TableHead>Steuernr.</TableHead>}
-              <TableHead>Typ</TableHead>
-              <TableHead className="text-right">Belege</TableHead>
-              <TableHead className="text-right">Aktionen</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {categories.length === 0 ? (
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={showTaxCodes ? 6 : 5} className="text-center py-8 text-muted-foreground">
-                  Keine Kategorien vorhanden
-                </TableCell>
+                <TableHead className="w-12"></TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead className="text-right">Belege</TableHead>
+                <TableHead className="text-right">Aktionen</TableHead>
               </TableRow>
-            ) : (
-              categories.map((category) => (
-                <TableRow 
-                  key={category.id}
-                  className={cn(category.is_hidden && 'opacity-50')}
-                >
-                  <TableCell>
-                    {renderIcon(category.icon, category.color)}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {category.name}
-                      {category.country && (
-                        <span className="text-xs" title={COUNTRY_LABELS[category.country]}>
-                          {COUNTRY_FLAGS[category.country]}
-                        </span>
-                      )}
-                      {category.is_system && category.country && TAX_CATEGORY_INFO[category.name] && (
-                        <TooltipProvider delayDuration={200}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                className="inline-flex items-center justify-center h-5 w-5 rounded-full hover:bg-muted transition-colors"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setInfoCategory(category);
-                                  setInfoDialogOpen(true);
-                                }}
-                              >
-                                <Info className="h-3.5 w-3.5 text-muted-foreground" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="max-w-xs">
-                              <p className="text-xs">{TAX_CATEGORY_INFO[category.name].short}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                      {category.is_hidden && (
-                        <Badge variant="outline" className="text-xs">Ausgeblendet</Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  {showTaxCodes && (
-                    <TableCell>
-                      {category.tax_code ? (
-                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">
-                          {category.tax_code}
-                        </code>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <Badge variant={category.is_system ? 'secondary' : 'outline'}>
-                      {category.is_system ? 'Steuer' : 'Eigene'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {category.receipt_count || 0} Belege
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {category.name === 'Keine Rechnung' ? (
-                        <Badge variant="outline" className="text-xs text-muted-foreground">
-                          Geschützt
-                        </Badge>
-                      ) : (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleToggleVisibility(category)}
-                            title={category.is_hidden ? 'Einblenden' : 'Ausblenden'}
-                          >
-                            {category.is_hidden ? (
-                              <Eye className="h-4 w-4" />
-                            ) : (
-                              <EyeOff className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleEdit(category)}
-                            title="Bearbeiten"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleDeleteClick(category)}
-                            title="Löschen"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
+            </TableHeader>
+            <TableBody>
+              {userCategories.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    Keine eigenen Kategorien vorhanden
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                userCategories.map((category) => renderCategoryRow(category, false))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
+      <Separator />
+
+      {/* Section 2: Buchungsarten */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-lg font-semibold">Buchungsarten</h3>
+          <p className="text-sm text-muted-foreground">Steuerliche Einordnung deiner Belege. Wird in Exporten verwendet.</p>
+        </div>
+
+        {/* Tax categories control */}
+        <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
+          <div className="flex flex-wrap items-center gap-3.5">
+            <div className="flex items-center gap-2 text-sm">
+              <span>{COUNTRY_FLAGS[selectedCountry]}</span>
+              <span className="font-medium">{COUNTRY_LABELS[selectedCountry]}</span>
+              <span className="text-muted-foreground text-xs">(aus deinem Profil)</span>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleToggleTaxCategories(!allTaxVisible)}
+              disabled={togglingTax}
+            >
+              {togglingTax && <Loader2 className="h-3 w-3 mr-2 animate-spin" />}
+              {allTaxVisible ? (
+                <>
+                  <EyeOff className="h-3.5 w-3.5 mr-1.5" />
+                  Steuer-Kategorien ausblenden
+                </>
+              ) : (
+                <>
+                  <Eye className="h-3.5 w-3.5 mr-1.5" />
+                  Steuer-Kategorien einblenden
+                </>
+              )}
+            </Button>
+
+            <div className="flex items-center gap-2 ml-auto">
+              <Label htmlFor="show-tax-codes" className="text-xs text-muted-foreground cursor-pointer">
+                Steuernummern anzeigen
+              </Label>
+              <Switch
+                id="show-tax-codes"
+                checked={showTaxCodes}
+                onCheckedChange={setShowTaxCodes}
+              />
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            {visibleTaxCats.length} von {taxCatsForCountry.length} {COUNTRY_LABELS[selectedCountry]}-Kategorien aktiv
+          </p>
+        </div>
+
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12"></TableHead>
+                <TableHead>Name</TableHead>
+                {showTaxCodes && <TableHead>Steuernr.</TableHead>}
+                <TableHead className="text-right">Belege</TableHead>
+                <TableHead className="text-right">Aktionen</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {taxCategories.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={showTaxCodes ? 5 : 4} className="text-center py-8 text-muted-foreground">
+                    Keine Buchungsarten vorhanden
+                  </TableCell>
+                </TableRow>
+              ) : (
+                taxCategories.map((category) => renderCategoryRow(category, showTaxCodes))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
 
       {/* Edit/Create Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
