@@ -204,17 +204,7 @@ serve(async (req) => {
 
         console.log(`Created split receipt ${newReceipt.id}: ${partName}`);
 
-        // KI-Extraktion für das neue Teil-PDF starten (async, nicht warten)
-        supabase.functions.invoke('extract-receipt', {
-          body: { 
-            receiptId: newReceipt.id, 
-            skipMultiCheck: true
-          }
-        }).then(() => {
-          console.log(`Extraction started for ${newReceipt.id}`);
-        }).catch(err => {
-          console.error(`Extraction failed for ${newReceipt.id}:`, err);
-        });
+        // Extraction will be triggered in background after response
 
       } catch (splitError: any) {
         console.error(`Error processing split ${i + 1}:`, splitError);
