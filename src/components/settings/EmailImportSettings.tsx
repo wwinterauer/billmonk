@@ -231,6 +231,7 @@ export const EmailImportSettings: React.FC = () => {
     emailAttachments,
     importHistory,
     isLoading,
+    isError,
     createConnection,
     isCreating,
     toggleConnection,
