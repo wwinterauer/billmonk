@@ -169,6 +169,11 @@ function parseFieldValue(fieldName: string, value: string): unknown {
       const dateMatch = value.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/);
       if (dateMatch) {
         const [, day, month, year] = dateMatch;
+        const dayNum = parseInt(day, 10);
+        const monthNum = parseInt(month, 10);
+        if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12) {
+          return value;
+        }
         const fullYear = year.length === 2 ? `20${year}` : year;
         return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       }
