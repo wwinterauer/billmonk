@@ -330,6 +330,18 @@ export const EmailImportSettings: React.FC = () => {
   const [formData, setFormData] = useState<AddAccountFormData>(defaultFormData);
   const [selectedPreset, setSelectedPreset] = useState<string>('');
   const [activeTab, setActiveTab] = useState("webhook");
+  const [customToken, setCustomToken] = useState('');
+  const [customTokenError, setCustomTokenError] = useState('');
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [editToken, setEditToken] = useState('');
+  const [editTokenError, setEditTokenError] = useState('');
+
+  const validateToken = (token: string): string => {
+    if (token.length < 3) return 'Mindestens 3 Zeichen erforderlich';
+    if (!/^[a-z0-9.\-]+$/.test(token)) return 'Nur Kleinbuchstaben, Zahlen, Punkte und Bindestriche erlaubt';
+    if (token.startsWith('.') || token.endsWith('.') || token.startsWith('-') || token.endsWith('-')) return 'Darf nicht mit Punkt oder Bindestrich beginnen/enden';
+    return '';
+  };
 
   // OAuth Callback Handling
   useEffect(() => {
