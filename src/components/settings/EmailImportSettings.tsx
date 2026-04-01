@@ -323,7 +323,7 @@ export const EmailImportSettings: React.FC = () => {
     refetchEmailAccounts,
   } = useEmailImport();
 
-  const [showWebhookInfo, setShowWebhookInfo] = useState(false);
+  
   const [showAddAccountDialog, setShowAddAccountDialog] = useState(false);
   const [formData, setFormData] = useState<AddAccountFormData>(defaultFormData);
   const [selectedPreset, setSelectedPreset] = useState<string>('');
