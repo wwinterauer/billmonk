@@ -274,6 +274,38 @@ export const useEmailImport = () => {
     },
   });
 
+  // Update import address with custom token
+  const updateImportAddressMutation = useMutation({
+    mutationFn: async (newToken: string) => {
+      if (!emailConnection?.id || !user?.id) throw new Error('Keine Verbindung vorhanden');
+
+      const newEmail = `rechnungen+${newToken}@import.billmonk.ai`;
+
+      const { error } = await supabase
+        .from('email_connections')
+        .update({
+          import_token: newToken,
+          import_email: newEmail,
+        })
+        .eq('id', emailConnection.id);
+
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('Diese Adresse ist bereits vergeben. Bitte wählen Sie eine andere.');
+        }
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['email-connection'] });
+      toast.success('Import-Adresse aktualisiert');
+    },
+    onError: (error: Error) => {
+      console.error('Error updating import address:', error);
+      toast.error(error.message || 'Fehler beim Ändern der Adresse');
+    },
+  });
+
   // Regenerate webhook token
   const regenerateTokenMutation = useMutation({
     mutationFn: async () => {
