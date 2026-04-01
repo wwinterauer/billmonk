@@ -292,21 +292,29 @@ serve(async (req: Request) => {
     console.log("Attachments count:", emailData.attachments?.length || 0);
 
     // Extract token from recipient email address
-    let token = emailData.token;
-    if (!token && emailData.to) {
-      const toAddress = emailData.to.toLowerCase();
-      const plusMatch = toAddress.match(/\+([a-z0-9.-]+)@/);
-      if (plusMatch) {
-        token = plusMatch[1];
-      } else {
-        const subdomainMatch = toAddress.match(/^([a-z0-9.-]+)@/);
-        if (subdomainMatch) {
-          token = subdomainMatch[1];
-        }
-      }
+    // Supports: import+TOKEN@billmonk.ai (primary, plus-addressing)
+    //           *+TOKEN@import.billmonk.ai (legacy subdomain with prefix)
+    //           TOKEN@import.billmonk.ai (legacy subdomain plain)
+    function extractTokenFromEmail(to: string): string | null {
+      const lower = to.toLowerCase().trim();
+      // Plus-addressing: import+TOKEN@billmonk.ai
+      const plusMatch = lower.match(/^import\+([a-z0-9._-]{3,})@billmonk\.ai$/);
+      if (plusMatch) return plusMatch[1];
+      // Legacy plus-addressing: rechnungen+TOKEN@import.billmonk.ai
+      const legacyPlusMatch = lower.match(/\+([a-z0-9._-]{3,})@import\.billmonk\.ai$/);
+      if (legacyPlusMatch) return legacyPlusMatch[1];
+      // Legacy subdomain plain: TOKEN@import.billmonk.ai
+      const subdomainMatch = lower.match(/^([a-z0-9._-]{3,})@import\.billmonk\.ai$/);
+      if (subdomainMatch) return subdomainMatch[1];
+      return null;
     }
 
-    if (!token || token.length < 3 || !/^[a-z0-9.-]+$/.test(token)) {
+    let token = emailData.token;
+    if (!token && emailData.to) {
+      token = extractTokenFromEmail(emailData.to);
+    }
+
+    if (!token || token.length < 3 || !/^[a-z0-9._-]+$/.test(token)) {
       console.error("No valid token found in email address");
       return new Response(JSON.stringify({ error: "Invalid import address" }), {
         status: 400,

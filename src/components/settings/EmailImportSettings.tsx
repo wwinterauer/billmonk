@@ -523,7 +523,7 @@ export const EmailImportSettings: React.FC = () => {
                   <div className="space-y-2 max-w-md mx-auto">
                     <Label>Import-Adresse wählen</Label>
                     <div className="flex items-center gap-1">
-                      <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">rechnungen+</span>
+                      <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">import+</span>
                       <Input
                         value={customToken}
                         onChange={(e) => {
@@ -534,7 +534,7 @@ export const EmailImportSettings: React.FC = () => {
                         placeholder="mein.name"
                         className="font-mono text-sm"
                       />
-                      <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">@import.billmonk.ai</span>
+                      <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">@billmonk.ai</span>
                     </div>
                     {customTokenError && (
                       <p className="text-xs text-destructive">{customTokenError}</p>
@@ -603,7 +603,7 @@ export const EmailImportSettings: React.FC = () => {
                       ) : (
                         <div className="space-y-2">
                           <div className="flex items-center gap-1">
-                            <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">rechnungen+</span>
+                            <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">import+</span>
                             <Input
                               value={editToken}
                               onChange={(e) => {
@@ -614,7 +614,7 @@ export const EmailImportSettings: React.FC = () => {
                               className="font-mono text-sm"
                               autoFocus
                             />
-                            <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">@import.billmonk.ai</span>
+                            <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">@billmonk.ai</span>
                           </div>
                           {editTokenError && (
                             <p className="text-xs text-destructive">{editTokenError}</p>

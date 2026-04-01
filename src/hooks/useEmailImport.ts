@@ -221,7 +221,7 @@ export const useEmailImport = () => {
       if (!user?.id) throw new Error('Nicht angemeldet');
 
       const token = customToken || generateUserToken(user);
-      const importEmail = `rechnungen+${token}@import.billmonk.ai`;
+      const importEmail = `import+${token}@billmonk.ai`;
 
       const { data, error } = await supabase
         .from('email_connections')
@@ -279,7 +279,7 @@ export const useEmailImport = () => {
     mutationFn: async (newToken: string) => {
       if (!emailConnection?.id || !user?.id) throw new Error('Keine Verbindung vorhanden');
 
-      const newEmail = `rechnungen+${newToken}@import.billmonk.ai`;
+      const newEmail = `import+${newToken}@billmonk.ai`;
 
       const { error } = await supabase
         .from('email_connections')
@@ -312,7 +312,7 @@ export const useEmailImport = () => {
       if (!emailConnection?.id || !user?.id) throw new Error('Keine Verbindung vorhanden');
 
       const newToken = generateUserToken(user);
-      const newEmail = `rechnungen+${newToken}@import.billmonk.ai`;
+      const newEmail = `import+${newToken}@billmonk.ai`;
 
       const { error } = await supabase
         .from('email_connections')
