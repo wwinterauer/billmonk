@@ -295,18 +295,18 @@ serve(async (req: Request) => {
     let token = emailData.token;
     if (!token && emailData.to) {
       const toAddress = emailData.to.toLowerCase();
-      const plusMatch = toAddress.match(/\+([a-z0-9]+)@/);
+      const plusMatch = toAddress.match(/\+([a-z0-9.-]+)@/);
       if (plusMatch) {
         token = plusMatch[1];
       } else {
-        const subdomainMatch = toAddress.match(/^([a-z0-9]+)@/);
+        const subdomainMatch = toAddress.match(/^([a-z0-9.-]+)@/);
         if (subdomainMatch) {
           token = subdomainMatch[1];
         }
       }
     }
 
-    if (!token || token.length < 12 || !/^[a-z0-9]+$/.test(token)) {
+    if (!token || token.length < 3 || !/^[a-z0-9.-]+$/.test(token)) {
       console.error("No valid token found in email address");
       return new Response(JSON.stringify({ error: "Invalid import address" }), {
         status: 400,
