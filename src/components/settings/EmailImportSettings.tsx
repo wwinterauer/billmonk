@@ -614,7 +614,7 @@ export const EmailImportSettings: React.FC = () => {
                               className="font-mono text-sm"
                               autoFocus
                             />
-                            <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">@import.billmonk.ai</span>
+                            <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">@billmonk.ai</span>
                           </div>
                           {editTokenError && (
                             <p className="text-xs text-destructive">{editTokenError}</p>
