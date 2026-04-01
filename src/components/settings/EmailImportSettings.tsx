@@ -580,15 +580,6 @@ export const EmailImportSettings: React.FC = () => {
                         Neue Adresse generieren
                       </Button>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowWebhookInfo(!showWebhookInfo)}
-                      >
-                        <Info className="h-4 w-4 mr-2" />
-                        Webhook-Konfiguration
-                      </Button>
-
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="outline" size="sm" className="text-destructive">
