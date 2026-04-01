@@ -603,7 +603,7 @@ export const EmailImportSettings: React.FC = () => {
                       ) : (
                         <div className="space-y-2">
                           <div className="flex items-center gap-1">
-                            <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">rechnungen+</span>
+                            <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">import+</span>
                             <Input
                               value={editToken}
                               onChange={(e) => {
