@@ -307,6 +307,8 @@ export const EmailImportSettings: React.FC = () => {
     isCreating,
     toggleConnection,
     isToggling,
+    updateImportAddress,
+    isUpdatingAddress,
     regenerateToken,
     isRegenerating,
     deleteConnection,
