@@ -516,8 +516,8 @@ export const EmailImportSettings: React.FC = () => {
                   <div className="text-center space-y-2">
                     <Mail className="h-12 w-12 mx-auto text-muted-foreground" />
                     <h3 className="font-medium">E-Mail-Weiterleitung aktivieren</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Wählen Sie Ihren persönlichen Adressteil für den Import
+                    <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                      Erstellen Sie eine persönliche Import-Adresse. Leiten Sie Rechnungen und Belege einfach per E-Mail an diese Adresse weiter — PDF- und Bildanhänge werden automatisch erkannt und verarbeitet.
                     </p>
                   </div>
                   <div className="space-y-2 max-w-md mx-auto">
