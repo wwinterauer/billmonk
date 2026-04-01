@@ -485,7 +485,7 @@ const Settings = () => {
 
   const allTabs = [
     { value: 'naming', icon: FileText, label: 'Umbenennung' },
-    { value: 'recognition', icon: Sparkles, label: 'Erkennung' },
+    { value: 'recognition', icon: Sparkles, label: 'Positions Erkennung' },
     { value: 'categories', icon: Tags, label: 'Kategorien' },
     { value: 'tags', icon: Hash, label: 'Tags' },
     { value: 'vendors', icon: Building, label: 'Lieferanten' },
