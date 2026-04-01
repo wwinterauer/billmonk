@@ -338,7 +338,7 @@ export const EmailImportSettings: React.FC = () => {
 
   const validateToken = (token: string): string => {
     if (token.length < 3) return 'Mindestens 3 Zeichen erforderlich';
-    if (!/^[a-z0-9.\-]+$/.test(token)) return 'Nur Kleinbuchstaben, Zahlen, Punkte und Bindestriche erlaubt';
+    if (!/^[a-z0-9.-]+$/.test(token)) return 'Nur Kleinbuchstaben, Zahlen, Punkte und Bindestriche erlaubt';
     if (token.startsWith('.') || token.endsWith('.') || token.startsWith('-') || token.endsWith('-')) return 'Darf nicht mit Punkt oder Bindestrich beginnen/enden';
     return '';
   };
