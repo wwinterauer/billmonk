@@ -610,45 +610,6 @@ export const EmailImportSettings: React.FC = () => {
                       </AlertDialog>
                     </div>
 
-                    {showWebhookInfo && (
-                      <Alert>
-                        <Info className="h-4 w-4" />
-                        <AlertDescription className="space-y-2">
-                          <p className="font-medium">Webhook-URL für E-Mail-Service:</p>
-                          <div className="flex gap-2">
-                            <Input
-                              value={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/email-import-webhook`}
-                              readOnly
-                              className="font-mono text-xs"
-                            />
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => copyToClipboard(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/email-import-webhook`)}
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <p className="text-xs">
-                            Konfigurieren Sie diese URL bei Ihrem E-Mail-Service (z.B. Postmark, SendGrid, Mailgun) 
-                            für Inbound-E-Mail-Webhooks.
-                          </p>
-                          <div className="flex gap-2 mt-2">
-                            <Button variant="link" size="sm" className="h-auto p-0" asChild>
-                              <a href="https://postmarkapp.com/developer/webhooks/inbound-webhook" target="_blank" rel="noopener noreferrer">
-                                Postmark <ExternalLink className="h-3 w-3 ml-1" />
-                              </a>
-                            </Button>
-                            <Button variant="link" size="sm" className="h-auto p-0" asChild>
-                              <a href="https://docs.sendgrid.com/for-developers/parsing-email/setting-up-the-inbound-parse-webhook" target="_blank" rel="noopener noreferrer">
-                                SendGrid <ExternalLink className="h-3 w-3 ml-1" />
-                              </a>
-                            </Button>
-                          </div>
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
                     <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                       <div>
                         <p className="text-sm text-muted-foreground">Importierte Belege</p>
