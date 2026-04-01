@@ -217,10 +217,10 @@ export const useEmailImport = () => {
 
   // Create webhook email connection
   const createConnectionMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (customToken?: string) => {
       if (!user?.id) throw new Error('Nicht angemeldet');
 
-      const token = generateUserToken(user);
+      const token = customToken || generateUserToken(user);
       const importEmail = `rechnungen+${token}@import.billmonk.ai`;
 
       const { data, error } = await supabase
@@ -234,7 +234,12 @@ export const useEmailImport = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('Diese Adresse ist bereits vergeben. Bitte wählen Sie eine andere.');
+        }
+        throw error;
+      }
       return data as EmailConnection;
     },
     onSuccess: () => {
@@ -243,7 +248,7 @@ export const useEmailImport = () => {
     },
     onError: (error: Error) => {
       console.error('Error creating email connection:', error);
-      toast.error('Fehler beim Aktivieren des E-Mail-Imports');
+      toast.error(error.message || 'Fehler beim Aktivieren des E-Mail-Imports');
     },
   });
 
@@ -266,6 +271,38 @@ export const useEmailImport = () => {
     onError: (error: Error) => {
       console.error('Error toggling email connection:', error);
       toast.error('Fehler beim Ändern des Status');
+    },
+  });
+
+  // Update import address with custom token
+  const updateImportAddressMutation = useMutation({
+    mutationFn: async (newToken: string) => {
+      if (!emailConnection?.id || !user?.id) throw new Error('Keine Verbindung vorhanden');
+
+      const newEmail = `rechnungen+${newToken}@import.billmonk.ai`;
+
+      const { error } = await supabase
+        .from('email_connections')
+        .update({
+          import_token: newToken,
+          import_email: newEmail,
+        })
+        .eq('id', emailConnection.id);
+
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('Diese Adresse ist bereits vergeben. Bitte wählen Sie eine andere.');
+        }
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['email-connection'] });
+      toast.success('Import-Adresse aktualisiert');
+    },
+    onError: (error: Error) => {
+      console.error('Error updating import address:', error);
+      toast.error(error.message || 'Fehler beim Ändern der Adresse');
     },
   });
 
@@ -645,6 +682,8 @@ export const useEmailImport = () => {
     isCreating: createConnectionMutation.isPending,
     toggleConnection: toggleConnectionMutation.mutate,
     isToggling: toggleConnectionMutation.isPending,
+    updateImportAddress: updateImportAddressMutation.mutate,
+    isUpdatingAddress: updateImportAddressMutation.isPending,
     regenerateToken: regenerateTokenMutation.mutate,
     isRegenerating: regenerateTokenMutation.isPending,
     deleteConnection: deleteConnectionMutation.mutate,

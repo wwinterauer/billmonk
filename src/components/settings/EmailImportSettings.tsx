@@ -307,6 +307,8 @@ export const EmailImportSettings: React.FC = () => {
     isCreating,
     toggleConnection,
     isToggling,
+    updateImportAddress,
+    isUpdatingAddress,
     regenerateToken,
     isRegenerating,
     deleteConnection,
@@ -328,6 +330,18 @@ export const EmailImportSettings: React.FC = () => {
   const [formData, setFormData] = useState<AddAccountFormData>(defaultFormData);
   const [selectedPreset, setSelectedPreset] = useState<string>('');
   const [activeTab, setActiveTab] = useState("webhook");
+  const [customToken, setCustomToken] = useState('');
+  const [customTokenError, setCustomTokenError] = useState('');
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [editToken, setEditToken] = useState('');
+  const [editTokenError, setEditTokenError] = useState('');
+
+  const validateToken = (token: string): string => {
+    if (token.length < 3) return 'Mindestens 3 Zeichen erforderlich';
+    if (!/^[a-z0-9.-]+$/.test(token)) return 'Nur Kleinbuchstaben, Zahlen, Punkte und Bindestriche erlaubt';
+    if (token.startsWith('.') || token.endsWith('.') || token.startsWith('-') || token.endsWith('-')) return 'Darf nicht mit Punkt oder Bindestrich beginnen/enden';
+    return '';
+  };
 
   // OAuth Callback Handling
   useEffect(() => {
@@ -497,19 +511,47 @@ export const EmailImportSettings: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {!emailConnection ? (
-                <div className="text-center py-8 space-y-4">
-                  <Mail className="h-12 w-12 mx-auto text-muted-foreground" />
-                  <div>
+               {!emailConnection ? (
+                <div className="space-y-4 py-4">
+                  <div className="text-center space-y-2">
+                    <Mail className="h-12 w-12 mx-auto text-muted-foreground" />
                     <h3 className="font-medium">E-Mail-Weiterleitung aktivieren</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Sie erhalten eine eindeutige E-Mail-Adresse, an die Sie Rechnungen weiterleiten können
+                    <p className="text-sm text-muted-foreground">
+                      Wählen Sie Ihren persönlichen Adressteil für den Import
                     </p>
                   </div>
-                  <Button onClick={() => createConnection()} disabled={isCreating}>
-                    {isCreating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    E-Mail-Weiterleitung aktivieren
-                  </Button>
+                  <div className="space-y-2 max-w-md mx-auto">
+                    <Label>Import-Adresse wählen</Label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">rechnungen+</span>
+                      <Input
+                        value={customToken}
+                        onChange={(e) => {
+                          const val = e.target.value.toLowerCase();
+                          setCustomToken(val);
+                          setCustomTokenError(val ? validateToken(val) : '');
+                        }}
+                        placeholder="mein.name"
+                        className="font-mono text-sm"
+                      />
+                      <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">@import.billmonk.ai</span>
+                    </div>
+                    {customTokenError && (
+                      <p className="text-xs text-destructive">{customTokenError}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Nur Kleinbuchstaben, Zahlen, Punkte und Bindestriche. Min. 3 Zeichen.
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <Button 
+                      onClick={() => createConnection(customToken || undefined)} 
+                      disabled={isCreating || (!!customToken && !!customTokenError)}
+                    >
+                      {isCreating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      E-Mail-Weiterleitung aktivieren
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -530,20 +572,77 @@ export const EmailImportSettings: React.FC = () => {
 
                     <div className="space-y-2">
                       <Label>Ihre Import-Adresse</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          value={emailConnection.import_email}
-                          readOnly
-                          className="font-mono text-sm"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => copyToClipboard(emailConnection.import_email)}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      {!isEditingAddress ? (
+                        <>
+                          <div className="flex gap-2">
+                            <Input
+                              value={emailConnection.import_email}
+                              readOnly
+                              className="font-mono text-sm"
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => copyToClipboard(emailConnection.import_email)}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setIsEditingAddress(true);
+                                setEditToken(emailConnection.import_token);
+                                setEditTokenError('');
+                              }}
+                            >
+                              Ändern
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">rechnungen+</span>
+                            <Input
+                              value={editToken}
+                              onChange={(e) => {
+                                const val = e.target.value.toLowerCase();
+                                setEditToken(val);
+                                setEditTokenError(val ? validateToken(val) : '');
+                              }}
+                              className="font-mono text-sm"
+                              autoFocus
+                            />
+                            <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">@import.billmonk.ai</span>
+                          </div>
+                          {editTokenError && (
+                            <p className="text-xs text-destructive">{editTokenError}</p>
+                          )}
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                if (editToken && !editTokenError && editToken !== emailConnection.import_token) {
+                                  updateImportAddress(editToken);
+                                }
+                                setIsEditingAddress(false);
+                              }}
+                              disabled={!!editTokenError || !editToken || editToken === emailConnection.import_token || isUpdatingAddress}
+                            >
+                              {isUpdatingAddress && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                              Speichern
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsEditingAddress(false)}
+                            >
+                              Abbrechen
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         Leiten Sie Rechnungs-E-Mails an diese Adresse weiter. PDF- und Bildanhänge werden automatisch verarbeitet.
                       </p>
