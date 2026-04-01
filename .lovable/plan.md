@@ -1,22 +1,18 @@
 
 
-# Kategorien im Dokumenten-Editor: Nur User-Kategorien anzeigen
-
-## Problem
-
-Im `InvoiceEditor.tsx` wird `categories` aus `useCategories()` verwendet, was sowohl persönliche Kategorien als auch steuerliche Buchungsarten (System-Kategorien mit Länderzuordnung) enthält. Für Ausgangsrechnungen, Angebote, Lieferscheine und AB sollen nur die **persönlichen User-Kategorien** zur Sortierung angezeigt werden.
+# Import-Adresse: Prefix von "receipts+" auf "rechnungen+" ändern
 
 ## Änderung
 
-### `src/pages/InvoiceEditor.tsx`
+Zwei Stellen in `src/hooks/useEmailImport.ts` anpassen:
 
-Eine einzige Änderung:
+- **Zeile 224**: `receipts+${token}@import.billmonk.ai` → `rechnungen+${token}@import.billmonk.ai`
+- **Zeile 278**: `receipts+${token}@import.billmonk.ai` → `rechnungen+${token}@import.billmonk.ai`
 
-- Zeile 95: Statt `const { categories } = useCategories()` → `const { userCategories } = useCategories()`
-- Zeile 495: Statt `categories.filter(c => !c.is_hidden)` → `userCategories.filter(c => !c.is_hidden)`
+## Kompatibilität
 
-Der Hook `useCategories()` liefert bereits `userCategories` (filtert `c => !c.is_system || !c.country`), das sind genau die persönlichen Kategorien ohne steuerliche Buchungsarten.
+Die Webhook-Funktion extrahiert den Token via Regex `/\+([a-z0-9]+)@/` — der Prefix vor dem `+` wird ignoriert. Bestehende Adressen mit `receipts+` funktionieren weiterhin. Nur neu erstellte/regenerierte Adressen verwenden `rechnungen+`.
 
 ### Dateien
-- `src/pages/InvoiceEditor.tsx` — 2 Zeilen ändern
+- `src/hooks/useEmailImport.ts` — 2 Zeilen ändern
 
