@@ -279,7 +279,7 @@ export const useEmailImport = () => {
     mutationFn: async (newToken: string) => {
       if (!emailConnection?.id || !user?.id) throw new Error('Keine Verbindung vorhanden');
 
-      const newEmail = `rechnungen+${newToken}@import.billmonk.ai`;
+      const newEmail = `import+${newToken}@billmonk.ai`;
 
       const { error } = await supabase
         .from('email_connections')
