@@ -572,20 +572,77 @@ export const EmailImportSettings: React.FC = () => {
 
                     <div className="space-y-2">
                       <Label>Ihre Import-Adresse</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          value={emailConnection.import_email}
-                          readOnly
-                          className="font-mono text-sm"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => copyToClipboard(emailConnection.import_email)}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      {!isEditingAddress ? (
+                        <>
+                          <div className="flex gap-2">
+                            <Input
+                              value={emailConnection.import_email}
+                              readOnly
+                              className="font-mono text-sm"
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => copyToClipboard(emailConnection.import_email)}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setIsEditingAddress(true);
+                                setEditToken(emailConnection.import_token);
+                                setEditTokenError('');
+                              }}
+                            >
+                              Ändern
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">rechnungen+</span>
+                            <Input
+                              value={editToken}
+                              onChange={(e) => {
+                                const val = e.target.value.toLowerCase();
+                                setEditToken(val);
+                                setEditTokenError(val ? validateToken(val) : '');
+                              }}
+                              className="font-mono text-sm"
+                              autoFocus
+                            />
+                            <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">@import.billmonk.ai</span>
+                          </div>
+                          {editTokenError && (
+                            <p className="text-xs text-destructive">{editTokenError}</p>
+                          )}
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                if (editToken && !editTokenError && editToken !== emailConnection.import_token) {
+                                  updateImportAddress(editToken);
+                                }
+                                setIsEditingAddress(false);
+                              }}
+                              disabled={!!editTokenError || !editToken || editToken === emailConnection.import_token || isUpdatingAddress}
+                            >
+                              {isUpdatingAddress && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                              Speichern
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsEditingAddress(false)}
+                            >
+                              Abbrechen
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         Leiten Sie Rechnungs-E-Mails an diese Adresse weiter. PDF- und Bildanhänge werden automatisch verarbeitet.
                       </p>
