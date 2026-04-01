@@ -217,10 +217,10 @@ export const useEmailImport = () => {
 
   // Create webhook email connection
   const createConnectionMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (customToken?: string) => {
       if (!user?.id) throw new Error('Nicht angemeldet');
 
-      const token = generateUserToken(user);
+      const token = customToken || generateUserToken(user);
       const importEmail = `rechnungen+${token}@import.billmonk.ai`;
 
       const { data, error } = await supabase
@@ -234,7 +234,12 @@ export const useEmailImport = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('Diese Adresse ist bereits vergeben. Bitte wählen Sie eine andere.');
+        }
+        throw error;
+      }
       return data as EmailConnection;
     },
     onSuccess: () => {
@@ -243,7 +248,7 @@ export const useEmailImport = () => {
     },
     onError: (error: Error) => {
       console.error('Error creating email connection:', error);
-      toast.error('Fehler beim Aktivieren des E-Mail-Imports');
+      toast.error(error.message || 'Fehler beim Aktivieren des E-Mail-Imports');
     },
   });
 
