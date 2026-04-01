@@ -511,19 +511,47 @@ export const EmailImportSettings: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {!emailConnection ? (
-                <div className="text-center py-8 space-y-4">
-                  <Mail className="h-12 w-12 mx-auto text-muted-foreground" />
-                  <div>
+               {!emailConnection ? (
+                <div className="space-y-4 py-4">
+                  <div className="text-center space-y-2">
+                    <Mail className="h-12 w-12 mx-auto text-muted-foreground" />
                     <h3 className="font-medium">E-Mail-Weiterleitung aktivieren</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Sie erhalten eine eindeutige E-Mail-Adresse, an die Sie Rechnungen weiterleiten können
+                    <p className="text-sm text-muted-foreground">
+                      Wählen Sie Ihren persönlichen Adressteil für den Import
                     </p>
                   </div>
-                  <Button onClick={() => createConnection()} disabled={isCreating}>
-                    {isCreating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    E-Mail-Weiterleitung aktivieren
-                  </Button>
+                  <div className="space-y-2 max-w-md mx-auto">
+                    <Label>Import-Adresse wählen</Label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">rechnungen+</span>
+                      <Input
+                        value={customToken}
+                        onChange={(e) => {
+                          const val = e.target.value.toLowerCase();
+                          setCustomToken(val);
+                          setCustomTokenError(val ? validateToken(val) : '');
+                        }}
+                        placeholder="mein.name"
+                        className="font-mono text-sm"
+                      />
+                      <span className="text-sm text-muted-foreground whitespace-nowrap font-mono">@import.billmonk.ai</span>
+                    </div>
+                    {customTokenError && (
+                      <p className="text-xs text-destructive">{customTokenError}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Nur Kleinbuchstaben, Zahlen, Punkte und Bindestriche. Min. 3 Zeichen.
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <Button 
+                      onClick={() => createConnection(customToken || undefined)} 
+                      disabled={isCreating || (!!customToken && !!customTokenError)}
+                    >
+                      {isCreating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      E-Mail-Weiterleitung aktivieren
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <>
