@@ -682,6 +682,8 @@ export const useEmailImport = () => {
     isCreating: createConnectionMutation.isPending,
     toggleConnection: toggleConnectionMutation.mutate,
     isToggling: toggleConnectionMutation.isPending,
+    updateImportAddress: updateImportAddressMutation.mutate,
+    isUpdatingAddress: updateImportAddressMutation.isPending,
     regenerateToken: regenerateTokenMutation.mutate,
     isRegenerating: regenerateTokenMutation.isPending,
     deleteConnection: deleteConnectionMutation.mutate,
