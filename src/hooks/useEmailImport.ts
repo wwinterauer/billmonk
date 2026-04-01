@@ -221,7 +221,7 @@ export const useEmailImport = () => {
       if (!user?.id) throw new Error('Nicht angemeldet');
 
       const token = customToken || generateUserToken(user);
-      const importEmail = `rechnungen+${token}@import.billmonk.ai`;
+      const importEmail = `import+${token}@billmonk.ai`;
 
       const { data, error } = await supabase
         .from('email_connections')
