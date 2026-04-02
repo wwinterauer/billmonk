@@ -26,6 +26,7 @@ interface EmailAttachment {
   filename: string;
   content: string; // base64 encoded
   contentType: string;
+  mimeType?: string; // Google Apps Script sends this instead of contentType
   size: number;
 }
 
@@ -382,11 +383,18 @@ serve(async (req: Request) => {
     // Process attachments with security validation
     const attachments = emailData.attachments || [];
 
-    if (attachments.length > MAX_ATTACHMENTS_PER_EMAIL) {
-      console.warn(`Too many attachments (${attachments.length}), limiting to ${MAX_ATTACHMENTS_PER_EMAIL}`);
+    // Normalize: Google Apps Script sends mimeType instead of contentType
+    const normalizedAttachments = attachments.map((att: any) => ({
+      ...att,
+      contentType: att.contentType || att.mimeType || '',
+      size: att.size || (att.content ? Math.floor(att.content.length * 0.75) : 0),
+    }));
+
+    if (normalizedAttachments.length > MAX_ATTACHMENTS_PER_EMAIL) {
+      console.warn(`Too many attachments (${normalizedAttachments.length}), limiting to ${MAX_ATTACHMENTS_PER_EMAIL}`);
     }
 
-    const validAttachments = attachments
+    const validAttachments = normalizedAttachments
       .slice(0, MAX_ATTACHMENTS_PER_EMAIL)
       .filter((att) => {
         if (!att.filename || typeof att.filename !== "string") {
