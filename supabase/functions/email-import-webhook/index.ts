@@ -26,6 +26,7 @@ interface EmailAttachment {
   filename: string;
   content: string; // base64 encoded
   contentType: string;
+  mimeType?: string; // Google Apps Script sends this instead of contentType
   size: number;
 }
 
