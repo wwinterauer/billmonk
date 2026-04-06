@@ -1,103 +1,152 @@
 
 
-# Responsive UI Audit — Alle Seiten & Komponenten
+# CRM-Erweiterung: Kontakte-Modul mit konfigurierbaren Typen + Mitglieder + Newsletter
 
-## Kritisches Hauptproblem: Sidebar & DashboardLayout
+## Konzept
 
-Das **gravierendste Problem** betrifft ALLE Dashboard-Seiten: Die `DashboardLayout` verwendet eine fixe Sidebar mit `ml-64` / `ml-16` Margin, hat aber **keinerlei Mobile-Handling**. Auf Screens unter 768px wird die Sidebar abgeschnitten und der Content ist nicht erreichbar.
+Statt einer starren "Mitglieder"-Tabelle wird ein **flexibles Kontakttyp-System** gebaut. Der User definiert selbst seine Kontakttypen (z.B. "Kunde", "Premium-Kunde", "Vereinsmitglied", "Members-Club", "Lieferant"). Jeder Kontakttyp kann eigene Zusatzfelder haben.
 
-**Betroffene Seiten (alle mit DashboardLayout):**
-Dashboard, Upload, Review, Expenses, BankImport, Reconciliation, Reports, Settings, Checklists, Invoices, InvoiceEditor, Quotes, DeliveryNotes, OrderConfirmations, Account
+Die bestehende `customers`-Tabelle bleibt erhalten. Daneben entsteht eine neue `members`-Tabelle mit einem **frei konfigurierbaren `member_type`**-Feld, das der User selbst benennen kann.
 
----
-
-## Befunde im Detail
-
-### 1. DashboardLayout + Sidebar — KRITISCH
-- `Sidebar` ist `fixed left-0 w-64` ohne mobile Breakpoint
-- `DashboardLayout` setzt `ml-64` / `ml-16` ohne `md:` Prefix
-- **Fix:** Mobile: Sidebar als Off-Canvas Sheet (wie die vorhandene `ui/sidebar.tsx`-Komponente), Hamburger-Button im Header, `ml-0` auf Mobile
-
-### 2. Review-Seite — HOCH
-- Zweispaltiges Layout (`grid lg:grid-cols-2`) funktioniert auf Tablet, aber auf Mobile gibt es Probleme:
-  - Navigation-Buttons (Prev/Next) + Counter sind eng
-  - Action-Buttons unten (`flex flex-wrap gap-3`) könnten überlappen auf kleinen Screens
-  - Lightbox Dialog `max-w-4xl h-[90vh]` ist okay
-
-### 3. Expenses-Seite — HOCH
-- Datatable mit vielen Spalten: Kein horizontales Scrolling auf Mobile
-- Filter-Leiste (`flex flex-wrap items-end gap-3`) könnte auf Mobile zu eng werden
-- Bulk-Actions Bar scrollt nicht
-- **Fix:** `overflow-x-auto` auf Table-Container, Column-Visibility Default für Mobile anpassen
-
-### 4. Settings-Seite — MITTEL
-- TabsList mit `flex flex-wrap` ist grundsätzlich okay
-- Tab-Labels sind `hidden sm:inline` — auf Mobile nur Icons, das funktioniert
-- Einige innere Forms haben fixe Breiten (z.B. `w-[280px]` SelectTrigger)
-
-### 5. InvoiceEditor — MITTEL
-- `grid grid-cols-1 xl:grid-cols-[1fr_400px]` — Preview-Panel nur auf XL sichtbar nebeneinander
-- Meta-Grid `grid-cols-1 md:grid-cols-2 lg:grid-cols-4` ist korrekt responsiv
-- Line-Items Table braucht horizontales Scrolling
-
-### 6. Invoices/Quotes/DeliveryNotes/OrderConfirmations — MITTEL
-- Tabellen ohne `overflow-x-auto` Wrapper
-- Filter/Header-Buttons könnten auf Mobile überlappen
-
-### 7. Reconciliation — MITTEL
-- Tabelle ohne horizontales Scrolling
-- Ähnliche Probleme wie Expenses
-
-### 8. Reports — MITTEL
-- Charts mit `ResponsiveContainer` sind okay
-- Export-Tabellen brauchen Scroll-Container
-
-### 9. Landing-Seiten (Index, Beta, Pricing) — NIEDRIG
-- Verwenden `container`-Klasse, grundsätzlich responsiv
-- Beta-Header hat `hidden md:flex` für Desktop-Nav, okay
-- Hero/Features/Pricing nutzen responsive Grids
-
-### 10. Auth-Seiten (Login, Register, ForgotPassword, ResetPassword) — OK
-- `max-w-md` zentriert, `px-4` padding — korrekt responsiv
-
-### 11. Onboarding — OK
-- Einfaches Card-Layout, zentriert, responsive
-
-### 12. Admin-Seite — NIEDRIG
-- TabsList mit vielen Tabs könnte überlaufen
-- Nur für Admins relevant
+```text
+┌─────────────────────────────────┐
+│         Kontakte (CRM)          │
+├─────────┬───────────┬───────────┤
+│ Kunden  │ Mitglieder│ Newsletter│
+│(besteh.)│  (neu)    │  (neu)    │
+└─────────┴───────────┴───────────┘
+           │
+           ▼
+  member_type = frei wählbar:
+  "Vereinsmitglied", "Premium-Kunde",
+  "Members-Club", "Sponsor", etc.
+```
 
 ---
 
-## Umsetzungsplan
+## Datenbank
 
-### Schritt 1: Mobile Sidebar (DashboardLayout + Sidebar) — behebt ALLE Dashboard-Seiten
-- `DashboardLayout`: Auf Mobile (`< md`) die Sidebar ausblenden, einen Top-Header mit Hamburger-Menü hinzufügen
-- `Sidebar`: Auf Mobile als Sheet/Drawer rendern statt fixed
-- `main` Container: `ml-0` auf Mobile, `md:ml-64` / `md:ml-16` auf Desktop
+### Neue Tabelle `members`
+```sql
+create table public.members (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  display_name text not null,
+  first_name text,
+  last_name text,
+  email text,
+  phone text,
+  street text, zip text, city text, country text default 'AT',
+  member_number text,
+  member_type text default 'Mitglied',  -- frei wählbar
+  membership_fee numeric default 0,
+  joined_at date,
+  is_active boolean default true,
+  newsletter_opt_out boolean default false,
+  notes text,
+  custom_fields jsonb default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+-- RLS: user_id = auth.uid() für alle Operationen
+```
 
-### Schritt 2: Tabellen-Scrolling
-- In `Expenses`, `Invoices`, `Reconciliation`, `Reports`, `Checklists` die `<Table>` in einen `<div className="overflow-x-auto">` Wrapper setzen
+### Neue Tabelle `crm_field_config`
+```sql
+create table public.crm_field_config (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  entity_type text not null default 'customer', -- 'customer' | 'member'
+  visible_fields jsonb default '[]',
+  list_columns jsonb default '[]',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(user_id, entity_type)
+);
+```
 
-### Schritt 3: Kleinere Responsive-Fixes
-- Review: Action-Buttons responsive Stack auf Mobile
-- Settings: Fixe Breiten durch `w-full sm:w-[280px]` ersetzen
-- InvoiceEditor: Line-Items Table Scroll-Container
-- Admin: TabsList scrollbar machen
+### Neue Tabelle `member_types` (User-definierte Typen)
+```sql
+create table public.member_types (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  name text not null,          -- "Premium-Kunde", "Vereinsmitglied", etc.
+  color text default '#8B5CF6',
+  icon text default 'users',
+  sort_order integer default 0,
+  created_at timestamptz default now(),
+  unique(user_id, name)
+);
+-- Default-Einträge werden beim ersten Laden im Frontend erstellt
+```
 
-### Dateien
+### Neue Tabellen `newsletters` + `newsletter_recipients`
+Wie im vorherigen Plan beschrieben.
+
+### Spalte auf `customers` hinzufügen
+```sql
+alter table customers add column newsletter_opt_out boolean default false;
+```
+
+---
+
+## Frontend-Komponenten
+
+### 1. `src/components/settings/MemberManagement.tsx`
+- Analog zu `CustomerManagement.tsx`
+- Dropdown für `member_type` mit den user-definierten Typen
+- Filterbar nach Typ, Status (aktiv/inaktiv)
+- Mitgliedsspezifische Felder: Mitgliedsnummer, Beitritt, Beitrag, Typ
+
+### 2. `src/components/settings/MemberTypeConfig.tsx`
+- Kleine Verwaltung der Kontakttypen (Name, Farbe, Icon)
+- Inline im MemberManagement-Header oder als eigener Sub-Bereich
+- Vorgeschlagene Defaults: "Mitglied", "Premium-Kunde", "Members-Club"
+
+### 3. `src/components/settings/CrmFieldConfig.tsx`
+- Checkboxen pro Entity-Typ: welche Felder in Liste/Formular sichtbar
+- Getrennt für Kunden und Mitglieder konfigurierbar
+
+### 4. `src/components/settings/NewsletterComposer.tsx`
+- Betreff + Textarea (HTML-fähig)
+- Empfänger: Alle Kunden / Alle Mitglieder / Nach Typ filtern / Manuell
+- Versand-Button → Edge Function
+
+### 5. `src/components/settings/NewsletterHistory.tsx`
+- Tabelle mit vergangenen Newslettern, Status, Empfängerzahl
+
+### 6. Hooks
+- `useMembers.ts` — CRUD für members
+- `useMemberTypes.ts` — CRUD für member_types
+- `useCrmFieldConfig.ts` — Feldkonfiguration laden/speichern
+- `useNewsletters.ts` — Newsletter CRUD + Versand triggern
+
+### 7. `src/pages/Settings.tsx`
+- Neue Tabs in der Invoice-Gruppe: "Mitglieder", "Newsletter"
+- Bestehender "Kunden"-Tab bleibt, bekommt Feldkonfigurations-Toggle
+
+### 8. `supabase/functions/send-newsletter/index.ts`
+- Empfänger laden, `newsletter_opt_out` prüfen
+- Resend API direkt ansprechen (Rate-Limiting 10/s)
+- Status pro Empfänger tracken
+
+---
+
+## Dateien
 
 | Datei | Änderung |
 |-------|----------|
-| `src/components/dashboard/DashboardLayout.tsx` | Mobile Header + Sheet-Sidebar + responsive margins |
-| `src/components/dashboard/Sidebar.tsx` | Mobile-Modus als Sheet, Hamburger-Toggle |
-| `src/pages/Expenses.tsx` | Table overflow-x-auto |
-| `src/pages/Invoices.tsx` | Table overflow-x-auto |
-| `src/pages/Reconciliation.tsx` | Table overflow-x-auto |
-| `src/pages/Reports.tsx` | Table overflow-x-auto |
-| `src/pages/Checklists.tsx` | Table overflow-x-auto |
-| `src/pages/Review.tsx` | Action-Buttons responsive |
-| `src/pages/Settings.tsx` | Fixe Breiten entfernen |
-| `src/pages/InvoiceEditor.tsx` | Line-Items Table scroll |
-| `src/pages/Admin.tsx` | TabsList scrollbar |
+| Migration | `members`, `member_types`, `crm_field_config`, `newsletters`, `newsletter_recipients` + RLS; `customers.newsletter_opt_out` |
+| `src/hooks/useMembers.ts` | Neuer Hook |
+| `src/hooks/useMemberTypes.ts` | Neuer Hook |
+| `src/hooks/useCrmFieldConfig.ts` | Neuer Hook |
+| `src/hooks/useNewsletters.ts` | Neuer Hook |
+| `src/components/settings/MemberManagement.tsx` | Neue Komponente |
+| `src/components/settings/MemberTypeConfig.tsx` | Neue Komponente |
+| `src/components/settings/CrmFieldConfig.tsx` | Neue Komponente |
+| `src/components/settings/NewsletterComposer.tsx` | Neue Komponente |
+| `src/components/settings/NewsletterHistory.tsx` | Neue Komponente |
+| `src/components/settings/CustomerManagement.tsx` | Feldkonfig + newsletter_opt_out |
+| `src/pages/Settings.tsx` | Neue Tabs: Mitglieder, Newsletter |
+| `supabase/functions/send-newsletter/index.ts` | Edge Function für Versand |
 
