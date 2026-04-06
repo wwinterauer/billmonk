@@ -417,7 +417,8 @@ serve(async (req) => {
         );
       }
 
-      imageBase64 = uint8ArrayToBase64(new Uint8Array(await fileData.arrayBuffer()));
+      const fileBytes = new Uint8Array(await fileData.arrayBuffer());
+      imageBase64 = uint8ArrayToBase64(fileBytes);
       mimeType = receipt.file_type === 'pdf' ? 'application/pdf' : `image/${receipt.file_type}`;
 
       const isPdf = receipt.file_name?.endsWith('.pdf') || receipt.file_type === 'application/pdf' || receipt.file_type === 'pdf';
@@ -427,7 +428,7 @@ serve(async (req) => {
       // Page count for PDFs
       let pageCount = 1;
       if (isPdf) {
-        pageCount = estimatePdfPageCount(uint8Array);
+        pageCount = estimatePdfPageCount(fileBytes);
         console.log(`Estimated PDF page count: ${pageCount}`);
         await supabase.from('receipts').update({ page_count: pageCount }).eq('id', receiptId);
       }
