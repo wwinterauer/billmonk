@@ -6,6 +6,9 @@ import type { Receipt, ReceiptFilters } from './useReceipts';
 export function useReceiptCrud() {
   const { user } = useAuth();
 
+  const buildCreatedAtBoundary = (date: string, endOfDay = false) =>
+    `${date}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`;
+
   const getReceipts = async (filters?: ReceiptFilters): Promise<Receipt[]> => {
     if (!user) {
       throw new Error('Nicht angemeldet');
@@ -21,24 +24,40 @@ export function useReceiptCrud() {
       query = query.eq('status', filters.status);
     }
 
-    // New date range filter (preferred over month/year)
+    const applyDateRangeWithCreatedAtFallback = (dateFrom?: string, dateTo?: string) => {
+      const receiptDateConditions: string[] = [];
+      const createdAtConditions: string[] = ['receipt_date.is.null'];
+
+      if (dateFrom) {
+        receiptDateConditions.push(`receipt_date.gte.${dateFrom}`);
+        createdAtConditions.push(`created_at.gte.${buildCreatedAtBoundary(dateFrom)}`);
+      }
+
+      if (dateTo) {
+        receiptDateConditions.push(`receipt_date.lte.${dateTo}`);
+        createdAtConditions.push(`created_at.lte.${buildCreatedAtBoundary(dateTo, true)}`);
+      }
+
+      const orConditions = [
+        receiptDateConditions.length > 0 ? `and(${receiptDateConditions.join(',')})` : null,
+        `and(${createdAtConditions.join(',')})`,
+      ].filter(Boolean);
+
+      query = query.or(orConditions.join(','));
+    };
+
     if (filters?.dateFrom || filters?.dateTo) {
-      if (filters.dateFrom) {
-        query = query.gte('receipt_date', filters.dateFrom);
-      }
-      if (filters.dateTo) {
-        query = query.lte('receipt_date', filters.dateTo);
-      }
+      applyDateRangeWithCreatedAtFallback(filters.dateFrom, filters.dateTo);
     } else if (filters?.year) {
-      // Legacy month/year filter for backwards compatibility
       const startDate = new Date(filters.year, filters.month ? filters.month - 1 : 0, 1);
-      const endDate = filters.month 
+      const endDate = filters.month
         ? new Date(filters.year, filters.month, 0)
         : new Date(filters.year, 11, 31);
-      
-      query = query
-        .gte('receipt_date', format(startDate, 'yyyy-MM-dd'))
-        .lte('receipt_date', format(endDate, 'yyyy-MM-dd'));
+
+      applyDateRangeWithCreatedAtFallback(
+        format(startDate, 'yyyy-MM-dd'),
+        format(endDate, 'yyyy-MM-dd')
+      );
     }
 
     const { data, error } = await query;
