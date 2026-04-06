@@ -1000,6 +1000,14 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
       );
     } catch (parseError) {
       console.error("Failed to parse AI response:", cleanedContent);
+      // Fallback: Receipt auf review setzen, damit er nicht auf processing hängen bleibt
+      if (receiptId) {
+        await supabase.from('receipts').update({
+          status: 'review',
+          notes: 'KI-Antwort konnte nicht verarbeitet werden. Bitte manuell prüfen.',
+          ai_processed_at: new Date().toISOString(),
+        }).eq('id', receiptId);
+      }
       return new Response(
         JSON.stringify({ success: false, error: "Failed to parse AI response", raw: content }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -576,12 +576,23 @@ serve(async (req: Request) => {
           });
 
           if (!extractResponse.ok) {
-            console.error("AI extraction failed:", await extractResponse.text());
+            const errorText = await extractResponse.text();
+            console.error("AI extraction failed:", errorText);
+            // Fallback: Receipt auf review setzen, damit User ihn sieht und manuell bearbeiten kann
+            await supabase.from("receipts").update({
+              status: "review",
+              notes: `KI-Extraktion fehlgeschlagen. ${receipt.notes || ""}`.trim(),
+            }).eq("id", receipt.id);
           } else {
             console.log("AI extraction triggered for receipt:", receipt.id);
           }
         } catch (extractError) {
           console.error("Error triggering AI extraction:", extractError);
+          // Fallback: Receipt auf review setzen
+          await supabase.from("receipts").update({
+            status: "review",
+            notes: `KI-Extraktion fehlgeschlagen. ${receipt.notes || ""}`.trim(),
+          }).eq("id", receipt.id);
         }
 
         processedCount++;
