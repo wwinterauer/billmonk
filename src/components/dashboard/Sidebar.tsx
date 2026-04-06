@@ -147,10 +147,13 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
 
 
 
+  const isInsideSheet = !!onNavigate;
+
   return (
     <aside className={cn(
-      'fixed left-0 top-0 z-40 h-screen bg-sidebar transition-all duration-300 flex flex-col',
-      collapsed ? 'w-16' : 'w-64'
+      'h-screen bg-sidebar transition-all duration-300 flex flex-col',
+      isInsideSheet ? 'w-full' : 'fixed left-0 top-0 z-40',
+      !isInsideSheet && (collapsed ? 'w-16' : 'w-64')
     )}>
       {/* Logo */}
       <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
