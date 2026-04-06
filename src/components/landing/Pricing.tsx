@@ -206,27 +206,18 @@ export function Pricing() {
                     ))}
                   </ul>
 
-                  {plan.plan === 'free' ? (
-                    <Link to="/register" className="block">
-                      <Button className="w-full" variant="outline">
-                        {plan.cta}
-                      </Button>
-                    </Link>
-                  ) : (
-                    <div className="space-y-2">
+                  <div className="space-y-2">
                     <Button
-                      className={`w-full ${plan.featured ? 'gradient-primary hover:opacity-90' : ''}`}
+                      className="w-full opacity-60 cursor-not-allowed"
                       variant={plan.featured ? 'default' : 'outline'}
-                      onClick={() => handleCheckout(plan.plan)}
-                      disabled={loadingPlan === plan.plan}
+                      disabled={true}
                     >
-                      {loadingPlan === plan.plan ? 'Wird geladen...' : `30 Tage gratis testen`}
+                      {plan.plan === 'free' ? plan.cta : '30 Tage gratis testen'}
                     </Button>
                     <p className="text-xs text-center text-muted-foreground">
-                      danach €{(PLAN_PRICES[plan.plan].monthly * 0.5).toFixed(2).replace('.', ',')}/Monat für 12 Monate
+                      Zugang derzeit nur über Beta-Bewerbung
                     </p>
-                    </div>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
             </div>

@@ -303,7 +303,7 @@ function BetaApplicationForm() {
 
           {/* Plan */}
           <div className="space-y-1.5">
-            <Label>Welchen Plan möchtest du nutzen? *</Label>
+            <Label>Für welchen Plan würdest du dich interessieren? *</Label>
             <Select value={form.intendedPlan} onValueChange={v => update('intendedPlan', v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
