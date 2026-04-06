@@ -782,6 +782,7 @@ export default function Reconciliation() {
                         <p className="text-muted-foreground mt-1">Keine offenen Ausgangsrechnungen vorhanden.</p>
                       </div>
                     ) : (
+                      <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
