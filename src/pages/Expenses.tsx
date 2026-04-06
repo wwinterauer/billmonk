@@ -2280,6 +2280,7 @@ const Expenses = () => {
                 </div>
               ) : (
                 <>
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>

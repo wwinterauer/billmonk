@@ -432,6 +432,7 @@ const Invoices = () => {
               </div>
             ) : (
               <>
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
