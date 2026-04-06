@@ -861,6 +861,7 @@ export default function Reconciliation() {
                       <p className="text-muted-foreground mt-1">Zu allen Ausgaben sind Belege zugeordnet.</p>
                     </div>
                   ) : (
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -909,6 +910,7 @@ export default function Reconciliation() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
