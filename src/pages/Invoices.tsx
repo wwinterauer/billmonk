@@ -432,6 +432,7 @@ const Invoices = () => {
               </div>
             ) : (
               <>
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -605,6 +606,7 @@ const Invoices = () => {
                     })}
                   </TableBody>
                 </Table>
+                </div>
 
                 {/* Pagination */}
                 {totalPages > 1 && (

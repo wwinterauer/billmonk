@@ -649,6 +649,7 @@ export default function Reconciliation() {
                     </div>
                   ) : (
                     <>
+                      <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -734,6 +735,7 @@ export default function Reconciliation() {
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
 
                       {totalPages > 1 && (
                         <div className="flex items-center justify-between px-6 py-4 border-t">
@@ -780,6 +782,7 @@ export default function Reconciliation() {
                         <p className="text-muted-foreground mt-1">Keine offenen Ausgangsrechnungen vorhanden.</p>
                       </div>
                     ) : (
+                      <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -829,6 +832,7 @@ export default function Reconciliation() {
                           })}
                         </TableBody>
                       </Table>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -857,6 +861,7 @@ export default function Reconciliation() {
                       <p className="text-muted-foreground mt-1">Zu allen Ausgaben sind Belege zugeordnet.</p>
                     </div>
                   ) : (
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -905,6 +910,7 @@ export default function Reconciliation() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>

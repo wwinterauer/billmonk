@@ -635,6 +635,7 @@ const InvoiceEditor = () => {
             </div>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -791,6 +792,7 @@ const InvoiceEditor = () => {
                 })}
               </TableBody>
             </Table>
+            </div>
 
             {/* Totals - only for non-delivery-note */}
             {showPrices && (

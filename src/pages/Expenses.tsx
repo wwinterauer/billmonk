@@ -2280,6 +2280,7 @@ const Expenses = () => {
                 </div>
               ) : (
                 <>
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2656,6 +2657,7 @@ const Expenses = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
 
                   {/* Pagination */}
                   {totalPages > 1 && (
