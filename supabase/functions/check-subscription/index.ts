@@ -52,11 +52,30 @@ serve(async (req) => {
     // Check if user is a beta user — if so, skip Stripe entirely
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("is_beta_user, plan, stripe_customer_id")
+      .select("is_beta_user, plan, stripe_customer_id, beta_expires_at")
       .eq("id", user.id)
       .single();
 
     if (profile?.is_beta_user) {
+      // Check if time-limited beta has expired
+      if (profile.beta_expires_at && new Date(profile.beta_expires_at) < new Date()) {
+        logStep("Beta expired, downgrading to free", { beta_expires_at: profile.beta_expires_at });
+        await supabaseAdmin.from("profiles").update({
+          is_beta_user: false,
+          plan: 'free',
+          subscription_status: null,
+        }).eq("id", user.id);
+        return new Response(JSON.stringify({
+          subscribed: false,
+          plan: 'free',
+          is_beta_user: false,
+          beta_expired: true,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+
       logStep("Beta user detected, preserving business plan");
       // Ensure beta user always has business plan
       if (profile.plan !== 'business') {
