@@ -649,6 +649,7 @@ export default function Reconciliation() {
                     </div>
                   ) : (
                     <>
+                      <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -734,6 +735,7 @@ export default function Reconciliation() {
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
 
                       {totalPages > 1 && (
                         <div className="flex items-center justify-between px-6 py-4 border-t">
