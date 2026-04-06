@@ -534,7 +534,7 @@ serve(async (req: Request) => {
             file_url: storagePath,
             file_type: attachment.contentType,
             file_hash: fileHash,
-            status: "pending",
+            status: "processing",
             source: "email_webhook",
             email_attachment_id: emailAttachment.id,
             notes: `Importiert via E-Mail von ${emailData.from?.slice(0, 200)}${emailData.subject ? ` - Betreff: ${emailData.subject.slice(0, 200)}` : ""}`,
