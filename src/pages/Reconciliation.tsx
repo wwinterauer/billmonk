@@ -832,6 +832,7 @@ export default function Reconciliation() {
                           })}
                         </TableBody>
                       </Table>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
