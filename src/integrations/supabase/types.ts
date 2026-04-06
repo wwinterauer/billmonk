@@ -1097,6 +1097,36 @@ export type Database = {
           },
         ]
       }
+      crm_field_config: {
+        Row: {
+          created_at: string | null
+          entity_type: string
+          id: string
+          list_columns: Json | null
+          updated_at: string | null
+          user_id: string
+          visible_fields: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          entity_type?: string
+          id?: string
+          list_columns?: Json | null
+          updated_at?: string | null
+          user_id: string
+          visible_fields?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          entity_type?: string
+          id?: string
+          list_columns?: Json | null
+          updated_at?: string | null
+          user_id?: string
+          visible_fields?: Json | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           city: string | null
@@ -1114,6 +1144,7 @@ export type Database = {
           has_different_shipping_address: boolean | null
           id: string
           is_archived: boolean | null
+          newsletter_opt_out: boolean | null
           notes: string | null
           payment_terms_days: number | null
           phone: string | null
@@ -1143,6 +1174,7 @@ export type Database = {
           has_different_shipping_address?: boolean | null
           id?: string
           is_archived?: boolean | null
+          newsletter_opt_out?: boolean | null
           notes?: string | null
           payment_terms_days?: number | null
           phone?: string | null
@@ -1172,6 +1204,7 @@ export type Database = {
           has_different_shipping_address?: boolean | null
           id?: string
           is_archived?: boolean | null
+          newsletter_opt_out?: boolean | null
           notes?: string | null
           payment_terms_days?: number | null
           phone?: string | null
@@ -2285,6 +2318,197 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      member_types: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          icon: string | null
+          id: string
+          name: string
+          sort_order: number | null
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          sort_order?: number | null
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          sort_order?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      members: {
+        Row: {
+          city: string | null
+          country: string | null
+          created_at: string | null
+          custom_fields: Json | null
+          display_name: string
+          email: string | null
+          first_name: string | null
+          id: string
+          is_active: boolean | null
+          joined_at: string | null
+          last_name: string | null
+          member_number: string | null
+          member_type: string | null
+          membership_fee: number | null
+          newsletter_opt_out: boolean | null
+          notes: string | null
+          phone: string | null
+          street: string | null
+          updated_at: string | null
+          user_id: string
+          zip: string | null
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          custom_fields?: Json | null
+          display_name: string
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          joined_at?: string | null
+          last_name?: string | null
+          member_number?: string | null
+          member_type?: string | null
+          membership_fee?: number | null
+          newsletter_opt_out?: boolean | null
+          notes?: string | null
+          phone?: string | null
+          street?: string | null
+          updated_at?: string | null
+          user_id: string
+          zip?: string | null
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          custom_fields?: Json | null
+          display_name?: string
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          joined_at?: string | null
+          last_name?: string | null
+          member_number?: string | null
+          member_type?: string | null
+          membership_fee?: number | null
+          newsletter_opt_out?: boolean | null
+          notes?: string | null
+          phone?: string | null
+          street?: string | null
+          updated_at?: string | null
+          user_id?: string
+          zip?: string | null
+        }
+        Relationships: []
+      }
+      newsletter_recipients: {
+        Row: {
+          created_at: string | null
+          email: string
+          error_message: string | null
+          id: string
+          name: string | null
+          newsletter_id: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          error_message?: string | null
+          id?: string
+          name?: string | null
+          newsletter_id: string
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          error_message?: string | null
+          id?: string
+          name?: string | null
+          newsletter_id?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "newsletter_recipients_newsletter_id_fkey"
+            columns: ["newsletter_id"]
+            isOneToOne: false
+            referencedRelation: "newsletters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      newsletters: {
+        Row: {
+          created_at: string | null
+          failed_count: number | null
+          html_content: string
+          id: string
+          recipient_filter: Json | null
+          recipient_type: string
+          sent_at: string | null
+          sent_count: number | null
+          status: string
+          subject: string
+          total_recipients: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          failed_count?: number | null
+          html_content?: string
+          id?: string
+          recipient_filter?: Json | null
+          recipient_type?: string
+          sent_at?: string | null
+          sent_count?: number | null
+          status?: string
+          subject: string
+          total_recipients?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          failed_count?: number | null
+          html_content?: string
+          id?: string
+          recipient_filter?: Json | null
+          recipient_type?: string
+          sent_at?: string | null
+          sent_count?: number | null
+          status?: string
+          subject?: string
+          total_recipients?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       oauth_states: {
         Row: {

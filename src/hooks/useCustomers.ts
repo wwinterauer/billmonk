@@ -29,6 +29,7 @@ export interface Customer {
   default_discount_percent: number | null;
   default_skonto_percent: number | null;
   default_skonto_days: number | null;
+  newsletter_opt_out: boolean | null;
   created_at: string | null;
   updated_at: string | null;
 }
