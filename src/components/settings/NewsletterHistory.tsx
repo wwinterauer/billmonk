@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Clock, CheckCircle, XCircle, Mail, ChevronDown, ChevronUp, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { useNewsletters, Newsletter, NewsletterRecipient } from '@/hooks/useNewsletters';
+import { useNewsletters, type NewsletterRecipient } from '@/hooks/useNewsletters';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
