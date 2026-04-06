@@ -476,35 +476,127 @@ export type Database = {
           },
         ]
       }
+      beta_applications: {
+        Row: {
+          admin_notes: string | null
+          beta_code_id: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          email: string
+          first_name: string
+          id: string
+          intended_plan: string
+          last_name: string
+          organization_name: string | null
+          organization_type: string
+          status: string
+          street: string | null
+          updated_at: string
+          user_id: string | null
+          zip: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          beta_code_id?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          email: string
+          first_name?: string
+          id?: string
+          intended_plan?: string
+          last_name?: string
+          organization_name?: string | null
+          organization_type?: string
+          status?: string
+          street?: string | null
+          updated_at?: string
+          user_id?: string | null
+          zip?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          beta_code_id?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          email?: string
+          first_name?: string
+          id?: string
+          intended_plan?: string
+          last_name?: string
+          organization_name?: string | null
+          organization_type?: string
+          status?: string
+          street?: string | null
+          updated_at?: string
+          user_id?: string | null
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beta_applications_beta_code_id_fkey"
+            columns: ["beta_code_id"]
+            isOneToOne: false
+            referencedRelation: "beta_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beta_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       beta_codes: {
         Row: {
+          assigned_email: string | null
+          beta_application_id: string | null
           code: string
           created_at: string
           description: string | null
+          expires_at: string | null
           id: string
           is_active: boolean
           max_uses: number | null
           used_count: number
         }
         Insert: {
+          assigned_email?: string | null
+          beta_application_id?: string | null
           code: string
           created_at?: string
           description?: string | null
+          expires_at?: string | null
           id?: string
           is_active?: boolean
           max_uses?: number | null
           used_count?: number
         }
         Update: {
+          assigned_email?: string | null
+          beta_application_id?: string | null
           code?: string
           created_at?: string
           description?: string | null
+          expires_at?: string | null
           id?: string
           is_active?: boolean
           max_uses?: number | null
           used_count?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "beta_codes_beta_application_id_fkey"
+            columns: ["beta_application_id"]
+            isOneToOne: false
+            referencedRelation: "beta_applications"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       blocked_senders: {
         Row: {
@@ -2294,6 +2386,7 @@ export type Database = {
           account_type: string | null
           admin_view_plan: string | null
           avatar_url: string | null
+          beta_expires_at: string | null
           booking_type_settings: Json | null
           city: string | null
           community_opt_out: boolean
@@ -2331,6 +2424,7 @@ export type Database = {
           account_type?: string | null
           admin_view_plan?: string | null
           avatar_url?: string | null
+          beta_expires_at?: string | null
           booking_type_settings?: Json | null
           city?: string | null
           community_opt_out?: boolean
@@ -2368,6 +2462,7 @@ export type Database = {
           account_type?: string | null
           admin_view_plan?: string | null
           avatar_url?: string | null
+          beta_expires_at?: string | null
           booking_type_settings?: Json | null
           city?: string | null
           community_opt_out?: boolean
