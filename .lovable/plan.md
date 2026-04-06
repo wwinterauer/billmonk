@@ -1,22 +1,23 @@
 
 
-# Pricing-Texte & Buttons anpassen
+# Fix: Email-Webhook Receipt-Status + Stuck Receipts
+
+## Problem
+Der Webhook erstellt Receipts mit `status: "pending"`. Wenn die KI-Extraktion fehlschlägt, bleiben Belege unsichtbar (weder in Review noch in Expenses).
 
 ## Änderungen
 
-### 1. `src/components/landing/Pricing.tsx`
-- **Label im Formular**: "Welchen Plan möchtest du nutzen?" → "Für welchen Plan würdest du dich interessieren?"
-- **CTA-Buttons ausgegraut**: Alle "30 Tage gratis testen"-Buttons werden `disabled` mit Tooltip/Hinweis "Derzeit nur über Beta-Bewerbung verfügbar"
-- **Free-Plan Button**: "Kostenlos starten" ebenfalls disabled mit gleichem Hinweis
-- **Checkout-Logik bleibt** im Code, wird aber nicht mehr ausgelöst (Buttons disabled)
-- Unter den disabled Buttons statt "danach €X/Monat..." → "Zugang über Beta-Bewerbung"
+### 1. `supabase/functions/email-import-webhook/index.ts` (Zeile 537)
+- Receipt-Status bei Erstellung von `"pending"` auf `"processing"` ändern
+- Das macht den Beleg sofort sichtbar und konsistent mit allen anderen Upload-Pfaden (Camera, Upload-Seite, Share)
 
-### 2. `src/pages/Beta.tsx` (Zeile 306)
-- Label ändern: "Welchen Plan möchtest du nutzen?" → "Für welchen Plan würdest du dich interessieren?"
+### 2. Stuck Receipts manuell fixen
+- Die 2 stuck Receipts (Kieninger + Test) per Migration auf `status = 'processing'` setzen
+- Dann kannst du sie in der Expenses-Seite sehen und manuell die KI-Analyse neu starten
 
 ### Dateien
 | Datei | Änderung |
 |-------|----------|
-| `src/components/landing/Pricing.tsx` | Buttons disabled + Hinweistext, kein Checkout |
-| `src/pages/Beta.tsx` | Label-Text anpassen |
+| `supabase/functions/email-import-webhook/index.ts` | Zeile 537: `"pending"` → `"processing"` |
+| Migration | UPDATE für die 2 stuck receipts |
 
