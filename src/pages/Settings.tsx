@@ -26,6 +26,7 @@ import {
   Package,
   FileCheck,
   Settings2,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1136,6 +1137,34 @@ const Settings = () => {
         </FeatureGate>
       </TabsContent>
 
+
+      {/* Members Tab */}
+      <TabsContent value="members">
+        <FeatureGate feature="invoiceModule">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <MemberManagement />
+        </motion.div>
+        </FeatureGate>
+      </TabsContent>
+
+      {/* CRM Field Config Tab */}
+      <TabsContent value="crm-fields">
+        <FeatureGate feature="invoiceModule">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <CrmFieldConfig />
+        </motion.div>
+        </FeatureGate>
+      </TabsContent>
+
+      {/* Newsletter Tab */}
+      <TabsContent value="newsletter">
+        <FeatureGate feature="invoiceModule">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          <NewsletterComposer />
+          <NewsletterHistory />
+        </motion.div>
+        </FeatureGate>
+      </TabsContent>
 
     </Tabs>
       </div>
