@@ -68,6 +68,10 @@ import { QuoteTemplateSettings } from '@/components/settings/QuoteTemplateSettin
 import { InvoiceModuleSettings } from '@/components/settings/InvoiceModuleSettings';
 import { CompanySettings } from '@/components/settings/CompanySettings';
 import { LiveBankSettings } from '@/components/settings/LiveBankSettings';
+import { MemberManagement } from '@/components/settings/MemberManagement';
+import { CrmFieldConfig } from '@/components/settings/CrmFieldConfig';
+import { NewsletterComposer } from '@/components/settings/NewsletterComposer';
+import { NewsletterHistory } from '@/components/settings/NewsletterHistory';
 import { usePlan } from '@/hooks/usePlan';
 import { FEATURE_MIN_PLAN, isPlanSufficient } from '@/lib/planConfig';
 import { FeatureGate } from '@/components/FeatureGate';
@@ -248,7 +252,7 @@ const Settings = () => {
   // Handle tab from URL query parameter - must be before any early returns
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'bank-live', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage', 'company', 'customers', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'];
+  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'bank-live', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage', 'company', 'customers', 'members', 'crm-fields', 'newsletter', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'naming';
   const [activeTab, setActiveTab] = useState(initialTab);
   
@@ -497,6 +501,9 @@ const Settings = () => {
     { value: 'cloud-storage', icon: Cloud, label: 'Cloud', requiredFeature: 'cloudBackup' as const },
     { value: 'company', icon: Building2, label: 'Firma', requiredFeature: 'invoiceModule' as const },
     { value: 'customers', icon: Building2, label: 'Kunden', requiredFeature: 'invoiceModule' as const },
+    { value: 'members', icon: Users, label: 'Mitglieder', requiredFeature: 'invoiceModule' as const },
+    { value: 'crm-fields', icon: Settings2, label: 'CRM-Felder', requiredFeature: 'invoiceModule' as const },
+    { value: 'newsletter', icon: Mail, label: 'Newsletter', requiredFeature: 'invoiceModule' as const },
     { value: 'invoice-items', icon: Package, label: 'Artikel', requiredFeature: 'invoiceModule' as const },
     { value: 'invoice-templates', icon: FileCheck, label: 'Rechnung', requiredFeature: 'invoiceModule' as const },
     { value: 'quote-templates', icon: FileText, label: 'Angebot', requiredFeature: 'invoiceModule' as const },
@@ -512,7 +519,7 @@ const Settings = () => {
 
   // Split tabs into expense group and invoice group
   const expenseTabs = allTabs.filter(t => !['bank-live', 'company', 'customers', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'].includes(t.value));
-  const invoiceTabs = allTabs.filter(t => ['bank-live', 'company', 'customers', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'].includes(t.value));
+  const invoiceTabs = allTabs.filter(t => ['bank-live', 'company', 'customers', 'members', 'crm-fields', 'newsletter', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'].includes(t.value));
 
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
