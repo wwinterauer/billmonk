@@ -792,6 +792,7 @@ const InvoiceEditor = () => {
                 })}
               </TableBody>
             </Table>
+            </div>
 
             {/* Totals - only for non-delivery-note */}
             {showPrices && (

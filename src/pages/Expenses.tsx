@@ -2657,6 +2657,7 @@ const Expenses = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
 
                   {/* Pagination */}
                   {totalPages > 1 && (
