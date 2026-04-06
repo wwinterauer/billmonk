@@ -1015,6 +1015,22 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
     }
   } catch (error) {
     console.error("Extract receipt error:", error);
+    // Fallback: Receipt auf review setzen, damit er nicht auf processing hängen bleibt
+    try {
+      const body = await req.clone().json().catch(() => ({}));
+      const rid = body?.receiptId;
+      if (rid) {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+        const sb = createClient(supabaseUrl, supabaseServiceKey);
+        await sb.from('receipts').update({
+          status: 'review',
+          notes: `KI-Extraktion fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`,
+          ai_processed_at: new Date().toISOString(),
+        }).eq('id', rid);
+      }
+    } catch (_) { /* best effort */ }
     return new Response(
       JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
