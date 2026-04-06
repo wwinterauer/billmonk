@@ -1571,6 +1571,7 @@ const Reports = () => {
                 Keine Daten für den gewählten Zeitraum
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1632,6 +1633,7 @@ const Reports = () => {
                   </TableRow>
                 </TableFooter>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -1657,6 +1659,7 @@ const Reports = () => {
                 Keine Tags für den gewählten Zeitraum
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1713,6 +1716,7 @@ const Reports = () => {
                   )}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -1736,6 +1740,7 @@ const Reports = () => {
               </div>
             ) : (
               <>
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1783,6 +1788,7 @@ const Reports = () => {
                     </TableRow>
                   </TableFooter>
                 </Table>
+                </div>
 
                 {/* VAT Note */}
                 <div className="mt-4 p-3 bg-blue-500/10 rounded-lg flex items-start gap-2">
@@ -2062,6 +2068,7 @@ const Reports = () => {
               </div>
             ) : (
               <>
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -2109,6 +2116,7 @@ const Reports = () => {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
 
                 {filteredVendorData.length > 20 && (
                   <p className="text-sm text-muted-foreground mt-4 text-center">
@@ -2302,6 +2310,7 @@ const Reports = () => {
                       Keine Daten für den gewählten Zeitraum
                     </div>
                   ) : (
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2343,6 +2352,7 @@ const Reports = () => {
                       </TableRow>
                     </TableFooter>
                   </Table>
+                  </div>
                   )}
                 </CardContent>
               </Card>
@@ -2362,6 +2372,7 @@ const Reports = () => {
                     Keine Tags für den gewählten Zeitraum
                   </div>
                 ) : (
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2403,6 +2414,7 @@ const Reports = () => {
                       )}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -2423,6 +2435,7 @@ const Reports = () => {
                     </div>
                   ) : (
                   <>
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2454,6 +2467,7 @@ const Reports = () => {
                       </TableRow>
                     </TableFooter>
                   </Table>
+                  </div>
 
                   {/* USt Note */}
                   <div className="mt-4 p-3 bg-blue-500/10 rounded-lg flex items-start gap-2">
@@ -2647,6 +2661,7 @@ const Reports = () => {
                   </div>
                 ) : (
                   <>
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -2681,6 +2696,7 @@ const Reports = () => {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                     {filteredCustomerData.length > 20 && (
                       <p className="text-sm text-muted-foreground mt-4 text-center">
                         Zeige 20 von {filteredCustomerData.length} Kunden
