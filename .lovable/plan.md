@@ -1,134 +1,67 @@
 
 
-# CRM-Erweiterung: Kontakte-Modul mit konfigurierbaren Typen + Mitglieder + Newsletter
+# SEO-Optimierung der gesamten Seite
 
-## Konzept
+## Aktuelle Defizite
 
-Statt einer starren "Mitglieder"-Tabelle wird ein **flexibles Kontakttyp-System** gebaut. Der User definiert selbst seine Kontakttypen (z.B. "Kunde", "Premium-Kunde", "Vereinsmitglied", "Members-Club", "Lieferant"). Jeder Kontakttyp kann eigene Zusatzfelder haben.
-
-Die bestehende `customers`-Tabelle bleibt erhalten. Daneben entsteht eine neue `members`-Tabelle mit einem **frei konfigurierbaren `member_type`**-Feld, das der User selbst benennen kann.
-
-```text
-┌─────────────────────────────────┐
-│         Kontakte (CRM)          │
-├─────────┬───────────┬───────────┤
-│ Kunden  │ Mitglieder│ Newsletter│
-│(besteh.)│  (neu)    │  (neu)    │
-└─────────┴───────────┴───────────┘
-           │
-           ▼
-  member_type = frei wählbar:
-  "Vereinsmitglied", "Premium-Kunde",
-  "Members-Club", "Sponsor", etc.
-```
+1. **Kein `sitemap.xml`** — Google kann die Seitenstruktur nicht crawlen
+2. **`robots.txt` ohne Sitemap-Verweis** und ohne Disallow für geschützte Routen
+3. **Keine dynamischen Meta-Tags pro Seite** — alle Seiten teilen den gleichen `<title>` und `<meta description>` aus `index.html`
+4. **Keine strukturierten Daten** (JSON-LD Schema.org)
+5. **Keine semantischen HTML-Tags** (`<article>`, `<nav aria-label>`, `<main>`, `role` Attribute) in Landing-Komponenten
+6. **OG-Image ist nur ein Icon** — kein richtiges Social-Sharing-Bild
+7. **Keine `canonical` URL** definiert
+8. **Kein `hreflang`** für deutsche Inhalte
+9. **Keine `alt`-Texte** auf dekorativen Elementen, fehlende `aria-label`s auf Navigations-Buttons
+10. **Keine `<h1>`-Hierarchie-Kontrolle** — mehrere Seiten könnten ohne h1 sein
 
 ---
 
-## Datenbank
+## Umsetzungsplan
 
-### Neue Tabelle `members`
-```sql
-create table public.members (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null,
-  display_name text not null,
-  first_name text,
-  last_name text,
-  email text,
-  phone text,
-  street text, zip text, city text, country text default 'AT',
-  member_number text,
-  member_type text default 'Mitglied',  -- frei wählbar
-  membership_fee numeric default 0,
-  joined_at date,
-  is_active boolean default true,
-  newsletter_opt_out boolean default false,
-  notes text,
-  custom_fields jsonb default '{}',
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
--- RLS: user_id = auth.uid() für alle Operationen
+### 1. SEO-Helfer-Komponente `PageMeta`
+Neue Komponente die per `document.title` und dynamischen `<meta>`-Tags pro Seite den Title/Description setzt. Kein `react-helmet` nötig — einfacher `useEffect`-Hook.
+
+Wird auf jeder öffentlichen Seite eingebunden: Index, Pricing, Beta, Datenschutz, Login, Register.
+
+### 2. `public/sitemap.xml`
+Statische Sitemap mit allen öffentlichen Routen:
+- `/`, `/pricing`, `/beta`, `/datenschutz`, `/login`, `/register`
+
+### 3. `public/robots.txt` erweitern
+```
+Sitemap: https://billmonk.lovable.app/sitemap.xml
+Disallow: /dashboard
+Disallow: /upload
+Disallow: /review
+Disallow: /settings
+Disallow: /admin
+...
 ```
 
-### Neue Tabelle `crm_field_config`
-```sql
-create table public.crm_field_config (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null,
-  entity_type text not null default 'customer', -- 'customer' | 'member'
-  visible_fields jsonb default '[]',
-  list_columns jsonb default '[]',
-  created_at timestamptz default now(),
-  updated_at timestamptz default now(),
-  unique(user_id, entity_type)
-);
-```
+### 4. `index.html` — Basis-SEO verbessern
+- `<link rel="canonical">` hinzufügen
+- `<meta name="robots" content="index, follow">`
+- `<meta property="og:url">` mit absoluter URL
+- `<meta property="og:locale" content="de_AT">`
+- OG-Image auf absolute URL setzen
+- `<html lang="de">` ist bereits korrekt
 
-### Neue Tabelle `member_types` (User-definierte Typen)
-```sql
-create table public.member_types (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null,
-  name text not null,          -- "Premium-Kunde", "Vereinsmitglied", etc.
-  color text default '#8B5CF6',
-  icon text default 'users',
-  sort_order integer default 0,
-  created_at timestamptz default now(),
-  unique(user_id, name)
-);
--- Default-Einträge werden beim ersten Laden im Frontend erstellt
-```
+### 5. JSON-LD Structured Data
+Auf der Startseite: `SoftwareApplication` + `Organization` Schema.
+Auf der Pricing-Seite: `Product` mit `Offer`-Schemas pro Plan.
+Auf der FAQ-Seite: `FAQPage` Schema.
 
-### Neue Tabellen `newsletters` + `newsletter_recipients`
-Wie im vorherigen Plan beschrieben.
+### 6. Semantisches HTML in Landing-Komponenten
+- `Header.tsx`: `<nav aria-label="Hauptnavigation">`
+- `Footer.tsx`: `<nav aria-label="Footer-Navigation">`
+- `Hero.tsx`: Sicherstellen dass `<h1>` korrekt ist
+- `Features.tsx`, `FAQ.tsx`, `Pricing.tsx`: Passende `aria-label` und Heading-Hierarchie
+- `alt`-Texte auf Logo-Images verbessern (bereits "BillMonk" — okay)
 
-### Spalte auf `customers` hinzufügen
-```sql
-alter table customers add column newsletter_opt_out boolean default false;
-```
-
----
-
-## Frontend-Komponenten
-
-### 1. `src/components/settings/MemberManagement.tsx`
-- Analog zu `CustomerManagement.tsx`
-- Dropdown für `member_type` mit den user-definierten Typen
-- Filterbar nach Typ, Status (aktiv/inaktiv)
-- Mitgliedsspezifische Felder: Mitgliedsnummer, Beitritt, Beitrag, Typ
-
-### 2. `src/components/settings/MemberTypeConfig.tsx`
-- Kleine Verwaltung der Kontakttypen (Name, Farbe, Icon)
-- Inline im MemberManagement-Header oder als eigener Sub-Bereich
-- Vorgeschlagene Defaults: "Mitglied", "Premium-Kunde", "Members-Club"
-
-### 3. `src/components/settings/CrmFieldConfig.tsx`
-- Checkboxen pro Entity-Typ: welche Felder in Liste/Formular sichtbar
-- Getrennt für Kunden und Mitglieder konfigurierbar
-
-### 4. `src/components/settings/NewsletterComposer.tsx`
-- Betreff + Textarea (HTML-fähig)
-- Empfänger: Alle Kunden / Alle Mitglieder / Nach Typ filtern / Manuell
-- Versand-Button → Edge Function
-
-### 5. `src/components/settings/NewsletterHistory.tsx`
-- Tabelle mit vergangenen Newslettern, Status, Empfängerzahl
-
-### 6. Hooks
-- `useMembers.ts` — CRUD für members
-- `useMemberTypes.ts` — CRUD für member_types
-- `useCrmFieldConfig.ts` — Feldkonfiguration laden/speichern
-- `useNewsletters.ts` — Newsletter CRUD + Versand triggern
-
-### 7. `src/pages/Settings.tsx`
-- Neue Tabs in der Invoice-Gruppe: "Mitglieder", "Newsletter"
-- Bestehender "Kunden"-Tab bleibt, bekommt Feldkonfigurations-Toggle
-
-### 8. `supabase/functions/send-newsletter/index.ts`
-- Empfänger laden, `newsletter_opt_out` prüfen
-- Resend API direkt ansprechen (Rate-Limiting 10/s)
-- Status pro Empfänger tracken
+### 7. Performance-Hinweise in `index.html`
+- `<link rel="preload">` für das Logo-Asset
+- Font-Display `swap` ist bereits gesetzt — gut
 
 ---
 
@@ -136,17 +69,17 @@ alter table customers add column newsletter_opt_out boolean default false;
 
 | Datei | Änderung |
 |-------|----------|
-| Migration | `members`, `member_types`, `crm_field_config`, `newsletters`, `newsletter_recipients` + RLS; `customers.newsletter_opt_out` |
-| `src/hooks/useMembers.ts` | Neuer Hook |
-| `src/hooks/useMemberTypes.ts` | Neuer Hook |
-| `src/hooks/useCrmFieldConfig.ts` | Neuer Hook |
-| `src/hooks/useNewsletters.ts` | Neuer Hook |
-| `src/components/settings/MemberManagement.tsx` | Neue Komponente |
-| `src/components/settings/MemberTypeConfig.tsx` | Neue Komponente |
-| `src/components/settings/CrmFieldConfig.tsx` | Neue Komponente |
-| `src/components/settings/NewsletterComposer.tsx` | Neue Komponente |
-| `src/components/settings/NewsletterHistory.tsx` | Neue Komponente |
-| `src/components/settings/CustomerManagement.tsx` | Feldkonfig + newsletter_opt_out |
-| `src/pages/Settings.tsx` | Neue Tabs: Mitglieder, Newsletter |
-| `supabase/functions/send-newsletter/index.ts` | Edge Function für Versand |
+| `src/components/PageMeta.tsx` | Neue Komponente: dynamischer Title + Meta pro Seite |
+| `src/pages/Index.tsx` | PageMeta einbinden + JSON-LD (SoftwareApplication + FAQPage) |
+| `src/pages/PricingPage.tsx` | PageMeta + JSON-LD (Product/Offer) |
+| `src/pages/Beta.tsx` | PageMeta |
+| `src/pages/Datenschutz.tsx` | PageMeta |
+| `src/pages/Login.tsx` | PageMeta |
+| `src/pages/Register.tsx` | PageMeta |
+| `public/sitemap.xml` | Neue Datei |
+| `public/robots.txt` | Sitemap-Verweis + Disallow geschützter Routen |
+| `index.html` | Canonical, og:url, og:locale, robots meta |
+| `src/components/landing/Header.tsx` | `aria-label` auf nav |
+| `src/components/landing/Footer.tsx` | `aria-label` auf nav |
+| `src/components/landing/FAQ.tsx` | JSON-LD FAQPage Schema |
 
