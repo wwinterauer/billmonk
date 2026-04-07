@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { PageMeta } from '@/components/PageMeta';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Shield, Database, Brain, Mail, Lock, Trash2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,11 @@ export default function Datenschutz() {
   }, [hash]);
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <PageMeta
+        title="Datenschutzerklärung — BillMonk"
+        description="Datenschutzerklärung von BillMonk. Erfahre wie wir deine Daten DSGVO-konform verarbeiten und schützen."
+        canonical="/datenschutz"
+      />
       <Header />
       
       <main className="flex-1 py-12">

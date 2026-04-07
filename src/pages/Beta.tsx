@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PageMeta } from '@/components/PageMeta';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,11 @@ export default function Beta() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta
+        title="Beta-Zugang — BillMonk | Jetzt bewerben"
+        description="Sichere dir deinen BillMonk Beta-Zugang. Teste die KI-gestützte Einnahmen-Ausgaben-Verwaltung als einer der Ersten — mit 50 % Rabatt auf alle Pläne."
+        canonical="/beta"
+      />
       {/* Sticky header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
         <div className="container flex items-center justify-between h-14">
