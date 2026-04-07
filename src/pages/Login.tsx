@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PageMeta } from '@/components/PageMeta';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -72,6 +73,12 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-secondary/30 px-4 py-12">
+      <PageMeta
+        title="Login — BillMonk"
+        description="Melde dich bei BillMonk an und verwalte deine Einnahmen und Ausgaben."
+        canonical="/login"
+        noindex
+      />
       <div className="w-full max-w-md">
         <Card className="border-border/50 shadow-xl">
           <CardHeader className="text-center pb-2">

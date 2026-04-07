@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PageMeta } from '@/components/PageMeta';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -129,6 +130,11 @@ const Register = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-secondary/30 px-4 py-12">
+      <PageMeta
+        title="Registrieren — BillMonk | Kostenlos starten"
+        description="Erstelle dein BillMonk-Konto und starte mit 10 kostenlosen Belegen. KI-gestützte Belegerfassung in unter 2 Minuten."
+        canonical="/register"
+      />
       <div className="w-full max-w-md">
         <Card className="border-border/50 shadow-xl">
           <CardHeader className="text-center pb-2">

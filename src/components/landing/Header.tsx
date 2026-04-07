@@ -31,7 +31,7 @@ export function Header() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav aria-label="Hauptnavigation" className="hidden md:flex items-center gap-8">
           <button
             onClick={() => scrollToSection('features')}
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
@@ -66,6 +66,8 @@ export function Header() {
         <button
           className="md:hidden p-2"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-label={mobileMenuOpen ? 'Menü schließen' : 'Menü öffnen'}
+          aria-expanded={mobileMenuOpen}
         >
           {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
@@ -80,7 +82,7 @@ export function Header() {
             exit={{ opacity: 0, height: 0 }}
             className="md:hidden border-t border-border bg-background"
           >
-            <nav className="container flex flex-col gap-4 py-4">
+            <nav aria-label="Mobile Navigation" className="container flex flex-col gap-4 py-4">
               <button
                 onClick={() => scrollToSection('features')}
                 className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors text-left"
