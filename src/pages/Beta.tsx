@@ -37,7 +37,12 @@ export default function Beta() {
             <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">Preise</a>
             <a href="#beta-signup" className="text-muted-foreground hover:text-foreground transition-colors">Beta-Zugang</a>
           </nav>
-          <Button size="sm" variant="outline" onClick={() => setActiveTab('code')} className="gap-1.5">
+          <Button size="sm" variant="outline" onClick={() => {
+            setActiveTab('code');
+            setTimeout(() => {
+              document.getElementById('beta-signup')?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          }} className="gap-1.5">
             <KeyRound className="h-3.5 w-3.5" />
             Code eingeben
           </Button>
