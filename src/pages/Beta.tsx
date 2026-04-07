@@ -404,7 +404,7 @@ function BetaCodeEntry() {
       }
 
       toast.success('Beta-Zugang freigeschaltet!');
-      navigate('/');
+      navigate('/login');
     } catch {
       toast.error('Fehler bei der Überprüfung');
     } finally {
