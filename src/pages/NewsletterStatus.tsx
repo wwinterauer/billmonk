@@ -21,6 +21,8 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNewsletters, type NewsletterRecipient } from '@/hooks/useNewsletters';
+import { TestSendDialog } from '@/components/newsletter/TestSendDialog';
+import { Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const STATUS_BADGE: Record<string, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
@@ -208,10 +210,17 @@ export default function NewsletterStatus() {
                         isExpanded ? 'border-primary/40 bg-primary/[0.02]' : 'border-border/50',
                       )}
                     >
-                      <button
-                        type="button"
+                      <div
+                        role="button"
+                        tabIndex={0}
                         onClick={() => toggleExpand(nl.id)}
-                        className="w-full text-left p-4 flex items-center gap-3 hover:bg-muted/30 transition-colors rounded-lg"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            toggleExpand(nl.id);
+                          }
+                        }}
+                        className="w-full text-left p-4 flex items-center gap-3 hover:bg-muted/30 transition-colors rounded-lg cursor-pointer"
                       >
                         <div className="flex-1 min-w-0 space-y-1.5">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -245,12 +254,24 @@ export default function NewsletterStatus() {
                             )}
                           </div>
                         </div>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <TestSendDialog
+                            newsletterId={nl.id}
+                            newsletterSubject={nl.subject}
+                            trigger={
+                              <Button variant="outline" size="sm" className="gap-1.5">
+                                <Send className="h-3.5 w-3.5" />
+                                Testversand
+                              </Button>
+                            }
+                          />
+                        </div>
                         {isExpanded ? (
                           <ChevronUp className="h-5 w-5 text-muted-foreground shrink-0" />
                         ) : (
                           <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />
                         )}
-                      </button>
+                      </div>
 
                       {isExpanded && (
                         <div className="border-t border-border/50 p-4 space-y-3">

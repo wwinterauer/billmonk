@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Mail, ArrowRight, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Mail, ArrowRight, AlertCircle, CheckCircle2, Loader2, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TestSendDialog } from '@/components/newsletter/TestSendDialog';
 
 interface LastNewsletter {
   id: string;
@@ -152,21 +153,33 @@ function NewsletterContent({ newsletter }: { newsletter: LastNewsletter }) {
         )}
       </div>
 
-      {failed > 0 ? (
-        <Link to={detailsHref}>
-          <Button variant="outline" size="sm" className="w-full">
-            <AlertCircle className="h-4 w-4 mr-2" />
-            Fehlerdetails anzeigen
-          </Button>
-        </Link>
-      ) : (
-        <Link to={detailsHref}>
-          <Button variant="ghost" size="sm" className="w-full">
-            Details ansehen
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        </Link>
-      )}
+      <div className="flex flex-col gap-2">
+        <TestSendDialog
+          newsletterId={newsletter.id}
+          newsletterSubject={newsletter.subject}
+          trigger={
+            <Button variant="outline" size="sm" className="w-full">
+              <Send className="h-4 w-4 mr-2" />
+              Testversand
+            </Button>
+          }
+        />
+        {failed > 0 ? (
+          <Link to={detailsHref}>
+            <Button variant="outline" size="sm" className="w-full">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              Fehlerdetails anzeigen
+            </Button>
+          </Link>
+        ) : (
+          <Link to={detailsHref}>
+            <Button variant="ghost" size="sm" className="w-full">
+              Details ansehen
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </Link>
+        )}
+      </div>
     </div>
   );
 }

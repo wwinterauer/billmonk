@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { newsletter_id } = await req.json();
+    const { newsletter_id, test_mode, test_email } = await req.json();
     if (!newsletter_id) {
       return new Response(JSON.stringify({ error: 'newsletter_id required' }), {
         status: 400,
@@ -69,6 +69,62 @@ Deno.serve(async (req) => {
       .select('company_name, email')
       .eq('user_id', user.id)
       .maybeSingle();
+
+    // ====== TEST MODE ======
+    if (test_mode === true) {
+      const targetEmail = (test_email || user.email || '').trim().toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!targetEmail || !emailRegex.test(targetEmail)) {
+        return new Response(JSON.stringify({ error: 'Ungültige Test-E-Mail-Adresse' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const senderName = company?.company_name || 'BillMonk';
+      const testBanner = `
+        <div style="background:#fef3c7;border:1px solid #fbbf24;color:#92400e;padding:12px 16px;border-radius:8px;margin-bottom:20px;font-family:Arial,sans-serif;font-size:14px;">
+          <strong>🧪 Testversand</strong> – Vorschau, dieser Newsletter wurde noch nicht an die echten Empfänger versendet.
+        </div>`;
+      const htmlForTest = `${testBanner}${newsletter.html_content}`;
+
+      console.log('[test-send]', { newsletter_id, targetEmail });
+
+      try {
+        const response = await fetch(`${GATEWAY_URL}/emails`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${lovableApiKey}`,
+            'X-Connection-Api-Key': resendApiKey,
+          },
+          body: JSON.stringify({
+            from: `${senderName} <onboarding@resend.dev>`,
+            to: [targetEmail],
+            subject: `[TEST] ${newsletter.subject}`,
+            html: htmlForTest,
+          }),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          return new Response(JSON.stringify({ error: `Testversand fehlgeschlagen: ${errText.substring(0, 500)}` }), {
+            status: 502,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({ success: true, test: true, sent_to: targetEmail }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ error: err.message || 'Unknown error' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+    // ====== END TEST MODE ======
 
     // Collect recipients based on type
     let recipientEmails: { email: string; name: string }[] = [];
