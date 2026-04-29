@@ -36,6 +36,7 @@ import NotFound from "./pages/NotFound";
 import PricingPage from "./pages/PricingPage";
 import Admin from "./pages/Admin";
 import Unsubscribe from "./pages/Unsubscribe";
+import NewsletterStatus from "./pages/NewsletterStatus";
 import { PageTracker } from "./components/PageTracker";
 import { BetaGate } from "./components/BetaGate";
 import Beta from "./pages/Beta";
@@ -118,7 +119,15 @@ const App = () => (
                 <ProtectedRoute>
                   <Settings />
                 </ProtectedRoute>
-              } 
+              }
+            />
+            <Route 
+              path="/newsletter-status" 
+              element={
+                <ProtectedRoute>
+                  <NewsletterStatus />
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/settings/bank-callback" 
