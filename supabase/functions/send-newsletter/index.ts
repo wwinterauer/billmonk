@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    const resendApiKey = Deno.env.get('RESEND_API_KEY_1');
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
 
     if (!resendApiKey || !lovableApiKey) {
