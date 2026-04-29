@@ -34,6 +34,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { LastNewsletterCard } from '@/components/dashboard/LastNewsletterCard';
 import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
 import { FeatureGate } from '@/components/FeatureGate';
 import { useDashboardData } from '@/hooks/useDashboardData';
@@ -628,6 +629,9 @@ const Dashboard = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Last Newsletter */}
+            <LastNewsletterCard />
           </motion.div>
         </div>
       </div>
