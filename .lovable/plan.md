@@ -1,85 +1,50 @@
+## Ziel
 
+Den Newsletter-Versand komplett auf den **Lovable Resend-Connector** umstellen und das alte manuell gepflegte Secret entfernen.
 
-# SEO-Optimierung der gesamten Seite
+## Ausgangslage
 
-## Aktuelle Defizite
+- `supabase/functions/send-newsletter/index.ts` nutzt bereits den korrekten Resend-Gateway (`https://connector-gateway.lovable.dev/resend/emails`).
+- Authentifizierung erfolgt aktuell über das manuell gesetzte Secret `RESEND_API_KEY`.
+- Der Lovable Resend-Connector ist bereits verbunden — neues Connector-Secret: `RESEND_API_KEY_1`.
+- `send-newsletter` ist die einzige Edge-Function, die `RESEND_API_KEY` direkt verwendet (alle anderen E-Mails laufen über die Lovable-Email-Infrastruktur mit `notify.billmonk.ai`).
 
-1. **Kein `sitemap.xml`** — Google kann die Seitenstruktur nicht crawlen
-2. **`robots.txt` ohne Sitemap-Verweis** und ohne Disallow für geschützte Routen
-3. **Keine dynamischen Meta-Tags pro Seite** — alle Seiten teilen den gleichen `<title>` und `<meta description>` aus `index.html`
-4. **Keine strukturierten Daten** (JSON-LD Schema.org)
-5. **Keine semantischen HTML-Tags** (`<article>`, `<nav aria-label>`, `<main>`, `role` Attribute) in Landing-Komponenten
-6. **OG-Image ist nur ein Icon** — kein richtiges Social-Sharing-Bild
-7. **Keine `canonical` URL** definiert
-8. **Kein `hreflang`** für deutsche Inhalte
-9. **Keine `alt`-Texte** auf dekorativen Elementen, fehlende `aria-label`s auf Navigations-Buttons
-10. **Keine `<h1>`-Hierarchie-Kontrolle** — mehrere Seiten könnten ohne h1 sein
+## Umsetzung
 
----
+### 1. `send-newsletter/index.ts` anpassen
 
-## Umsetzungsplan
+Eine Zeile ändern — direkter Wechsel auf den Connector-Key:
 
-### 1. SEO-Helfer-Komponente `PageMeta`
-Neue Komponente die per `document.title` und dynamischen `<meta>`-Tags pro Seite den Title/Description setzt. Kein `react-helmet` nötig — einfacher `useEffect`-Hook.
-
-Wird auf jeder öffentlichen Seite eingebunden: Index, Pricing, Beta, Datenschutz, Login, Register.
-
-### 2. `public/sitemap.xml`
-Statische Sitemap mit allen öffentlichen Routen:
-- `/`, `/pricing`, `/beta`, `/datenschutz`, `/login`, `/register`
-
-### 3. `public/robots.txt` erweitern
-```
-Sitemap: https://billmonk.lovable.app/sitemap.xml
-Disallow: /dashboard
-Disallow: /upload
-Disallow: /review
-Disallow: /settings
-Disallow: /admin
-...
+```ts
+const resendApiKey = Deno.env.get('RESEND_API_KEY_1');
 ```
 
-### 4. `index.html` — Basis-SEO verbessern
-- `<link rel="canonical">` hinzufügen
-- `<meta name="robots" content="index, follow">`
-- `<meta property="og:url">` mit absoluter URL
-- `<meta property="og:locale" content="de_AT">`
-- OG-Image auf absolute URL setzen
-- `<html lang="de">` ist bereits korrekt
+Alle restlichen Aufrufe (`X-Connection-Api-Key: ${resendApiKey}`) bleiben unverändert.
 
-### 5. JSON-LD Structured Data
-Auf der Startseite: `SoftwareApplication` + `Organization` Schema.
-Auf der Pricing-Seite: `Product` mit `Offer`-Schemas pro Plan.
-Auf der FAQ-Seite: `FAQPage` Schema.
+### 2. Edge Function deployen
 
-### 6. Semantisches HTML in Landing-Komponenten
-- `Header.tsx`: `<nav aria-label="Hauptnavigation">`
-- `Footer.tsx`: `<nav aria-label="Footer-Navigation">`
-- `Hero.tsx`: Sicherstellen dass `<h1>` korrekt ist
-- `Features.tsx`, `FAQ.tsx`, `Pricing.tsx`: Passende `aria-label` und Heading-Hierarchie
-- `alt`-Texte auf Logo-Images verbessern (bereits "BillMonk" — okay)
+`send-newsletter` redeployen, damit die Änderung produktiv wirkt.
 
-### 7. Performance-Hinweise in `index.html`
-- `<link rel="preload">` für das Logo-Asset
-- Font-Display `swap` ist bereits gesetzt — gut
+### 3. Altes Secret entfernen
 
----
+Das manuelle Projekt-Secret `RESEND_API_KEY` aus den Lovable-Cloud-Secrets löschen, damit nichts mehr darauf zugreifen kann und kein „toter" Key herumliegt.
 
-## Dateien
+### 4. Smoke-Test (empfohlen)
 
-| Datei | Änderung |
-|-------|----------|
-| `src/components/PageMeta.tsx` | Neue Komponente: dynamischer Title + Meta pro Seite |
-| `src/pages/Index.tsx` | PageMeta einbinden + JSON-LD (SoftwareApplication + FAQPage) |
-| `src/pages/PricingPage.tsx` | PageMeta + JSON-LD (Product/Offer) |
-| `src/pages/Beta.tsx` | PageMeta |
-| `src/pages/Datenschutz.tsx` | PageMeta |
-| `src/pages/Login.tsx` | PageMeta |
-| `src/pages/Register.tsx` | PageMeta |
-| `public/sitemap.xml` | Neue Datei |
-| `public/robots.txt` | Sitemap-Verweis + Disallow geschützter Routen |
-| `index.html` | Canonical, og:url, og:locale, robots meta |
-| `src/components/landing/Header.tsx` | `aria-label` auf nav |
-| `src/components/landing/Footer.tsx` | `aria-label` auf nav |
-| `src/components/landing/FAQ.tsx` | JSON-LD FAQPage Schema |
+Beim nächsten Newsletter-Versand kurz die Logs prüfen, um sicherzustellen, dass der Connector-Key sauber angenommen wird.
 
+## Vorteile nach Migration
+
+- Kein manuelles Token-Management mehr (kein Ablaufen, keine versehentliche Löschung).
+- Resend-Credentials werden zentral im Workspace verwaltet — wiederverwendbar für andere Projekte.
+- Weniger Konfigurations-Drift zwischen Umgebungen.
+
+## Was sich NICHT ändert
+
+- Der gesamte Versand-Flow (Empfänger-Filterung, Opt-out, Rate-Limit, Tracking in `newsletter_recipients`) bleibt identisch.
+- Absender-Adresse bleibt `onboarding@resend.dev` (Resend-Test-Absender). Eine eigene verifizierte Resend-Domain ist ein eigenes, optionales Folge-Thema.
+- Die Lovable-Email-Infrastruktur (Auth-Mails, Welcome-Mail, transaktionale Mails) bleibt unberührt.
+
+## Risiko
+
+**Sehr niedrig.** Die Umstellung betrifft nur eine Edge-Function. Falls nach Deployment unerwartet Probleme mit dem Connector-Key auftreten, können wir innerhalb von Sekunden auf das alte Secret zurückwechseln (solange es noch nicht gelöscht ist) — daher Empfehlung: **erst deployen + Test, dann altes Secret löschen** (Reihenfolge: 1 → 2 → 4 → 3).
