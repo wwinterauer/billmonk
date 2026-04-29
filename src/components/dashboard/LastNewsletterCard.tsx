@@ -9,15 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface LastNewsletter {
   id: string;
@@ -28,13 +19,6 @@ interface LastNewsletter {
   total_recipients: number | null;
   sent_count: number | null;
   failed_count: number | null;
-}
-
-interface FailedRecipient {
-  id: string;
-  email: string;
-  error_message: string | null;
-  sent_at: string | null;
 }
 
 const STATUS_BADGE: Record<string, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
@@ -59,8 +43,6 @@ export function LastNewsletterCard() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [newsletter, setNewsletter] = useState<LastNewsletter | null>(null);
-  const [failedRecipients, setFailedRecipients] = useState<FailedRecipient[]>([]);
-  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -84,19 +66,6 @@ export function LastNewsletterCard() {
     return () => { cancelled = true; };
   }, [user]);
 
-  const loadFailedRecipients = async () => {
-    if (!newsletter) return;
-    setLoadingDetails(true);
-    const { data } = await supabase
-      .from('newsletter_recipients')
-      .select('id, email, error_message, sent_at')
-      .eq('newsletter_id', newsletter.id)
-      .eq('status', 'failed')
-      .order('sent_at', { ascending: false });
-    setFailedRecipients((data as FailedRecipient[]) ?? []);
-    setLoadingDetails(false);
-  };
-
   return (
     <Card className="border-border/50">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -104,7 +73,7 @@ export function LastNewsletterCard() {
           <Mail className="h-5 w-5 text-muted-foreground" />
           Letzter Newsletter
         </CardTitle>
-        <Link to="/settings?tab=newsletter">
+        <Link to="/newsletter-status">
           <Button variant="ghost" size="sm">
             Alle
             <ArrowRight className="h-4 w-4 ml-2" />
@@ -129,29 +98,14 @@ export function LastNewsletterCard() {
             </Link>
           </div>
         ) : (
-          <NewsletterContent
-            newsletter={newsletter}
-            failedRecipients={failedRecipients}
-            loadingDetails={loadingDetails}
-            onOpenDetails={loadFailedRecipients}
-          />
+          <NewsletterContent newsletter={newsletter} />
         )}
       </CardContent>
     </Card>
   );
 }
 
-function NewsletterContent({
-  newsletter,
-  failedRecipients,
-  loadingDetails,
-  onOpenDetails,
-}: {
-  newsletter: LastNewsletter;
-  failedRecipients: FailedRecipient[];
-  loadingDetails: boolean;
-  onOpenDetails: () => void;
-}) {
+function NewsletterContent({ newsletter }: { newsletter: LastNewsletter }) {
   const statusConfig = STATUS_BADGE[newsletter.status] ?? {
     label: newsletter.status,
     className: 'bg-muted text-muted-foreground border-border',
@@ -162,12 +116,17 @@ function NewsletterContent({
   const total = newsletter.total_recipients ?? 0;
   const sent = newsletter.sent_count ?? 0;
   const failed = newsletter.failed_count ?? 0;
+  const detailsHref = `/newsletter-status?id=${newsletter.id}`;
 
   return (
     <div className="space-y-3">
-      <p className="font-medium text-foreground line-clamp-2" title={newsletter.subject}>
+      <Link
+        to={detailsHref}
+        className="block font-medium text-foreground hover:text-primary transition-colors line-clamp-2"
+        title={newsletter.subject}
+      >
         {newsletter.subject}
-      </p>
+      </Link>
 
       <div className="flex items-center gap-2 flex-wrap">
         <Badge variant="outline" className={statusConfig.className}>
@@ -193,64 +152,20 @@ function NewsletterContent({
         )}
       </div>
 
-      {failed > 0 && (
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={onOpenDetails}
-            >
-              <AlertCircle className="h-4 w-4 mr-2" />
-              Fehlerdetails anzeigen
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Fehlgeschlagene Empfänger</DialogTitle>
-              <DialogDescription>
-                Newsletter: {newsletter.subject}
-              </DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="max-h-[60vh] pr-4">
-              {loadingDetails ? (
-                <div className="space-y-2 py-4">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
-                  ))}
-                </div>
-              ) : failedRecipients.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">
-                  Keine Detailinformationen verfügbar.
-                </p>
-              ) : (
-                <div className="space-y-3 py-2">
-                  {failedRecipients.map((r) => (
-                    <div
-                      key={r.id}
-                      className="border border-border/50 rounded-lg p-3 bg-muted/30"
-                    >
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="font-mono text-sm text-foreground truncate">
-                          {r.email}
-                        </span>
-                        {r.sent_at && (
-                          <span className="text-xs text-muted-foreground shrink-0">
-                            {format(new Date(r.sent_at), 'dd.MM. HH:mm', { locale: de })}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-red-600 break-words">
-                        {r.error_message || 'Unbekannter Fehler'}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
+      {failed > 0 ? (
+        <Link to={detailsHref}>
+          <Button variant="outline" size="sm" className="w-full">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            Fehlerdetails anzeigen
+          </Button>
+        </Link>
+      ) : (
+        <Link to={detailsHref}>
+          <Button variant="ghost" size="sm" className="w-full">
+            Details ansehen
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        </Link>
       )}
     </div>
   );
