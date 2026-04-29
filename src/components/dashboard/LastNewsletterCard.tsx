@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Mail, ArrowRight, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Mail, ArrowRight, AlertCircle, CheckCircle2, Loader2, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TestSendDialog } from '@/components/newsletter/TestSendDialog';
 
 interface LastNewsletter {
   id: string;
