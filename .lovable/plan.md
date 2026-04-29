@@ -1,61 +1,44 @@
 ## Ziel
+Im Newsletter-Status (und LastNewsletterCard) einen Button **„Testversand"** hinzufügen. Damit kann ein Newsletter zuerst an die eigene Adresse gesendet werden, ohne den echten Versand auszulösen, ohne Empfänger anzulegen und ohne den Status (`sent_count`, `failed_count`, `status`) zu verändern.
 
-Eine eigenständige, geschützte Seite **`/newsletter-status`** (oder Detail-Variante `/newsletter-status/:id`) hinzufügen, die alle Newsletter-Versände auflistet und pro Eintrag Empfänger-Status + Fehlerdetails zeigt. Die Dashboard-Karte und der Dialog-Button verlinken direkt dorthin.
+## Backend-Änderungen
 
-## Umsetzung
+**Edge Function `send-newsletter` erweitern** (kein neuer Function-Name, einfacher Test-Modus):
+- Request-Body akzeptiert zusätzlich `test_email?: string` und `test_mode?: boolean`.
+- Wenn `test_mode === true`:
+  - Lade Newsletter (auch Status `draft` zulässig) und Company-Settings wie bisher.
+  - Empfänger = nur die übergebene `test_email` (validieren via simpler Regex).
+  - Falls keine `test_email` übergeben wird: Fallback auf E-Mail des eingeloggten Users (`user.email`).
+  - Betreff wird mit Präfix `[TEST] ` versehen.
+  - HTML enthält oben ein dezentes Test-Banner („Testversand – Vorschau, dieser Newsletter wurde noch nicht an Empfänger versendet").
+  - **Keine** Inserts in `newsletter_recipients`.
+  - **Keine** Updates an `newsletters` (Status, sent_count, failed_count, sent_at, total_recipients bleiben unangetastet).
+  - Response: `{ success, test: true, sent_to }` bzw. Fehlerdetails.
 
-### 1. Neue Page `src/pages/NewsletterStatus.tsx`
+## Frontend-Änderungen
 
-Im `DashboardLayout` eingebettet, geschützt via `ProtectedRoute`. Inhalt:
+**1. `src/pages/NewsletterStatus.tsx`**
+- Neuer Button „Testversand" pro Newsletter-Eintrag (Icon `Send`/`Mail`, Variant `outline`).
+- Klick öffnet Dialog mit:
+  - Eingabefeld für E-Mail-Adresse (vorbefüllt mit User-E-Mail aus `useAuth`/`supabase.auth.getUser`).
+  - Hinweistext: „Sendet eine Test-E-Mail an die angegebene Adresse. Echte Empfänger werden nicht benachrichtigt, der Newsletter-Status bleibt unverändert."
+  - Bestätigen-Button → ruft `supabase.functions.invoke('send-newsletter', { body: { newsletter_id, test_mode: true, test_email } })`.
+  - Zeigt Lade-Status, danach Toast (Erfolg/Fehler).
 
-- **Header** mit Titel „Newsletter-Status" + Zurück-Link aufs Dashboard.
-- **Übersichtsstats** (Stat-Cards, kompakt):
-  - Anzahl Newsletter gesamt
-  - Versendet (Status `sent`)
-  - Fehlgeschlagen (Status `failed`)
-  - Gesamte Empfänger / Erfolgsrate (%)
-- **Liste aller Newsletter** (über `useNewsletters`-Hook, sortiert nach `sent_at`/`created_at` desc), pro Eintrag:
-  - Betreff, Status-Badge, Datum, Counter `sent / total · X fehlgeschlagen`
-  - Klick öffnet Inline-Detailbereich (oder navigiert zu `?id=...`) mit:
-    - Tabelle aller Empfänger: Name, E-Mail, Status-Icon, Zeitpunkt
-    - Bei `failed`: rote Fehlermeldung (volltextfähig, scrollbar)
-    - Filter-Tabs: **Alle / Nur Fehler / Nur Erfolgreich**
-- **Auto-Scroll/Highlight**: Wenn URL-Param `?id=<uuid>` vorhanden ist, wird genau dieser Eintrag automatisch geöffnet und in den Viewport gescrollt.
-- Such-Input für Betreff (Client-side Filter).
-- Empty-State, wenn noch nichts versendet wurde.
+**2. `src/components/dashboard/LastNewsletterCard.tsx`**
+- Zusätzlich kleiner „Testversand"-Button (gleiche Dialog-Komponente wiederverwenden — extrahiert nach `src/components/newsletter/TestSendDialog.tsx`).
 
-### 2. Route registrieren
+**3. `src/components/newsletter/TestSendDialog.tsx`** (neu)
+- Wiederverwendbare Dialog-Komponente mit `newsletterId`, `defaultEmail`, Trigger-Slot.
 
-In `src/App.tsx` neue Route ergänzen:
-```tsx
-<Route path="/newsletter-status" element={<ProtectedRoute><NewsletterStatus /></ProtectedRoute>} />
-```
+## Edge Cases
+- Newsletter im Status `draft` muss ebenfalls testbar sein.
+- Validierung: ungültige E-Mail → 400 mit klarer Meldung.
+- Keine Änderung an Rate-Limiting nötig (nur 1 E-Mail).
+- Logging: einfacher `console.log('[test-send]', ...)` für Debugging.
 
-### 3. Dashboard-Karte verlinken
-
-`src/components/dashboard/LastNewsletterCard.tsx` anpassen:
-- „Alle"-Button im Header verlinkt jetzt auf `/newsletter-status` (statt `/settings?tab=newsletter`).
-- Button **„Fehlerdetails anzeigen"**: ersetze den Inline-Dialog durch einen `Link` nach `/newsletter-status?id=<newsletter.id>`. Dadurch entfällt die Dialog-State-Logik komplett — saubere Navigation auf die dedizierte Seite.
-- Klick auf den Betreff/die Karte selbst → ebenfalls Link zur Detail-Seite mit `?id=`.
-
-### 4. Datenzugriff
-
-Wiederverwendung der bestehenden:
-- `useNewsletters()` für die Liste (RLS-geschützt).
-- `fetchRecipients(newsletterId)` für die Detail-Empfänger.
-
-Keine neuen DB-Tabellen, keine Edge-Function-Änderung.
-
-### 5. Design
-
-- Konsistent mit Dashboard: `Card border-border/50`, `Badge`-Komponente, semantische Tokens (`text-destructive`, `text-muted-foreground`, `text-green-600`/`text-red-600` analog zu bestehenden Status-Badges im Projekt).
-- Mobile-First: Stat-Cards `grid-cols-2 lg:grid-cols-4`, Empfänger-Tabelle wird auf Mobile zu Cards.
-
-## Was sich NICHT ändert
-
-- `NewsletterHistory` in den Settings bleibt unverändert (für den Composer-Workflow weiterhin sinnvoll).
-- DB, Edge Functions, Versand-Flow.
-
-## Risiko
-
-Niedrig — additive Frontend-Route mit bestehenden Hooks.
+## Dateien
+- `supabase/functions/send-newsletter/index.ts` (erweitern, anschließend deployen)
+- `src/components/newsletter/TestSendDialog.tsx` (neu)
+- `src/pages/NewsletterStatus.tsx` (Button + Dialog einbinden)
+- `src/components/dashboard/LastNewsletterCard.tsx` (Button + Dialog einbinden)
