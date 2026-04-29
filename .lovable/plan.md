@@ -1,59 +1,61 @@
 ## Ziel
 
-Auf dem Dashboard eine kompakte Karte einblenden, die den **letzten Newsletter-Versand** zeigt: Status-Badge, Versanddatum, gesendet/fehlgeschlagen-Counter und (bei Fehlern) die zugehörigen Fehlerdetails.
-
-## Datengrundlage
-
-Die `newsletters`-Tabelle enthält bereits alles Nötige:
-- `status` (`draft` | `sending` | `sent` | `failed`)
-- `sent_at`, `subject`, `total_recipients`, `sent_count`, `failed_count`
-
-Detail-Fehlermeldungen pro Empfänger liegen in `newsletter_recipients` (`status='failed'`, `error_message`). Diese werden bei Bedarf nachgeladen.
+Eine eigenständige, geschützte Seite **`/newsletter-status`** (oder Detail-Variante `/newsletter-status/:id`) hinzufügen, die alle Newsletter-Versände auflistet und pro Eintrag Empfänger-Status + Fehlerdetails zeigt. Die Dashboard-Karte und der Dialog-Button verlinken direkt dorthin.
 
 ## Umsetzung
 
-### 1. Neue Komponente `LastNewsletterCard`
-Pfad: `src/components/dashboard/LastNewsletterCard.tsx`
+### 1. Neue Page `src/pages/NewsletterStatus.tsx`
 
-- Lädt via Supabase den letzten Newsletter des aktuellen Users:
-  ```
-  newsletters
-    .select(...)
-    .eq('user_id', user.id)
-    .neq('status', 'draft')
-    .order('sent_at', { ascending: false, nullsFirst: false })
-    .order('created_at', { ascending: false })
-    .limit(1)
-  ```
-- Wenn kein Versand vorhanden ist → Karte zeigt freundlichen Empty-State („Noch kein Newsletter versendet") + Link auf Settings → Newsletter.
-- Sonst Anzeige von:
-  - **Betreff** (truncate)
-  - **Status-Badge**: 
-    - `sent` → grün („Erfolgreich")
-    - `failed` → rot („Fehlgeschlagen")
-    - `sending` → gelb („Versand läuft")
-  - **Datum**: `sent_at` formatiert (`dd.MM.yyyy HH:mm`, Fallback `created_at`)
-  - **Counter**: `sent_count / total_recipients` und bei `failed_count > 0` ein roter Hinweis „X fehlgeschlagen"
-- Wenn `failed_count > 0`: Button **„Fehlerdetails anzeigen"** → öffnet einen Dialog/Sheet, der per `fetchRecipients(newsletter.id)` (bereits in `useNewsletters`-Hook vorhanden) die fehlgeschlagenen Empfänger lädt und tabellarisch zeigt: E-Mail, Zeitpunkt, gekürzte Fehlermeldung.
-- „Alle Newsletter ansehen" → Link nach `/settings` (Newsletter-Tab).
+Im `DashboardLayout` eingebettet, geschützt via `ProtectedRoute`. Inhalt:
 
-### 2. Einbindung ins Dashboard
-Datei: `src/pages/Dashboard.tsx`
+- **Header** mit Titel „Newsletter-Status" + Zurück-Link aufs Dashboard.
+- **Übersichtsstats** (Stat-Cards, kompakt):
+  - Anzahl Newsletter gesamt
+  - Versendet (Status `sent`)
+  - Fehlgeschlagen (Status `failed`)
+  - Gesamte Empfänger / Erfolgsrate (%)
+- **Liste aller Newsletter** (über `useNewsletters`-Hook, sortiert nach `sent_at`/`created_at` desc), pro Eintrag:
+  - Betreff, Status-Badge, Datum, Counter `sent / total · X fehlgeschlagen`
+  - Klick öffnet Inline-Detailbereich (oder navigiert zu `?id=...`) mit:
+    - Tabelle aller Empfänger: Name, E-Mail, Status-Icon, Zeitpunkt
+    - Bei `failed`: rote Fehlermeldung (volltextfähig, scrollbar)
+    - Filter-Tabs: **Alle / Nur Fehler / Nur Erfolgreich**
+- **Auto-Scroll/Highlight**: Wenn URL-Param `?id=<uuid>` vorhanden ist, wird genau dieser Eintrag automatisch geöffnet und in den Viewport gescrollt.
+- Such-Input für Betreff (Client-side Filter).
+- Empty-State, wenn noch nichts versendet wurde.
 
-- Komponente importieren und in der unteren Grid-Sektion (`grid lg:grid-cols-3 gap-6`, ab Zeile 334) als zusätzliche Karte einfügen — neben „Letzte Belege". Auf kleineren Viewports volle Breite, auf `lg` ein Drittel.
+### 2. Route registrieren
 
-### 3. Design
+In `src/App.tsx` neue Route ergänzen:
+```tsx
+<Route path="/newsletter-status" element={<ProtectedRoute><NewsletterStatus /></ProtectedRoute>} />
+```
 
-- Verwendung der bestehenden `Card`-Variante (`border-border/50`) und `Badge`-Komponente — konsistent mit dem restlichen Dashboard.
-- Nur semantische Tokens (`text-success`, `text-destructive`, `text-warning`/`text-muted-foreground`) — keine Hardcoded-Farben.
-- Mobile-First: Datum darunter umbrechen, Buttons vollflächig.
+### 3. Dashboard-Karte verlinken
+
+`src/components/dashboard/LastNewsletterCard.tsx` anpassen:
+- „Alle"-Button im Header verlinkt jetzt auf `/newsletter-status` (statt `/settings?tab=newsletter`).
+- Button **„Fehlerdetails anzeigen"**: ersetze den Inline-Dialog durch einen `Link` nach `/newsletter-status?id=<newsletter.id>`. Dadurch entfällt die Dialog-State-Logik komplett — saubere Navigation auf die dedizierte Seite.
+- Klick auf den Betreff/die Karte selbst → ebenfalls Link zur Detail-Seite mit `?id=`.
+
+### 4. Datenzugriff
+
+Wiederverwendung der bestehenden:
+- `useNewsletters()` für die Liste (RLS-geschützt).
+- `fetchRecipients(newsletterId)` für die Detail-Empfänger.
+
+Keine neuen DB-Tabellen, keine Edge-Function-Änderung.
+
+### 5. Design
+
+- Konsistent mit Dashboard: `Card border-border/50`, `Badge`-Komponente, semantische Tokens (`text-destructive`, `text-muted-foreground`, `text-green-600`/`text-red-600` analog zu bestehenden Status-Badges im Projekt).
+- Mobile-First: Stat-Cards `grid-cols-2 lg:grid-cols-4`, Empfänger-Tabelle wird auf Mobile zu Cards.
 
 ## Was sich NICHT ändert
 
-- Keine DB-Schema-Änderung nötig — alle Felder existieren bereits.
-- Keine Edge-Function-Änderung.
-- Newsletter-Versand-Logik bleibt unberührt.
+- `NewsletterHistory` in den Settings bleibt unverändert (für den Composer-Workflow weiterhin sinnvoll).
+- DB, Edge Functions, Versand-Flow.
 
 ## Risiko
 
-Sehr niedrig — rein additive Frontend-Änderung mit RLS-geschützter Read-Query auf eigene Daten.
+Niedrig — additive Frontend-Route mit bestehenden Hooks.
