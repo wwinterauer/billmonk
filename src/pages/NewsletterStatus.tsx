@@ -21,6 +21,8 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNewsletters, type NewsletterRecipient } from '@/hooks/useNewsletters';
+import { TestSendDialog } from '@/components/newsletter/TestSendDialog';
+import { Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const STATUS_BADGE: Record<string, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
