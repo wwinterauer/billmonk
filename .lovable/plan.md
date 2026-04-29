@@ -1,50 +1,59 @@
 ## Ziel
 
-Den Newsletter-Versand komplett auf den **Lovable Resend-Connector** umstellen und das alte manuell gepflegte Secret entfernen.
+Auf dem Dashboard eine kompakte Karte einblenden, die den **letzten Newsletter-Versand** zeigt: Status-Badge, Versanddatum, gesendet/fehlgeschlagen-Counter und (bei Fehlern) die zugehörigen Fehlerdetails.
 
-## Ausgangslage
+## Datengrundlage
 
-- `supabase/functions/send-newsletter/index.ts` nutzt bereits den korrekten Resend-Gateway (`https://connector-gateway.lovable.dev/resend/emails`).
-- Authentifizierung erfolgt aktuell über das manuell gesetzte Secret `RESEND_API_KEY`.
-- Der Lovable Resend-Connector ist bereits verbunden — neues Connector-Secret: `RESEND_API_KEY_1`.
-- `send-newsletter` ist die einzige Edge-Function, die `RESEND_API_KEY` direkt verwendet (alle anderen E-Mails laufen über die Lovable-Email-Infrastruktur mit `notify.billmonk.ai`).
+Die `newsletters`-Tabelle enthält bereits alles Nötige:
+- `status` (`draft` | `sending` | `sent` | `failed`)
+- `sent_at`, `subject`, `total_recipients`, `sent_count`, `failed_count`
+
+Detail-Fehlermeldungen pro Empfänger liegen in `newsletter_recipients` (`status='failed'`, `error_message`). Diese werden bei Bedarf nachgeladen.
 
 ## Umsetzung
 
-### 1. `send-newsletter/index.ts` anpassen
+### 1. Neue Komponente `LastNewsletterCard`
+Pfad: `src/components/dashboard/LastNewsletterCard.tsx`
 
-Eine Zeile ändern — direkter Wechsel auf den Connector-Key:
+- Lädt via Supabase den letzten Newsletter des aktuellen Users:
+  ```
+  newsletters
+    .select(...)
+    .eq('user_id', user.id)
+    .neq('status', 'draft')
+    .order('sent_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+    .limit(1)
+  ```
+- Wenn kein Versand vorhanden ist → Karte zeigt freundlichen Empty-State („Noch kein Newsletter versendet") + Link auf Settings → Newsletter.
+- Sonst Anzeige von:
+  - **Betreff** (truncate)
+  - **Status-Badge**: 
+    - `sent` → grün („Erfolgreich")
+    - `failed` → rot („Fehlgeschlagen")
+    - `sending` → gelb („Versand läuft")
+  - **Datum**: `sent_at` formatiert (`dd.MM.yyyy HH:mm`, Fallback `created_at`)
+  - **Counter**: `sent_count / total_recipients` und bei `failed_count > 0` ein roter Hinweis „X fehlgeschlagen"
+- Wenn `failed_count > 0`: Button **„Fehlerdetails anzeigen"** → öffnet einen Dialog/Sheet, der per `fetchRecipients(newsletter.id)` (bereits in `useNewsletters`-Hook vorhanden) die fehlgeschlagenen Empfänger lädt und tabellarisch zeigt: E-Mail, Zeitpunkt, gekürzte Fehlermeldung.
+- „Alle Newsletter ansehen" → Link nach `/settings` (Newsletter-Tab).
 
-```ts
-const resendApiKey = Deno.env.get('RESEND_API_KEY_1');
-```
+### 2. Einbindung ins Dashboard
+Datei: `src/pages/Dashboard.tsx`
 
-Alle restlichen Aufrufe (`X-Connection-Api-Key: ${resendApiKey}`) bleiben unverändert.
+- Komponente importieren und in der unteren Grid-Sektion (`grid lg:grid-cols-3 gap-6`, ab Zeile 334) als zusätzliche Karte einfügen — neben „Letzte Belege". Auf kleineren Viewports volle Breite, auf `lg` ein Drittel.
 
-### 2. Edge Function deployen
+### 3. Design
 
-`send-newsletter` redeployen, damit die Änderung produktiv wirkt.
-
-### 3. Altes Secret entfernen
-
-Das manuelle Projekt-Secret `RESEND_API_KEY` aus den Lovable-Cloud-Secrets löschen, damit nichts mehr darauf zugreifen kann und kein „toter" Key herumliegt.
-
-### 4. Smoke-Test (empfohlen)
-
-Beim nächsten Newsletter-Versand kurz die Logs prüfen, um sicherzustellen, dass der Connector-Key sauber angenommen wird.
-
-## Vorteile nach Migration
-
-- Kein manuelles Token-Management mehr (kein Ablaufen, keine versehentliche Löschung).
-- Resend-Credentials werden zentral im Workspace verwaltet — wiederverwendbar für andere Projekte.
-- Weniger Konfigurations-Drift zwischen Umgebungen.
+- Verwendung der bestehenden `Card`-Variante (`border-border/50`) und `Badge`-Komponente — konsistent mit dem restlichen Dashboard.
+- Nur semantische Tokens (`text-success`, `text-destructive`, `text-warning`/`text-muted-foreground`) — keine Hardcoded-Farben.
+- Mobile-First: Datum darunter umbrechen, Buttons vollflächig.
 
 ## Was sich NICHT ändert
 
-- Der gesamte Versand-Flow (Empfänger-Filterung, Opt-out, Rate-Limit, Tracking in `newsletter_recipients`) bleibt identisch.
-- Absender-Adresse bleibt `onboarding@resend.dev` (Resend-Test-Absender). Eine eigene verifizierte Resend-Domain ist ein eigenes, optionales Folge-Thema.
-- Die Lovable-Email-Infrastruktur (Auth-Mails, Welcome-Mail, transaktionale Mails) bleibt unberührt.
+- Keine DB-Schema-Änderung nötig — alle Felder existieren bereits.
+- Keine Edge-Function-Änderung.
+- Newsletter-Versand-Logik bleibt unberührt.
 
 ## Risiko
 
-**Sehr niedrig.** Die Umstellung betrifft nur eine Edge-Function. Falls nach Deployment unerwartet Probleme mit dem Connector-Key auftreten, können wir innerhalb von Sekunden auf das alte Secret zurückwechseln (solange es noch nicht gelöscht ist) — daher Empfehlung: **erst deployen + Test, dann altes Secret löschen** (Reihenfolge: 1 → 2 → 4 → 3).
+Sehr niedrig — rein additive Frontend-Änderung mit RLS-geschützter Read-Query auf eigene Daten.
