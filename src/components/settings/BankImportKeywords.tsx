@@ -344,8 +344,15 @@ export function BankImportKeywords() {
                   <TableRow key={kw.id} className={!kw.is_active ? 'opacity-50' : ''}>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Tag className="h-4 w-4 text-muted-foreground" />
+                        {kw.is_ignore ? (
+                          <Ban className="h-4 w-4 text-destructive" />
+                        ) : (
+                          <Tag className="h-4 w-4 text-muted-foreground" />
+                        )}
                         <span className="font-medium">{kw.keyword}</span>
+                        {kw.is_ignore && (
+                          <Badge variant="destructive" className="text-xs">Ignorieren</Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
