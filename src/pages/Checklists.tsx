@@ -356,6 +356,13 @@ export default function Checklists() {
     }));
   };
 
+  const updateLink = (index: number, field: 'label' | 'url', value: string) => {
+    setItemForm(prev => ({
+      ...prev,
+      links: prev.links.map((link, i) => (i === index ? { ...link, [field]: value } : link)),
+    }));
+  };
+
   const toggleExpanded = (id: string) => {
     setExpandedChecklists(prev => {
       const next = new Set(prev);
