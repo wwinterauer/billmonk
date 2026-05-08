@@ -87,6 +87,7 @@ export default function Checklists() {
   const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState<string | null>(null);
   const [expandedChecklists, setExpandedChecklists] = useState<Set<string>>(new Set());
+  const [completedExpanded, setCompletedExpanded] = useState<Record<string, boolean>>({});
 
   const [checklistForm, setChecklistForm] = useState({
     name: '',
