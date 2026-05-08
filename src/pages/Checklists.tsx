@@ -805,16 +805,26 @@ export default function Checklists() {
                 {itemForm.links.length > 0 && (
                   <div className="space-y-2 mb-2">
                     {itemForm.links.map((link, idx) => (
-                      <div key={idx} className="flex items-center gap-2 p-2 bg-muted rounded">
-                        <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                        <span className="flex-1 text-sm truncate">{link.label}</span>
+                      <div key={idx} className="flex items-center gap-2">
+                        <Input
+                          value={link.label}
+                          onChange={(e) => updateLink(idx, 'label', e.target.value)}
+                          placeholder="Bezeichnung"
+                          className="flex-1"
+                        />
+                        <Input
+                          value={link.url}
+                          onChange={(e) => updateLink(idx, 'url', e.target.value)}
+                          placeholder="https://..."
+                          className="flex-1"
+                        />
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
+                          className="h-8 w-8 shrink-0"
                           onClick={() => removeLink(idx)}
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     ))}
