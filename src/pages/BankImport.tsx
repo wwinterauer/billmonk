@@ -341,11 +341,13 @@ export default function BankImport() {
               .from('receipts')
               .insert({
                 user_id: user.id,
-                vendor: matchedKeyword.keyword,
+                vendor: (matchedKeyword.vendor_id && vendorNameMap[matchedKeyword.vendor_id]) || matchedKeyword.keyword,
+                vendor_id: matchedKeyword.vendor_id ?? null,
                 description: matchedKeyword.description_template || tx.description,
                 amount_gross: tx.amount,
                 receipt_date: format(tx.date, 'yyyy-MM-dd'),
                 category: matchedKeyword.category,
+                tax_type: matchedKeyword.tax_type ?? null,
                 vat_rate: matchedKeyword.tax_rate || 0,
                 status: 'approved',
                 source: 'bank_import',
