@@ -241,6 +241,7 @@ export default function BankImport() {
       const total = transactionsToImport.length;
       let imported = 0;
       let skippedDuplicates = 0;
+      let skippedIgnored = 0;
       let noReceiptEntriesCreated = 0;
       const skippedIncome = onlyExpenses ? parseResult.income : 0;
       
@@ -251,8 +252,11 @@ export default function BankImport() {
         .eq('user_id', user.id)
         .eq('is_active', true);
 
+      const ignoreKeywords = (keywords ?? []).filter((k: any) => k.is_ignore);
+      const matchKeywords = (keywords ?? []).filter((k: any) => !k.is_ignore);
+
       // Preload vendor names for keywords with vendor_id
-      const vendorIds = Array.from(new Set((keywords ?? []).map((k: any) => k.vendor_id).filter(Boolean)));
+      const vendorIds = Array.from(new Set(matchKeywords.map((k: any) => k.vendor_id).filter(Boolean)));
       const vendorNameMap: Record<string, string> = {};
       if (vendorIds.length > 0) {
         const { data: vData } = await supabase
