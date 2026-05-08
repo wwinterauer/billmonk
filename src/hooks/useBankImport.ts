@@ -444,23 +444,68 @@ export async function parseCsvFile(file: File, bankType: string): Promise<ParseR
     };
 
     let dataStartIndex = config.skipRows;
+    let headerFound = false;
     const scanLimit = Math.min(rows.length, dataStartIndex + 25);
     for (let i = dataStartIndex; i < scanLimit; i++) {
       if (looksLikeHeader(rows[i])) {
         dataStartIndex = i;
+        headerFound = true;
         break;
       }
     }
 
-    const headers = rows[dataStartIndex] || [];
+    // Headerless CSV (e.g. Erste Bank ELBA): infer columns by content of the first data row.
+    // Heuristic: pick first column that looks like a date, the column with a parseable signed amount,
+    // optionally a second date column for valueDate, and the longest text column for description.
+    let headers: string[];
+    let inferredCols: { date: number; amount: number; valueDate: number; description: number } | null = null;
 
-    // Find column indices
-    const dateColIndex = findColumn(headers, config.dateColumn);
-    let amountColIndex = findColumn(headers, config.amountColumn);
-    const descriptionColIndex = findColumn(headers, config.descriptionColumn);
-    const valueDateColIndex = config.valueDateColumn
-      ? findColumn(headers, config.valueDateColumn)
-      : -1;
+    if (!headerFound) {
+      const sample = rows.find(r => r && r.some(c => c && c.trim() !== '')) || [];
+      const isDateCell = (s: string) => parseDate((s || '').trim()) !== null;
+      const isAmountCell = (s: string) => {
+        const v = (s || '').trim();
+        if (!v || /[a-zA-Z]/.test(v.replace(/EUR|USD|CHF/gi, ''))) return false;
+        return /^-?[\d.,]+$/.test(v.replace(/[€$£\s]/g, ''));
+      };
+
+      const dateCols = sample.map((c, i) => (isDateCell(c) ? i : -1)).filter(i => i !== -1);
+      const amountCols = sample.map((c, i) => (isAmountCell(c) && !isDateCell(c) ? i : -1)).filter(i => i !== -1);
+      const descCol = sample
+        .map((c, i) => ({ i, len: (c || '').length, isText: !isDateCell(c) && !isAmountCell(c) }))
+        .filter(x => x.isText)
+        .sort((a, b) => b.len - a.len)[0]?.i ?? -1;
+
+      if (dateCols.length > 0 && amountCols.length > 0) {
+        inferredCols = {
+          date: dateCols[0],
+          valueDate: dateCols[1] ?? -1,
+          amount: amountCols[0],
+          description: descCol,
+        };
+        // Synthesize headers so rawData and downstream code work
+        headers = sample.map((_, i) => {
+          if (i === inferredCols!.date) return 'Buchungsdatum';
+          if (i === inferredCols!.valueDate) return 'Valutadatum';
+          if (i === inferredCols!.amount) return 'Betrag';
+          if (i === inferredCols!.description) return 'Buchungstext';
+          return `Spalte ${i + 1}`;
+        });
+        dataStartIndex = -1; // start from row 0
+      } else {
+        headers = rows[dataStartIndex] || [];
+      }
+    } else {
+      headers = rows[dataStartIndex] || [];
+    }
+
+    // Find column indices (prefer inferred positions for headerless files)
+    const dateColIndex = inferredCols ? inferredCols.date : findColumn(headers, config.dateColumn);
+    let amountColIndex = inferredCols ? inferredCols.amount : findColumn(headers, config.amountColumn);
+    const descriptionColIndex = inferredCols ? inferredCols.description : findColumn(headers, config.descriptionColumn);
+    const valueDateColIndex = inferredCols
+      ? inferredCols.valueDate
+      : (config.valueDateColumn ? findColumn(headers, config.valueDateColumn) : -1);
 
     // Soll/Haben fallback (debit + credit columns)
     let debitColIndex = -1;
