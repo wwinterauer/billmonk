@@ -557,10 +557,10 @@ export default function Checklists() {
                                           href={link.url}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                          className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
                                           onClick={(e) => e.stopPropagation()}
                                         >
-                                          <ExternalLink className="h-3 w-3" />
+                                          <ExternalLink className="h-5 w-5" />
                                           {link.label}
                                         </a>
                                       ))}
