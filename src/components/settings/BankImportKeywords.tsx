@@ -155,6 +155,7 @@ export function BankImportKeywords() {
         tax_rate: parseFloat(data.tax_rate) || 0,
         tax_type: data.tax_type || null,
         vendor_id: vendorId,
+        is_ignore: data.is_ignore,
       };
 
       if (editingKeyword) {
