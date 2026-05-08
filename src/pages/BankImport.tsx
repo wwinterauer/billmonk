@@ -250,6 +250,17 @@ export default function BankImport() {
         .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true);
+
+      // Preload vendor names for keywords with vendor_id
+      const vendorIds = Array.from(new Set((keywords ?? []).map((k: any) => k.vendor_id).filter(Boolean)));
+      const vendorNameMap: Record<string, string> = {};
+      if (vendorIds.length > 0) {
+        const { data: vData } = await supabase
+          .from('vendors')
+          .select('id, display_name')
+          .in('id', vendorIds as string[]);
+        (vData ?? []).forEach((v: any) => { vendorNameMap[v.id] = v.display_name; });
+      }
       
       // Create import batch record first
       const dateFromValue = transactionsToImport.length > 0
