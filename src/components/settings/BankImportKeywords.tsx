@@ -448,6 +448,7 @@ export function BankImportKeywords() {
               </div>
 
               {!formData.is_ignore && (
+              <>
               <div className="space-y-2">
                 <Label>Kategorie</Label>
                 <Select
