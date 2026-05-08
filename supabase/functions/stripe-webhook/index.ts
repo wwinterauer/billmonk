@@ -22,6 +22,15 @@ const logStep = (step: string, details?: unknown) => {
   console.log(`[STRIPE-WEBHOOK] ${step}${detailsStr}`);
 };
 
+const fmtDate = (unixSec?: number | null): string | undefined => {
+  if (!unixSec) return undefined;
+  try {
+    return new Date(unixSec * 1000).toLocaleDateString("de-DE", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+    });
+  } catch { return undefined; }
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -29,13 +38,9 @@ serve(async (req) => {
 
   const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
   const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
-  if (!stripeKey) {
-    logStep("ERROR", { message: "STRIPE_SECRET_KEY not set" });
+  if (!stripeKey || !webhookSecret) {
+    logStep("ERROR", { message: "Stripe env vars missing" });
     return new Response("Server misconfigured", { status: 500 });
-  }
-  if (!webhookSecret) {
-    logStep("ERROR", { message: "STRIPE_WEBHOOK_SECRET not set" });
-    return new Response("Webhook secret not configured", { status: 500 });
   }
 
   const supabaseAdmin = createClient(
@@ -46,18 +51,61 @@ serve(async (req) => {
 
   const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
-  try {
-    let event: Stripe.Event;
-    const body = await req.text();
+  // helper: skip if email already sent for this idempotency key
+  const alreadySent = async (key: string): Promise<boolean> => {
+    const { data } = await supabaseAdmin
+      .from("email_send_log")
+      .select("id")
+      .eq("message_id", key)
+      .limit(1);
+    return !!(data && data.length > 0);
+  };
 
+  // helper: get profile first_name by email
+  const getName = async (email: string): Promise<string | undefined> => {
+    const { data } = await supabaseAdmin
+      .from("profiles")
+      .select("first_name")
+      .eq("email", email)
+      .maybeSingle();
+    return data?.first_name || undefined;
+  };
+
+  // helper: resolve customer email
+  const getCustomerEmail = async (customerId: string): Promise<string | null> => {
+    try {
+      const customer = await stripe.customers.retrieve(customerId);
+      if (!customer || (customer as any).deleted) return null;
+      return (customer as Stripe.Customer).email ?? null;
+    } catch (e) {
+      logStep("getCustomerEmail error", { customerId, error: String(e) });
+      return null;
+    }
+  };
+
+  const sendEmail = async (templateName: string, recipientEmail: string, idempotencyKey: string, templateData: Record<string, unknown>) => {
+    if (await alreadySent(idempotencyKey)) {
+      logStep("Email already sent, skipping", { templateName, idempotencyKey });
+      return;
+    }
+    logStep("Sending email", { templateName, recipientEmail, idempotencyKey });
+    await supabaseAdmin.functions.invoke("send-transactional-email", {
+      body: { templateName, recipientEmail, idempotencyKey, templateData },
+    });
+  };
+
+  try {
+    const body = await req.text();
     const signature = req.headers.get("stripe-signature");
     if (!signature) {
       return new Response("Missing stripe-signature header", { status: 400 });
     }
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-
+    const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     logStep("Event received", { type: event.type, id: event.id });
 
+    // ============================================================
+    // Subscription confirmed (checkout / new subscription)
+    // ============================================================
     if (
       event.type === "checkout.session.completed" ||
       event.type === "customer.subscription.created"
@@ -80,14 +128,8 @@ serve(async (req) => {
       } else {
         const sub = event.data.object as Stripe.Subscription;
         subscriptionId = sub.id;
-        // Get email from customer
         const customerId = typeof sub.customer === "string" ? sub.customer : (sub.customer as any)?.id;
-        if (customerId) {
-          const customer = await stripe.customers.retrieve(customerId);
-          if (!customer.deleted) {
-            customerEmail = (customer as Stripe.Customer).email;
-          }
-        }
+        if (customerId) customerEmail = await getCustomerEmail(customerId);
       }
 
       if (!subscriptionId || !customerEmail) {
@@ -97,54 +139,165 @@ serve(async (req) => {
         });
       }
 
-      // Idempotency: use event ID to prevent double sending
       const idempotencyKey = `sub-confirmed-webhook-${event.id}`;
-
-      // Check if already sent
-      const { data: existingLog } = await supabaseAdmin
-        .from("email_send_log")
-        .select("id")
-        .eq("message_id", idempotencyKey)
-        .limit(1);
-
-      if (existingLog && existingLog.length > 0) {
-        logStep("Email already sent for this event", { eventId: event.id });
-        return new Response(JSON.stringify({ received: true, skipped: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Get subscription details for plan name
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       const productId = subscription.items.data[0]?.price?.product as string;
       const plan = PRODUCT_TO_PLAN[productId] || "Pro";
+      const name = await getName(customerEmail);
 
-      // Get user name from profile
-      let name: string | undefined;
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("first_name")
-        .eq("email", customerEmail)
-        .single();
+      await sendEmail("subscription-confirmed", customerEmail, idempotencyKey, { name, plan });
+    }
 
-      if (profile?.first_name) {
-        name = profile.first_name;
+    // ============================================================
+    // Subscription updated → plan-changed OR subscription-cancelled (cancel_at_period_end)
+    // ============================================================
+    else if (event.type === "customer.subscription.updated") {
+      const sub = event.data.object as Stripe.Subscription;
+      const previousAttributes = (event.data as any).previous_attributes || {};
+      const customerId = typeof sub.customer === "string" ? sub.customer : (sub.customer as any)?.id;
+      const customerEmail = customerId ? await getCustomerEmail(customerId) : null;
+      if (!customerEmail) {
+        logStep("No customer email for subscription.updated");
+        return new Response(JSON.stringify({ received: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
+      const name = await getName(customerEmail);
 
-      logStep("Sending subscription-confirmed email", { email: customerEmail, plan, name });
+      // Cancellation scheduled (cancel_at_period_end flipped from false → true)
+      if (sub.cancel_at_period_end === true && previousAttributes?.cancel_at_period_end === false) {
+        const productId = sub.items.data[0]?.price?.product as string;
+        const plan = PRODUCT_TO_PLAN[productId] || "Pro";
+        const accessUntil = fmtDate((sub as any).current_period_end);
+        await sendEmail(
+          "subscription-cancelled",
+          customerEmail,
+          `sub-cancelled-${event.id}`,
+          { name, plan, accessUntil, immediate: false },
+        );
+      }
+      // Plan change (items changed AND new product differs from prev)
+      else if (previousAttributes?.items) {
+        const newProductId = sub.items.data[0]?.price?.product as string;
+        const newPlan = PRODUCT_TO_PLAN[newProductId] || "Pro";
+        // Try to read previous product from previous_attributes
+        const prevItems = previousAttributes.items?.data?.[0];
+        const prevProductId = prevItems?.price?.product as string | undefined;
+        const oldPlan = prevProductId ? (PRODUCT_TO_PLAN[prevProductId] || undefined) : undefined;
 
-      await supabaseAdmin.functions.invoke("send-transactional-email", {
-        body: {
-          templateName: "subscription-confirmed",
-          recipientEmail: customerEmail,
-          idempotencyKey,
-          templateData: { name, plan },
-        },
-      });
+        if (oldPlan !== newPlan) {
+          const effectiveDate = fmtDate(Math.floor(Date.now() / 1000));
+          await sendEmail(
+            "plan-changed",
+            customerEmail,
+            `plan-changed-${event.id}`,
+            { name, oldPlan, newPlan, effectiveDate },
+          );
+        } else {
+          logStep("Items changed but same plan, skipping plan-changed mail");
+        }
+      } else {
+        logStep("subscription.updated: no relevant change for emails");
+      }
+    }
 
-      logStep("Email sent successfully");
-    } else {
-      logStep("Unhandled event type, ignoring");
+    // ============================================================
+    // Subscription deleted (immediate end)
+    // ============================================================
+    else if (event.type === "customer.subscription.deleted") {
+      const sub = event.data.object as Stripe.Subscription;
+      const customerId = typeof sub.customer === "string" ? sub.customer : (sub.customer as any)?.id;
+      const customerEmail = customerId ? await getCustomerEmail(customerId) : null;
+      if (customerEmail) {
+        const name = await getName(customerEmail);
+        const productId = sub.items.data[0]?.price?.product as string;
+        const plan = PRODUCT_TO_PLAN[productId] || "Pro";
+        await sendEmail(
+          "subscription-cancelled",
+          customerEmail,
+          `sub-deleted-${event.id}`,
+          { name, plan, immediate: true },
+        );
+      }
+    }
+
+    // ============================================================
+    // Invoice payment failed
+    // ============================================================
+    else if (event.type === "invoice.payment_failed") {
+      const invoice = event.data.object as Stripe.Invoice;
+      const customerEmail = invoice.customer_email
+        ?? (typeof invoice.customer === "string" ? await getCustomerEmail(invoice.customer) : null);
+      if (customerEmail) {
+        const name = await getName(customerEmail);
+        const amount = (invoice.amount_due / 100).toFixed(2).replace(".", ",");
+        const currency = (invoice.currency || "eur").toUpperCase();
+        const nextRetryDate = fmtDate((invoice as any).next_payment_attempt);
+        await sendEmail(
+          "payment-failed",
+          customerEmail,
+          `payment-failed-${event.id}`,
+          { name, amount, currency, nextRetryDate },
+        );
+      }
+    }
+
+    // ============================================================
+    // Payment method attached / default updated
+    // ============================================================
+    else if (event.type === "payment_method.attached") {
+      const pm = event.data.object as Stripe.PaymentMethod;
+      const customerId = typeof pm.customer === "string" ? pm.customer : (pm.customer as any)?.id;
+      if (customerId) {
+        const customerEmail = await getCustomerEmail(customerId);
+        if (customerEmail) {
+          const name = await getName(customerEmail);
+          const brand = pm.card?.brand
+            ? pm.card.brand.charAt(0).toUpperCase() + pm.card.brand.slice(1)
+            : pm.type;
+          const last4 = pm.card?.last4 || (pm as any).sepa_debit?.last4;
+          await sendEmail(
+            "payment-method-updated",
+            customerEmail,
+            `payment-method-${event.id}`,
+            { name, brand, last4 },
+          );
+        }
+      }
+    }
+
+    else if (event.type === "customer.updated") {
+      const customer = event.data.object as Stripe.Customer;
+      const previousAttributes = (event.data as any).previous_attributes || {};
+      const defaultPmChanged = previousAttributes?.invoice_settings?.default_payment_method !== undefined
+        || previousAttributes?.default_source !== undefined;
+      if (defaultPmChanged && customer.email) {
+        const name = await getName(customer.email);
+        let brand: string | undefined;
+        let last4: string | undefined;
+        const defaultPmId = (customer.invoice_settings?.default_payment_method ?? customer.default_source) as string | null;
+        if (defaultPmId && typeof defaultPmId === "string") {
+          try {
+            const pm = await stripe.paymentMethods.retrieve(defaultPmId);
+            brand = pm.card?.brand
+              ? pm.card.brand.charAt(0).toUpperCase() + pm.card.brand.slice(1)
+              : pm.type;
+            last4 = pm.card?.last4 || (pm as any).sepa_debit?.last4;
+          } catch (e) {
+            logStep("Could not retrieve PM details", { error: String(e) });
+          }
+        }
+        await sendEmail(
+          "payment-method-updated",
+          customer.email,
+          `customer-pm-updated-${event.id}`,
+          { name, brand, last4 },
+        );
+      }
+    }
+
+    else {
+      logStep("Unhandled event type, ignoring", { type: event.type });
     }
 
     return new Response(JSON.stringify({ received: true }), {
