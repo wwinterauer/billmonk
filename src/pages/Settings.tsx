@@ -519,7 +519,7 @@ const Settings = () => {
   };
 
   // Split tabs into expense group and invoice group
-  const expenseTabs = allTabs.filter(t => !['bank-live', 'company', 'customers', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'].includes(t.value));
+  const expenseTabs = allTabs.filter(t => !['bank-live', 'company', 'customers', 'members', 'crm-fields', 'newsletter', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'].includes(t.value));
   const invoiceTabs = allTabs.filter(t => ['bank-live', 'company', 'customers', 'members', 'crm-fields', 'newsletter', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'].includes(t.value));
 
   // Update URL when tab changes
