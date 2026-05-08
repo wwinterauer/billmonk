@@ -36,82 +36,94 @@ export interface BankConfig {
 
 export const bankConfigs: Record<string, BankConfig> = {
   'erste-sparkasse': {
-    delimiter: ';',
-    dateColumn: ['Buchungsdatum', 'Datum'],
-    valueDateColumn: ['Valutadatum', 'Wertstellung'],
-    amountColumn: ['Betrag'],
-    descriptionColumn: ['Buchungstext', 'Verwendungszweck'],
-    decimalSeparator: ',',
-    thousandSeparator: '.',
+    delimiter: 'auto',
+    dateColumn: ['Buchungsdatum', 'Datum', 'Buchungstag', 'Umsatztag'],
+    valueDateColumn: ['Valutadatum', 'Wertstellung', 'Valuta'],
+    amountColumn: ['Betrag', 'Umsatz', 'Umsatzbetrag', 'Betrag in EUR'],
+    descriptionColumn: ['Buchungstext', 'Verwendungszweck', 'Umsatzbezeichnung', 'Auftraggeber/Empfänger', 'Text'],
+    decimalSeparator: 'auto',
+    thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'iso-8859-1'
   },
   'raiffeisen': {
-    delimiter: ';',
-    dateColumn: ['Buchungstag', 'Buchungsdatum'],
-    valueDateColumn: ['Valuta', 'Wertstellung'],
-    amountColumn: ['Betrag'],
-    descriptionColumn: ['Buchungstext'],
-    decimalSeparator: ',',
-    thousandSeparator: '.',
+    delimiter: 'auto',
+    dateColumn: ['Buchungstag', 'Buchungsdatum', 'Datum', 'Umsatztag'],
+    valueDateColumn: ['Valuta', 'Wertstellung', 'Valutadatum'],
+    amountColumn: ['Betrag', 'Umsatz', 'Umsatzbetrag', 'Betrag in EUR'],
+    descriptionColumn: ['Buchungstext', 'Umsatzbezeichnung', 'Verwendungszweck', 'Auftraggeber/Empfänger', 'Text'],
+    decimalSeparator: 'auto',
+    thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'iso-8859-1'
   },
   'bank-austria': {
-    delimiter: ';',
-    dateColumn: ['Buchungsdatum'],
-    valueDateColumn: ['Valutadatum'],
-    amountColumn: ['Betrag'],
-    descriptionColumn: ['Zahlungsreferenz', 'Buchungstext'],
-    decimalSeparator: ',',
-    thousandSeparator: '.',
+    delimiter: 'auto',
+    dateColumn: ['Buchungsdatum', 'Datum', 'Buchungstag'],
+    valueDateColumn: ['Valutadatum', 'Wertstellung', 'Valuta'],
+    amountColumn: ['Betrag', 'Umsatz', 'Betrag in EUR'],
+    descriptionColumn: ['Zahlungsreferenz', 'Buchungstext', 'Umsatzbezeichnung', 'Verwendungszweck', 'Auftraggeber/Empfänger'],
+    decimalSeparator: 'auto',
+    thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'iso-8859-1'
   },
   'bawag': {
-    delimiter: ';',
-    dateColumn: ['Buchungsdatum'],
-    valueDateColumn: ['Valutadatum'],
-    amountColumn: ['Betrag'],
-    descriptionColumn: ['Buchungstext'],
-    decimalSeparator: ',',
-    thousandSeparator: '.',
+    delimiter: 'auto',
+    dateColumn: ['Buchungsdatum', 'Datum', 'Buchungstag'],
+    valueDateColumn: ['Valutadatum', 'Wertstellung', 'Valuta'],
+    amountColumn: ['Betrag', 'Umsatz', 'Betrag in EUR'],
+    descriptionColumn: ['Buchungstext', 'Verwendungszweck', 'Umsatzbezeichnung', 'Auftraggeber/Empfänger'],
+    decimalSeparator: 'auto',
+    thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'iso-8859-1'
   },
   'easybank': {
-    delimiter: ';',
-    dateColumn: ['Buchungsdatum'],
-    valueDateColumn: ['Valutadatum'],
-    amountColumn: ['Betrag'],
-    descriptionColumn: ['Buchungstext'],
-    decimalSeparator: ',',
-    thousandSeparator: '.',
+    delimiter: 'auto',
+    dateColumn: ['Buchungsdatum', 'Datum', 'Buchungstag'],
+    valueDateColumn: ['Valutadatum', 'Wertstellung', 'Valuta'],
+    amountColumn: ['Betrag', 'Umsatz', 'Betrag in EUR'],
+    descriptionColumn: ['Buchungstext', 'Verwendungszweck', 'Umsatzbezeichnung', 'Auftraggeber/Empfänger'],
+    decimalSeparator: 'auto',
+    thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'iso-8859-1'
   },
   'n26': {
-    delimiter: ',',
-    dateColumn: ['Datum', 'Date'],
-    valueDateColumn: ['Wertstellung', 'Value Date'],
-    amountColumn: ['Betrag (EUR)', 'Amount (EUR)'],
-    descriptionColumn: ['Empfänger', 'Verwendungszweck', 'Partner Name'],
-    decimalSeparator: '.',
-    thousandSeparator: ',',
+    delimiter: 'auto',
+    dateColumn: ['Datum', 'Date', 'Booking Date', 'Buchungsdatum'],
+    valueDateColumn: ['Wertstellung', 'Value Date', 'Valutadatum'],
+    amountColumn: ['Betrag (EUR)', 'Amount (EUR)', 'Betrag', 'Amount'],
+    descriptionColumn: ['Empfänger', 'Verwendungszweck', 'Partner Name', 'Payment reference', 'Buchungstext'],
+    decimalSeparator: 'auto',
+    thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'utf-8'
   },
   'other': {
     delimiter: 'auto',
-    dateColumn: ['datum', 'date', 'buchungsdatum', 'buchungstag'],
-    amountColumn: ['betrag', 'amount', 'summe'],
-    descriptionColumn: ['beschreibung', 'text', 'buchungstext', 'verwendungszweck'],
+    dateColumn: ['datum', 'date', 'buchungsdatum', 'buchungstag', 'umsatztag', 'posting date', 'booking date', 'buchungs-/wertstellungsdatum'],
+    amountColumn: ['betrag', 'amount', 'summe', 'umsatz', 'umsatzbetrag', 'betrag in eur'],
+    descriptionColumn: ['beschreibung', 'text', 'buchungstext', 'verwendungszweck', 'umsatzbezeichnung', 'auftraggeber/empfänger', 'memo', 'partner name', 'empfänger'],
     decimalSeparator: 'auto',
     thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'utf-8'
   }
 };
+
+// Soll/Haben column pairs (debit + credit) — used when no single amount column is found
+const DEBIT_CREDIT_PAIRS: Array<[string[], string[]]> = [
+  [['soll', 'belastung', 'ausgang', 'debit'], ['haben', 'gutschrift', 'eingang', 'credit']],
+];
+
+// Keywords used by the auto-header detector
+const HEADER_KEYWORDS = [
+  'datum', 'date', 'buchung', 'valuta', 'wertstellung', 'umsatztag',
+  'betrag', 'amount', 'umsatz', 'soll', 'haben', 'belastung', 'gutschrift',
+  'verwendungszweck', 'buchungstext', 'beschreibung', 'empfänger', 'auftraggeber',
+];
 
 // ============= Helper Functions =============
 
@@ -147,21 +159,41 @@ function detectDecimalSeparator(content: string): string {
 /**
  * Find column index by checking multiple possible column names
  */
+function normalizeHeader(s: string): string {
+  return (s || '')
+    .replace(/\uFEFF/g, '')
+    .toLowerCase()
+    .replace(/["']/g, '')
+    .replace(/[\s_\-./()\\]+/g, '')
+    .trim();
+}
+
 function findColumn(headers: string[], possibleNames: string[]): number {
-  const normalizedHeaders = headers.map(h => h.toLowerCase().trim());
-  
+  const normalizedHeaders = headers.map(normalizeHeader);
+
   for (const name of possibleNames) {
-    const index = normalizedHeaders.indexOf(name.toLowerCase().trim());
+    const target = normalizeHeader(name);
+    if (!target) continue;
+    const index = normalizedHeaders.indexOf(target);
     if (index !== -1) return index;
   }
-  
-  // Partial match as fallback
+
   for (const name of possibleNames) {
-    const lowerName = name.toLowerCase().trim();
-    const index = normalizedHeaders.findIndex(h => h.includes(lowerName) || lowerName.includes(h));
+    const target = normalizeHeader(name);
+    if (!target) continue;
+    const index = normalizedHeaders.findIndex(h => h && (h.includes(target) || target.includes(h)));
     if (index !== -1) return index;
   }
-  
+
+  return -1;
+}
+
+/** Find the first matching column from any of the candidate name lists. */
+function findAnyColumn(headers: string[], lists: string[][]): number {
+  for (const list of lists) {
+    const idx = findColumn(headers, list);
+    if (idx !== -1) return idx;
+  }
   return -1;
 }
 
@@ -219,36 +251,46 @@ function parseAmount(value: string, config: BankConfig): number {
  */
 function parseDate(value: string): Date | null {
   if (!value || value.trim() === '') return null;
-  
-  const cleanValue = value.trim();
-  
-  // Try DD.MM.YYYY (German format - most common for Austrian banks)
-  const germanMatch = cleanValue.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+
+  const cleanValue = value.trim().replace(/\uFEFF/g, '');
+
+  // DD.MM.YYYY or DD.MM.YY
+  const germanMatch = cleanValue.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
   if (germanMatch) {
-    const [, day, month, year] = germanMatch;
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const [, day, month, yearRaw] = germanMatch;
+    const year = yearRaw.length === 2 ? 2000 + parseInt(yearRaw) : parseInt(yearRaw);
+    return new Date(year, parseInt(month) - 1, parseInt(day));
   }
-  
-  // Try YYYY-MM-DD (ISO format)
-  const isoMatch = cleanValue.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+
+  // YYYY-MM-DD or YYYY/MM/DD
+  const isoMatch = cleanValue.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
   if (isoMatch) {
     const [, year, month, day] = isoMatch;
     return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
   }
-  
-  // Try DD/MM/YYYY
-  const slashMatch = cleanValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+
+  // DD/MM/YYYY or DD-MM-YYYY (European, day-first)
+  const slashMatch = cleanValue.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})$/);
   if (slashMatch) {
-    const [, day, month, year] = slashMatch;
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const [, day, month, yearRaw] = slashMatch;
+    const year = yearRaw.length === 2 ? 2000 + parseInt(yearRaw) : parseInt(yearRaw);
+    return new Date(year, parseInt(month) - 1, parseInt(day));
   }
-  
-  // Try parsing as standard date
+
+  // Excel serial number (e.g. 45234)
+  if (/^\d{4,6}$/.test(cleanValue)) {
+    const serial = parseInt(cleanValue);
+    if (serial > 20000 && serial < 80000) {
+      // Excel epoch: 1899-12-30 (accounts for the Lotus 1900 leap year bug)
+      const ms = (serial - 25569) * 86400 * 1000;
+      const d = new Date(ms);
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+
   const parsed = new Date(cleanValue);
-  if (!isNaN(parsed.getTime())) {
-    return parsed;
-  }
-  
+  if (!isNaN(parsed.getTime())) return parsed;
+
   return null;
 }
 
@@ -350,6 +392,11 @@ export async function parseCsvFile(file: File, bankType: string): Promise<ParseR
       content = await readFileContent(file, 'utf-8');
     }
     
+    // Strip BOM
+    if (content.charCodeAt(0) === 0xFEFF) {
+      content = content.slice(1);
+    }
+
     if (!content || content.trim() === '') {
       return {
         success: false,
@@ -360,21 +407,21 @@ export async function parseCsvFile(file: File, bankType: string): Promise<ParseR
         errors: ['Die Datei ist leer.']
       };
     }
-    
+
     // Detect delimiter if auto
-    const delimiter = config.delimiter === 'auto' 
-      ? detectDelimiter(content) 
+    const delimiter = config.delimiter === 'auto'
+      ? detectDelimiter(content)
       : config.delimiter;
-    
+
     // Update decimal separator detection if auto
     if (config.decimalSeparator === 'auto') {
       config.decimalSeparator = detectDecimalSeparator(content);
       config.thousandSeparator = config.decimalSeparator === ',' ? '.' : ',';
     }
-    
+
     // Parse CSV
     const rows = parseCsvContent(content, delimiter);
-    
+
     if (rows.length < 2) {
       return {
         success: false,
@@ -385,31 +432,70 @@ export async function parseCsvFile(file: File, bankType: string): Promise<ParseR
         errors: ['Die Datei enthält keine Daten.']
       };
     }
-    
-    // Skip configured rows and get headers
-    const dataStartIndex = config.skipRows;
-    const headers = rows[dataStartIndex];
-    
+
+    // Auto-detect header row: scan first ~25 rows for one that contains a date/amount keyword
+    // and has at least 3 mostly-textual cells. Falls back to config.skipRows.
+    const looksLikeHeader = (row: string[]): boolean => {
+      if (!row || row.length < 2) return false;
+      const cells = row.map(c => normalizeHeader(c)).filter(Boolean);
+      if (cells.length < 2) return false;
+      const matches = cells.filter(c => HEADER_KEYWORDS.some(k => c.includes(k))).length;
+      return matches >= 2;
+    };
+
+    let dataStartIndex = config.skipRows;
+    const scanLimit = Math.min(rows.length, dataStartIndex + 25);
+    for (let i = dataStartIndex; i < scanLimit; i++) {
+      if (looksLikeHeader(rows[i])) {
+        dataStartIndex = i;
+        break;
+      }
+    }
+
+    const headers = rows[dataStartIndex] || [];
+
     // Find column indices
     const dateColIndex = findColumn(headers, config.dateColumn);
-    const amountColIndex = findColumn(headers, config.amountColumn);
+    let amountColIndex = findColumn(headers, config.amountColumn);
     const descriptionColIndex = findColumn(headers, config.descriptionColumn);
-    const valueDateColIndex = config.valueDateColumn 
-      ? findColumn(headers, config.valueDateColumn) 
+    const valueDateColIndex = config.valueDateColumn
+      ? findColumn(headers, config.valueDateColumn)
       : -1;
-    
-    // Validate required columns
-    if (dateColIndex === -1) {
-      errors.push(`Datumsspalte nicht gefunden. Erwartet: ${config.dateColumn.join(' oder ')}`);
-    }
+
+    // Soll/Haben fallback (debit + credit columns)
+    let debitColIndex = -1;
+    let creditColIndex = -1;
     if (amountColIndex === -1) {
-      errors.push(`Betragsspalte nicht gefunden. Erwartet: ${config.amountColumn.join(' oder ')}`);
+      for (const [debitNames, creditNames] of DEBIT_CREDIT_PAIRS) {
+        const d = findColumn(headers, debitNames);
+        const c = findColumn(headers, creditNames);
+        if (d !== -1 && c !== -1) {
+          debitColIndex = d;
+          creditColIndex = c;
+          break;
+        }
+      }
+    }
+
+    const headersHint = headers.filter(h => h && h.trim()).join(', ') || '(keine Kopfzeile erkannt)';
+
+    if (dateColIndex === -1) {
+      errors.push(
+        `Datumsspalte nicht gefunden. Erwartet z. B.: ${config.dateColumn.join(', ')}. ` +
+        `Gefundene Spalten: ${headersHint}`
+      );
+    }
+    if (amountColIndex === -1 && debitColIndex === -1) {
+      errors.push(
+        `Betragsspalte nicht gefunden. Erwartet z. B.: ${config.amountColumn.join(', ')} ` +
+        `oder Soll/Haben. Gefundene Spalten: ${headersHint}`
+      );
     }
     if (descriptionColIndex === -1) {
-      errors.push(`Beschreibungsspalte nicht gefunden. Erwartet: ${config.descriptionColumn.join(' oder ')}`);
+      errors.push(`Beschreibungsspalte nicht gefunden. Erwartet z. B.: ${config.descriptionColumn.join(', ')}`);
     }
-    
-    if (dateColIndex === -1 || amountColIndex === -1) {
+
+    if (dateColIndex === -1 || (amountColIndex === -1 && debitColIndex === -1)) {
       return {
         success: false,
         transactions: [],
@@ -419,44 +505,49 @@ export async function parseCsvFile(file: File, bankType: string): Promise<ParseR
         errors
       };
     }
-    
+
     // Process data rows
     for (let i = dataStartIndex + 1; i < rows.length; i++) {
       const row = rows[i];
-      
+
       // Skip empty rows
       if (!row || row.every(cell => !cell || cell.trim() === '')) {
         continue;
       }
-      
+
       try {
         const date = parseDate(row[dateColIndex] || '');
-        const amount = parseAmount(row[amountColIndex] || '', config);
-        const description = descriptionColIndex !== -1 
+        let amount: number;
+        if (amountColIndex !== -1) {
+          amount = parseAmount(row[amountColIndex] || '', config);
+        } else {
+          const debit = parseAmount(row[debitColIndex] || '', config);
+          const credit = parseAmount(row[creditColIndex] || '', config);
+          amount = credit - debit;
+        }
+        const description = descriptionColIndex !== -1
           ? row[descriptionColIndex] || ''
           : '';
-        const valueDate = valueDateColIndex !== -1 
+        const valueDate = valueDateColIndex !== -1
           ? parseDate(row[valueDateColIndex] || '')
           : undefined;
-        
+
         if (!date) {
           errors.push(`Zeile ${i + 1}: Ungültiges Datum "${row[dateColIndex]}"`);
           continue;
         }
-        
+
         if (amount === 0) {
-          // Skip zero amounts
           continue;
         }
-        
-        // Build raw data object
+
         const rawData: Record<string, string> = {};
         headers.forEach((header, index) => {
           if (header && row[index] !== undefined) {
             rawData[header] = row[index];
           }
         });
-        
+
         transactions.push({
           date,
           valueDate: valueDate || undefined,
