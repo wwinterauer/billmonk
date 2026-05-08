@@ -519,8 +519,12 @@ export default function Checklists() {
                     <CardContent className="pt-0 border-t">
                       <div className="space-y-2 mt-4">
                         {checklist.items && checklist.items.length > 0 ? (
-                          <div className="space-y-2">
-                            {checklist.items.map((item) => (
+                          (() => {
+                            const openItems = checklist.items.filter((i) => !i.is_completed);
+                            const completedItems = checklist.items.filter((i) => i.is_completed);
+                            const completedOpen = !!completedExpanded[checklist.id];
+
+                            const renderItem = (item: typeof checklist.items[number]) => (
                               <div
                                 key={item.id}
                                 className={`flex items-start gap-3 p-3 rounded-lg border ${
@@ -602,8 +606,47 @@ export default function Checklists() {
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </div>
-                            ))}
-                          </div>
+                            );
+
+                            return (
+                              <div className="space-y-2">
+                                {openItems.length > 0 ? (
+                                  openItems.map(renderItem)
+                                ) : (
+                                  <p className="text-sm text-muted-foreground text-center py-4">
+                                    Alle Punkte erledigt
+                                  </p>
+                                )}
+
+                                {completedItems.length > 0 && (
+                                  <div className="pt-2">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setCompletedExpanded((prev) => ({
+                                          ...prev,
+                                          [checklist.id]: !prev[checklist.id],
+                                        }))
+                                      }
+                                      className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-2"
+                                    >
+                                      {completedOpen ? (
+                                        <ChevronDown className="h-4 w-4" />
+                                      ) : (
+                                        <ChevronRight className="h-4 w-4" />
+                                      )}
+                                      Erledigt ({completedItems.length})
+                                    </button>
+                                    {completedOpen && (
+                                      <div className="space-y-2 mt-2">
+                                        {completedItems.map(renderItem)}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()
                         ) : (
                           <p className="text-sm text-muted-foreground text-center py-4">
                             Noch keine Positionen vorhanden
