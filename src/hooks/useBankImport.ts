@@ -251,36 +251,46 @@ function parseAmount(value: string, config: BankConfig): number {
  */
 function parseDate(value: string): Date | null {
   if (!value || value.trim() === '') return null;
-  
-  const cleanValue = value.trim();
-  
-  // Try DD.MM.YYYY (German format - most common for Austrian banks)
-  const germanMatch = cleanValue.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+
+  const cleanValue = value.trim().replace(/\uFEFF/g, '');
+
+  // DD.MM.YYYY or DD.MM.YY
+  const germanMatch = cleanValue.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
   if (germanMatch) {
-    const [, day, month, year] = germanMatch;
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const [, day, month, yearRaw] = germanMatch;
+    const year = yearRaw.length === 2 ? 2000 + parseInt(yearRaw) : parseInt(yearRaw);
+    return new Date(year, parseInt(month) - 1, parseInt(day));
   }
-  
-  // Try YYYY-MM-DD (ISO format)
-  const isoMatch = cleanValue.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+
+  // YYYY-MM-DD or YYYY/MM/DD
+  const isoMatch = cleanValue.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
   if (isoMatch) {
     const [, year, month, day] = isoMatch;
     return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
   }
-  
-  // Try DD/MM/YYYY
-  const slashMatch = cleanValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+
+  // DD/MM/YYYY or DD-MM-YYYY (European, day-first)
+  const slashMatch = cleanValue.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})$/);
   if (slashMatch) {
-    const [, day, month, year] = slashMatch;
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const [, day, month, yearRaw] = slashMatch;
+    const year = yearRaw.length === 2 ? 2000 + parseInt(yearRaw) : parseInt(yearRaw);
+    return new Date(year, parseInt(month) - 1, parseInt(day));
   }
-  
-  // Try parsing as standard date
+
+  // Excel serial number (e.g. 45234)
+  if (/^\d{4,6}$/.test(cleanValue)) {
+    const serial = parseInt(cleanValue);
+    if (serial > 20000 && serial < 80000) {
+      // Excel epoch: 1899-12-30 (accounts for the Lotus 1900 leap year bug)
+      const ms = (serial - 25569) * 86400 * 1000;
+      const d = new Date(ms);
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+
   const parsed = new Date(cleanValue);
-  if (!isNaN(parsed.getTime())) {
-    return parsed;
-  }
-  
+  if (!isNaN(parsed.getTime())) return parsed;
+
   return null;
 }
 
