@@ -418,7 +418,7 @@ export function BankImportKeywords() {
                   setFormData({ ...formData, vendor_name: value, vendor_id: vendorId || '' })
                 }
                 onVendorSelect={(vendor) =>
-                  setFormData({ ...formData, vendor_name: vendor.name, vendor_id: vendor.id })
+                  setFormData({ ...formData, vendor_name: vendor.display_name, vendor_id: vendor.id })
                 }
                 label="Lieferant (optional)"
                 placeholder="Bestehenden Lieferant wählen oder neu anlegen…"
