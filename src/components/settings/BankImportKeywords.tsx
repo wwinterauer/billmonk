@@ -534,6 +534,8 @@ export function BankImportKeywords() {
                   Bankgebühren, Versicherungen und Steuern haben meist 0% MwSt
                 </p>
               </div>
+              </>
+              )}
             </div>
 
             <DialogFooter>
