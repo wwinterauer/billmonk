@@ -95,9 +95,9 @@ export function BankImportKeywords() {
   const { data: vendorMap } = useQuery({
     queryKey: ['vendors-name-map'],
     queryFn: async () => {
-      const { data } = await supabase.from('vendors').select('id, name');
+      const { data } = await supabase.from('vendors').select('id, display_name');
       const map: Record<string, string> = {};
-      (data ?? []).forEach((v: any) => { map[v.id] = v.name; });
+      (data ?? []).forEach((v: any) => { map[v.id] = v.display_name; });
       return map;
     },
   });
