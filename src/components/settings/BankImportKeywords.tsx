@@ -48,6 +48,7 @@ import {
   Loader2,
   Info,
   Sparkles,
+  Ban,
 } from 'lucide-react';
 
 interface BankKeyword {
@@ -59,6 +60,7 @@ interface BankKeyword {
   tax_type: string | null;
   vendor_id: string | null;
   is_active: boolean;
+  is_ignore: boolean;
 }
 
 const CATEGORIES = [
