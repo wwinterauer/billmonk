@@ -430,6 +430,23 @@ export function BankImportKeywords() {
                 </p>
               </div>
 
+              <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+                <div className="space-y-0.5">
+                  <Label className="flex items-center gap-2">
+                    <Ban className="h-4 w-4 text-destructive" />
+                    Buchung komplett ignorieren
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Beim CSV-Import werden Treffer für dieses Schlagwort übersprungen –
+                    keine Bankbuchung und kein Beleg werden angelegt.
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.is_ignore}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_ignore: checked })}
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label>Kategorie</Label>
                 <Select
