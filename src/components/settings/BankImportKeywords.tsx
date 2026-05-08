@@ -248,6 +248,7 @@ export function BankImportKeywords() {
       tax_type: '',
       vendor_id: '',
       vendor_name: '',
+      is_ignore: false,
     });
     setEditingKeyword(null);
   };
@@ -262,6 +263,7 @@ export function BankImportKeywords() {
       tax_type: keyword.tax_type || '',
       vendor_id: keyword.vendor_id || '',
       vendor_name: (keyword.vendor_id && vendorMap?.[keyword.vendor_id]) || '',
+      is_ignore: keyword.is_ignore ?? false,
     });
     setShowDialog(true);
   };
