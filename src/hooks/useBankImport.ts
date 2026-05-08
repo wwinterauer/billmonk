@@ -159,21 +159,41 @@ function detectDecimalSeparator(content: string): string {
 /**
  * Find column index by checking multiple possible column names
  */
+function normalizeHeader(s: string): string {
+  return (s || '')
+    .replace(/\uFEFF/g, '')
+    .toLowerCase()
+    .replace(/["']/g, '')
+    .replace(/[\s_\-./()\\]+/g, '')
+    .trim();
+}
+
 function findColumn(headers: string[], possibleNames: string[]): number {
-  const normalizedHeaders = headers.map(h => h.toLowerCase().trim());
-  
+  const normalizedHeaders = headers.map(normalizeHeader);
+
   for (const name of possibleNames) {
-    const index = normalizedHeaders.indexOf(name.toLowerCase().trim());
+    const target = normalizeHeader(name);
+    if (!target) continue;
+    const index = normalizedHeaders.indexOf(target);
     if (index !== -1) return index;
   }
-  
-  // Partial match as fallback
+
   for (const name of possibleNames) {
-    const lowerName = name.toLowerCase().trim();
-    const index = normalizedHeaders.findIndex(h => h.includes(lowerName) || lowerName.includes(h));
+    const target = normalizeHeader(name);
+    if (!target) continue;
+    const index = normalizedHeaders.findIndex(h => h && (h.includes(target) || target.includes(h)));
     if (index !== -1) return index;
   }
-  
+
+  return -1;
+}
+
+/** Find the first matching column from any of the candidate name lists. */
+function findAnyColumn(headers: string[], lists: string[][]): number {
+  for (const list of lists) {
+    const idx = findColumn(headers, list);
+    if (idx !== -1) return idx;
+  }
   return -1;
 }
 
