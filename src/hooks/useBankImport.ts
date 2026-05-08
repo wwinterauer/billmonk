@@ -392,6 +392,11 @@ export async function parseCsvFile(file: File, bankType: string): Promise<ParseR
       content = await readFileContent(file, 'utf-8');
     }
     
+    // Strip BOM
+    if (content.charCodeAt(0) === 0xFEFF) {
+      content = content.slice(1);
+    }
+
     if (!content || content.trim() === '') {
       return {
         success: false,
@@ -402,21 +407,21 @@ export async function parseCsvFile(file: File, bankType: string): Promise<ParseR
         errors: ['Die Datei ist leer.']
       };
     }
-    
+
     // Detect delimiter if auto
-    const delimiter = config.delimiter === 'auto' 
-      ? detectDelimiter(content) 
+    const delimiter = config.delimiter === 'auto'
+      ? detectDelimiter(content)
       : config.delimiter;
-    
+
     // Update decimal separator detection if auto
     if (config.decimalSeparator === 'auto') {
       config.decimalSeparator = detectDecimalSeparator(content);
       config.thousandSeparator = config.decimalSeparator === ',' ? '.' : ',';
     }
-    
+
     // Parse CSV
     const rows = parseCsvContent(content, delimiter);
-    
+
     if (rows.length < 2) {
       return {
         success: false,
@@ -427,31 +432,70 @@ export async function parseCsvFile(file: File, bankType: string): Promise<ParseR
         errors: ['Die Datei enthält keine Daten.']
       };
     }
-    
-    // Skip configured rows and get headers
-    const dataStartIndex = config.skipRows;
-    const headers = rows[dataStartIndex];
-    
+
+    // Auto-detect header row: scan first ~25 rows for one that contains a date/amount keyword
+    // and has at least 3 mostly-textual cells. Falls back to config.skipRows.
+    const looksLikeHeader = (row: string[]): boolean => {
+      if (!row || row.length < 2) return false;
+      const cells = row.map(c => normalizeHeader(c)).filter(Boolean);
+      if (cells.length < 2) return false;
+      const matches = cells.filter(c => HEADER_KEYWORDS.some(k => c.includes(k))).length;
+      return matches >= 2;
+    };
+
+    let dataStartIndex = config.skipRows;
+    const scanLimit = Math.min(rows.length, dataStartIndex + 25);
+    for (let i = dataStartIndex; i < scanLimit; i++) {
+      if (looksLikeHeader(rows[i])) {
+        dataStartIndex = i;
+        break;
+      }
+    }
+
+    const headers = rows[dataStartIndex] || [];
+
     // Find column indices
     const dateColIndex = findColumn(headers, config.dateColumn);
-    const amountColIndex = findColumn(headers, config.amountColumn);
+    let amountColIndex = findColumn(headers, config.amountColumn);
     const descriptionColIndex = findColumn(headers, config.descriptionColumn);
-    const valueDateColIndex = config.valueDateColumn 
-      ? findColumn(headers, config.valueDateColumn) 
+    const valueDateColIndex = config.valueDateColumn
+      ? findColumn(headers, config.valueDateColumn)
       : -1;
-    
-    // Validate required columns
-    if (dateColIndex === -1) {
-      errors.push(`Datumsspalte nicht gefunden. Erwartet: ${config.dateColumn.join(' oder ')}`);
-    }
+
+    // Soll/Haben fallback (debit + credit columns)
+    let debitColIndex = -1;
+    let creditColIndex = -1;
     if (amountColIndex === -1) {
-      errors.push(`Betragsspalte nicht gefunden. Erwartet: ${config.amountColumn.join(' oder ')}`);
+      for (const [debitNames, creditNames] of DEBIT_CREDIT_PAIRS) {
+        const d = findColumn(headers, debitNames);
+        const c = findColumn(headers, creditNames);
+        if (d !== -1 && c !== -1) {
+          debitColIndex = d;
+          creditColIndex = c;
+          break;
+        }
+      }
+    }
+
+    const headersHint = headers.filter(h => h && h.trim()).join(', ') || '(keine Kopfzeile erkannt)';
+
+    if (dateColIndex === -1) {
+      errors.push(
+        `Datumsspalte nicht gefunden. Erwartet z. B.: ${config.dateColumn.join(', ')}. ` +
+        `Gefundene Spalten: ${headersHint}`
+      );
+    }
+    if (amountColIndex === -1 && debitColIndex === -1) {
+      errors.push(
+        `Betragsspalte nicht gefunden. Erwartet z. B.: ${config.amountColumn.join(', ')} ` +
+        `oder Soll/Haben. Gefundene Spalten: ${headersHint}`
+      );
     }
     if (descriptionColIndex === -1) {
-      errors.push(`Beschreibungsspalte nicht gefunden. Erwartet: ${config.descriptionColumn.join(' oder ')}`);
+      errors.push(`Beschreibungsspalte nicht gefunden. Erwartet z. B.: ${config.descriptionColumn.join(', ')}`);
     }
-    
-    if (dateColIndex === -1 || amountColIndex === -1) {
+
+    if (dateColIndex === -1 || (amountColIndex === -1 && debitColIndex === -1)) {
       return {
         success: false,
         transactions: [],
@@ -461,44 +505,49 @@ export async function parseCsvFile(file: File, bankType: string): Promise<ParseR
         errors
       };
     }
-    
+
     // Process data rows
     for (let i = dataStartIndex + 1; i < rows.length; i++) {
       const row = rows[i];
-      
+
       // Skip empty rows
       if (!row || row.every(cell => !cell || cell.trim() === '')) {
         continue;
       }
-      
+
       try {
         const date = parseDate(row[dateColIndex] || '');
-        const amount = parseAmount(row[amountColIndex] || '', config);
-        const description = descriptionColIndex !== -1 
+        let amount: number;
+        if (amountColIndex !== -1) {
+          amount = parseAmount(row[amountColIndex] || '', config);
+        } else {
+          const debit = parseAmount(row[debitColIndex] || '', config);
+          const credit = parseAmount(row[creditColIndex] || '', config);
+          amount = credit - debit;
+        }
+        const description = descriptionColIndex !== -1
           ? row[descriptionColIndex] || ''
           : '';
-        const valueDate = valueDateColIndex !== -1 
+        const valueDate = valueDateColIndex !== -1
           ? parseDate(row[valueDateColIndex] || '')
           : undefined;
-        
+
         if (!date) {
           errors.push(`Zeile ${i + 1}: Ungültiges Datum "${row[dateColIndex]}"`);
           continue;
         }
-        
+
         if (amount === 0) {
-          // Skip zero amounts
           continue;
         }
-        
-        // Build raw data object
+
         const rawData: Record<string, string> = {};
         headers.forEach((header, index) => {
           if (header && row[index] !== undefined) {
             rawData[header] = row[index];
           }
         });
-        
+
         transactions.push({
           date,
           valueDate: valueDate || undefined,
