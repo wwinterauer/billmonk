@@ -1,15 +1,31 @@
-## Links im Position-Dialog bearbeitbar machen
+## Ziel
+Der CSV-Import (`/bank-import`) bricht mit „Datumsspalte nicht gefunden" ab. Ursache ist meist eines davon: die echte Kopfzeile steht nicht in Zeile 1 (viele AT-Banken haben 5–15 Zeilen Meta-Daten davor), die Spalten heißen anders als in `bankConfigs` hinterlegt, oder Betrag steht in zwei Spalten (Soll/Haben) statt einer.
 
-Aktuell können Links im "Position bearbeiten"-Dialog nur gelöscht (Mülleimer) oder neu hinzugefügt werden. Es soll möglich sein, Bezeichnung und URL bestehender Links direkt zu ändern.
+## Was ich umbauen werde (`src/hooks/useBankImport.ts`)
 
-### Änderungen in `src/pages/Checklists.tsx`
+### 1. Auto-Header-Erkennung
+Statt fix `rows[skipRows]` zu nehmen: die ersten ~20 Zeilen scannen und die erste Zeile finden, die nach „Header" aussieht (mehrere nicht-numerische Felder + enthält ein bekanntes Datums-/Betrags-Keyword wie `datum|date|buchung|valuta|betrag|amount|umsatz`). So funktionieren auch Exporte mit Vorspann (Kontonummer, Zeitraum, Leerzeilen).
 
-1. **Inline-Bearbeitung der Linkliste** (Zeilen 798–815): Die bestehende read-only Anzeige (`LinkIcon` + `<span>{link.label}</span>` + Trash-Button) wird durch zwei `Input`-Felder pro Link ersetzt — eines für Bezeichnung, eines für URL — plus den Trash-Button rechts. Layout analog zur "neuer Link"-Zeile darunter, damit es konsistent aussieht.
+### 2. Mehr Spalten-Aliase + bessere Fuzzy-Suche
+- `dateColumn`: zusätzlich `Umsatztag`, `Buchung`, `Buchungs-/Wertstellungsdatum`, `Datum/Zeit`, `Posting Date`
+- `amountColumn`: `Umsatz`, `Umsatzbetrag`, `Betrag in EUR`, `Wert`, `Saldo` ausschließen
+- `descriptionColumn`: `Umsatzbezeichnung`, `Auftraggeber/Empfänger`, `Verwendungszweck 1`, `Text`, `Memo`
+- `findColumn` zusätzlich Sonderzeichen entfernen (`/ - . ()`), damit `Buchungs-/Wertstellungsdatum` matcht.
 
-2. **Neue Hilfsfunktion `updateLink(index, field, value)`**: aktualisiert `itemForm.links[index].label` bzw. `.url` immutabel via `setItemForm`.
+### 3. Soll/Haben als Alternative zu einer Betragsspalte
+Wenn keine einzelne Betragsspalte gefunden wird, nach Paaren suchen: `Soll`+`Haben`, `Belastung`+`Gutschrift`, `Debit`+`Credit`. Betrag = Haben − Soll, `isExpense` entsprechend.
 
-3. Speichern erfolgt wie bisher über `saveItemMutation` beim Klick auf "Speichern" — keine zusätzliche Logik nötig, da der gesamte `links`-Array übernommen wird.
+### 4. Robusteres Datum-Parsing
+- BOM (`\uFEFF`) am Dateianfang entfernen, sonst matcht der erste Header nicht.
+- Zusätzlich `DD-MM-YYYY`, `YYYY/MM/DD`, `DD.MM.YY` (zweistelliges Jahr → 20YY).
+- Excel-Seriennummern (z. B. `45234`) erkennen und in Datum umrechnen, falls die Spalte numerisch ist.
 
-### Nicht im Scope
-- Keine Änderungen an Datenbank, Mutationen oder an der Anzeige der Links in der Listenansicht.
-- Keine Drag-and-Drop-Sortierung der Links.
+### 5. Bessere Fehlermeldung
+Wenn nichts geht: erkannte Header in der Fehlermeldung mit anzeigen („Gefundene Spalten: …") – dann sieht man sofort, was fehlt.
+
+## Nicht im Scope
+- Kein UI-Mapping-Schritt (manuelle Spalten-Zuordnung). Falls die Auto-Erkennung trotzdem fehlschlägt, machen wir das in einem zweiten Schritt.
+- Keine Änderungen an Import-Logik nach dem Parsen, an RLS oder an Edge Functions.
+
+## Danach
+Sobald du die CSV anhängst, prüfe ich konkret welche Spaltennamen drinstehen und ergänze sie zusätzlich fix in `bankConfigs` für die jeweilige Bank.

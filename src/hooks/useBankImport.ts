@@ -36,82 +36,94 @@ export interface BankConfig {
 
 export const bankConfigs: Record<string, BankConfig> = {
   'erste-sparkasse': {
-    delimiter: ';',
-    dateColumn: ['Buchungsdatum', 'Datum'],
-    valueDateColumn: ['Valutadatum', 'Wertstellung'],
-    amountColumn: ['Betrag'],
-    descriptionColumn: ['Buchungstext', 'Verwendungszweck'],
-    decimalSeparator: ',',
-    thousandSeparator: '.',
+    delimiter: 'auto',
+    dateColumn: ['Buchungsdatum', 'Datum', 'Buchungstag', 'Umsatztag'],
+    valueDateColumn: ['Valutadatum', 'Wertstellung', 'Valuta'],
+    amountColumn: ['Betrag', 'Umsatz', 'Umsatzbetrag', 'Betrag in EUR'],
+    descriptionColumn: ['Buchungstext', 'Verwendungszweck', 'Umsatzbezeichnung', 'Auftraggeber/Empfänger', 'Text'],
+    decimalSeparator: 'auto',
+    thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'iso-8859-1'
   },
   'raiffeisen': {
-    delimiter: ';',
-    dateColumn: ['Buchungstag', 'Buchungsdatum'],
-    valueDateColumn: ['Valuta', 'Wertstellung'],
-    amountColumn: ['Betrag'],
-    descriptionColumn: ['Buchungstext'],
-    decimalSeparator: ',',
-    thousandSeparator: '.',
+    delimiter: 'auto',
+    dateColumn: ['Buchungstag', 'Buchungsdatum', 'Datum', 'Umsatztag'],
+    valueDateColumn: ['Valuta', 'Wertstellung', 'Valutadatum'],
+    amountColumn: ['Betrag', 'Umsatz', 'Umsatzbetrag', 'Betrag in EUR'],
+    descriptionColumn: ['Buchungstext', 'Umsatzbezeichnung', 'Verwendungszweck', 'Auftraggeber/Empfänger', 'Text'],
+    decimalSeparator: 'auto',
+    thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'iso-8859-1'
   },
   'bank-austria': {
-    delimiter: ';',
-    dateColumn: ['Buchungsdatum'],
-    valueDateColumn: ['Valutadatum'],
-    amountColumn: ['Betrag'],
-    descriptionColumn: ['Zahlungsreferenz', 'Buchungstext'],
-    decimalSeparator: ',',
-    thousandSeparator: '.',
+    delimiter: 'auto',
+    dateColumn: ['Buchungsdatum', 'Datum', 'Buchungstag'],
+    valueDateColumn: ['Valutadatum', 'Wertstellung', 'Valuta'],
+    amountColumn: ['Betrag', 'Umsatz', 'Betrag in EUR'],
+    descriptionColumn: ['Zahlungsreferenz', 'Buchungstext', 'Umsatzbezeichnung', 'Verwendungszweck', 'Auftraggeber/Empfänger'],
+    decimalSeparator: 'auto',
+    thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'iso-8859-1'
   },
   'bawag': {
-    delimiter: ';',
-    dateColumn: ['Buchungsdatum'],
-    valueDateColumn: ['Valutadatum'],
-    amountColumn: ['Betrag'],
-    descriptionColumn: ['Buchungstext'],
-    decimalSeparator: ',',
-    thousandSeparator: '.',
+    delimiter: 'auto',
+    dateColumn: ['Buchungsdatum', 'Datum', 'Buchungstag'],
+    valueDateColumn: ['Valutadatum', 'Wertstellung', 'Valuta'],
+    amountColumn: ['Betrag', 'Umsatz', 'Betrag in EUR'],
+    descriptionColumn: ['Buchungstext', 'Verwendungszweck', 'Umsatzbezeichnung', 'Auftraggeber/Empfänger'],
+    decimalSeparator: 'auto',
+    thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'iso-8859-1'
   },
   'easybank': {
-    delimiter: ';',
-    dateColumn: ['Buchungsdatum'],
-    valueDateColumn: ['Valutadatum'],
-    amountColumn: ['Betrag'],
-    descriptionColumn: ['Buchungstext'],
-    decimalSeparator: ',',
-    thousandSeparator: '.',
+    delimiter: 'auto',
+    dateColumn: ['Buchungsdatum', 'Datum', 'Buchungstag'],
+    valueDateColumn: ['Valutadatum', 'Wertstellung', 'Valuta'],
+    amountColumn: ['Betrag', 'Umsatz', 'Betrag in EUR'],
+    descriptionColumn: ['Buchungstext', 'Verwendungszweck', 'Umsatzbezeichnung', 'Auftraggeber/Empfänger'],
+    decimalSeparator: 'auto',
+    thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'iso-8859-1'
   },
   'n26': {
-    delimiter: ',',
-    dateColumn: ['Datum', 'Date'],
-    valueDateColumn: ['Wertstellung', 'Value Date'],
-    amountColumn: ['Betrag (EUR)', 'Amount (EUR)'],
-    descriptionColumn: ['Empfänger', 'Verwendungszweck', 'Partner Name'],
-    decimalSeparator: '.',
-    thousandSeparator: ',',
+    delimiter: 'auto',
+    dateColumn: ['Datum', 'Date', 'Booking Date', 'Buchungsdatum'],
+    valueDateColumn: ['Wertstellung', 'Value Date', 'Valutadatum'],
+    amountColumn: ['Betrag (EUR)', 'Amount (EUR)', 'Betrag', 'Amount'],
+    descriptionColumn: ['Empfänger', 'Verwendungszweck', 'Partner Name', 'Payment reference', 'Buchungstext'],
+    decimalSeparator: 'auto',
+    thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'utf-8'
   },
   'other': {
     delimiter: 'auto',
-    dateColumn: ['datum', 'date', 'buchungsdatum', 'buchungstag'],
-    amountColumn: ['betrag', 'amount', 'summe'],
-    descriptionColumn: ['beschreibung', 'text', 'buchungstext', 'verwendungszweck'],
+    dateColumn: ['datum', 'date', 'buchungsdatum', 'buchungstag', 'umsatztag', 'posting date', 'booking date', 'buchungs-/wertstellungsdatum'],
+    amountColumn: ['betrag', 'amount', 'summe', 'umsatz', 'umsatzbetrag', 'betrag in eur'],
+    descriptionColumn: ['beschreibung', 'text', 'buchungstext', 'verwendungszweck', 'umsatzbezeichnung', 'auftraggeber/empfänger', 'memo', 'partner name', 'empfänger'],
     decimalSeparator: 'auto',
     thousandSeparator: 'auto',
     skipRows: 0,
     encoding: 'utf-8'
   }
 };
+
+// Soll/Haben column pairs (debit + credit) — used when no single amount column is found
+const DEBIT_CREDIT_PAIRS: Array<[string[], string[]]> = [
+  [['soll', 'belastung', 'ausgang', 'debit'], ['haben', 'gutschrift', 'eingang', 'credit']],
+];
+
+// Keywords used by the auto-header detector
+const HEADER_KEYWORDS = [
+  'datum', 'date', 'buchung', 'valuta', 'wertstellung', 'umsatztag',
+  'betrag', 'amount', 'umsatz', 'soll', 'haben', 'belastung', 'gutschrift',
+  'verwendungszweck', 'buchungstext', 'beschreibung', 'empfänger', 'auftraggeber',
+];
 
 // ============= Helper Functions =============
 
