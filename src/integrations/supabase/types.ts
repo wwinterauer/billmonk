@@ -300,6 +300,7 @@ export type Database = {
           description_template: string | null
           id: string
           is_active: boolean | null
+          is_ignore: boolean
           keyword: string
           tax_rate: number | null
           tax_type: string | null
@@ -313,6 +314,7 @@ export type Database = {
           description_template?: string | null
           id?: string
           is_active?: boolean | null
+          is_ignore?: boolean
           keyword: string
           tax_rate?: number | null
           tax_type?: string | null
@@ -326,6 +328,7 @@ export type Database = {
           description_template?: string | null
           id?: string
           is_active?: boolean | null
+          is_ignore?: boolean
           keyword?: string
           tax_rate?: number | null
           tax_type?: string | null

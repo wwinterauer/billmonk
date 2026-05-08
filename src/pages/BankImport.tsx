@@ -241,6 +241,7 @@ export default function BankImport() {
       const total = transactionsToImport.length;
       let imported = 0;
       let skippedDuplicates = 0;
+      let skippedIgnored = 0;
       let noReceiptEntriesCreated = 0;
       const skippedIncome = onlyExpenses ? parseResult.income : 0;
       
@@ -251,8 +252,11 @@ export default function BankImport() {
         .eq('user_id', user.id)
         .eq('is_active', true);
 
+      const ignoreKeywords = (keywords ?? []).filter((k: any) => k.is_ignore);
+      const matchKeywords = (keywords ?? []).filter((k: any) => !k.is_ignore);
+
       // Preload vendor names for keywords with vendor_id
-      const vendorIds = Array.from(new Set((keywords ?? []).map((k: any) => k.vendor_id).filter(Boolean)));
+      const vendorIds = Array.from(new Set(matchKeywords.map((k: any) => k.vendor_id).filter(Boolean)));
       const vendorNameMap: Record<string, string> = {};
       if (vendorIds.length > 0) {
         const { data: vData } = await supabase
@@ -289,6 +293,15 @@ export default function BankImport() {
         const tx = transactionsToImport[i];
         setImportProgress({ current: i + 1, total });
         
+        // Skip transactions matching an "ignore" keyword
+        const isIgnored = ignoreKeywords.some((kw: any) =>
+          tx.description.toLowerCase().includes(kw.keyword.toLowerCase())
+        );
+        if (isIgnored) {
+          skippedIgnored++;
+          continue;
+        }
+
         // Check for duplicate if enabled
         if (skipDuplicates) {
           const { count } = await supabase
@@ -330,8 +343,8 @@ export default function BankImport() {
         imported++;
         
         // Check for keyword match and create no-receipt entry if enabled
-        if (createNoReceiptEntries && tx.isExpense && keywords && keywords.length > 0) {
-          const matchedKeyword = keywords.find(kw => 
+        if (createNoReceiptEntries && tx.isExpense && matchKeywords.length > 0) {
+          const matchedKeyword = matchKeywords.find((kw: any) => 
             tx.description.toLowerCase().includes(kw.keyword.toLowerCase())
           );
           
@@ -376,7 +389,7 @@ export default function BankImport() {
         .from('bank_imports')
         .update({
           imported_rows: imported,
-          skipped_rows: skippedDuplicates + skippedIncome,
+          skipped_rows: skippedDuplicates + skippedIncome + skippedIgnored,
         })
         .eq('id', importBatch.id);
       

@@ -1,0 +1,1 @@
+ALTER TABLE public.bank_import_keywords ADD COLUMN IF NOT EXISTS is_ignore boolean NOT NULL DEFAULT false;

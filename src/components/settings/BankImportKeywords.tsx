@@ -48,6 +48,7 @@ import {
   Loader2,
   Info,
   Sparkles,
+  Ban,
 } from 'lucide-react';
 
 interface BankKeyword {
@@ -59,6 +60,7 @@ interface BankKeyword {
   tax_type: string | null;
   vendor_id: string | null;
   is_active: boolean;
+  is_ignore: boolean;
 }
 
 const CATEGORIES = [
@@ -89,6 +91,7 @@ export function BankImportKeywords() {
     tax_type: '',
     vendor_id: '' as string | '',
     vendor_name: '',
+    is_ignore: false,
   });
 
   // Vendor-Namen für Tabelle laden
@@ -152,6 +155,7 @@ export function BankImportKeywords() {
         tax_rate: parseFloat(data.tax_rate) || 0,
         tax_type: data.tax_type || null,
         vendor_id: vendorId,
+        is_ignore: data.is_ignore,
       };
 
       if (editingKeyword) {
@@ -244,6 +248,7 @@ export function BankImportKeywords() {
       tax_type: '',
       vendor_id: '',
       vendor_name: '',
+      is_ignore: false,
     });
     setEditingKeyword(null);
   };
@@ -258,6 +263,7 @@ export function BankImportKeywords() {
       tax_type: keyword.tax_type || '',
       vendor_id: keyword.vendor_id || '',
       vendor_name: (keyword.vendor_id && vendorMap?.[keyword.vendor_id]) || '',
+      is_ignore: keyword.is_ignore ?? false,
     });
     setShowDialog(true);
   };
@@ -338,8 +344,15 @@ export function BankImportKeywords() {
                   <TableRow key={kw.id} className={!kw.is_active ? 'opacity-50' : ''}>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Tag className="h-4 w-4 text-muted-foreground" />
+                        {kw.is_ignore ? (
+                          <Ban className="h-4 w-4 text-destructive" />
+                        ) : (
+                          <Tag className="h-4 w-4 text-muted-foreground" />
+                        )}
                         <span className="font-medium">{kw.keyword}</span>
+                        {kw.is_ignore && (
+                          <Badge variant="destructive" className="text-xs">Ignorieren</Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -417,6 +430,25 @@ export function BankImportKeywords() {
                 </p>
               </div>
 
+              <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+                <div className="space-y-0.5">
+                  <Label className="flex items-center gap-2">
+                    <Ban className="h-4 w-4 text-destructive" />
+                    Buchung komplett ignorieren
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Beim CSV-Import werden Treffer für dieses Schlagwort übersprungen –
+                    keine Bankbuchung und kein Beleg werden angelegt.
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.is_ignore}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_ignore: checked })}
+                />
+              </div>
+
+              {!formData.is_ignore && (
+              <>
               <div className="space-y-2">
                 <Label>Kategorie</Label>
                 <Select
@@ -502,6 +534,8 @@ export function BankImportKeywords() {
                   Bankgebühren, Versicherungen und Steuern haben meist 0% MwSt
                 </p>
               </div>
+              </>
+              )}
             </div>
 
             <DialogFooter>
