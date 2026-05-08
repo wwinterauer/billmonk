@@ -1,47 +1,22 @@
-## Ziel
-Alle Belege und davon abgeleitete Daten für deinen Account (`w.winterauer@gmail.com`) löschen, damit du mit einem leeren System startest. Lieferanten (Vendors) bleiben erhalten.
+## Erledigte Punkte in eigenen Bereich verschieben
 
-## Korrigierte Anzahl Belege
+In der Checklisten-Ansicht (`src/pages/Checklists.tsx`) werden derzeit alle Positionen in einer einzigen Liste angezeigt – egal ob erledigt oder offen.
 
-| Status | Anzahl |
-|---|---|
-| approved | 67 |
-| review | 61 |
-| **Gesamt** | **128** |
+### Änderung
+Innerhalb jeder Checkliste die Items in zwei Gruppen splitten:
 
-## Was gelöscht wird (nur dein User-Account)
+1. **Offen** (oben): alle Positionen mit `is_completed = false`, sortiert nach `sort_order`. Direkt sichtbar.
+2. **Erledigt** (unten): alle Positionen mit `is_completed = true`, gesammelt unter einem zusammenklappbaren Abschnitt mit Überschrift z. B. „Erledigt (12)". Standardmäßig **eingeklappt**, damit oben nur die noch zu erledigenden Punkte sichtbar bleiben. Per Klick aufklappbar.
 
-| Tabelle | Bemerkung |
-|---|---|
-| `receipts` | alle 128 Belege |
-| `receipt_split_lines` | 38 Split-Buchungen |
-| `field_corrections` | 101 KI-Korrektur-Einträge |
-| `vendor_learning` | 37 gelernte Vendor-Muster (basieren auf Korrekturen) |
-| `email_attachments` | 11 importierte Anhänge |
-| `bank_transactions.receipt_id` | auf NULL setzen, falls verknüpft (Transaktion selbst bleibt) |
-| Storage `receipts/{user_id}/*` | alle hochgeladenen Belegdateien |
-| `profiles.monthly_receipt_count` | auf 0 zurücksetzen (steht auf 268) |
+### Verhalten
+- Hakt der User eine offene Position ab → sie wandert automatisch in den „Erledigt"-Block.
+- Entfernt er den Haken im „Erledigt"-Block → die Position wandert wieder nach oben in „Offen".
+- Wenn keine erledigten Items existieren, wird der „Erledigt"-Abschnitt gar nicht angezeigt.
+- Wenn alle Items erledigt sind, zeigt der obere Bereich einen kleinen Hinweis „Alle Punkte erledigt".
+- Funktioniert für alle Checklisten gleich (auch z. B. „Ausgaben Rechnungen").
 
-## Was NICHT gelöscht wird
-
-- **Vendors / Lieferanten** (128) — bleiben vollständig erhalten
-- **Bank-Transaktionen** (128) — bleiben, nur evtl. Belegzuordnung wird entfernt
-- Kategorien, Tags, Firmen-/Bank-Einstellungen, Rechnungen, Kunden, CRM, E-Mail-Konten, Cloud-Backups
-- Andere User sind nicht betroffen — alles strikt auf `user_id = bb51fc98-...` gefiltert
-
-## Reihenfolge
-
-```text
-1. Storage:  receipts/{user_id}/* löschen
-2. DB (in Reihenfolge wegen Abhängigkeiten):
-   a) UPDATE bank_transactions SET receipt_id=NULL WHERE user_id=...
-   b) DELETE receipt_split_lines (über JOIN auf receipts.user_id)
-   c) DELETE field_corrections   WHERE user_id=...
-   d) DELETE vendor_learning     WHERE user_id=...
-   e) DELETE email_attachments   WHERE user_id=...
-   f) DELETE receipts            WHERE user_id=...
-   g) UPDATE profiles SET monthly_receipt_count=0 WHERE id=...
-```
-
-## Hinweis
-Die Aktion ist **nicht rückgängig** zu machen (außer per History-Revert vor der Ausführung). Bestätige den Plan, dann führe ich die Löschungen aus.
+### Technische Details
+- Rein clientseitig: Items in `checklist.items` per `filter` in `openItems` / `completedItems` aufteilen.
+- Collapsible-Bereich mit lokalem `useState<Record<checklistId, boolean>>` für Aufklappstatus (oder einfach `useState` pro Card via Sub-Component).
+- Keine Datenbank-Änderungen, keine Änderungen an Mutationen oder Sortierung in der DB.
+- Bestehende Item-Render-Logik (Checkbox, Notes, Links, Dropdown-Menü) wird in beiden Gruppen identisch wiederverwendet – idealerweise in eine kleine interne Render-Funktion ausgelagert, um Duplikation zu vermeiden.
