@@ -1,37 +1,32 @@
-## Ziel
+## Problem
 
-In den Bank-Import-Schlagwörtern (Settings → "Buchungen ohne Rechnung") soll pro Schlagwort
-1. eine **Steuerart (tax_type)** und
-2. ein **Lieferant (vendor)**
+In "Alle Ausgaben" zeigen aus dem CSV automatisch erstellte Ausgaben den Schlagwort-Text als Lieferanten (z.B. "Rahmenbereitstellung", "Kest", "Generali") statt des hinterlegten Lieferanten (z.B. "Raiffeisen", "Generali").
 
-hinterlegt werden können – inkl. der Möglichkeit, direkt im Dialog einen neuen Lieferanten anzulegen. Beim automatischen "Keine Rechnung"-Beleg im Bank-Import werden beide Werte übernommen.
+Ursache: Diese Receipts wurden erstellt **bevor** den Schlagwörtern Lieferanten zugeordnet wurden. Sie haben `vendor_id = NULL` und `vendor = <keyword>`. Die Auto-Erstellungs-Logik in `BankImport.tsx` ist bereits korrekt — sie greift nur für neue Imports.
 
-## Änderungen
+## Lösung
 
-### 1. Datenbank (Migration)
-`bank_import_keywords` erweitern:
-- `tax_type text` (nullable)
-- `vendor_id uuid` (nullable, kein FK – konsistent mit anderen Vendor-Referenzen über UUID)
+### 1. Backfill via Migration
+Bestehende Receipts aktualisieren, die per Bank-Import erstellt wurden und ein verknüpftes Keyword mit `vendor_id` haben:
 
-Bestehende Daten bleiben unverändert (NULL = keine Voreinstellung).
+```sql
+UPDATE public.receipts r
+SET vendor_id = k.vendor_id,
+    vendor = v.display_name,
+    tax_type = COALESCE(r.tax_type, k.tax_type)
+FROM public.bank_import_keywords k
+JOIN public.vendors v ON v.id = k.vendor_id
+WHERE r.bank_import_keyword_id = k.id
+  AND r.user_id = k.user_id
+  AND k.vendor_id IS NOT NULL
+  AND (r.vendor_id IS NULL OR r.vendor_id <> k.vendor_id);
+```
 
-### 2. Settings UI – `src/components/settings/BankImportKeywords.tsx`
-- `BankKeyword`-Interface um `tax_type: string | null` und `vendor_id: string | null` ergänzen.
-- `formData` um `tax_type` und `vendor_id` erweitern; in `resetForm` und `handleEdit` mitführen.
-- Im Hinzufügen/Bearbeiten-Dialog **zwei neue Felder** ergänzen:
-  - **Steuerart**: Select mit Optionen aus `useCategories().taxCategories`. Erste Option "Keine Voreinstellung" → speichert NULL.
-  - **Lieferant**: `VendorAutocomplete` (`src/components/receipts/VendorAutocomplete.tsx`) verwenden. Auswahl eines bestehenden Lieferanten setzt `vendor_id` + Vendor-Name. Das Komponenten-eigene Inline-Anlegen erlaubt Neuanlage im selben Dialog.
-- In der Tabelle zwei zusätzliche Spalten **Lieferant** und **Steuerart** rendern (Badge / Text, "—" wenn leer).
-- `saveMutation`: `tax_type` und `vendor_id` mitschreiben (`|| null`).
-- `createDefaultsMutation`: keine Vorbelegung von `tax_type`/`vendor_id`.
+Nur Receipts mit `bank_import_keyword_id` werden angefasst — keine manuell erfassten Belege.
 
-### 3. Bank-Import – `src/pages/BankImport.tsx`
-Beim Anlegen des automatischen Receipts (aktuell ~Zeile 329):
-- `tax_type: matchedKeyword.tax_type ?? null`
-- `vendor_id: matchedKeyword.vendor_id ?? null`
-- Falls `vendor_id` gesetzt ist: `vendor` mit dem Vendor-Namen aus der `vendors`-Tabelle vorbelegen (einmal pro Import laden, in einer Map cachen), sonst wie bisher `matchedKeyword.keyword`.
+### 2. Going-forward-Verhalten
+`BankImport.tsx` (Zeilen 254–263, 344–350) schreibt bereits `vendor_id`, `vendor` (aus `vendorNameMap`) und `tax_type`. Keine Codeänderung nötig.
 
-## Hinweise
-- Keine Änderungen an `useBankImport.ts` (CSV-Parsing) nötig.
-- Keine Änderung an Default-Schlagwörtern (Trigger `create_default_bank_keywords`).
-- Nach der Migration aktualisiert sich `src/integrations/supabase/types.ts` automatisch; danach Code-Änderungen.
+## Nicht im Scope
+- Änderung der Default-Keywords-Trigger
+- Änderung an `useBankImport.ts` oder UI-Komponenten
