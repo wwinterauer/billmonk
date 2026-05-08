@@ -302,8 +302,10 @@ export type Database = {
           is_active: boolean | null
           keyword: string
           tax_rate: number | null
+          tax_type: string | null
           updated_at: string | null
           user_id: string
+          vendor_id: string | null
         }
         Insert: {
           category?: string | null
@@ -313,8 +315,10 @@ export type Database = {
           is_active?: boolean | null
           keyword: string
           tax_rate?: number | null
+          tax_type?: string | null
           updated_at?: string | null
           user_id: string
+          vendor_id?: string | null
         }
         Update: {
           category?: string | null
@@ -324,8 +328,10 @@ export type Database = {
           is_active?: boolean | null
           keyword?: string
           tax_rate?: number | null
+          tax_type?: string | null
           updated_at?: string | null
           user_id?: string
+          vendor_id?: string | null
         }
         Relationships: []
       }

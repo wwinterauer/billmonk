@@ -37,11 +37,13 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Plus, 
-  Pencil, 
-  Trash2, 
-  Tag, 
+import { useCategories } from '@/hooks/useCategories';
+import { VendorAutocomplete } from '@/components/receipts/VendorAutocomplete';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Tag,
   FileX,
   Loader2,
   Info,
@@ -54,6 +56,8 @@ interface BankKeyword {
   category: string | null;
   description_template: string | null;
   tax_rate: number;
+  tax_type: string | null;
+  vendor_id: string | null;
   is_active: boolean;
 }
 
@@ -68,10 +72,13 @@ const CATEGORIES = [
   'Sonstige Ausgaben',
 ];
 
+const NONE_VALUE = '__none__';
+
 export function BankImportKeywords() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+  const { taxCategories } = useCategories();
+
   const [showDialog, setShowDialog] = useState(false);
   const [editingKeyword, setEditingKeyword] = useState<BankKeyword | null>(null);
   const [formData, setFormData] = useState({
@@ -79,6 +86,20 @@ export function BankImportKeywords() {
     category: '',
     description_template: '',
     tax_rate: '0',
+    tax_type: '',
+    vendor_id: '' as string | '',
+    vendor_name: '',
+  });
+
+  // Vendor-Namen für Tabelle laden
+  const { data: vendorMap } = useQuery({
+    queryKey: ['vendors-name-map'],
+    queryFn: async () => {
+      const { data } = await supabase.from('vendors').select('id, display_name');
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((v: any) => { map[v.id] = v.display_name; });
+      return map;
+    },
   });
 
   // Keywords laden
@@ -89,7 +110,7 @@ export function BankImportKeywords() {
         .from('bank_import_keywords')
         .select('*')
         .order('keyword', { ascending: true });
-      
+
       if (error) throw error;
       return data as BankKeyword[];
     },
@@ -101,35 +122,31 @@ export function BankImportKeywords() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Nicht angemeldet');
 
+      const payload = {
+        keyword: data.keyword,
+        category: data.category || null,
+        description_template: data.description_template || null,
+        tax_rate: parseFloat(data.tax_rate) || 0,
+        tax_type: data.tax_type || null,
+        vendor_id: data.vendor_id || null,
+      };
+
       if (editingKeyword) {
         const { error } = await supabase
           .from('bank_import_keywords')
-          .update({
-            keyword: data.keyword,
-            category: data.category || null,
-            description_template: data.description_template || null,
-            tax_rate: parseFloat(data.tax_rate) || 0,
-            updated_at: new Date().toISOString(),
-          })
+          .update({ ...payload, updated_at: new Date().toISOString() })
           .eq('id', editingKeyword.id);
-        
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('bank_import_keywords')
-          .insert({
-            user_id: user.id,
-            keyword: data.keyword,
-            category: data.category || null,
-            description_template: data.description_template || null,
-            tax_rate: parseFloat(data.tax_rate) || 0,
-          });
-        
+          .insert({ user_id: user.id, ...payload });
         if (error) throw error;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-import-keywords'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors-name-map'] });
       setShowDialog(false);
       resetForm();
       toast({
@@ -137,22 +154,13 @@ export function BankImportKeywords() {
       });
     },
     onError: (error: Error) => {
-      toast({
-        title: 'Fehler',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
     },
   });
 
-  // Keyword löschen
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('bank_import_keywords')
-        .delete()
-        .eq('id', id);
-      
+      const { error } = await supabase.from('bank_import_keywords').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -161,14 +169,12 @@ export function BankImportKeywords() {
     },
   });
 
-  // Aktiv/Inaktiv togglen
   const toggleMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
       const { error } = await supabase
         .from('bank_import_keywords')
         .update({ is_active })
         .eq('id', id);
-      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -176,7 +182,6 @@ export function BankImportKeywords() {
     },
   });
 
-  // Standard-Keywords erstellen
   const createDefaultsMutation = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -198,10 +203,7 @@ export function BankImportKeywords() {
       for (const kw of defaults) {
         await supabase
           .from('bank_import_keywords')
-          .upsert({
-            user_id: user.id,
-            ...kw,
-          }, { onConflict: 'user_id,keyword' });
+          .upsert({ user_id: user.id, ...kw }, { onConflict: 'user_id,keyword' });
       }
     },
     onSuccess: () => {
@@ -216,6 +218,9 @@ export function BankImportKeywords() {
       category: '',
       description_template: '',
       tax_rate: '0',
+      tax_type: '',
+      vendor_id: '',
+      vendor_name: '',
     });
     setEditingKeyword(null);
   };
@@ -227,16 +232,16 @@ export function BankImportKeywords() {
       category: keyword.category || '',
       description_template: keyword.description_template || '',
       tax_rate: keyword.tax_rate.toString(),
+      tax_type: keyword.tax_type || '',
+      vendor_id: keyword.vendor_id || '',
+      vendor_name: (keyword.vendor_id && vendorMap?.[keyword.vendor_id]) || '',
     });
     setShowDialog(true);
   };
 
   const handleSubmit = () => {
     if (!formData.keyword.trim()) {
-      toast({
-        title: 'Schlagwort erforderlich',
-        variant: 'destructive',
-      });
+      toast({ title: 'Schlagwort erforderlich', variant: 'destructive' });
       return;
     }
     saveMutation.mutate(formData);
@@ -250,31 +255,29 @@ export function BankImportKeywords() {
           Buchungen ohne Rechnung
         </CardTitle>
         <CardDescription>
-          Definiere Schlagwörter für Bankbuchungen die automatisch als Ausgaben erfasst werden sollen, 
+          Definiere Schlagwörter für Bankbuchungen die automatisch als Ausgaben erfasst werden sollen,
           auch wenn keine Rechnung vorhanden ist (z.B. Bankgebühren, Versicherungen, Steuern).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Hinweis */}
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription>
-            <strong>So funktioniert's:</strong> Beim Bank-Import wird der Verwendungszweck nach diesen 
-            Schlagwörtern durchsucht. Treffer werden automatisch als Ausgabe erfasst mit dem Vermerk 
+            <strong>So funktioniert's:</strong> Beim Bank-Import wird der Verwendungszweck nach diesen
+            Schlagwörtern durchsucht. Treffer werden automatisch als Ausgabe erfasst mit dem Vermerk
             "Keine Rechnung vorhanden".
           </AlertDescription>
         </Alert>
 
-        {/* Buttons */}
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => { resetForm(); setShowDialog(true); }}>
             <Plus className="h-4 w-4 mr-2" />
             Schlagwort hinzufügen
           </Button>
-          
+
           {(!keywords || keywords.length === 0) && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => createDefaultsMutation.mutate()}
               disabled={createDefaultsMutation.isPending}
             >
@@ -288,18 +291,19 @@ export function BankImportKeywords() {
           )}
         </div>
 
-        {/* Tabelle */}
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : keywords && keywords.length > 0 ? (
-          <div className="border rounded-lg">
+          <div className="border rounded-lg overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Schlagwort</TableHead>
                   <TableHead>Kategorie</TableHead>
+                  <TableHead>Lieferant</TableHead>
+                  <TableHead>Steuerart</TableHead>
                   <TableHead>Beschreibung</TableHead>
                   <TableHead className="text-right">MwSt</TableHead>
                   <TableHead className="text-center">Aktiv</TableHead>
@@ -316,9 +320,13 @@ export function BankImportKeywords() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {kw.category && (
-                        <Badge variant="secondary">{kw.category}</Badge>
-                      )}
+                      {kw.category && <Badge variant="secondary">{kw.category}</Badge>}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {kw.vendor_id ? (vendorMap?.[kw.vendor_id] ?? '…') : '—'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {kw.tax_type || '—'}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {kw.description_template || '-'}
@@ -334,11 +342,7 @@ export function BankImportKeywords() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(kw)}
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(kw)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
@@ -368,9 +372,8 @@ export function BankImportKeywords() {
           </div>
         )}
 
-        {/* Dialog für Hinzufügen/Bearbeiten */}
         <Dialog open={showDialog} onOpenChange={(open) => { if (!open) resetForm(); setShowDialog(open); }}>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingKeyword ? 'Schlagwort bearbeiten' : 'Neues Schlagwort'}
@@ -406,6 +409,42 @@ export function BankImportKeywords() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <VendorAutocomplete
+                value={formData.vendor_name}
+                vendorId={formData.vendor_id || null}
+                onChange={(value, vendorId) =>
+                  setFormData({ ...formData, vendor_name: value, vendor_id: vendorId || '' })
+                }
+                onVendorSelect={(vendor) =>
+                  setFormData({ ...formData, vendor_name: vendor.display_name, vendor_id: vendor.id })
+                }
+                label="Lieferant (optional)"
+                placeholder="Bestehenden Lieferant wählen oder neu anlegen…"
+              />
+
+              <div className="space-y-2">
+                <Label>Steuerart (optional)</Label>
+                <Select
+                  value={formData.tax_type || NONE_VALUE}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, tax_type: value === NONE_VALUE ? '' : value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Keine Voreinstellung" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_VALUE}>Keine Voreinstellung</SelectItem>
+                    {taxCategories.map((c) => (
+                      <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Wird beim automatisch erstellten Beleg als Steuer-Buchungsart gesetzt.
+                </p>
               </div>
 
               <div className="space-y-2">
