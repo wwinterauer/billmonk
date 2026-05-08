@@ -293,6 +293,15 @@ export default function BankImport() {
         const tx = transactionsToImport[i];
         setImportProgress({ current: i + 1, total });
         
+        // Skip transactions matching an "ignore" keyword
+        const isIgnored = ignoreKeywords.some((kw: any) =>
+          tx.description.toLowerCase().includes(kw.keyword.toLowerCase())
+        );
+        if (isIgnored) {
+          skippedIgnored++;
+          continue;
+        }
+
         // Check for duplicate if enabled
         if (skipDuplicates) {
           const { count } = await supabase
@@ -334,8 +343,8 @@ export default function BankImport() {
         imported++;
         
         // Check for keyword match and create no-receipt entry if enabled
-        if (createNoReceiptEntries && tx.isExpense && keywords && keywords.length > 0) {
-          const matchedKeyword = keywords.find(kw => 
+        if (createNoReceiptEntries && tx.isExpense && matchKeywords.length > 0) {
+          const matchedKeyword = matchKeywords.find((kw: any) => 
             tx.description.toLowerCase().includes(kw.keyword.toLowerCase())
           );
           
