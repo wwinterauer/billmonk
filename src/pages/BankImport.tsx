@@ -389,7 +389,7 @@ export default function BankImport() {
         .from('bank_imports')
         .update({
           imported_rows: imported,
-          skipped_rows: skippedDuplicates + skippedIncome,
+          skipped_rows: skippedDuplicates + skippedIncome + skippedIgnored,
         })
         .eq('id', importBatch.id);
       
