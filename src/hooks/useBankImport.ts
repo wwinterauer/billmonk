@@ -499,13 +499,13 @@ export async function parseCsvFile(file: File, bankType: string): Promise<ParseR
       headers = rows[dataStartIndex] || [];
     }
 
-    // Find column indices
-    const dateColIndex = findColumn(headers, config.dateColumn);
-    let amountColIndex = findColumn(headers, config.amountColumn);
-    const descriptionColIndex = findColumn(headers, config.descriptionColumn);
-    const valueDateColIndex = config.valueDateColumn
-      ? findColumn(headers, config.valueDateColumn)
-      : -1;
+    // Find column indices (prefer inferred positions for headerless files)
+    const dateColIndex = inferredCols ? inferredCols.date : findColumn(headers, config.dateColumn);
+    let amountColIndex = inferredCols ? inferredCols.amount : findColumn(headers, config.amountColumn);
+    const descriptionColIndex = inferredCols ? inferredCols.description : findColumn(headers, config.descriptionColumn);
+    const valueDateColIndex = inferredCols
+      ? inferredCols.valueDate
+      : (config.valueDateColumn ? findColumn(headers, config.valueDateColumn) : -1);
 
     // Soll/Haben fallback (debit + credit columns)
     let debitColIndex = -1;
