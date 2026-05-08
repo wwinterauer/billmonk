@@ -122,13 +122,36 @@ export function BankImportKeywords() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Nicht angemeldet');
 
+      // Lieferant ggf. neu anlegen, wenn Name eingegeben aber keine vendor_id ausgewählt
+      let vendorId: string | null = data.vendor_id || null;
+      const vendorName = data.vendor_name.trim();
+      if (!vendorId && vendorName) {
+        const { data: existing } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('user_id', user.id)
+          .ilike('display_name', vendorName)
+          .maybeSingle();
+        if (existing?.id) {
+          vendorId = existing.id;
+        } else {
+          const { data: newVendor, error: vErr } = await supabase
+            .from('vendors')
+            .insert({ user_id: user.id, display_name: vendorName })
+            .select('id')
+            .single();
+          if (vErr) throw vErr;
+          vendorId = newVendor.id;
+        }
+      }
+
       const payload = {
         keyword: data.keyword,
         category: data.category || null,
         description_template: data.description_template || null,
         tax_rate: parseFloat(data.tax_rate) || 0,
         tax_type: data.tax_type || null,
-        vendor_id: data.vendor_id || null,
+        vendor_id: vendorId,
       };
 
       if (editingKeyword) {
