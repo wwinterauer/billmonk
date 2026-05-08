@@ -91,6 +91,7 @@ export function BankImportKeywords() {
     tax_type: '',
     vendor_id: '' as string | '',
     vendor_name: '',
+    is_ignore: false,
   });
 
   // Vendor-Namen für Tabelle laden
