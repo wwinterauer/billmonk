@@ -77,7 +77,6 @@ const Login = () => {
         title="Login — BillMonk"
         description="Melde dich bei BillMonk an und verwalte deine Einnahmen und Ausgaben."
         canonical="/login"
-        noindex
       />
       <div className="w-full max-w-md">
         <Card className="border-border/50 shadow-xl">

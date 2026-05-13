@@ -14,7 +14,6 @@ const NotFound = () => {
       <PageMeta
         title="Seite nicht gefunden — BillMonk"
         description="Diese Seite existiert nicht oder wurde verschoben."
-        noindex
       />
       <div className="text-center">
         <h1 className="mb-4 text-4xl font-bold">404</h1>
