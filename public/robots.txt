@@ -21,5 +21,6 @@ Disallow: /order-confirmations
 Disallow: /share-receive
 Disallow: /reset-password
 Disallow: /forgot-password
+Disallow: /newsletter-status
 
 Sitemap: https://billmonk.lovable.app/sitemap.xml
