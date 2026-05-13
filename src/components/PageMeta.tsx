@@ -9,7 +9,7 @@ interface PageMetaProps {
   noindex?: boolean;
 }
 
-const BASE_URL = 'https://billmonk.lovable.app';
+const BASE_URL = 'https://billmonk.ai';
 const DEFAULT_OG_IMAGE = `${BASE_URL}/og-image.jpg`;
 
 export function PageMeta({ title, description, canonical, ogType = 'website', ogImage, noindex = false }: PageMetaProps) {
