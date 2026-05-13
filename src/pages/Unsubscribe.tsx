@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, XCircle, Loader2, MailX } from "lucide-react";
+import { PageMeta } from "@/components/PageMeta";
 
 const Unsubscribe = () => {
   const [searchParams] = useSearchParams();
@@ -65,6 +66,12 @@ const Unsubscribe = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <PageMeta
+        title="E-Mail-Benachrichtigungen abbestellen — BillMonk"
+        description="Bestätige hier, dass du keine E-Mail-Benachrichtigungen mehr von BillMonk erhalten möchtest."
+        canonical="/unsubscribe"
+        noindex
+      />
       <Card className="max-w-md w-full">
         <CardContent className="pt-6 text-center space-y-4">
           {status === "loading" && (
