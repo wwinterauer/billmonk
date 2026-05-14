@@ -1,0 +1,18 @@
+# BillMonk
+
+> KI-gestützte Einnahmen-Ausgaben-Verwaltung für Selbstständige und KMU im DACH-Raum. Belege erfassen, Rechnungen erstellen, Bankabgleich — vorbereitet für den Steuerberater. Made in Austria.
+
+BillMonk automatisiert die Belegerfassung per Foto, E-Mail-Import oder Bank-Sync, kategorisiert mit KI nach österreichischem/deutschem Steuerrecht und erstellt rechtskonforme Ausgangsrechnungen inklusive EPC-QR-Code. Für Steuerberater steht eine eigene Kanzlei-Plattform zur Verfügung.
+
+## Pages
+
+- [Startseite](/): Produktübersicht und Hauptfunktionen.
+- [Preise](/pricing): Starter, Pro und Business — Tarife im Vergleich.
+- [Beta-Programm](/beta): Zugang zum Beta-Programm beantragen.
+- [Registrieren](/register): Neues Konto anlegen.
+- [Anmelden](/login): In bestehendes Konto einloggen.
+- [Datenschutz](/datenschutz): Datenschutzerklärung.
+
+## Optional
+
+- [Newsletter abmelden](/unsubscribe): E-Mail-Benachrichtigungen abbestellen.
