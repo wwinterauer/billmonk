@@ -810,21 +810,30 @@ export function ReceiptDetailPanel({
       // Track corrections for AI learning (only if vendor is assigned)
       if (selectedVendorId) {
         const corrections: CorrectionData[] = [];
-        
+        // Fields where a first-time fill (no AI-detected value) should NOT count as a correction:
+        // - vendor: identifies the learning record itself
+        // - description: would just "learn" the description text without value
+        const SKIP_EMPTY_ORIGINAL_FIELDS = new Set(['vendor', 'description']);
+
         for (const field of LEARNABLE_FIELDS) {
           const fieldId = field.id;
           const originalValue = originalReceipt[fieldId as keyof Receipt];
           const newValue = currentValues[fieldId];
-          
+
           // Normalize values for comparison
           const normalizedOriginal = originalValue === undefined ? null : originalValue;
           const normalizedNew = newValue === undefined ? null : newValue;
-          
-          // Skip first-time fills (no AI value extracted) - not a correction
+
           const originalIsEmpty = normalizedOriginal === null || normalizedOriginal === '';
-          if (originalIsEmpty) continue;
-          
-          if (String(normalizedOriginal) !== String(normalizedNew ?? '')) {
+          const newIsEmpty = normalizedNew === null || normalizedNew === '';
+
+          // Skip if both empty
+          if (originalIsEmpty && newIsEmpty) continue;
+
+          // For vendor/description: skip first-time fills (not a real correction)
+          if (originalIsEmpty && SKIP_EMPTY_ORIGINAL_FIELDS.has(fieldId)) continue;
+
+          if (String(normalizedOriginal ?? '') !== String(normalizedNew ?? '')) {
             corrections.push({
               fieldName: fieldId,
               detectedValue: normalizedOriginal,
@@ -834,7 +843,7 @@ export function ReceiptDetailPanel({
             });
           }
         }
-        
+
         if (corrections.length > 0) {
           // Track corrections for AI learning
           trackCorrections(corrections);
@@ -842,6 +851,10 @@ export function ReceiptDetailPanel({
           // No corrections = AI was correct, track successful prediction
           trackSuccessfulPrediction(receipt.id, selectedVendorId);
         }
+
+        // Also feed field_defaults_stats so the "after 3 confirmations" suggestion fires
+        if (category) trackFieldChange(selectedVendorId, 'category', category);
+        if (taxType) trackFieldChange(selectedVendorId, 'tax_type', taxType);
       }
 
       // Reset AI changes state
