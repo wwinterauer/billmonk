@@ -165,11 +165,11 @@ export function CategoryManagement() {
   const { user } = useAuth();
   
   const [categories, setCategories] = useState<Category[]>([]);
+  const [taxTypeCounts, setTaxTypeCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showTaxCodes, setShowTaxCodes] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<string>('AT');
-  const [togglingTax, setTogglingTax] = useState(false);
   
   // Modal states
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -220,17 +220,23 @@ export function CategoryManagement() {
 
       const { data: countData, error: countError } = await supabase
         .from('receipts')
-        .select('category')
+        .select('category, tax_type')
         .eq('user_id', user.id);
 
       if (countError) throw countError;
 
       const counts: Record<string, number> = {};
+      const taxCounts: Record<string, number> = {};
       countData?.forEach(r => {
         if (r.category) {
           counts[r.category] = (counts[r.category] || 0) + 1;
         }
+        if ((r as any).tax_type) {
+          const t = (r as any).tax_type as string;
+          taxCounts[t] = (taxCounts[t] || 0) + 1;
+        }
       });
+      setTaxTypeCounts(taxCounts);
 
       const categoriesWithCounts = (catData || [])
         .filter(cat => {
@@ -264,43 +270,7 @@ export function CategoryManagement() {
     fetchCategories();
   }, [user, selectedCountry]);
 
-  // Toggle tax categories for selected country
-  const handleToggleTaxCategories = async (show: boolean) => {
-    setTogglingTax(true);
-    try {
-      // Get all tax categories for the selected country
-      const taxCats = categories.filter(c => c.country === selectedCountry && c.is_system);
-      
-      if (taxCats.length === 0) {
-        toast({ title: `Keine Steuer-Kategorien für ${COUNTRY_LABELS[selectedCountry]} gefunden` });
-        return;
-      }
-
-      const ids = taxCats.map(c => c.id);
-      const { error } = await supabase
-        .from('categories')
-        .update({ is_hidden: !show })
-        .in('id', ids);
-
-      if (error) throw error;
-
-      toast({
-        title: show
-          ? `${COUNTRY_FLAGS[selectedCountry]} ${taxCats.length} Steuer-Kategorien eingeblendet`
-          : `${COUNTRY_FLAGS[selectedCountry]} ${taxCats.length} Steuer-Kategorien ausgeblendet`,
-      });
-      
-      await fetchCategories();
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
-      });
-    } finally {
-      setTogglingTax(false);
-    }
-  };
+  // Tax-Buchungsarten kommen aus taxCategoryInfo.ts (statisch). Kein DB-Toggle mehr.
 
   const handleNewCategory = () => {
     setIsNewCategory(true);
@@ -496,14 +466,34 @@ export function CategoryManagement() {
     );
   };
 
-  // Count how many tax categories for selected country are currently visible
-  const taxCatsForCountry = categories.filter(c => c.country === selectedCountry && c.is_system);
-  const visibleTaxCats = taxCatsForCountry.filter(c => !c.is_hidden);
-  const allTaxVisible = taxCatsForCountry.length > 0 && visibleTaxCats.length === taxCatsForCountry.length;
+  // (Buchungsarten-Toggle entfernt: Buchungsarten sind jetzt statisch aus taxCategoryInfo.ts)
 
   // Split into two groups
   const userCategories = useMemo(() => categories.filter(c => !c.is_system || !c.country), [categories]);
-  const taxCategories = useMemo(() => categories.filter(c => c.is_system && !!c.country), [categories]);
+
+  // Buchungsarten kommen aus taxCategoryInfo.ts (statisches DACH-Set), nicht aus DB.
+  // Gefiltert nach userland; rein informativ (Anzeige + Info-Dialog).
+  const taxCategories = useMemo<Category[]>(() => {
+    return Object.keys(TAX_CATEGORY_INFO)
+      .filter(name => {
+        const m = name.match(/\(([A-Z]{2})\)\s*$/);
+        return m ? m[1] === selectedCountry : false;
+      })
+      .map((name, idx) => ({
+        id: `tax:${name}`,
+        user_id: null,
+        name,
+        icon: 'FileText',
+        color: '#64748B',
+        is_system: true,
+        is_hidden: false,
+        sort_order: idx,
+        created_at: '',
+        country: selectedCountry,
+        tax_code: null,
+        receipt_count: taxTypeCounts[name] || 0,
+      }));
+  }, [selectedCountry, taxTypeCounts]);
 
   const renderCategoryRow = (category: Category, showTaxCodeCol: boolean) => (
     <TableRow 
@@ -564,7 +554,11 @@ export function CategoryManagement() {
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
-          {category.name === 'Keine Rechnung' ? (
+          {category.id.startsWith('tax:') ? (
+            <Badge variant="outline" className="text-xs text-muted-foreground">
+              System
+            </Badge>
+          ) : category.name === 'Keine Rechnung' ? (
             <Badge variant="outline" className="text-xs text-muted-foreground">
               Geschützt
             </Badge>
@@ -674,26 +668,6 @@ export function CategoryManagement() {
               <span className="text-muted-foreground text-xs">(aus deinem Profil)</span>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleToggleTaxCategories(!allTaxVisible)}
-              disabled={togglingTax}
-            >
-              {togglingTax && <Loader2 className="h-3 w-3 mr-2 animate-spin" />}
-              {allTaxVisible ? (
-                <>
-                  <EyeOff className="h-3.5 w-3.5 mr-1.5" />
-                  Steuer-Kategorien ausblenden
-                </>
-              ) : (
-                <>
-                  <Eye className="h-3.5 w-3.5 mr-1.5" />
-                  Steuer-Kategorien einblenden
-                </>
-              )}
-            </Button>
-
             <div className="flex items-center gap-2 ml-auto">
               <Label htmlFor="show-tax-codes" className="text-xs text-muted-foreground cursor-pointer">
                 Steuernummern anzeigen
@@ -707,7 +681,7 @@ export function CategoryManagement() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            {visibleTaxCats.length} von {taxCatsForCountry.length} {COUNTRY_LABELS[selectedCountry]}-Kategorien aktiv
+            {taxCategories.length} Buchungsarten für {COUNTRY_LABELS[selectedCountry]}. Werden automatisch von der KI erkannt und sind systemweit fix.
           </p>
         </div>
 
