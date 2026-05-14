@@ -540,7 +540,7 @@ export function CategoryManagement() {
         sort_order: idx,
         created_at: '',
         country: selectedCountry,
-        tax_code: null,
+        tax_code: TAX_CODES[name] || null,
         receipt_count: taxTypeCounts[name] || 0,
       }));
   }, [selectedCountry, taxTypeCounts]);
