@@ -474,7 +474,6 @@ export function CategoryManagement() {
   // Buchungsarten kommen aus taxCategoryInfo.ts (statisches DACH-Set), nicht aus DB.
   // Gefiltert nach userland; rein informativ (Anzeige + Info-Dialog).
   const taxCategories = useMemo<Category[]>(() => {
-    const counts: Record<string, number> = {};
     return Object.keys(TAX_CATEGORY_INFO)
       .filter(name => {
         const m = name.match(/\(([A-Z]{2})\)\s*$/);
@@ -492,9 +491,9 @@ export function CategoryManagement() {
         created_at: '',
         country: selectedCountry,
         tax_code: null,
-        receipt_count: counts[name] || 0,
+        receipt_count: taxTypeCounts[name] || 0,
       }));
-  }, [selectedCountry]);
+  }, [selectedCountry, taxTypeCounts]);
 
   const renderCategoryRow = (category: Category, showTaxCodeCol: boolean) => (
     <TableRow 
