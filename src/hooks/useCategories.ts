@@ -20,6 +20,7 @@ export interface Category {
 export function useCategories(options?: { includeHidden?: boolean }) {
   const { user } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [userCountry, setUserCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const includeHidden = options?.includeHidden ?? false;
