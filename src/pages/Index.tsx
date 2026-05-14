@@ -25,7 +25,7 @@ const structuredData = {
       "applicationCategory": "FinanceApplication",
       "operatingSystem": "Web",
       "description": "KI-gestützte Einnahmen-Ausgaben-Verwaltung für Kleinunternehmer, Freelancer und Vermieter. Belege erfassen, Rechnungen erstellen, Bankabgleich.",
-      "url": "https://billmonk.lovable.app",
+      "url": "https://billmonk.ai",
       "offers": {
         "@type": "AggregateOffer",
         "priceCurrency": "EUR",
@@ -36,7 +36,7 @@ const structuredData = {
       "author": {
         "@type": "Organization",
         "name": "BillMonk",
-        "url": "https://billmonk.lovable.app",
+        "url": "https://billmonk.ai",
         "email": "w.winterauer@billmonk.ai",
         "address": {
           "@type": "PostalAddress",
@@ -48,8 +48,8 @@ const structuredData = {
     {
       "@type": "Organization",
       "name": "BillMonk",
-      "url": "https://billmonk.lovable.app",
-      "logo": "https://billmonk.lovable.app/icons/icon-512x512.png",
+      "url": "https://billmonk.ai",
+      "logo": "https://billmonk.ai/icons/icon-512x512.png",
       "sameAs": [],
       "contactPoint": {
         "@type": "ContactPoint",

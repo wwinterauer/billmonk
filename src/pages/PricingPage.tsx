@@ -21,7 +21,7 @@ const pricingStructuredData = {
       "price": "2.99",
       "priceCurrency": "EUR",
       "priceSpecification": { "@type": "UnitPriceSpecification", "billingDuration": "P1M" },
-      "url": "https://billmonk.lovable.app/pricing"
+      "url": "https://billmonk.ai/pricing"
     },
     {
       "@type": "Offer",
@@ -29,7 +29,7 @@ const pricingStructuredData = {
       "price": "7.99",
       "priceCurrency": "EUR",
       "priceSpecification": { "@type": "UnitPriceSpecification", "billingDuration": "P1M" },
-      "url": "https://billmonk.lovable.app/pricing"
+      "url": "https://billmonk.ai/pricing"
     },
     {
       "@type": "Offer",
@@ -37,7 +37,7 @@ const pricingStructuredData = {
       "price": "15.99",
       "priceCurrency": "EUR",
       "priceSpecification": { "@type": "UnitPriceSpecification", "billingDuration": "P1M" },
-      "url": "https://billmonk.lovable.app/pricing"
+      "url": "https://billmonk.ai/pricing"
     }
   ]
 };
