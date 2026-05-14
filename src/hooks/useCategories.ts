@@ -28,6 +28,7 @@ export function useCategories(options?: { includeHidden?: boolean }) {
   const fetchCategories = async () => {
     if (!user) {
       setCategories([]);
+      setUserCountry(null);
       setLoading(false);
       return;
     }
@@ -47,13 +48,15 @@ export function useCategories(options?: { includeHidden?: boolean }) {
         query = query.eq('is_hidden', false);
       }
 
-      const { data, error: fetchError } = await query;
+      const [{ data, error: fetchError }, { data: profile }] = await Promise.all([
+        query,
+        supabase.from('profiles').select('country').eq('id', user.id).maybeSingle(),
+      ]);
 
       if (fetchError) {
         throw new Error(fetchError.message);
       }
 
-      // Map data with defaults for new columns
       const mappedData = (data || []).map(cat => ({
         ...cat,
         is_hidden: cat.is_hidden ?? false,
@@ -61,6 +64,7 @@ export function useCategories(options?: { includeHidden?: boolean }) {
       })) as Category[];
 
       setCategories(mappedData);
+      setUserCountry((profile?.country || 'AT').toUpperCase());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Laden der Kategorien');
     } finally {
