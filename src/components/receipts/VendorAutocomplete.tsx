@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { ChevronsUpDown, Search, Plus } from 'lucide-react';
+import { ChevronsUpDown, Search, Plus, Loader2 } from 'lucide-react';
+import { createVendorInternal } from '@/services/vendorMatchingService';
+import { toast } from 'sonner';
 
 interface VendorWithCategory {
   id: string;
