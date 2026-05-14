@@ -507,11 +507,11 @@ const Dashboard = () => {
 
             {/* Category Chart */}
             <Card className="border-border/50">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg">
+              <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2 space-y-0">
+                <CardTitle className="text-lg leading-tight">
                   {chartView === 'category' ? 'Nach Kategorie' : 'Nach Buchungsart'}
                 </CardTitle>
-                <div className="flex gap-1">
+                <div className="flex gap-1 shrink-0">
                   <Button
                     variant={chartView === 'category' ? 'default' : 'ghost'}
                     size="sm"
@@ -537,50 +537,66 @@ const Dashboard = () => {
                   </div>
                 ) : chartData.length === 0 ? (
                   <div className="h-48 flex items-center justify-center">
-                    <p className="text-sm text-muted-foreground">Keine Kategorien-Daten</p>
+                    <p className="text-sm text-muted-foreground">
+                      {chartView === 'taxType' ? 'Noch keine Buchungsarten zugewiesen' : 'Keine Kategorien-Daten'}
+                    </p>
                   </div>
                 ) : (
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={chartData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={70}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {chartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip
-                          formatter={(value: number, name: string) => [
-                            `${formatCurrency(value)} (${Math.round((value / totalCategorySum) * 100)}%)`,
-                            name
-                          ]}
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--background))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                          }}
-                        />
-                        <Legend 
-                          layout="vertical" 
-                          align="right" 
-                          verticalAlign="middle"
-                          formatter={(value, entry: any) => (
-                            <span className="text-xs text-foreground">{value}</span>
-                          )}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <div className="flex flex-col gap-3">
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={chartData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={45}
+                            outerRadius={75}
+                            paddingAngle={2}
+                            dataKey="value"
+                          >
+                            {chartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip
+                            formatter={(value: number, name: string) => [
+                              `${formatCurrency(value)} (${Math.round((value / totalCategorySum) * 100)}%)`,
+                              name
+                            ]}
+                            contentStyle={{
+                              backgroundColor: 'hsl(var(--background))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px',
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <ul className="grid grid-cols-2 gap-x-3 gap-y-1 max-h-32 overflow-y-auto pr-1">
+                      {chartData.map((entry) => {
+                        const pct = Math.round((entry.value / totalCategorySum) * 100);
+                        return (
+                          <li
+                            key={entry.name}
+                            title={`${entry.name} – ${formatCurrency(entry.value)} (${pct}%)`}
+                            className="flex items-center gap-2 text-xs min-w-0"
+                          >
+                            <span
+                              className="inline-block h-2.5 w-2.5 rounded-sm shrink-0"
+                              style={{ backgroundColor: entry.color }}
+                            />
+                            <span className="truncate text-foreground flex-1 min-w-0">{entry.name}</span>
+                            <span className="text-muted-foreground tabular-nums shrink-0">{pct}%</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
                   </div>
                 )}
               </CardContent>
             </Card>
+
 
             {/* Tag Statistics */}
             <Card className="border-border/50">
