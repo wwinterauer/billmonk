@@ -284,6 +284,7 @@ export function VendorManagement() {
           defaultCategoryId: formData.default_category_id || undefined,
           defaultTagId: formData.default_tag_id || undefined,
           defaultVatRate: formData.default_vat_rate ? parseFloat(formData.default_vat_rate) : undefined,
+          defaultTaxType: formData.default_tax_type || undefined,
           defaultPaymentMethod: formData.default_payment_method || undefined,
           website: formData.website.trim() || undefined,
           notes: formData.notes.trim() || undefined,
