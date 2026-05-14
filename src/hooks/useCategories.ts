@@ -154,10 +154,30 @@ export function useCategories(options?: { includeHidden?: boolean }) {
     [categories]
   );
 
-  const taxCategories = useMemo(
-    () => categories.filter(c => c.is_system && !!c.country),
-    [categories]
-  );
+  // Tax-Buchungsarten kommen aus taxCategoryInfo.ts (nicht mehr aus categories-Tabelle).
+  // Gefiltert nach Userland (AT/DE/CH). Synthese in Category-Form, damit alle Konsumenten
+  // (Dropdowns, CategoryManagement-Anzeige) ohne Anpassung weiterlaufen.
+  const taxCategories = useMemo(() => {
+    const country = userCountry || 'AT';
+    return Object.keys(TAX_CATEGORY_INFO)
+      .filter(name => {
+        const m = name.match(/\(([A-Z]{2})\)\s*$/);
+        return m ? m[1] === country : false;
+      })
+      .map<Category>((name, idx) => ({
+        id: `tax:${name}`,
+        user_id: null,
+        name,
+        icon: null,
+        color: null,
+        is_system: true,
+        is_hidden: false,
+        sort_order: idx,
+        created_at: '',
+        country,
+        tax_code: null,
+      }));
+  }, [userCountry]);
 
   return {
     categories,
