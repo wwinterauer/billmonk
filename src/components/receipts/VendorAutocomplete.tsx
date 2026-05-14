@@ -297,9 +297,14 @@ export function VendorAutocomplete({
                       variant="link"
                       size="sm"
                       className="mt-1"
-                      onClick={handleUseCustomValue}
+                      onClick={handleCreateNewVendor}
+                      disabled={isCreating || vendorSearch.trim().length < 2}
                     >
-                      "{vendorSearch}" verwenden
+                      {isCreating ? (
+                        <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Anlegen…</>
+                      ) : (
+                        <>"{vendorSearch}" als neuen Lieferanten anlegen</>
+                      )}
                     </Button>
                   </div>
                 ) : (
