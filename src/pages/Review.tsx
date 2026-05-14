@@ -1003,7 +1003,7 @@ const Review = () => {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Label htmlFor="vendor_brand">Lieferant (Markenname)</Label>
-                        {currentReceipt?.vendor_id && (
+                        {selectedVendorId && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
@@ -1011,7 +1011,7 @@ const Review = () => {
                                 variant="ghost"
                                 size="icon"
                                 className="h-5 w-5"
-                                onClick={() => window.open(`/settings?tab=vendors&vendorId=${currentReceipt.vendor_id}`, '_blank')}
+                                onClick={() => window.open(`/settings?tab=vendors&vendorId=${selectedVendorId}`, '_blank')}
                               >
                                 <ExternalLink className="h-3 w-3" />
                               </Button>
