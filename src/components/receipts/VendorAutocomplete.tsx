@@ -53,6 +53,7 @@ export function VendorAutocomplete({
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [allVendors, setAllVendors] = useState<VendorWithCategory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
