@@ -1514,18 +1514,14 @@ export function ReceiptDetailPanel({
                         vendorLearning={vendorLearning}
                         onReset={() => setTaxType(originalReceipt?.tax_type || '')}
                       >
-                        <Select value={taxType} onValueChange={setTaxType}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Offen" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {taxCategories.map(c => (
-                              <SelectItem key={c.id} value={c.name}>
-                                {c.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <SearchableSelect
+                          value={taxType}
+                          onChange={setTaxType}
+                          options={taxCategories.map(c => ({ value: c.name, label: c.name }))}
+                          placeholder="Offen"
+                          searchPlaceholder="Buchungsart suchen..."
+                          allowClear
+                        />
                       </LearnableField>
                     </div>
 
