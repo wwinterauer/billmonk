@@ -24,7 +24,6 @@ export function TagSelector({
   receiptId,
   receiptIds,
   onChange,
-  maxVisibleTags = 6,
   size = 'md',
   disabled = false,
 }: TagSelectorProps) {
