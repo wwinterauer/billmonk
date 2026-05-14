@@ -249,6 +249,13 @@ export function normalizeExtractionResult(
   const settings = descriptionSettings || DEFAULT_DESCRIPTION_SETTINGS;
   normalized.description = processDescription(normalized.description, settings);
 
+  // Defensive: tax_type must end with a country code in parens, e.g. "(AT)".
+  // Drops hallucinated values like "Betriebsausgabe", "Sonstiges", "Aufwand".
+  if (normalized.tax_type && !/\([A-Z]{2}\)\s*$/.test(normalized.tax_type)) {
+    console.warn('[normalize] Dropping invalid tax_type:', normalized.tax_type);
+    normalized.tax_type = null;
+  }
+
   return normalized;
 }
 
