@@ -665,7 +665,12 @@ export function ReceiptDetailPanel({
       const normalizedOriginal = originalValue === undefined ? null : originalValue;
       const normalizedNew = newValue === undefined ? null : newValue;
       
-      if (String(normalizedOriginal || '') !== String(normalizedNew || '')) {
+      // Only count as a "correction" if the AI actually extracted an original value.
+      // First-time fills (UI defaults like vat_rate fallback) are not corrections.
+      const originalIsEmpty = normalizedOriginal === null || normalizedOriginal === '';
+      if (originalIsEmpty) continue;
+      
+      if (String(normalizedOriginal) !== String(normalizedNew ?? '')) {
         changes[fieldId] = {
           original: normalizedOriginal,
           current: normalizedNew
