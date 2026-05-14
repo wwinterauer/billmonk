@@ -264,43 +264,7 @@ export function CategoryManagement() {
     fetchCategories();
   }, [user, selectedCountry]);
 
-  // Toggle tax categories for selected country
-  const handleToggleTaxCategories = async (show: boolean) => {
-    setTogglingTax(true);
-    try {
-      // Get all tax categories for the selected country
-      const taxCats = categories.filter(c => c.country === selectedCountry && c.is_system);
-      
-      if (taxCats.length === 0) {
-        toast({ title: `Keine Steuer-Kategorien für ${COUNTRY_LABELS[selectedCountry]} gefunden` });
-        return;
-      }
-
-      const ids = taxCats.map(c => c.id);
-      const { error } = await supabase
-        .from('categories')
-        .update({ is_hidden: !show })
-        .in('id', ids);
-
-      if (error) throw error;
-
-      toast({
-        title: show
-          ? `${COUNTRY_FLAGS[selectedCountry]} ${taxCats.length} Steuer-Kategorien eingeblendet`
-          : `${COUNTRY_FLAGS[selectedCountry]} ${taxCats.length} Steuer-Kategorien ausgeblendet`,
-      });
-      
-      await fetchCategories();
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
-      });
-    } finally {
-      setTogglingTax(false);
-    }
-  };
+  // Tax-Buchungsarten kommen aus taxCategoryInfo.ts (statisch). Kein DB-Toggle mehr.
 
   const handleNewCategory = () => {
     setIsNewCategory(true);
