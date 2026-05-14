@@ -83,6 +83,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
+import { VendorAutocomplete } from '@/components/receipts/VendorAutocomplete';
 import { PAYMENT_METHODS } from '@/lib/constants';
 import { PageMeta } from '@/components/PageMeta';
 
