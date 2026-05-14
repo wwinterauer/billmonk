@@ -1708,18 +1708,14 @@ export function ReceiptDetailPanel({
                       originalValue={originalReceipt?.payment_method}
                       onReset={() => setPaymentMethod(originalReceipt?.payment_method || '')}
                     >
-                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Zahlungsart wählen" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PAYMENT_METHODS.map((method) => (
-                            <SelectItem key={method.value} value={method.value}>
-                              {method.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchableSelect
+                        value={paymentMethod}
+                        onChange={setPaymentMethod}
+                        options={PAYMENT_METHODS.map(m => ({ value: m.value, label: m.label }))}
+                        placeholder="Zahlungsart wählen"
+                        searchPlaceholder="Zahlungsart suchen..."
+                        allowClear
+                      />
                     </LearnableField>
 
                     {/* Notes */}
