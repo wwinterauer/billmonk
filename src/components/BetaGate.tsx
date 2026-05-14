@@ -21,11 +21,6 @@ export function BetaGate({ children }: BetaGateProps) {
   // Check beta_expires_at for logged-in users
   useEffect(() => {
     const checkExpiry = async () => {
-      if (!hasBetaAccess()) {
-        setChecked(true);
-        return;
-      }
-
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
@@ -39,7 +34,17 @@ export function BetaGate({ children }: BetaGateProps) {
           .eq('id', user.id)
           .maybeSingle();
 
-        if (profile?.beta_expires_at && new Date(profile.beta_expires_at) < new Date()) {
+        const expired = profile?.beta_expires_at && new Date(profile.beta_expires_at) < new Date();
+
+        if (profile?.is_beta_user && !expired) {
+          // Auto-grant local beta access for known beta users (e.g. new device after login)
+          if (!hasBetaAccess()) {
+            localStorage.setItem('beta_access', 'true');
+            const expires = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toUTCString();
+            document.cookie = `beta_access=true; expires=${expires}; path=/; SameSite=Lax`;
+            setHasAccess(true);
+          }
+        } else if (expired && hasBetaAccess()) {
           // Beta expired — revoke access
           localStorage.removeItem('beta_access');
           document.cookie = 'beta_access=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
