@@ -26,6 +26,7 @@ import { InvoiceTagSelector } from '@/components/invoices/InvoiceTagSelector';
 import { useQuoteSettings } from '@/hooks/useQuoteSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { PageMeta } from '@/components/PageMeta';
 
 interface EditorLineItem {
   tempId: string;
@@ -420,6 +421,8 @@ const InvoiceEditor = () => {
   let currentGroup: string | null = null;
 
   return (
+    <>
+      <PageMeta title="Rechnungseditor — BillMonk" description="Rechnungen, Angebote und Lieferscheine professionell erstellen und bearbeiten." canonical="/invoices/new" noindex />
     <DashboardLayout>
       <div className="p-6 lg:p-8">
         {/* Header */}
@@ -933,6 +936,8 @@ const InvoiceEditor = () => {
         </div>
       </div>
     </DashboardLayout>
+  
+    </>
   );
 };
 

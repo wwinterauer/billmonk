@@ -35,6 +35,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
+import { PageMeta } from '@/components/PageMeta';
 import {
   Plus,
   ClipboardList,
@@ -125,7 +126,11 @@ export default function Checklists() {
         .eq('user_id', user.id)
         .order('sort_order', { ascending: true });
 
-      return (lists || []).map(list => ({
+      return (
+        <>
+          <PageMeta title="Checklisten — BillMonk" description="Monatliche und jährliche Checklisten für deine Buchhaltung abarbeiten." canonical="/checklists" noindex />lists || []
+        </>
+      ).map(list => ({
         ...list,
         items: (items || []).filter(item => item.checklist_id === list.id).map(item => ({
           ...item,

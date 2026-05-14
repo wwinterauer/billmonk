@@ -21,6 +21,7 @@ import { PdfPreviewDialog } from '@/components/invoices/PdfPreviewDialog';
 import { format, startOfMonth, endOfMonth, subMonths, startOfQuarter, endOfQuarter, subQuarters, startOfYear, endOfYear, subYears } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { PageMeta } from '@/components/PageMeta';
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Entwurf', variant: 'secondary' },
@@ -128,6 +129,8 @@ const DeliveryNotes = () => {
   };
 
   return (
+    <>
+      <PageMeta title="Lieferscheine — BillMonk" description="Lieferscheine erstellen, drucken und an Kund:innen senden." canonical="/delivery-notes" noindex />
     <DashboardLayout>
       <FeatureGate feature="invoiceModule">
         <div className="p-6 lg:p-8 space-y-6">
@@ -297,6 +300,8 @@ const DeliveryNotes = () => {
         </AlertDialogContent>
       </AlertDialog>
     </DashboardLayout>
+  
+    </>
   );
 };
 

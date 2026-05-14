@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowRight, ArrowLeft, Check, User, Building2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PageMeta } from '@/components/PageMeta';
 
 const STEPS = [
   { title: 'Persönliche Daten', description: 'Vervollständige dein Profil' },
@@ -82,6 +83,8 @@ export default function Onboarding() {
   };
 
   return (
+    <>
+      <PageMeta title="Einrichtung — BillMonk" description="Richte BillMonk in wenigen Schritten für dein Unternehmen ein." canonical="/onboarding" noindex />
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
         {/* Step Indicator */}
@@ -254,5 +257,7 @@ export default function Onboarding() {
         </Card>
       </div>
     </div>
+  
+    </>
   );
 }

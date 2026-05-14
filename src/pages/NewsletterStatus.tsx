@@ -24,6 +24,7 @@ import { useNewsletters, type NewsletterRecipient } from '@/hooks/useNewsletters
 import { TestSendDialog } from '@/components/newsletter/TestSendDialog';
 import { Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PageMeta } from '@/components/PageMeta';
 
 const STATUS_BADGE: Record<string, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
   sent: {
@@ -121,6 +122,8 @@ export default function NewsletterStatus() {
   }, [recipients, filterMode]);
 
   return (
+    <>
+      <PageMeta title="Newsletter-Status — BillMonk" description="Status deines Newsletter-Abonnements bei BillMonk anzeigen." canonical="/newsletter-status" noindex />
     <DashboardLayout>
       <div className="container max-w-6xl mx-auto px-4 py-6 space-y-6">
         {/* Header */}
@@ -320,6 +323,8 @@ export default function NewsletterStatus() {
         </Card>
       </div>
     </DashboardLayout>
+  
+    </>
   );
 }
 

@@ -57,6 +57,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePlan } from '@/hooks/usePlan';
+import { PageMeta } from '@/components/PageMeta';
 
 type StatusFilter = 'all' | 'unmatched' | 'matched' | 'ignored';
 type SortField = 'transaction_date' | 'amount';
@@ -414,6 +415,8 @@ export default function Reconciliation() {
   };
 
   return (
+    <>
+      <PageMeta title="Abgleich — BillMonk" description="Bankumsätze und Belege automatisch und manuell abgleichen." canonical="/reconciliation" noindex />
     <DashboardLayout>
       <FeatureGate feature="reconciliation">
       <div className="space-y-6">
@@ -947,5 +950,7 @@ export default function Reconciliation() {
       />
       </FeatureGate>
     </DashboardLayout>
+  
+    </>
   );
 }

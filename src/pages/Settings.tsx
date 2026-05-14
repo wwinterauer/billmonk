@@ -194,6 +194,7 @@ const SPACE_REPLACEMENT_OPTIONS = [
 ];
 
 import { Switch } from '@/components/ui/switch';
+import { PageMeta } from '@/components/PageMeta';
 
 const SplitBookingToggle = () => {
   const { user } = useAuth();
@@ -232,6 +233,8 @@ const SplitBookingToggle = () => {
   if (loading) return null;
 
   return (
+    <>
+      <PageMeta title="Einstellungen — BillMonk" description="Konto, Firma, Steuer und Integrationen für BillMonk konfigurieren." canonical="/settings" noindex />
     <div className="flex items-center justify-between">
       <div className="space-y-1">
         <Label>Splitbuchungen aktivieren</Label>
@@ -241,6 +244,8 @@ const SplitBookingToggle = () => {
       </div>
       <Switch checked={enabled} onCheckedChange={handleToggle} />
     </div>
+  
+    </>
   );
 };
 

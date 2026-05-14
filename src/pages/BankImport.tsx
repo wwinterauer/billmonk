@@ -42,6 +42,7 @@ import { ImportHistoryTable } from '@/components/bank-import/ImportHistoryTable'
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
+import { PageMeta } from '@/components/PageMeta';
 
 const banks = [
   { value: 'erste-sparkasse', label: 'Erste Bank / Sparkasse' },
@@ -438,6 +439,8 @@ export default function BankImport() {
   };
 
   return (
+    <>
+      <PageMeta title="Bankimport — BillMonk" description="Bankumsätze importieren und automatisch mit deinen Belegen abgleichen." canonical="/bank-import" noindex />
     <DashboardLayout>
       <FeatureGate feature="bankImport">
       <div className="space-y-6">
@@ -775,5 +778,7 @@ export default function BankImport() {
       />
       </FeatureGate>
     </DashboardLayout>
+  
+    </>
   );
 }

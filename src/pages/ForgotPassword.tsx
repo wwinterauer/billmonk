@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { supabase } from '@/integrations/supabase/client';
+import { PageMeta } from '@/components/PageMeta';
 
 const schema = z.object({
   email: z.string().email('Bitte gültige E-Mail eingeben'),
@@ -36,6 +37,8 @@ const ForgotPassword = () => {
   };
 
   return (
+    <>
+      <PageMeta title="Passwort vergessen — BillMonk" description="Setze dein BillMonk-Passwort zurück und erhalte einen Link per E-Mail." canonical="/forgot-password" noindex />
     <div className="min-h-screen flex items-center justify-center bg-secondary/30 px-4 py-12">
       <div className="w-full max-w-md">
         <Card className="border-border/50 shadow-xl">
@@ -120,6 +123,8 @@ const ForgotPassword = () => {
         </Card>
       </div>
     </div>
+  
+    </>
   );
 };
 

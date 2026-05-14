@@ -87,6 +87,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { TaxExportDialog } from '@/components/exports/TaxExportDialog';
+import { PageMeta } from '@/components/PageMeta';
 
 const Reports = () => {
   const { toast } = useToast();
@@ -166,7 +167,11 @@ const Reports = () => {
       if (error) throw error;
       
       // Transform tags into flat array
-      return (data || []).map(r => ({
+      return (
+        <>
+          <PageMeta title="Auswertungen — BillMonk" description="Berichte und Auswertungen über Umsätze, Ausgaben und Steuern erstellen." canonical="/reports" noindex />data || []
+        </>
+      ).map(r => ({
         ...r,
         tags: (r.receipt_tags || [])
           .map((rt: { tag: { id: string; name: string; color: string } | null }) => rt.tag)

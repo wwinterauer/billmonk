@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
+import { PageMeta } from '@/components/PageMeta';
 
 interface ProfileData {
   first_name: string;
@@ -112,6 +113,8 @@ function CommunityOptOut() {
   const isFree = plan === 'free';
 
   return (
+    <>
+      <PageMeta title="Mein Konto — BillMonk" description="Profil, Plan und Abrechnung deines BillMonk-Kontos verwalten." canonical="/account" noindex />
     <div className="flex items-center justify-between rounded-lg border border-border p-4">
       <div className="space-y-0.5">
         <Label className="text-sm font-medium flex items-center gap-1.5">
@@ -129,6 +132,8 @@ function CommunityOptOut() {
         disabled={isFree}
       />
     </div>
+  
+    </>
   );
 }
 

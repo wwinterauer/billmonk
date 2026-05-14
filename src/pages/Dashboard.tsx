@@ -40,6 +40,7 @@ import { FeatureGate } from '@/components/FeatureGate';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { PageMeta } from '@/components/PageMeta';
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   pending: { label: 'Offen', className: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' },
@@ -170,6 +171,8 @@ const Dashboard = () => {
   ];
 
   return (
+    <>
+      <PageMeta title="Dashboard — BillMonk" description="Übersicht über deine Einnahmen, Ausgaben und offene Belege auf einen Blick." canonical="/dashboard" noindex />
     <DashboardLayout>
       <div className="p-6 lg:p-8">
         {/* Header */}
@@ -662,6 +665,8 @@ const Dashboard = () => {
         onUpdate={refetch}
       />
     </DashboardLayout>
+  
+    </>
   );
 };
 
