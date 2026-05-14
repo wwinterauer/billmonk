@@ -49,7 +49,8 @@ export function useReceiptUpload(
     const errors: string[] = [];
     
     if (files.length > MAX_FILES) {
-      errors.push(`Maximal ${MAX_FILES} Dateien gleichzeitig erlaubt.`);
+      const dropped = files.length - MAX_FILES;
+      errors.push(`Du hast ${files.length} Dateien ausgewählt, es werden die ersten ${MAX_FILES} verarbeitet. Bitte ziehe die restlichen ${dropped} Dateien danach erneut in den Upload.`);
       files = files.slice(0, MAX_FILES);
     }
 
