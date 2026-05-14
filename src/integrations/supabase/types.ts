@@ -696,6 +696,7 @@ export type Database = {
           tax_type_name: string | null
           updated_at: string | null
           user_id: string
+          vendor_id: string | null
         }
         Insert: {
           category_name: string
@@ -708,6 +709,7 @@ export type Database = {
           tax_type_name?: string | null
           updated_at?: string | null
           user_id: string
+          vendor_id?: string | null
         }
         Update: {
           category_name?: string
@@ -720,6 +722,7 @@ export type Database = {
           tax_type_name?: string | null
           updated_at?: string | null
           user_id?: string
+          vendor_id?: string | null
         }
         Relationships: [
           {
