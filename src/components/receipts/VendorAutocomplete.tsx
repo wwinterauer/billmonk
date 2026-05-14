@@ -179,9 +179,49 @@ export function VendorAutocomplete({
     setVendorSearch('');
   };
 
-  const handleUseCustomValue = () => {
-    onChange(vendorSearch, null);
-    setShowVendorDropdown(false);
+  const handleCreateNewVendor = async () => {
+    const name = vendorSearch.trim();
+    if (!user || name.length < 2 || isCreating) return;
+
+    setIsCreating(true);
+    try {
+      const newVendor = await createVendorInternal(user.id, name);
+      if (!newVendor) {
+        toast.error('Anlegen fehlgeschlagen', {
+          description: 'Bitte erneut versuchen.',
+        });
+        return;
+      }
+
+      // Reload list so the new vendor appears in future searches
+      await loadAllVendors();
+
+      // Map to VendorWithCategory shape and propagate selection
+      const selected: VendorWithCategory = {
+        id: newVendor.id,
+        display_name: newVendor.display_name,
+        legal_names: newVendor.legal_names ?? null,
+        detected_names: newVendor.detected_names ?? null,
+        default_category_id: newVendor.default_category_id ?? null,
+        default_tag_id: (newVendor as any).default_tag_id ?? null,
+        default_vat_rate: newVendor.default_vat_rate ?? null,
+        field_defaults: (newVendor as any).field_defaults ?? null,
+        receipt_count: 0,
+        default_category: null,
+      };
+
+      onVendorSelect(selected);
+      setShowVendorDropdown(false);
+      setVendorSearch('');
+      toast.success('Lieferant angelegt', { description: name });
+    } catch (err: any) {
+      console.error('Error creating vendor:', err);
+      toast.error('Anlegen fehlgeschlagen', {
+        description: err?.message || 'Bitte erneut versuchen.',
+      });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const isExactMatch = vendorSuggestions.some(
