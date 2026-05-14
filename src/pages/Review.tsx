@@ -330,7 +330,39 @@ const Review = () => {
     }
   }, []);
 
-  // Navigate to receipt
+  // Apply vendor when selected from dropdown
+  const handleVendorSelect = useCallback((vendorData: {
+    id: string;
+    display_name: string;
+    legal_names: string[] | null;
+    default_category_id: string | null;
+    default_vat_rate: number | null;
+  }) => {
+    setSelectedVendorId(vendorData.id);
+    const legalName = vendorData.legal_names?.[0] || vendorData.display_name;
+    setFormData(prev => ({
+      ...prev,
+      vendor: legalName,
+      vendor_brand: vendorData.display_name,
+      // Pre-fill VAT only if currently empty/default
+      vat_rate: (prev.vat_rate === '' || prev.vat_rate === defaultVatRate) && vendorData.default_vat_rate !== null
+        ? vendorData.default_vat_rate.toString()
+        : prev.vat_rate,
+    }));
+    // Default category id -> resolve to category name asynchronously
+    if (vendorData.default_category_id && !formData.category) {
+      supabase
+        .from('user_categories')
+        .select('name')
+        .eq('id', vendorData.default_category_id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.name) {
+            setFormData(prev => prev.category ? prev : { ...prev, category: data.name });
+          }
+        });
+    }
+  }, [defaultVatRate, formData.category]);
   const goToReceipt = useCallback((index: number) => {
     if (index >= 0 && index < receipts.length) {
       setCurrentIndex(index);
