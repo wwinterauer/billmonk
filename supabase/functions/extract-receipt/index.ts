@@ -611,11 +611,12 @@ LIEFERANT:
 
 BESCHREIBUNG: Alle Positionen zusammenfassen, max 100 Zeichen, keine Preise.
 
-KATEGORIE: Wähle passendste aus: ${categoryList}
+KATEGORIE (category, persönliches User-Label – UNABHÄNGIG von Steuerrecht):
+Wähle NUR aus dieser Liste eine passende User-Kategorie aus, oder lasse leer ("") wenn keine passt: ${categoryList}
+WICHTIG: category ist KEIN Steuer-Begriff. Nimm hier NIE Werte wie "KFZ-Kosten (AT)" oder "Bewirtung 50%" – die gehören ausschließlich in tax_type.
 
-BUCHUNGSART (tax_type): Steuerliche Einordnung nach DACH-Steuerrecht.
-Mögliche Werte: Betriebsausgabe, GWG bis 1.000€, Bewirtung 50%, Bewirtung 100%, Vorsteuer abzugsfähig, Reisekosten, Kfz-Kosten, Repräsentation, Abschreibung, Sonstige.
-Regeln: Gerät/Hardware >1.000€ netto → Abschreibung. Gerät ≤1.000€ → GWG bis 1.000€. Restaurant/Bewirtung → Bewirtung 50%. Tankstelle/Mietwagen → Kfz-Kosten. Hotel/Flug/Bahn → Reisekosten. Nur wenn eindeutig erkennbar, sonst "".
+BUCHUNGSART (tax_type, steuerliche Einordnung – UNABHÄNGIG von category):
+Wähle NUR aus dieser Liste den passenden Eintrag (oder "" wenn unklar): ${taxTypeList}${taxTypeHints}
 MwSt-ERKENNUNG:
 - Suche explizite %-Angaben auf dem Beleg (20%, 19%, 10%, 7% etc.)
 - Berechne: MwSt = Brutto × Satz/(100+Satz). Validiere: Netto + MwSt = Brutto (±0.05€)
