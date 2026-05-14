@@ -25,6 +25,7 @@ export interface ExtractionResult {
   tax_rate_details?: TaxRateDetail[] | null;
   receipt_date: string | null;
   category: string | null;
+  tax_type?: string | null;
   payment_method: string | null;
   invoice_number: string | null;
   confidence: number;
@@ -248,6 +249,13 @@ export function normalizeExtractionResult(
   // Process description with user settings or defaults
   const settings = descriptionSettings || DEFAULT_DESCRIPTION_SETTINGS;
   normalized.description = processDescription(normalized.description, settings);
+
+  // Defensive: tax_type must end with a country code in parens, e.g. "(AT)".
+  // Drops hallucinated values like "Betriebsausgabe", "Sonstiges", "Aufwand".
+  if (normalized.tax_type && !/\([A-Z]{2}\)\s*$/.test(normalized.tax_type)) {
+    console.warn('[normalize] Dropping invalid tax_type:', normalized.tax_type);
+    normalized.tax_type = null;
+  }
 
   return normalized;
 }
