@@ -155,7 +155,7 @@ export function useReceiptProcessing(
           }
 
           // Apply vendor default tax_type if AI didn't detect one
-          if (vendorResult.vendor.default_tax_type && !normalized.tax_type) {
+          if (vendorResult.vendor.default_tax_type && !(normalized as any).tax_type) {
             updateData.tax_type = vendorResult.vendor.default_tax_type;
           }
         } else if (vendorResult.isNew) {
