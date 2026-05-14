@@ -1,36 +1,21 @@
-# Lieferanten-Felder im Review-Fenster angleichen
+## Anpassungen an SearchableSelect & Review-Dropdowns
 
-**Ist-Zustand** in `src/pages/Review.tsx` (Zeilen 966–1033):
-- **Lieferant (Markenname)** und **Rechtlicher Firmenname** sind beide schlichte `Input`-Felder.
-- Kein Dropdown, keine Sperre — auch wenn der Beleg bereits einem Lieferanten (`vendor_id`) zugeordnet ist.
+### 1) Leeren erlauben (Kategorie & Buchungsart)
+In `SearchableSelect` einen optionalen `allowClear`-Modus + festen Eintrag „— Keine Auswahl —" am Anfang der Liste, der `onChange("")` auslöst. Im Review für beide Dropdowns aktivieren, sodass bestehende Auswahl gelöscht werden kann (analog Toggle-Verhalten beim Click auf bereits gewählten Eintrag, das es bereits gibt).
 
-Im Detail-Panel (`ReceiptDetailPanel.tsx`) ist es bereits richtig: Firmenname = `VendorAutocomplete`, Markenname = bei zugeordnetem Vendor read-only mit „Bearbeiten"-Button. Im Review-Fenster fehlt das.
+### 2) Neue Kategorie direkt aus dem Kategorie-Dropdown anlegen
+Analog `VendorAutocomplete` „… als neuen Lieferanten":
+- Wenn kein exakter Treffer im Suchfeld existiert, am Ende der Liste einen Eintrag „+ ‚<Suchbegriff>' als neue Kategorie anlegen" anzeigen.
+- Klick → ruft `addCategory(name)` aus `useCategories` auf, setzt danach `formData.category = name`, schließt Popover.
+- Toast bei Erfolg / Fehler.
 
-## Umsetzung in `src/pages/Review.tsx`
+Damit das generisch bleibt, bekommt `SearchableSelect` einen optionalen Prop `onCreate?: (label: string) => Promise<void> | void` plus `createLabel?: (q: string) => string`. Buchungsart bleibt ohne `onCreate` (länderspezifische, fixe Liste — kein User-Anlegen).
 
-### 1) Markenname-Feld bei zugeordnetem Vendor sperren
-- Wenn `currentReceipt?.vendor_id` gesetzt ist → `Input` `readOnly` + `disabled`, dezenter `bg-muted/50`-Stil, plus „Bearbeiten"-Button rechts (öffnet `/settings?tab=vendors&vendorId=…`, wie im Detail-Panel).
-- Sonst: bleibt das aktuelle freie `Input`.
-
-### 2) Rechtlichen Firmennamen als Dropdown
-- Das `Input` bei Zeile 1026–1032 durch die bestehende `VendorAutocomplete`-Komponente ersetzen.
-- `value={formData.vendor}`, `vendorId={currentReceipt?.vendor_id || null}`.
-- `onChange(value, id)`: setzt `formData.vendor = value` und (falls `id` null wird beim manuellen Tippen) löscht die Vendor-Bindung lokal in `formData` (kein direktes DB-Update; passiert beim „Speichern & Weiter").
-- `onVendorSelect(vendorData)`: füllt automatisch
-  - `formData.vendor` = primärer `legal_names[0]` (oder `display_name` als Fallback),
-  - `formData.vendor_brand` = `display_name` (wenn unterschiedlich),
-  - `vendor_id` lokal merken — dazu wird ein neues `selectedVendorId`-State eingeführt, das beim Speichern in `receipts.vendor_id` geschrieben wird.
-  - Optional: wenn `default_category_id`/`default_vat_rate` vorhanden und Felder leer/Default → vorbelegen (analog Detail-Panel).
-- Dadurch wird das Markenname-Feld sofort gesperrt (siehe 1), weil `vendor_id` jetzt gesetzt ist.
-
-### 3) State + Save anpassen
-- Neuer State: `const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null)`. Initialisierung beim Receipt-Wechsel aus `receipt.vendor_id`.
-- `handleSave`: in den `update()`-Aufruf zusätzlich `vendor_id: selectedVendorId` aufnehmen, ebenso `vendor_brand: formData.vendor_brand`.
-- `currentReceipt?.vendor_id` für die Sperrlogik des Markenname-Felds durch `selectedVendorId` ersetzen, damit die Sperre sofort greift, ohne dass der Beleg neu geladen werden muss.
-
-## Technische Details
-- Geänderte Datei: nur `src/pages/Review.tsx`.
-- Keine Änderungen an `VendorAutocomplete.tsx`, `ReceiptDetailPanel.tsx`, DB oder Edge Functions.
-- Bestehende Lernlogik (`useCorrectionTracking`) bleibt unverändert — beim Speichern werden weiterhin `vendor` und `vendor_brand` aus `formData` getrackt.
+### Technische Details
+- Datei `src/components/ui/searchable-select.tsx`: Props erweitern (`allowClear`, `clearLabel`, `onCreate`, `createLabel`); Render-Logik für Clear-Item oben und Create-Item unten; Suchstate aus `CommandInput` per `value`/`onValueChange` selber halten, damit der aktuelle Suchbegriff für `onCreate` verfügbar ist.
+- Datei `src/pages/Review.tsx`: 
+  - Kategorie-`SearchableSelect`: `allowClear` + `onCreate={async (name) => { const cat = await addCategory(name); setFormData(prev => ({ ...prev, category: cat.name })); }}`. `addCategory` aus `useCategories` destrukturieren.
+  - Buchungsart-`SearchableSelect`: nur `allowClear`.
+- Keine Änderungen an DB, Edge Functions, anderen Komponenten.
 
 OK, soll ich umsetzen?
