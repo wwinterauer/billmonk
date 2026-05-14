@@ -818,7 +818,11 @@ export function ReceiptDetailPanel({
           const normalizedOriginal = originalValue === undefined ? null : originalValue;
           const normalizedNew = newValue === undefined ? null : newValue;
           
-          if (String(normalizedOriginal || '') !== String(normalizedNew || '')) {
+          // Skip first-time fills (no AI value extracted) - not a correction
+          const originalIsEmpty = normalizedOriginal === null || normalizedOriginal === '';
+          if (originalIsEmpty) continue;
+          
+          if (String(normalizedOriginal) !== String(normalizedNew ?? '')) {
             corrections.push({
               fieldName: fieldId,
               detectedValue: normalizedOriginal,
