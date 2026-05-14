@@ -165,11 +165,11 @@ export function CategoryManagement() {
   const { user } = useAuth();
   
   const [categories, setCategories] = useState<Category[]>([]);
+  const [taxTypeCounts, setTaxTypeCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showTaxCodes, setShowTaxCodes] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<string>('AT');
-  const [togglingTax, setTogglingTax] = useState(false);
   
   // Modal states
   const [editModalOpen, setEditModalOpen] = useState(false);
