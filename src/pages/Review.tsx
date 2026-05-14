@@ -1215,21 +1215,13 @@ const Review = () => {
                             </TooltipContent>
                           </Tooltip>
                         </div>
-                        <Select
+                        <SearchableSelect
                           value={formData.tax_type}
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, tax_type: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Offen" />
-                          </SelectTrigger>
-                           <SelectContent>
-                            {taxCategories.map(c => (
-                              <SelectItem key={c.id} value={c.name}>
-                                {c.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          onChange={(value) => setFormData(prev => ({ ...prev, tax_type: value }))}
+                          options={taxCategories.map(c => ({ value: c.name, label: c.name }))}
+                          placeholder="Offen"
+                          searchPlaceholder="Buchungsart suchen..."
+                        />
                       </div>
                     </div>
 
