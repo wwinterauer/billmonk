@@ -1036,6 +1036,9 @@ const Review = () => {
                         value={formData.vendor_brand}
                         onChange={(e) => setFormData(prev => ({ ...prev, vendor_brand: e.target.value }))}
                         placeholder="z.B. timr, Amazon, A1"
+                        readOnly={!!selectedVendorId}
+                        disabled={!!selectedVendorId}
+                        className={cn(selectedVendorId && 'text-muted-foreground bg-muted/50')}
                       />
                     </div>
 
