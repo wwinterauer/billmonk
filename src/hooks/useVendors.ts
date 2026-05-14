@@ -137,6 +137,7 @@ export function useVendors() {
       defaultCategoryId?: string;
       defaultTagId?: string;
       defaultVatRate?: number;
+      defaultTaxType?: string;
       defaultPaymentMethod?: string;
       notes?: string;
       website?: string;
