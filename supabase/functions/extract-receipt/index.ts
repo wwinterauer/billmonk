@@ -537,7 +537,8 @@ serve(async (req) => {
     console.log(`Expenses-only mode: ${expensesOnlyPrompt ? 'ACTIVE' : 'inactive'} (flag: ${expensesOnly}, keywords: ${extractionKeywords.length})`);
 
     // ── Fetch categories ───────────────────────────────────────────
-    let categoryList = 'Sonstiges';
+    let categoryList = '(keine eigenen Kategorien definiert)';
+    let userCountry: string | null = null;
     let userId: string | null = receipt?.user_id || null;
     if (!userId) {
       const authHeader = req.headers.get('authorization');
@@ -549,22 +550,23 @@ serve(async (req) => {
 
     if (userId) {
       const { data: userProfile } = await supabase.from('profiles').select('country').eq('id', userId).single();
-      const userCountry = userProfile?.country?.toUpperCase() || null;
+      userCountry = userProfile?.country?.toUpperCase() || null;
 
       // category-Liste = NUR persönliche User-Kategorien + globale System-Einträge ohne Land.
       // Steuer-Buchungsarten (KFZ-Kosten (AT) etc.) gehen NICHT mehr hier rein, sondern in tax_type.
-      let query = supabase.from('categories').select('name, country').eq('is_hidden', false).order('sort_order');
-      query = query.or(`user_id.eq.${userId},and(is_system.eq.true,country.is.null)`);
+      const { data: userCategories } = await supabase
+        .from('categories')
+        .select('name, country')
+        .eq('is_hidden', false)
+        .or(`user_id.eq.${userId},and(is_system.eq.true,country.is.null)`)
+        .order('sort_order');
 
-      const { data: userCategories } = await query;
       if (userCategories && userCategories.length > 0) {
         const catNames = userCategories.map(c => c.name).filter(n => n !== 'Keine Rechnung');
         if (catNames.length > 0) {
           categoryList = catNames.join(', ');
-          const categoryHints = buildCategoryHints(userCountry, catNames);
-          if (categoryHints) categoryList += categoryHints;
 
-          // Community patterns (limited to 15)
+          // Community patterns (limited to 15) — gelten nur für User-Kategorien
           const { data: communityPatterns } = await supabase
             .from('community_patterns')
             .select('vendor_name_normalized, suggested_category, contributor_count')
@@ -579,14 +581,18 @@ serve(async (req) => {
               .map(cp => `- "${cp.vendor_name_normalized}" → ${cp.suggested_category}`)
               .join('\n');
             if (communityHints) {
-              categoryList += `\n\nVERIFIZIERTE ZUORDNUNGEN:\n${communityHints}`;
+              categoryList += `\n\nVERIFIZIERTE ZUORDNUNGEN (User-Kategorien):\n${communityHints}`;
             }
           }
 
-          console.log(`Using ${catNames.length} categories (country: ${userCountry}, community: ${communityPatterns?.length || 0})`);
+          console.log(`Using ${catNames.length} user categories (country: ${userCountry}, community: ${communityPatterns?.length || 0})`);
         }
       }
     }
+
+    // Buchungsarten-Liste (steuerliche Einordnung) – NICHT mehr in categories-Tabelle.
+    const taxTypeList = buildTaxTypeList(userCountry);
+    const taxTypeHints = buildCategoryHints(userCountry, TAX_TYPES_BY_COUNTRY[(userCountry || 'AT').toUpperCase()] || []);
 
     // ── V2 compressed user prompt ──────────────────────────────────
     const userPrompt = `Analysiere dieses Dokument:
