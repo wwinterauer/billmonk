@@ -150,16 +150,12 @@ const Review = () => {
     vat_amount_override: '',
   });
 
-  // Load receipts with status='review' or 'needs_splitting'
+  // Load receipts with status='review' (multi-invoice PDFs land here too — surfaced via split_suggestion)
   const loadReceipts = useCallback(async () => {
     setLoading(true);
     try {
-      // Get both review and needs_splitting receipts
       const reviewData = await getReceipts({ status: 'review' });
-      const splittingData = await getReceipts({ status: 'needs_splitting' as any });
-      
-      // Combine and sort by created_at (splitting first, then review)
-      const allData = [...splittingData, ...reviewData];
+      const allData = reviewData;
       
       setReceipts(allData);
       if (allData.length > 0) {
@@ -825,7 +821,7 @@ const Review = () => {
 
               <CardContent>
                 {/* Multi-Invoice Alert for PDFs with multiple invoices */}
-                {currentReceipt?.status === 'needs_splitting' && (
+                {(currentReceipt?.split_suggestion as any)?.contains_multiple_invoices && (
                   <div className="mb-6">
                     <MultiInvoiceAlert
                       receiptId={currentReceipt.id}

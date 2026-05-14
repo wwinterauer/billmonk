@@ -1,0 +1,1 @@
+UPDATE public.receipts SET status = 'review' WHERE status = 'needs_splitting';
