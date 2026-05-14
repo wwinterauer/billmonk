@@ -99,6 +99,8 @@ const Upload = () => {
   const [applyToAll, setApplyToAll] = useState(false);
   const [isProcessingVendor, setIsProcessingVendor] = useState(false);
   
+  const [recoveredQueue, setRecoveredQueue] = useState<UploadQueueState | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
