@@ -1,25 +1,20 @@
-## Ursache
+## Problem
 
-Im Lieferanten-Bearbeiten-Dialog ist das Feld **„Rechtliche Firmennamen"** als **Tag/Chip-Input** umgesetzt: Der getippte Text wird erst dann als Firmenname übernommen, wenn du
+Wer schon einen Beta-Code hat (z. B. `is_beta_user = true` im Profil), aber auf einem neuen Gerät/Browser ist, hat **kein** `localStorage.beta_access`. Klickt er im Header auf **Login**, leitet `BetaGate` ihn auf `/beta` um, statt das Login-Fenster zu zeigen — er kommt nicht rein, ohne erneut einen Code einzugeben.
 
-- **Enter** drückst, oder
-- den **+-Button** rechts neben dem Eingabefeld klickst.
+Ursache: In `src/components/BetaGate.tsx` enthält `EXEMPT_ROUTES` nur `/beta`, `/datenschutz`, `/unsubscribe`, `/share-receive`. `/login`, `/register`, `/reset-password` sind durch das Gate blockiert.
 
-Tippst du nur Text ein und klickst direkt auf **Speichern**, bleibt der Wert nur im Eingabefeld stehen — `formData.legal_names` ist weiterhin leer und genau dieses leere Array wird gespeichert. Beim nächsten Öffnen ist daher nichts hinterlegt.
+## Lösung
 
-Das ist nicht offensichtlich und führt erwartbar zu Datenverlust.
+### 1. `src/components/BetaGate.tsx`
+- `EXEMPT_ROUTES` erweitern um `/login`, `/register`, `/reset-password`, `/forgot-password` — Auth-Seiten müssen immer erreichbar sein.
+- Nach erfolgreicher Auth-Erkennung im `useEffect`: wenn `profile.is_beta_user === true` und (kein `beta_expires_at` oder noch gültig), **automatisch** `localStorage.beta_access = 'true'` und Cookie setzen. So wird ein bestehender Beta-User auf neuem Gerät beim ersten Login automatisch freigeschaltet, ohne dass er den Code erneut eingeben muss.
+- Wenn `is_beta_user === false` und kein lokaler Beta-Zugang: weiterhin auf `/beta` umleiten (für geschützte Routen).
 
-## Fix
+### 2. Keine DB-Änderungen nötig.
 
-Beim Klick auf **Speichern** in `VendorManagement.tsx` (`handleSave`) zuerst prüfen, ob im Input `#new_legal_name` noch ein nicht übernommener Wert steht. Falls ja: vor dem Speichern automatisch in das `legal_names`-Array übernehmen (dedupliziert, getrimmt) und Input leeren.
+## Effekt
 
-Damit wird sowohl der bisherige Workflow (Enter/+) als auch das intuitive „Tippen + Speichern" korrekt verarbeitet.
-
-Optional zusätzlich (UX-Klarheit, gleiche Datei):
-- Hinweistext unter dem Input von „Mehrere rechtliche Firmennamen möglich …" ergänzen um „Mit Enter oder + hinzufügen — wird beim Speichern automatisch übernommen."
-
-## Betroffene Datei
-
-- `src/components/settings/VendorManagement.tsx` — `handleSave` (~Zeile 240) ergänzen, kleiner Hinweistext (~Zeile 1235).
-
-Keine Datenbank-Änderungen nötig. Bestehende Lieferanten sind nicht betroffen.
+- Header-Login funktioniert immer (auch ohne lokalen Beta-Cookie).
+- Bereits freigeschaltete Beta-User werden nach Login automatisch wieder freigeschaltet.
+- Neue Besucher ohne Beta-Code werden weiter auf `/beta` geleitet, wenn sie geschützte App-Routen aufrufen.
