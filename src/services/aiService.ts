@@ -25,6 +25,7 @@ export interface ExtractionResult {
   tax_rate_details?: TaxRateDetail[] | null;
   receipt_date: string | null;
   category: string | null;
+  tax_type?: string | null;
   payment_method: string | null;
   invoice_number: string | null;
   confidence: number;
