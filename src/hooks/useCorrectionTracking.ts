@@ -136,26 +136,30 @@ async function updateFieldPatterns(
     }
   }
   
-  // 4. Store common mistakes
-  const existingMistakeIndex = fieldPatterns.common_mistakes.findIndex(
-    m => m.detected === detected
-  );
-  
-  if (existingMistakeIndex >= 0) {
-    fieldPatterns.common_mistakes[existingMistakeIndex].count += 1;
-    fieldPatterns.common_mistakes[existingMistakeIndex].correct = corrected;
-  } else {
-    fieldPatterns.common_mistakes.push({
-      detected,
-      correct: corrected,
-      count: 1
-    });
+  // 4. Store common mistakes — only when there is a non-empty detected value.
+  // Otherwise an "empty → corrected" entry would pollute the pattern map and
+  // never match a future detected value anyway.
+  if (detected) {
+    const existingMistakeIndex = fieldPatterns.common_mistakes.findIndex(
+      m => m.detected === detected
+    );
+
+    if (existingMistakeIndex >= 0) {
+      fieldPatterns.common_mistakes[existingMistakeIndex].count += 1;
+      fieldPatterns.common_mistakes[existingMistakeIndex].correct = corrected;
+    } else {
+      fieldPatterns.common_mistakes.push({
+        detected,
+        correct: corrected,
+        count: 1
+      });
+    }
+
+    // 5. Keep only the 15 most frequent mistakes, sorted by frequency
+    fieldPatterns.common_mistakes = fieldPatterns.common_mistakes
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15);
   }
-  
-  // 5. Keep only the 15 most frequent mistakes, sorted by frequency
-  fieldPatterns.common_mistakes = fieldPatterns.common_mistakes
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 15);
   
   // 6. For amounts: Learn typical range
   if (['amount_gross', 'amount_net', 'vat_amount'].includes(fieldName)) {
