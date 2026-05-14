@@ -160,6 +160,19 @@ const Upload = () => {
     loadPendingReceipts();
   }, [user]);
 
+  // Detect an unfinished upload session left over from a previous reload/crash.
+  useEffect(() => {
+    if (!user) return;
+    const existing = loadQueue(user.id);
+    if (!existing) return;
+    const unfinished = existing.items.filter(i => i.status !== 'complete' && i.status !== 'error');
+    if (unfinished.length === 0) {
+      clearQueue(user.id);
+      return;
+    }
+    setRecoveredQueue(existing);
+  }, [user]);
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
