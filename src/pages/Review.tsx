@@ -1062,12 +1062,17 @@ const Review = () => {
                           </Tooltip>
                         )}
                       </div>
-                      <Input
-                        id="vendor"
+                      <VendorAutocomplete
                         value={formData.vendor}
-                        onChange={(e) => setFormData(prev => ({ ...prev, vendor: e.target.value }))}
+                        vendorId={selectedVendorId}
+                        onChange={(value, id) => {
+                          setFormData(prev => ({ ...prev, vendor: value }));
+                          if (!id) setSelectedVendorId(null);
+                        }}
+                        onVendorSelect={handleVendorSelect}
+                        disabled={saving}
+                        hideLabel
                         placeholder="z.B. troii Software GmbH"
-                        className="text-sm"
                       />
                     </div>
 
