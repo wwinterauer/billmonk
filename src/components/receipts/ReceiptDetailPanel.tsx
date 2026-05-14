@@ -1495,18 +1495,14 @@ export function ReceiptDetailPanel({
                         originalValue={originalReceipt?.category}
                         onReset={() => setCategory(originalReceipt?.category || '')}
                       >
-                        <Select value={category} onValueChange={setCategory}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Nicht zugeordnet" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {userCategories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.name}>
-                                {cat.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <SearchableSelect
+                          value={category}
+                          onChange={setCategory}
+                          options={userCategories.map(cat => ({ value: cat.name, label: cat.name }))}
+                          placeholder="Nicht zugeordnet"
+                          searchPlaceholder="Kategorie suchen..."
+                          allowClear
+                        />
                       </LearnableField>
 
                       {/* Buchungsart (tax_type) */}
