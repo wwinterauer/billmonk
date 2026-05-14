@@ -445,6 +445,7 @@ const Review = () => {
         is_mixed_tax_rate: formData.is_mixed_tax_rate,
         tax_rate_details: formData.is_mixed_tax_rate ? formData.tax_rate_details : null,
         payment_method: formData.payment_method || null,
+        vendor_id: selectedVendorId,
       };
 
       if (newStatus) {
