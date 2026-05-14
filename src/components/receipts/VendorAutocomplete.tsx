@@ -356,10 +356,15 @@ export function VendorAutocomplete({
                 variant="ghost"
                 size="sm"
                 className="w-full justify-start text-primary hover:text-primary"
-                onClick={handleUseCustomValue}
+                onClick={handleCreateNewVendor}
+                disabled={isCreating || vendorSearch.trim().length < 2}
               >
-                <Plus className="w-4 h-4 mr-2" />
-                "{vendorSearch}" als neuen Lieferanten
+                {isCreating ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4 mr-2" />
+                )}
+                "{vendorSearch}" als neuen Lieferanten anlegen
               </Button>
             </div>
           )}
