@@ -1132,24 +1132,28 @@ const Review = () => {
                               onCheckedChange={async (checked) => {
                                 setVendorAutoApprove(checked);
                                 if (selectedVendorId) {
-                                  const { error } = await supabase
-                                    .from('vendors')
-                                    .update({
+                                  try {
+                                    const result = await updateVendor(selectedVendorId, {
                                       auto_approve: checked,
                                       auto_approve_min_confidence: vendorAutoApproveMinConfidence,
-                                    })
-                                    .eq('id', selectedVendorId);
-                                  if (error) {
+                                    });
+                                    const approved = result?.autoApprovedReceipts ?? 0;
+                                    toast({
+                                      title: checked ? 'Automatische Freigabe aktiviert' : 'Automatische Freigabe deaktiviert',
+                                      description: approved > 0
+                                        ? `${approved} Beleg(e) rückwirkend freigegeben.`
+                                        : undefined,
+                                    });
+                                    if (approved > 0) {
+                                      await loadReceipts();
+                                    }
+                                  } catch (err: any) {
                                     toast({
                                       variant: 'destructive',
                                       title: 'Fehler',
-                                      description: 'Automatische Freigabe konnte nicht gespeichert werden.',
+                                      description: err?.message || 'Automatische Freigabe konnte nicht gespeichert werden.',
                                     });
                                     setVendorAutoApprove(!checked);
-                                  } else {
-                                    toast({
-                                      title: checked ? 'Automatische Freigabe aktiviert' : 'Automatische Freigabe deaktiviert',
-                                    });
                                   }
                                 }
                               }}
