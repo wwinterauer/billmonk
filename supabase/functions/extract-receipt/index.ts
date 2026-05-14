@@ -522,12 +522,10 @@ serve(async (req) => {
       const { data: userProfile } = await supabase.from('profiles').select('country').eq('id', userId).single();
       const userCountry = userProfile?.country?.toUpperCase() || null;
 
+      // category-Liste = NUR persönliche User-Kategorien + globale System-Einträge ohne Land.
+      // Steuer-Buchungsarten (KFZ-Kosten (AT) etc.) gehen NICHT mehr hier rein, sondern in tax_type.
       let query = supabase.from('categories').select('name, country').eq('is_hidden', false).order('sort_order');
-      if (userCountry) {
-        query = query.or(`user_id.eq.${userId},and(is_system.eq.true,country.eq.${userCountry})`);
-      } else {
-        query = query.or(`user_id.eq.${userId},is_system.eq.true`);
-      }
+      query = query.or(`user_id.eq.${userId},and(is_system.eq.true,country.is.null)`);
 
       const { data: userCategories } = await query;
       if (userCategories && userCategories.length > 0) {
