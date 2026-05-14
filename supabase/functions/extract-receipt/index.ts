@@ -1033,6 +1033,73 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           console.error("Failed to update receipt:", updateError);
         } else {
           console.log(`Receipt ${receiptId} updated (V2, VAT: ${vatRateSource})`);
+
+          // Post-save duplicate recheck (handles race condition with parallel uploads).
+          // Look for sibling receipts of the same user updated within the last 15 minutes
+          // that match by invoice_number OR (amount_gross + receipt_date).
+          try {
+            if (userId) {
+              const sinceIso = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+              const activeStatuses = ['pending', 'processing', 'review', 'approved', 'duplicate'];
+              const orFilters: string[] = [];
+              if (extractedData.invoice_number) {
+                orFilters.push(`invoice_number.eq.${extractedData.invoice_number}`);
+              }
+              if (extractedData.amount_gross != null && extractedData.receipt_date) {
+                orFilters.push(`and(amount_gross.eq.${extractedData.amount_gross},receipt_date.eq.${extractedData.receipt_date})`);
+              }
+              if (orFilters.length > 0) {
+                const { data: siblings } = await supabase
+                  .from('receipts')
+                  .select('id, vendor, invoice_number, amount_gross, receipt_date, file_hash, created_at, is_duplicate')
+                  .eq('user_id', userId)
+                  .in('status', activeStatuses)
+                  .neq('id', receiptId)
+                  .gte('updated_at', sinceIso)
+                  .or(orFilters.join(','))
+                  .limit(5);
+
+                const { data: self } = await supabase
+                  .from('receipts')
+                  .select('id, file_hash, created_at')
+                  .eq('id', receiptId)
+                  .single();
+
+                const match = (siblings || []).find((s: any) => {
+                  // Skip if file hashes are equal — that's an exact-file dup handled elsewhere
+                  if (self?.file_hash && s.file_hash && self.file_hash === s.file_hash) return true;
+                  // Strong: same invoice_number
+                  if (extractedData.invoice_number && s.invoice_number === extractedData.invoice_number) return true;
+                  // Strong: same amount + same date
+                  if (extractedData.amount_gross != null && extractedData.receipt_date
+                      && Number(s.amount_gross) === Number(extractedData.amount_gross)
+                      && s.receipt_date === extractedData.receipt_date) return true;
+                  return false;
+                });
+
+                if (match && self) {
+                  // Mark the NEWER one as the duplicate of the OLDER one
+                  const selfIsNewer = new Date(self.created_at).getTime() >= new Date(match.created_at).getTime();
+                  const dupId = selfIsNewer ? receiptId : match.id;
+                  const ofId = selfIsNewer ? match.id : receiptId;
+                  const reasons: string[] = [];
+                  if (extractedData.invoice_number && match.invoice_number === extractedData.invoice_number) reasons.push('Gleiche Rechnungsnummer');
+                  if (extractedData.amount_gross != null && Number(match.amount_gross) === Number(extractedData.amount_gross)) reasons.push('Gleicher Betrag');
+                  if (extractedData.receipt_date && match.receipt_date === extractedData.receipt_date) reasons.push('Gleiches Datum');
+                  await supabase.from('receipts').update({
+                    is_duplicate: true,
+                    duplicate_of: ofId,
+                    duplicate_score: extractedData.invoice_number && match.invoice_number === extractedData.invoice_number ? 95 : 90,
+                    duplicate_checked_at: new Date().toISOString(),
+                    notes: `Mögliches Duplikat (Auto-Recheck): ${reasons.join(', ')}`,
+                  }).eq('id', dupId);
+                  console.log(`[DupRecheck] Marked ${dupId} as duplicate of ${ofId} (${reasons.join(', ')})`);
+                }
+              }
+            }
+          } catch (recheckErr) {
+            console.error('[DupRecheck] failed:', recheckErr);
+          }
         }
       }
 
