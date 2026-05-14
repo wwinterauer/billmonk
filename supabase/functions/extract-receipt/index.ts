@@ -827,13 +827,25 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
 
       // ── Post-Processing: VAT consistency (skip for mixed tax rates) ──
       if (extractedData.amount_gross != null && !extractedData.is_mixed_tax_rate) {
+        // Truth-from-Line-Items dominiert: Rule 0 nur ausführen, wenn weder Line Items
+        // noch tax_rate_details einen positiven Steuersatz belegen.
+        const lineItemsHavePositiveRate = validLineItems.some((li: any) => {
+          const r = parseFloat(String(li.tax_rate).replace(',', '.').replace('%', ''));
+          return Number.isFinite(r) && r > 0;
+        });
+        const detailsHavePositiveRate = Array.isArray(extractedData.tax_rate_details)
+          && extractedData.tax_rate_details.some((d: any) => Number(d?.rate) > 0);
+        const skipRule0 = lineItemsHavePositiveRate || detailsHavePositiveRate;
+
         // Rule 0: Explicit 0% in document
         const zeroVatPattern = /0[,.]?0{0,2}\s*%\s*(USt|MwSt|Ust|mwst|umsatzsteuer)/i;
-        if (zeroVatPattern.test(content) && extractedData.vat_rate !== 0) {
+        if (!skipRule0 && zeroVatPattern.test(content) && extractedData.vat_rate !== 0) {
           console.log(`[VAT Consistency] Rule 0: Explicit 0% found, correcting from ${extractedData.vat_rate}%`);
           extractedData.vat_rate = 0;
           extractedData.vat_amount = 0;
           extractedData.amount_net = extractedData.amount_gross;
+        } else if (skipRule0 && zeroVatPattern.test(content) && extractedData.vat_rate !== 0) {
+          console.log(`[VAT Consistency] Rule 0 übersprungen: Line Items / tax_rate_details belegen positive Steuersätze (Truth-from-LineItems)`);
         }
 
         // Rule 1: Gross == Net and no VAT
