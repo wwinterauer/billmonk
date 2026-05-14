@@ -1046,6 +1046,12 @@ const Reports = () => {
 
   return (
     <DashboardLayout>
+      <PageMeta
+        title="Berichte & Auswertungen — BillMonk"
+        description="Analysiere Einnahmen, Ausgaben, USt-Sätze und Kategorien. Exporte für den Steuerberater inklusive — alles übersichtlich in BillMonk."
+        canonical="/reports"
+        noindex
+      />
       <div className="p-6 lg:p-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
