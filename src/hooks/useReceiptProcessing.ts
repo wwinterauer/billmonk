@@ -32,9 +32,10 @@ export function useReceiptProcessing(
     const isSupported = supportedTypes.includes(file.type);
 
     if (!isSupported) {
-      // Not a supported type, set to pending for manual entry
+      // Not a supported type, send to review for manual entry so the user
+      // can see and edit it instead of letting it sit invisibly in pending.
       onProgress?.(100, 'Manuelle Eingabe');
-      const updated = await updateReceipt(receiptId, { status: 'pending' });
+      const updated = await updateReceipt(receiptId, { status: 'review' });
       return { receipt: updated, aiSuccess: false };
     }
 
@@ -228,11 +229,17 @@ export function useReceiptProcessing(
 
     } catch (error) {
       console.error('AI extraction failed:', error);
-      
-      // AI failed, set to pending for manual entry
-      onProgress?.(100, 'Manuelle Eingabe');
-      const updated = await updateReceipt(receiptId, { status: 'pending' });
-      
+
+      // AI failed (e.g. edge function 5xx, AI gateway throttle, empty
+      // response). Send the receipt to review so the user sees it in the
+      // list and can fill the data manually instead of having it stuck
+      // invisibly in `pending`.
+      onProgress?.(100, 'KI fehlgeschlagen — manuelle Eingabe');
+      const updated = await updateReceipt(receiptId, {
+        status: 'review',
+        ai_processed_at: new Date().toISOString(),
+      });
+
       return { receipt: updated, aiSuccess: false };
     }
   };
