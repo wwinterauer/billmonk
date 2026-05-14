@@ -229,20 +229,16 @@ export function RecurringExpensesTab() {
                       </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <Select
-                      value={expense.category_id || 'none'}
-                      onValueChange={(v) => updateCategory(expense.id, v === 'none' ? null : v)}
-                    >
-                      <SelectTrigger className="w-[140px] h-8 text-xs">
-                        <SelectValue placeholder="Kategorie" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Keine</SelectItem>
-                        {userCategories.map(c => (
-                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={expense.category_id || ''}
+                      onChange={(v) => updateCategory(expense.id, v || null)}
+                      options={userCategories.map(c => ({ value: c.id, label: c.name }))}
+                      placeholder="Kategorie"
+                      searchPlaceholder="Kategorie suchen..."
+                      allowClear
+                      clearLabel="Keine"
+                      className="w-[140px] h-8 text-xs"
+                    />
                   </div>
                 </div>
               </CardContent>
