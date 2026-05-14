@@ -663,6 +663,12 @@ const Review = () => {
 
   return (
     <DashboardLayout>
+      <PageMeta
+        title="Belege überprüfen — BillMonk"
+        description="Kontrolliere automatisch erkannte Belegdaten, korrigiere Felder und bestätige Buchungen — KI-gestützte Belegprüfung in BillMonk."
+        canonical="/review"
+        noindex
+      />
       <div className="p-6 lg:p-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

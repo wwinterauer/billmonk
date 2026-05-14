@@ -389,6 +389,12 @@ export default function Checklists() {
 
   return (
     <DashboardLayout>
+      <PageMeta
+        title="Checklisten — BillMonk"
+        description="Erstelle und verwalte wiederverwendbare Checklisten für Aufgaben, Onboarding und Routinen — direkt in BillMonk."
+        canonical="/checklists"
+        noindex
+      />
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>

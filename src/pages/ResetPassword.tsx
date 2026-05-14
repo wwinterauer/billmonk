@@ -112,6 +112,12 @@ const ResetPassword = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-secondary/30 px-4 py-12">
+      <PageMeta
+        title="Passwort zurücksetzen — BillMonk"
+        description="Setze dein BillMonk-Passwort sicher zurück und melde dich wieder bei deinem Konto an — schnell und unkompliziert."
+        canonical="/reset-password"
+        noindex
+      />
       <div className="w-full max-w-md">
         <Card className="border-border/50 shadow-xl">
           <CardHeader className="text-center pb-2">
