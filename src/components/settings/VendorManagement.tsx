@@ -1361,6 +1361,30 @@ export function VendorManagement() {
               </Select>
             </div>
 
+            {/* Standard-Buchungsart (tax_type) */}
+            <div className="space-y-2">
+              <Label htmlFor="default_tax_type">Standard-Buchungsart</Label>
+              <Select
+                value={formData.default_tax_type || '__none__'}
+                onValueChange={(value) =>
+                  setFormData(prev => ({ ...prev, default_tax_type: value === '__none__' ? '' : value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Keine Vorgabe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Keine Vorgabe</SelectItem>
+                  {taxCategories.map((c) => (
+                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Steuer-Buchungsart wird bei neuen Belegen dieses Lieferanten automatisch vorausgewählt (sofern AI keine erkennt).
+              </p>
+            </div>
+
             {/* Standard-Zahlungsart */}
             <div className="space-y-2">
               <Label htmlFor="default_payment_method">Standard-Zahlungsart</Label>
