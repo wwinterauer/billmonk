@@ -460,10 +460,7 @@ export function CategoryManagement() {
     );
   };
 
-  // Count how many tax categories for selected country are currently visible
-  const taxCatsForCountry = categories.filter(c => c.country === selectedCountry && c.is_system);
-  const visibleTaxCats = taxCatsForCountry.filter(c => !c.is_hidden);
-  const allTaxVisible = taxCatsForCountry.length > 0 && visibleTaxCats.length === taxCatsForCountry.length;
+  // (Buchungsarten-Toggle entfernt: Buchungsarten sind jetzt statisch aus taxCategoryInfo.ts)
 
   // Split into two groups
   const userCategories = useMemo(() => categories.filter(c => !c.is_system || !c.country), [categories]);
