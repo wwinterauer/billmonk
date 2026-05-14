@@ -174,6 +174,34 @@ const Upload = () => {
     setRecoveredQueue(existing);
   }, [user]);
 
+  // Realtime subscription: keep the pending-receipts list (and the status
+  // counter chips) in sync while uploads are happening in the background,
+  // so the user sees Erfolgreich/Wartend/… counts update live without a
+  // page reload.
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`upload-page-receipts-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'receipts', filter: `user_id=eq.${user.id}` },
+        () => { loadPendingReceipts(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, loadPendingReceipts]);
+
+  // Fallback polling while uploads are in flight — covers the case where
+  // realtime briefly drops or the tab was backgrounded.
+  useEffect(() => {
+    const hasActiveUploads = Array.from(uploads.values()).some(
+      u => u.status === 'uploading' || u.status === 'processing'
+    );
+    if (!hasActiveUploads) return;
+    const interval = setInterval(() => { loadPendingReceipts(); }, 3000);
+    return () => clearInterval(interval);
+  }, [uploads, loadPendingReceipts]);
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
