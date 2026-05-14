@@ -139,6 +139,8 @@ const Review = () => {
   const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
+  const [vendorAutoApprove, setVendorAutoApprove] = useState(false);
+  const [vendorAutoApproveMinConfidence, setVendorAutoApproveMinConfidence] = useState(0.8);
   const [formData, setFormData] = useState<FormData>({
     vendor: '',
     vendor_brand: '',
