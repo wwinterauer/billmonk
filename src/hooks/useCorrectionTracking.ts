@@ -362,6 +362,7 @@ export function useCorrectionTracking() {
               .from('category_rules')
               .select('id, tax_type_match_count')
               .eq('user_id', user.id)
+              .eq('vendor_id', vendorId)
               .eq('keyword', keyword)
               .maybeSingle();
             
@@ -379,6 +380,7 @@ export function useCorrectionTracking() {
                 .from('category_rules')
                 .insert({
                   user_id: user.id,
+                  vendor_id: vendorId,
                   keyword,
                   category_name: '', // required column, empty since this is tax_type only
                   tax_type_name: String(correctedValue),
