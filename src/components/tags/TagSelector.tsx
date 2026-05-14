@@ -1,23 +1,15 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { Check, Minus, MoreHorizontal, Settings } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { useState, useEffect, useRef } from 'react';
+import { Check, Minus, Settings } from 'lucide-react';
 import { useTags } from '@/hooks/useTags';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
-import type { Tag, TagWithAssignment } from '@/types/tags';
+import type { Tag } from '@/types/tags';
 
 interface TagSelectorProps {
   receiptId?: string;              // Einzelner Beleg
   receiptIds?: string[];           // Mehrere Belege (Bulk-Modus)
   onChange?: () => void;           // Callback nach Änderung
-  maxVisibleTags?: number;         // Default: 6
   size?: 'sm' | 'md';              // Default: 'md'
   disabled?: boolean;
 }
@@ -32,7 +24,6 @@ export function TagSelector({
   receiptId,
   receiptIds,
   onChange,
-  maxVisibleTags = 6,
   size = 'md',
   disabled = false,
 }: TagSelectorProps) {
@@ -49,7 +40,7 @@ export function TagSelector({
 
   const [tagStates, setTagStates] = useState<TagState[]>([]);
   const [loadingTags, setLoadingTags] = useState(true);
-  const [popoverOpen, setPopoverOpen] = useState(false);
+  
   
   // Track if we've done initial load to prevent unnecessary re-fetches
   const loadedRef = useRef<string>('');
@@ -186,16 +177,7 @@ export function TagSelector({
     }
   };
 
-  // Split tags for overflow display
-  const { visibleTags, overflowTags } = useMemo(() => {
-    if (tagStates.length <= maxVisibleTags) {
-      return { visibleTags: tagStates, overflowTags: [] };
-    }
-    return {
-      visibleTags: tagStates.slice(0, maxVisibleTags - 1),
-      overflowTags: tagStates.slice(maxVisibleTags - 1),
-    };
-  }, [tagStates, maxVisibleTags]);
+
 
   // Size classes
   const sizeClasses = {
@@ -307,35 +289,7 @@ export function TagSelector({
 
   return (
     <div className={cn('flex flex-wrap items-center', classes.container)}>
-      {/* Visible tags */}
-      {visibleTags.map(tag => renderTagChip(tag))}
-
-      {/* Overflow popover */}
-      {overflowTags.length > 0 && (
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className={cn(
-                'rounded-full',
-                size === 'sm' ? 'h-5 px-2 text-xs' : 'h-7 px-2.5 text-sm'
-              )}
-            >
-              <MoreHorizontal className={classes.icon} />
-              <span className="ml-1">+{overflowTags.length}</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            className="w-auto p-2"
-            align="start"
-          >
-            <div className={cn('flex flex-wrap max-w-xs', classes.container)}>
-              {overflowTags.map(tag => renderTagChip(tag))}
-            </div>
-          </PopoverContent>
-        </Popover>
-      )}
+      {tagStates.map(tag => renderTagChip(tag))}
     </div>
   );
 }
