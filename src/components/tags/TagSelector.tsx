@@ -1,17 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { Check, Minus, MoreHorizontal, Settings } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { useState, useEffect, useRef } from 'react';
+import { Check, Minus, Settings } from 'lucide-react';
 import { useTags } from '@/hooks/useTags';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
-import type { Tag, TagWithAssignment } from '@/types/tags';
+import type { Tag } from '@/types/tags';
 
 interface TagSelectorProps {
   receiptId?: string;              // Einzelner Beleg
