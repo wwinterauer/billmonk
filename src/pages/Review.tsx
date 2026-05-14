@@ -1167,16 +1167,32 @@ const Review = () => {
                               </div>
                               <Slider
                                 value={[Math.round(vendorAutoApproveMinConfidence * 100)]}
-                                onValueChange={async ([value]) => {
-                                  const newVal = value / 100;
-                                  setVendorAutoApproveMinConfidence(newVal);
-                                  if (selectedVendorId) {
-                                    await supabase
-                                      .from('vendors')
-                                      .update({ auto_approve_min_confidence: newVal })
-                                      .eq('id', selectedVendorId);
-                                  }
-                                }}
+                                 onValueChange={async ([value]) => {
+                                   const newVal = value / 100;
+                                   setVendorAutoApproveMinConfidence(newVal);
+                                   if (selectedVendorId) {
+                                     try {
+                                       const result = await updateVendor(selectedVendorId, {
+                                         auto_approve: vendorAutoApprove,
+                                         auto_approve_min_confidence: newVal,
+                                       });
+                                       const approved = result?.autoApprovedReceipts ?? 0;
+                                       if (approved > 0) {
+                                         toast({
+                                           title: 'Mindest-Konfidenz aktualisiert',
+                                           description: `${approved} Beleg(e) rückwirkend freigegeben.`,
+                                         });
+                                         await loadReceipts();
+                                       }
+                                     } catch (err: any) {
+                                       toast({
+                                         variant: 'destructive',
+                                         title: 'Fehler',
+                                         description: err?.message || 'Konnte nicht gespeichert werden.',
+                                       });
+                                     }
+                                   }
+                                 }}
                                 min={50}
                                 max={100}
                                 step={5}
