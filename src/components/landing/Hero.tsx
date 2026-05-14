@@ -98,9 +98,9 @@ export function Hero() {
                 {/* Mock Dashboard Preview */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <img src={logoTeal} alt="BillMonk" className="h-6" />
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <img src={logoTeal} alt="BillMonk" className="h-6" width="100" height="24" fetchPriority="high" />
+                  </div>
                     <Badge variant="secondary" className="text-xs">Dashboard</Badge>
                   </div>
                   
