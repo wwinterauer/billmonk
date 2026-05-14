@@ -85,6 +85,7 @@ import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
 import { VendorAutocomplete } from '@/components/receipts/VendorAutocomplete';
 import { PAYMENT_METHODS } from '@/lib/constants';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PageMeta } from '@/components/PageMeta';
 
 interface TaxRateDetail {
@@ -1189,21 +1190,13 @@ const Review = () => {
                             </TooltipContent>
                           </Tooltip>
                         </div>
-                        <Select
+                        <SearchableSelect
                           value={formData.category}
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Nicht zugeordnet" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {userCategories.map(cat => (
-                              <SelectItem key={cat.id} value={cat.name}>
-                                {cat.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          onChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                          options={userCategories.map(cat => ({ value: cat.name, label: cat.name }))}
+                          placeholder="Nicht zugeordnet"
+                          searchPlaceholder="Kategorie suchen..."
+                        />
                       </div>
 
                       {/* Buchungsart (tax_type) */}
@@ -1222,21 +1215,13 @@ const Review = () => {
                             </TooltipContent>
                           </Tooltip>
                         </div>
-                        <Select
+                        <SearchableSelect
                           value={formData.tax_type}
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, tax_type: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Offen" />
-                          </SelectTrigger>
-                           <SelectContent>
-                            {taxCategories.map(c => (
-                              <SelectItem key={c.id} value={c.name}>
-                                {c.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          onChange={(value) => setFormData(prev => ({ ...prev, tax_type: value }))}
+                          options={taxCategories.map(c => ({ value: c.name, label: c.name }))}
+                          placeholder="Offen"
+                          searchPlaceholder="Buchungsart suchen..."
+                        />
                       </div>
                     </div>
 
