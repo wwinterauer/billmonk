@@ -1244,7 +1244,7 @@ export function VendorManagement() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Mehrere rechtliche Firmennamen möglich – z.B. für Marktplätze wie Amazon mit verschiedenen Händlern
+                Mehrere rechtliche Firmennamen möglich – z.B. für Marktplätze wie Amazon mit verschiedenen Händlern. Mit Enter oder + hinzufügen (wird beim Speichern auch automatisch übernommen).
               </p>
             </div>
 
