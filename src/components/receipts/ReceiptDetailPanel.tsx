@@ -86,6 +86,7 @@ import {
 } from '@/lib/filenameUtils';
 import { AlertTriangle, GraduationCap, Trash2 } from 'lucide-react';
 import { useCorrectionTracking, type CorrectionData } from '@/hooks/useCorrectionTracking';
+import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 import { LEARNABLE_FIELDS } from '@/types/learning';
 import { useVendorLearning } from '@/hooks/useVendorLearning';
 import { LearnableField } from './LearnableField';
