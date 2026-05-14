@@ -7,7 +7,7 @@ function hasBetaAccess(): boolean {
   return document.cookie.split(';').some(c => c.trim().startsWith('beta_access=true'));
 }
 
-const EXEMPT_ROUTES = ['/beta', '/datenschutz', '/unsubscribe', '/share-receive'];
+const EXEMPT_ROUTES = ['/beta', '/datenschutz', '/unsubscribe', '/share-receive', '/login', '/register', '/reset-password', '/forgot-password'];
 
 interface BetaGateProps {
   children: React.ReactNode;
