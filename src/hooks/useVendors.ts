@@ -23,6 +23,7 @@ export interface Vendor {
   default_category_id: string | null;
   default_tag_id: string | null;
   default_vat_rate: number | null;
+  default_tax_type: string | null;
   field_defaults: FieldDefaults;
   field_defaults_stats: FieldDefaultsStats;
   field_suggestions_dismissed: FieldSuggestionsDismissed;
