@@ -1232,6 +1232,7 @@ const Review = () => {
                           options={taxCategories.map(c => ({ value: c.name, label: c.name }))}
                           placeholder="Offen"
                           searchPlaceholder="Buchungsart suchen..."
+                          allowClear
                         />
                       </div>
                     </div>
