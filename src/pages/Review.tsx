@@ -83,6 +83,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
+import { VendorAutocomplete } from '@/components/receipts/VendorAutocomplete';
 import { PAYMENT_METHODS } from '@/lib/constants';
 import { PageMeta } from '@/components/PageMeta';
 
@@ -133,6 +134,7 @@ const Review = () => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({
     vendor: '',
     vendor_brand: '',
@@ -289,6 +291,7 @@ const Review = () => {
       vat_amount_override: vatAmountOverride,
     });
     setAiConfidence(receipt.ai_confidence ?? null);
+    setSelectedVendorId(receipt.vendor_id ?? null);
   };
 
   // Handle reanalysis updates
@@ -327,7 +330,39 @@ const Review = () => {
     }
   }, []);
 
-  // Navigate to receipt
+  // Apply vendor when selected from dropdown
+  const handleVendorSelect = useCallback((vendorData: {
+    id: string;
+    display_name: string;
+    legal_names: string[] | null;
+    default_category_id: string | null;
+    default_vat_rate: number | null;
+  }) => {
+    setSelectedVendorId(vendorData.id);
+    const legalName = vendorData.legal_names?.[0] || vendorData.display_name;
+    setFormData(prev => ({
+      ...prev,
+      vendor: legalName,
+      vendor_brand: vendorData.display_name,
+      // Pre-fill VAT only if currently empty/default
+      vat_rate: (prev.vat_rate === '' || prev.vat_rate === defaultVatRate) && vendorData.default_vat_rate !== null
+        ? vendorData.default_vat_rate.toString()
+        : prev.vat_rate,
+    }));
+    // Default category id -> resolve to category name asynchronously
+    if (vendorData.default_category_id && !formData.category) {
+      supabase
+        .from('categories')
+        .select('name')
+        .eq('id', vendorData.default_category_id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.name) {
+            setFormData(prev => prev.category ? prev : { ...prev, category: data.name });
+          }
+        });
+    }
+  }, [defaultVatRate, formData.category]);
   const goToReceipt = useCallback((index: number) => {
     if (index >= 0 && index < receipts.length) {
       setCurrentIndex(index);
@@ -410,6 +445,7 @@ const Review = () => {
         is_mixed_tax_rate: formData.is_mixed_tax_rate,
         tax_rate_details: formData.is_mixed_tax_rate ? formData.tax_rate_details : null,
         payment_method: formData.payment_method || null,
+        vendor_id: selectedVendorId,
       };
 
       if (newStatus) {
@@ -967,7 +1003,7 @@ const Review = () => {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Label htmlFor="vendor_brand">Lieferant (Markenname)</Label>
-                        {currentReceipt?.vendor_id && (
+                        {selectedVendorId && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
@@ -975,7 +1011,7 @@ const Review = () => {
                                 variant="ghost"
                                 size="icon"
                                 className="h-5 w-5"
-                                onClick={() => window.open(`/settings?tab=vendors&vendorId=${currentReceipt.vendor_id}`, '_blank')}
+                                onClick={() => window.open(`/settings?tab=vendors&vendorId=${selectedVendorId}`, '_blank')}
                               >
                                 <ExternalLink className="h-3 w-3" />
                               </Button>
@@ -1000,6 +1036,9 @@ const Review = () => {
                         value={formData.vendor_brand}
                         onChange={(e) => setFormData(prev => ({ ...prev, vendor_brand: e.target.value }))}
                         placeholder="z.B. timr, Amazon, A1"
+                        readOnly={!!selectedVendorId}
+                        disabled={!!selectedVendorId}
+                        className={cn(selectedVendorId && 'text-muted-foreground bg-muted/50')}
                       />
                     </div>
 
@@ -1023,12 +1062,17 @@ const Review = () => {
                           </Tooltip>
                         )}
                       </div>
-                      <Input
-                        id="vendor"
+                      <VendorAutocomplete
                         value={formData.vendor}
-                        onChange={(e) => setFormData(prev => ({ ...prev, vendor: e.target.value }))}
+                        vendorId={selectedVendorId}
+                        onChange={(value, id) => {
+                          setFormData(prev => ({ ...prev, vendor: value }));
+                          if (!id) setSelectedVendorId(null);
+                        }}
+                        onVendorSelect={handleVendorSelect}
+                        disabled={saving}
+                        hideLabel
                         placeholder="z.B. troii Software GmbH"
-                        className="text-sm"
                       />
                     </div>
 
