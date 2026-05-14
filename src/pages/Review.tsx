@@ -1114,6 +1114,72 @@ const Review = () => {
                         hideLabel
                         placeholder="z.B. troii Software GmbH"
                       />
+                      {/* Auto Approve Toggle */}
+                      {selectedVendorId && (
+                        <div className="mt-2 space-y-2 rounded-lg border border-border/50 bg-muted/30 p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Zap className="h-3.5 w-3.5 text-yellow-500" />
+                              <Label htmlFor="auto-approve" className="text-sm cursor-pointer">
+                                Automatische Freigabe
+                              </Label>
+                            </div>
+                            <Switch
+                              id="auto-approve"
+                              checked={vendorAutoApprove}
+                              onCheckedChange={async (checked) => {
+                                setVendorAutoApprove(checked);
+                                if (selectedVendorId) {
+                                  const { error } = await supabase
+                                    .from('vendors')
+                                    .update({
+                                      auto_approve: checked,
+                                      auto_approve_min_confidence: vendorAutoApproveMinConfidence,
+                                    })
+                                    .eq('id', selectedVendorId);
+                                  if (error) {
+                                    toast({
+                                      variant: 'destructive',
+                                      title: 'Fehler',
+                                      description: 'Automatische Freigabe konnte nicht gespeichert werden.',
+                                    });
+                                    setVendorAutoApprove(!checked);
+                                  } else {
+                                    toast({
+                                      title: checked ? 'Automatische Freigabe aktiviert' : 'Automatische Freigabe deaktiviert',
+                                    });
+                                  }
+                                }
+                              }}
+                            />
+                          </div>
+                          {vendorAutoApprove && (
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">Mindest-Konfidenz</span>
+                                <span className="text-xs font-medium">{Math.round(vendorAutoApproveMinConfidence * 100)}%</span>
+                              </div>
+                              <Slider
+                                value={[Math.round(vendorAutoApproveMinConfidence * 100)]}
+                                onValueChange={async ([value]) => {
+                                  const newVal = value / 100;
+                                  setVendorAutoApproveMinConfidence(newVal);
+                                  if (selectedVendorId) {
+                                    await supabase
+                                      .from('vendors')
+                                      .update({ auto_approve_min_confidence: newVal })
+                                      .eq('id', selectedVendorId);
+                                  }
+                                }}
+                                min={50}
+                                max={100}
+                                step={5}
+                                className="w-full"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Description */}
