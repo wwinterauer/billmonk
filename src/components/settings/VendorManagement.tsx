@@ -240,12 +240,23 @@ export function VendorManagement() {
       return;
     }
 
+    // Nicht übernommenen Wert aus dem Legal-Name-Input automatisch aufnehmen,
+    // damit Nutzer:innen, die direkt auf Speichern klicken (ohne Enter/+), nichts verlieren.
+    const pendingInput = document.getElementById('new_legal_name') as HTMLInputElement | null;
+    const pendingVal = pendingInput?.value.trim();
+    let effectiveLegalNames = formData.legal_names;
+    if (pendingVal && !effectiveLegalNames.includes(pendingVal)) {
+      effectiveLegalNames = [...effectiveLegalNames, pendingVal];
+      setFormData(prev => ({ ...prev, legal_names: effectiveLegalNames }));
+      if (pendingInput) pendingInput.value = '';
+    }
+
     setIsSaving(true);
     try {
       if (editingVendor) {
         const result = await updateVendor(editingVendor.id, {
           display_name: formData.display_name.trim(),
-          legal_names: formData.legal_names.filter(n => n.trim()),
+          legal_names: effectiveLegalNames.filter(n => n.trim()),
           detected_names: formData.detected_names,
           default_category_id: formData.default_category_id || null,
           default_tag_id: formData.default_tag_id || null,
@@ -279,7 +290,7 @@ export function VendorManagement() {
         }
       } else {
         await addVendor(formData.display_name.trim(), {
-          legalName: formData.legal_names[0]?.trim() || undefined,
+          legalName: effectiveLegalNames[0]?.trim() || undefined,
           detectedNames: formData.detected_names,
           defaultCategoryId: formData.default_category_id || undefined,
           defaultTagId: formData.default_tag_id || undefined,
@@ -1233,7 +1244,7 @@ export function VendorManagement() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Mehrere rechtliche Firmennamen möglich – z.B. für Marktplätze wie Amazon mit verschiedenen Händlern
+                Mehrere rechtliche Firmennamen möglich – z.B. für Marktplätze wie Amazon mit verschiedenen Händlern. Mit Enter oder + hinzufügen (wird beim Speichern auch automatisch übernommen).
               </p>
             </div>
 
