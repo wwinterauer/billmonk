@@ -9,6 +9,7 @@ export interface MatchedVendor {
   detected_names: string[];
   default_category_id: string | null;
   default_vat_rate: number | null;
+  default_tax_type: string | null;
   default_category?: {
     id: string;
     name: string;
