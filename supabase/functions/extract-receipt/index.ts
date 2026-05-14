@@ -781,8 +781,31 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           extractedData.amount_net = Math.round(newDetails.reduce((s, d) => s + d.net_amount, 0) * 100) / 100;
           extractedData.vat_amount = Math.round(newDetails.reduce((s, d) => s + d.tax_amount, 0) * 100) / 100;
           
+        } else if (rateKeys.length === 1) {
+          // Single-Rate Truth aus Line Items: AI-Aggregat überschreiben
+          const rate = parseFloat(rateKeys[0]);
+          const lineItemsGross = Math.round(rateGroups[rateKeys[0]].gross * 100) / 100;
+          const aiGross = Number(extractedData.amount_gross) || 0;
+          // Wenn Line-Item-Summe deutlich (>1%) vom AI-Aggregat abweicht, Line-Item-Summe als Brutto verwenden
+          const useLineItemGross = aiGross === 0 || Math.abs(lineItemsGross - aiGross) / Math.max(aiGross, 1) > 0.01;
+          const gross = useLineItemGross ? lineItemsGross : aiGross;
+          const netAmount = rate === 0 ? gross : gross / (1 + rate / 100);
+          const taxAmount = gross - netAmount;
+          const prevRate = extractedData.vat_rate;
+          extractedData.vat_rate = rate;
+          extractedData.amount_gross = Math.round(gross * 100) / 100;
+          extractedData.amount_net = Math.round(netAmount * 100) / 100;
+          extractedData.vat_amount = Math.round(taxAmount * 100) / 100;
+          extractedData.is_mixed_tax_rate = false;
+          extractedData.tax_rate_details = null;
+          (extractedData as any).vat_detection_method = 'line_items';
+          (extractedData as any).vat_confidence = 1.0;
+          if (prevRate !== rate) {
+            console.log(`[VAT Truth-from-LineItems] Single-rate ${rate}% aus ${validLineItems.length} Line Items übernommen (AI-Aggregat war ${prevRate}%)`);
+          }
         }
       }
+
 
       // ── Fallback: recalculate tax_rate_details with correct math if line_items didn't trigger ──
       if (!extractedData.is_mixed_tax_rate && Array.isArray(extractedData.tax_rate_details) && extractedData.tax_rate_details.length > 1) {
