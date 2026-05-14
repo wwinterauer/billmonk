@@ -631,7 +631,8 @@ Wähle NUR aus dieser Liste eine passende User-Kategorie aus, oder lasse leer ("
 WICHTIG: category ist KEIN Steuer-Begriff. Nimm hier NIE Werte wie "KFZ-Kosten (AT)" oder "Bewirtung 50%" – die gehören ausschließlich in tax_type.
 
 BUCHUNGSART (tax_type, steuerliche Einordnung – UNABHÄNGIG von category):
-Wähle NUR aus dieser Liste den passenden Eintrag (oder "" wenn unklar): ${taxTypeList}${taxTypeHints}
+STRIKT: Wähle EXAKT einen Wert aus dieser Liste ODER lass leer (""). NIEMALS einen anderen Begriff erfinden (z.B. "Betriebsausgabe", "Sonstiges", "Aufwand"). Im Zweifel "" zurückgeben.
+Erlaubte Werte: ${taxTypeList}${taxTypeHints}
 MwSt-ERKENNUNG:
 - Suche explizite %-Angaben auf dem Beleg (20%, 19%, 10%, 7% etc.)
 - Berechne: MwSt = Brutto × Satz/(100+Satz). Validiere: Netto + MwSt = Brutto (±0.05€)
