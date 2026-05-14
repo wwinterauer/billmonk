@@ -303,6 +303,23 @@ const Review = () => {
     });
     setAiConfidence(receipt.ai_confidence ?? null);
     setSelectedVendorId(receipt.vendor_id ?? null);
+    // Load vendor auto_approve settings if vendor exists
+    if (receipt.vendor_id) {
+      supabase
+        .from('vendors')
+        .select('auto_approve, auto_approve_min_confidence')
+        .eq('id', receipt.vendor_id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            setVendorAutoApprove(data.auto_approve ?? false);
+            setVendorAutoApproveMinConfidence(data.auto_approve_min_confidence ?? 0.8);
+          }
+        });
+    } else {
+      setVendorAutoApprove(false);
+      setVendorAutoApproveMinConfidence(0.8);
+    }
   };
 
   // Handle reanalysis updates
