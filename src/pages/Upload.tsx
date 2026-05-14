@@ -1059,6 +1059,48 @@ const Upload = () => {
           <p className="text-muted-foreground">Lade deine Belege hoch und lass die KI sie analysieren</p>
         </div>
 
+        {/* Recovery banner: previous upload session was interrupted */}
+        {recoveredQueue && user && (() => {
+          const unfinished = recoveredQueue.items.filter(i => i.status !== 'complete' && i.status !== 'error');
+          if (unfinished.length === 0) return null;
+          return (
+            <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Letzter Upload nicht abgeschlossen
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Von {recoveredQueue.total} Dateien wurden {unfinished.length} vor dem Abschluss unterbrochen
+                    (z. B. durch Tab-Wechsel oder Reload). Bitte ziehe die fehlenden Dateien erneut in den Upload —
+                    bereits verarbeitete werden automatisch als Duplikat erkannt und übersprungen.
+                  </p>
+                  <details className="mt-2">
+                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                      Liste der nicht abgeschlossenen Dateien anzeigen
+                    </summary>
+                    <ul className="mt-2 max-h-40 overflow-y-auto text-xs text-muted-foreground space-y-0.5 pl-2">
+                      {unfinished.map((i, idx) => (
+                        <li key={idx} className="truncate">• {i.fileName}</li>
+                      ))}
+                    </ul>
+                  </details>
+                  <div className="mt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { clearQueue(user.id); setRecoveredQueue(null); }}
+                    >
+                      Hinweis ausblenden
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* File Check Progress - shown during checking phase */}
         {uploadPhase === 'checking' && (
           <FileCheckProgress current={checkProgress.current} total={checkProgress.total} />
