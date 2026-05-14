@@ -21,6 +21,7 @@ import {
   Tag,
   ExternalLink,
   Trash2,
+  Zap,
 } from 'lucide-react';
 import {
   AlertDialog,
