@@ -131,6 +131,56 @@ const COUNTRY_LABELS: Record<string, string> = {
   CH: 'Schweiz',
 };
 
+// Steuernummern (Kennzahlen / Kontenrahmen) je Buchungsart
+const TAX_CODES: Record<string, string> = {
+  // AT (EAR-Kennzahlen)
+  'Bewirtung 50% (AT)': 'KZ 9230',
+  'Reisekosten (AT)': 'KZ 9200',
+  'KFZ-Kosten (AT)': 'KZ 9160',
+  'Büromaterial (AT)': 'KZ 9110',
+  'Telefon & Internet (AT)': 'KZ 9130',
+  'Versicherungen (AT)': 'KZ 9220',
+  'Miete & Betriebskosten (AT)': 'KZ 9100',
+  'Werbung & Marketing (AT)': 'KZ 9140',
+  'Rechts-/Beratungskosten (AT)': 'KZ 9150',
+  'Fortbildung (AT)': 'KZ 9170',
+  'Abschreibungen AfA (AT)': 'KZ 9180',
+  'Sozialversicherung SVS (AT)': 'KZ 9225',
+  'Kammerumlage WKO (AT)': 'KZ 9226',
+  'Bankgebühren (AT)': 'KZ 9210',
+  'Geringwertige WG (AT)': 'KZ 9185',
+  // DE (SKR03/SKR04)
+  'Bewirtung 70% (DE)': 'SKR03: 4650 / SKR04: 6640',
+  'Reisekosten (DE)': 'SKR03: 4660 / SKR04: 6650',
+  'KFZ-Kosten (DE)': 'SKR03: 4510 / SKR04: 6520',
+  'Bürobedarf (DE)': 'SKR03: 4930 / SKR04: 6815',
+  'Telekommunikation (DE)': 'SKR03: 4920 / SKR04: 6805',
+  'Versicherungen (DE)': 'SKR03: 4360 / SKR04: 6400',
+  'Raumkosten/Miete (DE)': 'SKR03: 4210 / SKR04: 6310',
+  'Werbekosten (DE)': 'SKR03: 4600 / SKR04: 6600',
+  'Rechts-/Beratungskosten (DE)': 'SKR03: 4950 / SKR04: 6825',
+  'Fortbildungskosten (DE)': 'SKR03: 4945 / SKR04: 6821',
+  'Abschreibungen AfA (DE)': 'SKR03: 4830 / SKR04: 6220',
+  'Geschenke §4 Abs.5 (DE)': 'SKR03: 4630 / SKR04: 6620',
+  'Geringwertige WG (DE)': 'SKR03: 4855 / SKR04: 6260',
+  'Leasingkosten (DE)': 'SKR03: 4570 / SKR04: 6560',
+  'IHK-Beiträge (DE)': 'SKR03: 4380 / SKR04: 6420',
+  // CH (KMU-Kontenrahmen)
+  'Geschäftsbewirtung (CH)': 'KMU: 6640',
+  'Reisekosten (CH)': 'KMU: 6530',
+  'Fahrzeugkosten (CH)': 'KMU: 6200',
+  'Büromaterial (CH)': 'KMU: 6500',
+  'Telekommunikation (CH)': 'KMU: 6510',
+  'Versicherungsprämien (CH)': 'KMU: 6300',
+  'Mietaufwand (CH)': 'KMU: 6000',
+  'Werbeaufwand (CH)': 'KMU: 6600',
+  'Beratungskosten (CH)': 'KMU: 6550',
+  'Weiterbildung (CH)': 'KMU: 6540',
+  'Abschreibungen (CH)': 'KMU: 6800',
+  'AHV/IV/EO-Beiträge (CH)': 'KMU: 5700',
+  'BVG-Beiträge (CH)': 'KMU: 5720',
+};
+
 interface Category {
   id: string;
   user_id: string | null;
@@ -490,7 +540,7 @@ export function CategoryManagement() {
         sort_order: idx,
         created_at: '',
         country: selectedCountry,
-        tax_code: null,
+        tax_code: TAX_CODES[name] || null,
         receipt_count: taxTypeCounts[name] || 0,
       }));
   }, [selectedCountry, taxTypeCounts]);
