@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -382,29 +383,27 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
 
             {/* Category / Tax Type / Payment Method row */}
             <div className="grid grid-cols-2 gap-2">
-              <Select value={line.category} onValueChange={v => updateLine(idx, 'category', v === '__empty__' ? '' : v)}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="Nicht zugeordnet" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__empty__">Nicht zugeordnet</SelectItem>
-                  {userCategories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={line.category}
+                onChange={v => updateLine(idx, 'category', v)}
+                options={userCategories.map(cat => ({ value: cat.name, label: cat.name }))}
+                placeholder="Nicht zugeordnet"
+                searchPlaceholder="Kategorie suchen..."
+                allowClear
+                clearLabel="Nicht zugeordnet"
+                className="h-8 text-sm"
+              />
 
-              <Select value={line.tax_type} onValueChange={v => updateLine(idx, 'tax_type', v === '__empty__' ? '' : v)}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="Offen" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__empty__">Offen</SelectItem>
-                  {taxCategories.map(c => (
-                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={line.tax_type}
+                onChange={v => updateLine(idx, 'tax_type', v)}
+                options={taxCategories.map(c => ({ value: c.name, label: c.name }))}
+                placeholder="Offen"
+                searchPlaceholder="Buchungsart suchen..."
+                allowClear
+                clearLabel="Offen"
+                className="h-8 text-sm"
+              />
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end">

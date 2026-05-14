@@ -1,42 +1,73 @@
-# Fix: "+ als neuen Lieferanten" legt tatsächlich einen Lieferanten an
+# Plan: Suchbare Dropdowns systemweit
 
-## Problem
-In `src/components/receipts/VendorAutocomplete.tsx` öffnet sich beim Tippen ein Dropdown mit dem Button **"„{name}" als neuen Lieferanten"** (Z. 305–317) sowie im Empty-State **"„{name}" verwenden"** (Z. 253–260). Beide Buttons rufen `handleUseCustomValue` (Z. 179–182) auf, das ausschließlich `onChange(vendorSearch, null)` ausführt — also nur das Inputfeld befüllt und `vendor_id` explizit auf `null` setzt.
+Ziel: Alle relevanten Dropdowns für **Lieferant (rechtl. Name)**, **Kategorie**, **Tag**, **Buchungsart (Tax-Type)** und **Zahlungsart** werden auf eine einheitliche, suchbare Combobox umgestellt — überall im System. **Ausgenommen: MwSt-Felder** (bleiben unverändert).
 
-Es wird **nie** ein Insert in die Tabelle `vendors` ausgeführt. Beim Speichern in `Review.tsx` (Z. 454) wird dann `vendor_id: selectedVendorId` (=null) am Beleg gespeichert, der Name landet nur als Freitext in `vendor_brand`. Daraus folgt: "Fertigputze Haslinger GmbH" existiert nirgends in `vendors`, taucht im Dropdown nicht wieder auf, hat keine Defaults, keine Statistik.
+## Ansatz
 
-## Lösung — nur Frontend
+Die bestehende `SearchableSelect`-Komponente (`src/components/ui/searchable-select.tsx`) ist bereits vorhanden und im Einsatz (z. B. Vendor-Settings). Sie unterstützt Suche, Clear und optional Inline-Anlage neuer Einträge — wird systemweit als Standard verwendet.
 
-### A) `src/services/vendorMatchingService.ts`
-- `createVendorInternal` exportieren (aktuell `async function` ohne `export`, Z. 310). Umbenennen ist nicht nötig — einfach `export async function createVendorInternal(...)` setzen, damit das UI eine direkte, eindeutige "Neu anlegen"-Aktion hat (ohne Matching-Heuristik, die den Namen sonst wieder mit einem ähnlichen verbindet).
+Für **Tags** wird das bestehende `TagSelector`-Komponentenmuster beibehalten (es ist bereits Multi-Select + suchbar via Command), aber überprüft, ob die Suche dort durchgängig funktioniert.
 
-### B) `src/components/receipts/VendorAutocomplete.tsx`
-1. Imports ergänzen: `useAuth` ist da, zusätzlich `createVendorInternal` aus `@/services/vendorMatchingService` und `useToast` aus `@/hooks/use-toast`.
-2. Neuer Handler `handleCreateNewVendor()`:
-   - Validiert Name (trim, min. 2 Zeichen).
-   - Setzt lokales `isCreating`-State (Button-Disabled + Spinner-Text).
-   - Ruft `createVendorInternal(user.id, name)` auf.
-   - Bei Erfolg: 
-     - `loadAllVendors()` neu laden, damit der neue Lieferant sofort im Dropdown auftaucht.
-     - In das `VendorWithCategory`-Shape mappen (mit `receipt_count: 0`, `default_category: null`, `default_tag_id`/`field_defaults` optional auf null) und `onVendorSelect(newVendor)` aufrufen → das setzt im `Review` `selectedVendorId`, sodass beim Speichern `vendor_id` korrekt gesetzt wird.
-     - Dropdown schließen, Suchfeld leeren.
-     - `toast({ title: 'Lieferant angelegt' })`.
-   - Bei Fehler: `toast({ variant: 'destructive', title: 'Anlegen fehlgeschlagen', description: error.message })` und Dropdown offen lassen.
-3. Beide Buttons (Empty-State Z. 253 + Footer Z. 307) auf `handleCreateNewVendor` umstellen. Der bisherige Free-Text-Pfad „nur ins Inputfeld übernehmen" wird abgeschafft, da das genau die jetzige Lücke ist und der User explizit „neuen Lieferanten anlegen" erwartet.
-4. Button-Label klarer: „`{vendorSearch}` als neuen Lieferanten anlegen" (mit "anlegen") und im Empty-State analog.
+## Betroffene Dateien (wird auf einfaches `<Select>` umgestellt → `SearchableSelect`)
 
-### C) Sicherheitsnetz
-- Wenn `createVendorInternal` `null` zurückgibt (z.B. RLS-Fehler), Fehler-Toast mit „Bitte erneut versuchen" und Konsole-Log behalten.
-- Edge: leerer Username → Button disabled.
+Dropdowns mit den genannten Feldern (Kategorie / Buchungsart / Zahlungsart / Lieferant-Filter):
 
-## Nicht im Scope
-- Keine DB-Migration, keine Änderung an RLS oder Schema.
-- Kein Backfill für Belege, bei denen früher nur Freitext gespeichert wurde — der User legt diesen Lieferanten jetzt manuell sauber neu an.
-- `Upload.tsx` nutzt bereits `createVendorForReceipt` korrekt — bleibt unverändert.
+1. **`src/pages/Review.tsx`**
+   - Zahlungsart-Dropdown (Z. ~1450)
 
-## Verifikation
-- Build prüfen.
-- Im Preview Review öffnen, im Lieferanten-Feld "Fertigputze Haslinger GmbH" tippen → "+ als neuen Lieferanten anlegen" klicken.
-  - Erwartung: Toast „Lieferant angelegt", Eingabefeld zeigt den Namen, `vendor_id` ist gesetzt (Edit-Icon „Lieferanten bearbeiten" erscheint, Z. 1012–1024).
-  - Beleg speichern → in DB: `receipts.vendor_id IS NOT NULL`, ein neuer Eintrag in `vendors` mit `display_name = 'Fertigputze Haslinger GmbH'` ist vorhanden.
-  - Anderen Beleg öffnen → Lieferant erscheint im Dropdown.
+2. **`src/components/receipts/ReceiptDetailPanel.tsx`**
+   - Kategorie-Dropdown (Z. ~1497)
+   - Zahlungsart-Dropdown (Z. ~1718)
+
+3. **`src/components/receipts/SplitBookingEditor.tsx`**
+   - Kategorie pro Zeile (Z. ~385)
+   - Buchungsart (tax_type) pro Zeile (Z. ~397)
+
+4. **`src/components/expenses/RecurringExpensesTab.tsx`**
+   - Kategorie-Dropdown (Z. ~236)
+
+5. **`src/pages/Expenses.tsx`**
+   - Kategorie-Filter (Z. ~1639) + ggf. weitere Lieferanten-/Buchungsart-/Zahlungsart-Filter (vollständig prüfen)
+
+6. **`src/pages/Dashboard.tsx`**
+   - Falls Kategorie/Buchungsart-Auswahl im „Nach Kategorie"-Feld vorhanden ist
+
+7. **`src/pages/BankImport.tsx` & `src/components/bank-import/ReceiptAssignmentModal.tsx`**
+   - Kategorie/Buchungsart/Zahlungsart in Zuordnung & Keywords
+
+8. **`src/components/settings/BankImportKeywords.tsx`**
+   - Kategorie-Auswahl bei Keywords
+
+9. **`src/pages/Reports.tsx`**
+   - Filter-Dropdowns (Lieferant/Kategorie/Buchungsart) sofern vorhanden
+
+10. **`src/components/receipts/ManualTrainingModal.tsx`**
+    - Kategorie-/Buchungsart-Auswahl
+
+11. **Settings-Komponenten** (CategoryManagement, VendorManagement, etc.) — nur dort umstellen, wo Auswahl-Dropdowns dieser Felder vorkommen (nicht für reine Listen).
+
+## Was bleibt unverändert
+
+- **MwSt-Felder** (VAT-Rate-Selects in Review, ReceiptDetailPanel, SplitBookingEditor, Invoice-Editor etc.) — explizit ausgenommen.
+- Status-/Sortier-/Sprach-/Provider-/Theme-/Konfigurations-Dropdowns (Plan, Rolle, Land, Währung, Sortierreihenfolge, Sidebar etc.).
+- `TagSelector` — bleibt wie heute (ist bereits suchbar via Command), nur leichte QA falls Suche fehlt.
+
+## Vorgehen
+
+1. Dropdown-für-Dropdown auf `SearchableSelect` umstellen, bestehende `value`/`onChange`-Logik unverändert lassen.
+2. Optionen werden in `{ value, label }`-Form gemappt (oft trivial; Kategorien & Lieferanten sind bereits geladen).
+3. Wo „Neu anlegen" sinnvoll ist (z. B. Kategorie inline in Review/Detail), `onCreate` mit der bestehenden Anlage-Logik verbinden — nur an Stellen, wo das auch heute über „+"-Buttons möglich ist. Sonst weglassen.
+4. Layout/Breite/Placeholder bleiben sichtbar identisch, nur das Verhalten ändert sich (Suche + Tastatur).
+5. Keine Daten-, Schema- oder RLS-Änderungen.
+
+## Technische Hinweise
+
+- `SearchableSelect` triggert `onChange("")` für Clear → bestehende Setter müssen leere Strings tolerieren (in betroffenen Stellen bereits der Fall, sonst Wrapper).
+- Für Felder mit Sentinel-Wert `__empty__` (SplitBookingEditor) wird das Sentinel entfernt; Clear erfolgt jetzt über `allowClear`.
+- Build-Check nach jeder Datei; abschließend visueller Smoke-Test in Review, Detail, Split, Expenses, BankImport.
+
+## Out of Scope
+
+- Keine Änderung an Geschäftslogik, Berechnungen oder Datenstrukturen.
+- Keine Änderung am MwSt-Verhalten.
+- Keine Designsystem-Token-Änderungen.

@@ -58,6 +58,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1636,33 +1637,31 @@ const Expenses = () => {
             </SelectContent>
           </Select>
 
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Kategorie" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle Kategorien</SelectItem>
-              <SelectItem value="__unassigned__">Nicht zugeordnet</SelectItem>
-              <SelectSeparator />
-              {userCategories.map(c => (
-                <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={categoryFilter}
+            onChange={(v) => setCategoryFilter(v || 'all')}
+            options={[
+              { value: 'all', label: 'Alle Kategorien' },
+              { value: '__unassigned__', label: 'Nicht zugeordnet' },
+              ...userCategories.map(c => ({ value: c.name, label: c.name })),
+            ]}
+            placeholder="Kategorie"
+            searchPlaceholder="Kategorie suchen..."
+            className="w-[180px]"
+          />
 
-          <Select value={taxTypeFilter} onValueChange={setTaxTypeFilter}>
-            <SelectTrigger className="w-[170px]">
-              <SelectValue placeholder="Buchungsart" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle Buchungsarten</SelectItem>
-              <SelectItem value="__open__">Offen</SelectItem>
-              <SelectSeparator />
-              {taxCategories.map(c => (
-                <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={taxTypeFilter}
+            onChange={(v) => setTaxTypeFilter(v || 'all')}
+            options={[
+              { value: 'all', label: 'Alle Buchungsarten' },
+              { value: '__open__', label: 'Offen' },
+              ...taxCategories.map(c => ({ value: c.name, label: c.name })),
+            ]}
+            placeholder="Buchungsart"
+            searchPlaceholder="Buchungsart suchen..."
+            className="w-[170px]"
+          />
 
           <Select value={invoiceFilter} onValueChange={setInvoiceFilter}>
             <SelectTrigger className="w-[160px]">
