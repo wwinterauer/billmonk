@@ -40,7 +40,7 @@ export function TagSelector({
 
   const [tagStates, setTagStates] = useState<TagState[]>([]);
   const [loadingTags, setLoadingTags] = useState(true);
-  const [popoverOpen, setPopoverOpen] = useState(false);
+  
   
   // Track if we've done initial load to prevent unnecessary re-fetches
   const loadedRef = useRef<string>('');
