@@ -373,6 +373,18 @@ const Review = () => {
           }
         });
     }
+    // Load vendor auto_approve settings
+    supabase
+      .from('vendors')
+      .select('auto_approve, auto_approve_min_confidence')
+      .eq('id', vendorData.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setVendorAutoApprove(data.auto_approve ?? false);
+          setVendorAutoApproveMinConfidence(data.auto_approve_min_confidence ?? 0.8);
+        }
+      });
   }, [defaultVatRate, formData.category]);
   const goToReceipt = useCallback((index: number) => {
     if (index >= 0 && index < receipts.length) {
