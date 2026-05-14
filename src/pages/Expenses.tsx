@@ -2447,11 +2447,12 @@ const Expenses = () => {
                                     {receiptTagsCache[receipt.id]?.length > 0 ? (
                                       <>
                                         {receiptTagsCache[receipt.id].slice(0, 2).map(tag => (
-                                          <Badge 
+                                          <Badge
                                             key={tag.id}
                                             variant="secondary"
                                             className="text-xs py-0.5 px-1.5 text-white"
                                             style={{ backgroundColor: tag.color }}
+                                            title={tag.name}
                                           >
                                             {tag.name}
                                           </Badge>
