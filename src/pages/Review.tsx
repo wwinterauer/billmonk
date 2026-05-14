@@ -291,6 +291,7 @@ const Review = () => {
       vat_amount_override: vatAmountOverride,
     });
     setAiConfidence(receipt.ai_confidence ?? null);
+    setSelectedVendorId(receipt.vendor_id ?? null);
   };
 
   // Handle reanalysis updates
