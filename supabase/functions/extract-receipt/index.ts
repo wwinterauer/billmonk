@@ -197,6 +197,35 @@ CH-spezifisch:${has('KFZ') ? ' Km-Pauschale 0,70 CHF/km.' : ''}${has('Geringwert
   return hints;
 }
 
+// ── Tax-Type-Liste pro Land (Quelle: src/components/settings/taxCategoryInfo.ts) ────
+const TAX_TYPES_BY_COUNTRY: Record<string, string[]> = {
+  AT: [
+    "Bewirtung 50% (AT)", "Reisekosten (AT)", "KFZ-Kosten (AT)", "Büromaterial (AT)",
+    "Telefon & Internet (AT)", "Versicherungen (AT)", "Miete & Betriebskosten (AT)",
+    "Fortbildung (AT)", "Werbung & Marketing (AT)", "Rechts-/Beratungskosten (AT)",
+    "Bankgebühren (AT)", "Geringwertige WG (AT)", "Abschreibungen AfA (AT)",
+    "Sozialversicherung SVS (AT)", "Kammerumlage WKO (AT)",
+  ],
+  DE: [
+    "Bewirtung 70% (DE)", "Reisekosten (DE)", "KFZ-Kosten (DE)", "Bürobedarf (DE)",
+    "Telekommunikation (DE)", "Versicherungen (DE)", "Raumkosten/Miete (DE)",
+    "Fortbildungskosten (DE)", "Werbekosten (DE)", "Rechts-/Beratungskosten (DE)",
+    "Geringwertige WG (DE)", "Abschreibungen AfA (DE)", "Leasingkosten (DE)",
+    "Geschenke §4 Abs.5 (DE)", "IHK-Beiträge (DE)",
+  ],
+  CH: [
+    "Geschäftsbewirtung (CH)", "Reisekosten (CH)", "Fahrzeugkosten (CH)", "Büromaterial (CH)",
+    "Telekommunikation (CH)", "Versicherungsprämien (CH)", "Mietaufwand (CH)",
+    "Weiterbildung (CH)", "Werbeaufwand (CH)", "Beratungskosten (CH)",
+    "Abschreibungen (CH)", "AHV/IV/EO-Beiträge (CH)", "BVG-Beiträge (CH)",
+  ],
+};
+
+function buildTaxTypeList(country: string | null): string {
+  const list = TAX_TYPES_BY_COUNTRY[(country || 'AT').toUpperCase()] || [];
+  return list.join(', ');
+}
+
 // ── Expenses-only prompt builder (deduplicated) ────────────────────
 function buildExpensesOnlyPrompt(keywords: string[], hint: string): string {
   let prompt = '';
