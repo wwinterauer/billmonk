@@ -10,6 +10,16 @@ export function useReceiptProcessing(
 ) {
   const { user } = useAuth();
 
+  const resolveCategoryName = async (categoryId: string | null | undefined): Promise<string | null> => {
+    if (!categoryId) return null;
+    const { data } = await supabase
+      .from('categories')
+      .select('name')
+      .eq('id', categoryId)
+      .maybeSingle();
+    return data?.name ?? null;
+  };
+
   const processReceiptWithAI = async (
     file: File,
     receiptId: string,
@@ -140,7 +150,8 @@ export function useReceiptProcessing(
           
           // Vendor default category ALWAYS takes precedence when set
           if (vendorResult.vendor.default_category_id) {
-            updateData.category = vendorResult.vendor.default_category_id;
+            const categoryName = await resolveCategoryName(vendorResult.vendor.default_category_id);
+            if (categoryName) updateData.category = categoryName;
           }
           
           // Apply vendor default VAT rate if AI didn't detect one
@@ -174,7 +185,8 @@ export function useReceiptProcessing(
           updateData.vendor = matchedVendor.display_name;
           
           if (matchedVendor.default_category_id) {
-            updateData.category = matchedVendor.default_category_id;
+            const categoryName = await resolveCategoryName(matchedVendor.default_category_id);
+            if (categoryName) updateData.category = categoryName;
           }
           
           if (matchedVendor.default_vat_rate !== null && normalized.vat_rate === null) {
@@ -314,7 +326,8 @@ export function useReceiptProcessing(
 
       // Apply vendor defaults
       if (vendor.default_category_id && !extractedData.category) {
-        updateData.category = vendor.default_category_id;
+        const categoryName = await resolveCategoryName(vendor.default_category_id);
+        if (categoryName) updateData.category = categoryName;
       }
       if (vendor.default_vat_rate !== null && !extractedData.vat_rate) {
         updateData.vat_rate = vendor.default_vat_rate;
