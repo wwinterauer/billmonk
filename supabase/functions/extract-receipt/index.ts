@@ -226,6 +226,21 @@ function buildTaxTypeList(country: string | null): string {
   return list.join(', ');
 }
 
+// Validates a tax_type against the allowed list for the country.
+// Returns the value if valid, or null if hallucinated/unknown.
+function validateTaxType(value: string | null | undefined, country: string | null): string | null {
+  if (!value || typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const countryList = TAX_TYPES_BY_COUNTRY[(country || 'AT').toUpperCase()] || [];
+  if (countryList.includes(trimmed)) return trimmed;
+  // Allow values from any country list (in case vendor_country was misdetected)
+  const allKnown = new Set(Object.values(TAX_TYPES_BY_COUNTRY).flat());
+  if (allKnown.has(trimmed)) return trimmed;
+  console.log(`[Tax Type Validation] Rejecting hallucinated tax_type "${trimmed}" (country: ${country || 'AT'})`);
+  return null;
+}
+
 // ── Expenses-only prompt builder (deduplicated) ────────────────────
 function buildExpensesOnlyPrompt(keywords: string[], hint: string): string {
   let prompt = '';
