@@ -320,6 +320,10 @@ export function useVendors() {
           receiptUpdate.vat_rate = updates.default_vat_rate;
         }
 
+        if (updates.default_tax_type !== undefined) {
+          receiptUpdate.tax_type = updates.default_tax_type || null;
+        }
+
         if (updates.field_defaults?.payment_method !== undefined) {
           receiptUpdate.payment_method = updates.field_defaults.payment_method || null;
         }
