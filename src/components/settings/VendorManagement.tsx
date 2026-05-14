@@ -138,6 +138,7 @@ export function VendorManagement() {
     default_category_id: '',
     default_tag_id: '',
     default_vat_rate: '',
+    default_tax_type: '',
     default_payment_method: '',
     website: '',
     notes: '',
