@@ -907,12 +907,13 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
 
           const vendorId = receipt?.vendor_id || finalVendorMatch?.id;
 
-          // Category & tax_type learning: product rule > vendor default > AI
+          // Category & tax_type learning: vendor-scoped keyword > global keyword > vendor default > AI
           if (extractedData.description) {
             const { data: categoryRules } = await supabase
               .from('category_rules')
-              .select('keyword, category_name, match_count, tax_type_name, tax_type_match_count')
+              .select('keyword, category_name, match_count, tax_type_name, tax_type_match_count, vendor_id')
               .eq('user_id', receiptUserId)
+              .or(`vendor_id.eq.${vendorId ?? '00000000-0000-0000-0000-000000000000'},vendor_id.is.null`)
               .order('match_count', { ascending: false });
 
             if (categoryRules && categoryRules.length > 0) {
@@ -928,17 +929,25 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
               
               const allText = [descLower, ...lineItemDescs].join(' ');
               
-              const matchedRule = categoryRules.find(rule => allText.includes(rule.keyword.toLowerCase()));
-              if (matchedRule) {
-                if (matchedRule.category_name && (matchedRule.match_count || 0) >= 3) {
-                  console.log(`[Category Learning] Product rule: "${matchedRule.keyword}" → "${matchedRule.category_name}"`);
-                  finalCategory = matchedRule.category_name;
+              // Pass 1: vendor-scoped (threshold 2). Pass 2: global (threshold 3).
+              const vendorRules = categoryRules.filter(r => r.vendor_id === vendorId && vendorId);
+              const globalRules = categoryRules.filter(r => !r.vendor_id);
+              
+              const findMatch = (rules: typeof categoryRules, catThreshold: number, taxThreshold: number) => {
+                const rule = rules.find(r => allText.includes(r.keyword.toLowerCase()));
+                if (!rule) return;
+                if (rule.category_name && (rule.match_count || 0) >= catThreshold) {
+                  console.log(`[Category Learning] ${rule.vendor_id ? 'Vendor' : 'Global'} rule: "${rule.keyword}" → "${rule.category_name}"`);
+                  finalCategory = rule.category_name;
                 }
-                if (matchedRule.tax_type_name && (matchedRule.tax_type_match_count || 0) >= 3) {
-                  console.log(`[Tax Type Learning] Product rule: "${matchedRule.keyword}" → "${matchedRule.tax_type_name}"`);
-                  extractedData.tax_type = matchedRule.tax_type_name;
+                if (rule.tax_type_name && (rule.tax_type_match_count || 0) >= taxThreshold) {
+                  console.log(`[Tax Type Learning] ${rule.vendor_id ? 'Vendor' : 'Global'} rule: "${rule.keyword}" → "${rule.tax_type_name}"`);
+                  extractedData.tax_type = rule.tax_type_name;
                 }
-              }
+              };
+              
+              findMatch(vendorRules, 2, 2);
+              if (finalCategory === extractedData.category) findMatch(globalRules, 3, 3);
             }
           }
 
