@@ -1190,21 +1190,13 @@ const Review = () => {
                             </TooltipContent>
                           </Tooltip>
                         </div>
-                        <Select
+                        <SearchableSelect
                           value={formData.category}
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Nicht zugeordnet" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {userCategories.map(cat => (
-                              <SelectItem key={cat.id} value={cat.name}>
-                                {cat.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          onChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                          options={userCategories.map(cat => ({ value: cat.name, label: cat.name }))}
+                          placeholder="Nicht zugeordnet"
+                          searchPlaceholder="Kategorie suchen..."
+                        />
                       </div>
 
                       {/* Buchungsart (tax_type) */}
