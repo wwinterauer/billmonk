@@ -1,35 +1,34 @@
-# Plan: Multi-Invoice PDFs einheitlich über Review
-
 ## Ziel
-Ein Ort für Multi-Invoice-Handling: Review. Kein separater `needs_splitting`-Workflow im Upload mehr. Nach Split läuft automatisch die KI pro Teilbeleg neu.
+
+In den Lieferanten-Einstellungen soll zusätzlich zur Standard-Kategorie und Standard-MwSt auch eine **Standard-Buchungsart (Steuerart / tax_type)** hinterlegt werden können. Diese wird bei neuen Belegen dieses Lieferanten automatisch vorausgewählt — analog zur Logik bei Bank-Import-Keywords.
 
 ## Änderungen
 
-### 1. `supabase/functions/extract-receipt/index.ts`
-Wenn Multi-Invoice erkannt wird:
-- **Vorher:** Status `needs_splitting`, keine weitere Extraktion.
-- **Nachher:** Status `review` setzen, `split_suggestion` JSON speichern, **trotzdem** die normale Extraktion auf das gesamte PDF durchlaufen lassen (damit der User wahlweise "als einzelne Rechnung behalten" klicken kann und sofort Daten hat).
+### 1. Datenbank (Migration)
+- Neue Spalte `default_tax_type text` (nullable) in `vendors` hinzufügen.
 
-### 2. `src/pages/Review.tsx` / Review-Liste
-- `MultiInvoiceAlert` triggert auf `split_suggestion != null` (nicht auf `status = needs_splitting`).
-- Belege mit `split_suggestion` erscheinen ganz normal in der Review-Liste (visueller Hinweis via `SplitStatusBadge` bleibt).
+### 2. UI: `src/components/settings/VendorManagement.tsx`
+- `formData` und `Vendor`-Typ um `default_tax_type` erweitern.
+- Im Dialog (Anlegen + Bearbeiten) ein neues Select **"Standard-Buchungsart"** unterhalb von "Standard-MwSt-Satz" einfügen.
+  - Werte stammen aus `useCategories().taxCategories` (gleich wie bei Bank-Import-Keywords).
+  - Option "Keine Voreinstellung" als Default.
+- Beim Speichern (`createVendor` / `updateVendor`) das Feld mitsenden.
+- In der Lieferanten-Tabelle/Karte als kleines Badge anzeigen (optional, kompakt).
 
-### 3. `src/pages/Upload.tsx`
-- `needs_splitting` aus den Status-Filtern entfernen — diese Belege zählen jetzt unter "Wartend"/"Erfolgreich" wie alle anderen.
-- Klick auf den Beleg → Sprung in Review (dort regelt der User den Split).
+### 3. Hook: `src/hooks/useVendors.ts`
+- `default_tax_type` in den Vendor-Typ und in `createVendor` / `updateVendor` Payloads aufnehmen.
 
-### 4. Split-Workflow (bereits korrekt — keine Änderung nötig)
-`supabase/functions/split-pdf/index.ts` Zeilen 248–277: Nach dem Split wird für **jeden** neu erzeugten Teilbeleg `extract-receipt` mit `skipMultiCheck: true` aufgerufen (mit 1× Retry, bei Fehler Status `error`). Das ist genau das Verhalten, das du willst — frische KI-Extraktion pro Teilbeleg.
+### 4. Anwendung der Voreinstellung
+Damit die Buchungsart bei neuen Belegen wirklich vorausgefüllt wird, an drei Stellen ergänzen — analog zu `default_category_id` / `default_vat_rate`:
+- **`src/hooks/useReceiptProcessing.ts`**: in den 3 Stellen, wo `vendor.default_category_id` und `default_vat_rate` auf `updateData` gemappt werden, zusätzlich `tax_type` setzen wenn vom AI noch keiner extrahiert wurde.
+- **`supabase/functions/extract-receipt/index.ts`**: in den `select(...)`-Statements `default_tax_type` mit auslesen und dort, wo Vendor-Defaults greifen, ebenfalls auf `tax_type` schreiben (nur wenn noch leer).
 
-### 5. Datenmigration
-Die 2 aktuell auf `needs_splitting` stehenden Belege auf `review` setzen (sie haben bereits `split_suggestion`).
+## Verhalten
 
-### 6. Optional/Aufräumen
-- `NeedsSplittingBanner.tsx` und der separate Splitting-Screen können entfernt werden, falls nicht mehr verlinkt. Prüfen wir beim Umsetzen.
+- **Neuer Beleg von bekanntem Lieferant** → tax_type wird automatisch aus `vendor.default_tax_type` gesetzt, sofern AI keinen erkannt hat.
+- **AI hat tax_type extrahiert** → AI-Wert hat Vorrang (Vendor-Default ist nur Fallback).
+- **Manuell im Review änderbar** → bleibt unverändert.
 
-## Was passiert nach dem Split (zur Bestätigung)
-1. User klickt im Review auf "PDF aufteilen" → `split-pdf` Edge Function.
-2. Original-Beleg bekommt Status `split` (taucht nicht mehr in Review auf).
-3. N neue Belege werden erzeugt, Status `processing`.
-4. **Sofort, im Hintergrund:** `extract-receipt` läuft pro Teilbeleg → Felder werden frisch extrahiert → Status `review`.
-5. User sieht die N neuen, separat extrahierten Belege in der Review-Liste.
+## Hinweis
+
+Das bestehende Field-Learning-System (`field_defaults` in vendors) lernt tax_type bereits implizit nach 3 Korrekturen pro Lieferant — die neue Spalte `default_tax_type` ist jedoch eine **explizite, vom User gepflegte Voreinstellung** und hat höhere Priorität als die gelernten Defaults.

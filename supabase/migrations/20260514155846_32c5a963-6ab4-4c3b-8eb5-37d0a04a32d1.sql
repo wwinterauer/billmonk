@@ -1,0 +1,1 @@
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS default_tax_type text;

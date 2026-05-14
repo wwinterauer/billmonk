@@ -3582,6 +3582,7 @@ export type Database = {
           created_at: string | null
           default_category_id: string | null
           default_tag_id: string | null
+          default_tax_type: string | null
           default_vat_rate: number | null
           detected_names: string[] | null
           display_name: string
@@ -3610,6 +3611,7 @@ export type Database = {
           created_at?: string | null
           default_category_id?: string | null
           default_tag_id?: string | null
+          default_tax_type?: string | null
           default_vat_rate?: number | null
           detected_names?: string[] | null
           display_name: string
@@ -3638,6 +3640,7 @@ export type Database = {
           created_at?: string | null
           default_category_id?: string | null
           default_tag_id?: string | null
+          default_tax_type?: string | null
           default_vat_rate?: number | null
           detected_names?: string[] | null
           display_name?: string
