@@ -72,7 +72,7 @@ export function VendorManagement() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const { vendors, loading, isUpdatingVendor, addVendor, updateVendor, deleteVendor, fetchVendors } = useVendors();
-  const { categories, userCategories } = useCategories();
+  const { categories, userCategories, taxCategories } = useCategories();
   const { activeTags } = useTags();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
@@ -138,6 +138,7 @@ export function VendorManagement() {
     default_category_id: '',
     default_tag_id: '',
     default_vat_rate: '',
+    default_tax_type: '',
     default_payment_method: '',
     website: '',
     notes: '',
@@ -158,6 +159,7 @@ export function VendorManagement() {
       default_category_id: '',
       default_tag_id: '',
       default_vat_rate: '',
+      default_tax_type: '',
       default_payment_method: '',
       website: '',
       notes: '',
@@ -180,6 +182,7 @@ export function VendorManagement() {
       default_category_id: vendor.default_category_id || '',
       default_tag_id: vendor.default_tag_id || '',
       default_vat_rate: vendor.default_vat_rate?.toString() || '',
+      default_tax_type: vendor.default_tax_type || '',
       default_payment_method: (vendor.field_defaults as Record<string, string>)?.payment_method || '',
       website: vendor.website || '',
       notes: vendor.notes || '',
@@ -247,6 +250,7 @@ export function VendorManagement() {
           default_category_id: formData.default_category_id || null,
           default_tag_id: formData.default_tag_id || null,
           default_vat_rate: formData.default_vat_rate ? parseFloat(formData.default_vat_rate) : null,
+          default_tax_type: formData.default_tax_type || null,
           field_defaults: {
             ...(editingVendor.field_defaults || {}),
             ...(formData.default_payment_method ? { payment_method: formData.default_payment_method } : {}),
@@ -280,6 +284,7 @@ export function VendorManagement() {
           defaultCategoryId: formData.default_category_id || undefined,
           defaultTagId: formData.default_tag_id || undefined,
           defaultVatRate: formData.default_vat_rate ? parseFloat(formData.default_vat_rate) : undefined,
+          defaultTaxType: formData.default_tax_type || undefined,
           defaultPaymentMethod: formData.default_payment_method || undefined,
           website: formData.website.trim() || undefined,
           notes: formData.notes.trim() || undefined,
@@ -1354,6 +1359,30 @@ export function VendorManagement() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Standard-Buchungsart (tax_type) */}
+            <div className="space-y-2">
+              <Label htmlFor="default_tax_type">Standard-Buchungsart</Label>
+              <Select
+                value={formData.default_tax_type || '__none__'}
+                onValueChange={(value) =>
+                  setFormData(prev => ({ ...prev, default_tax_type: value === '__none__' ? '' : value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Keine Vorgabe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Keine Vorgabe</SelectItem>
+                  {taxCategories.map((c) => (
+                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Steuer-Buchungsart wird bei neuen Belegen dieses Lieferanten automatisch vorausgewählt (sofern AI keine erkennt).
+              </p>
             </div>
 
             {/* Standard-Zahlungsart */}

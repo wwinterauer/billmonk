@@ -920,17 +920,20 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
             }
           }
 
-          // Vendor field_defaults for tax_type (only if not already overridden by keyword rule)
+          // Vendor explicit default_tax_type or learned field_defaults (only if not already set by keyword rule)
           if (vendorId && !extractedData.tax_type) {
             const { data: vendorDefaults } = await supabase
               .from('vendors')
-              .select('field_defaults')
+              .select('default_tax_type, field_defaults')
               .eq('id', vendorId)
               .maybeSingle();
-            
+
             const fieldDefaults = (vendorDefaults?.field_defaults as Record<string, string>) || {};
-            if (fieldDefaults.tax_type) {
-              console.log(`[Tax Type Learning] Vendor default: "${fieldDefaults.tax_type}"`);
+            if (vendorDefaults?.default_tax_type) {
+              console.log(`[Tax Type] Vendor explicit default: "${vendorDefaults.default_tax_type}"`);
+              extractedData.tax_type = vendorDefaults.default_tax_type;
+            } else if (fieldDefaults.tax_type) {
+              console.log(`[Tax Type Learning] Vendor learned default: "${fieldDefaults.tax_type}"`);
               extractedData.tax_type = fieldDefaults.tax_type;
             }
           }

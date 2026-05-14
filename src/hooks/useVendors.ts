@@ -23,6 +23,7 @@ export interface Vendor {
   default_category_id: string | null;
   default_tag_id: string | null;
   default_vat_rate: number | null;
+  default_tax_type: string | null;
   field_defaults: FieldDefaults;
   field_defaults_stats: FieldDefaultsStats;
   field_suggestions_dismissed: FieldSuggestionsDismissed;
@@ -136,6 +137,7 @@ export function useVendors() {
       defaultCategoryId?: string;
       defaultTagId?: string;
       defaultVatRate?: number;
+      defaultTaxType?: string;
       defaultPaymentMethod?: string;
       notes?: string;
       website?: string;
@@ -166,6 +168,7 @@ export function useVendors() {
         default_category_id: options?.defaultCategoryId || null,
         default_tag_id: options?.defaultTagId || null,
         default_vat_rate: options?.defaultVatRate || null,
+        default_tax_type: options?.defaultTaxType || null,
         field_defaults: Object.keys(fieldDefaults).length > 0 ? fieldDefaults : {},
         notes: options?.notes || null,
         website: options?.website || null,
@@ -208,7 +211,7 @@ export function useVendors() {
 
   const updateVendor = async (
     id: string,
-    updates: Partial<Pick<Vendor, 'display_name' | 'legal_names' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'field_defaults' | 'field_defaults_stats' | 'field_suggestions_dismissed' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
+    updates: Partial<Pick<Vendor, 'display_name' | 'legal_names' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_tax_type' | 'field_defaults' | 'field_defaults_stats' | 'field_suggestions_dismissed' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
   ): Promise<{ vendor: Vendor; syncedReceipts: number; autoApprovedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
     if (isUpdatingRef.current) {
@@ -274,6 +277,7 @@ export function useVendors() {
     const hasDefaultUpdates =
       updates.default_category_id !== undefined ||
       updates.default_vat_rate !== undefined ||
+      updates.default_tax_type !== undefined ||
       updates.field_defaults !== undefined ||
       updates.default_tag_id !== undefined;
 
@@ -314,6 +318,10 @@ export function useVendors() {
 
         if (updates.default_vat_rate !== undefined) {
           receiptUpdate.vat_rate = updates.default_vat_rate;
+        }
+
+        if (updates.default_tax_type !== undefined) {
+          receiptUpdate.tax_type = updates.default_tax_type || null;
         }
 
         if (updates.field_defaults?.payment_method !== undefined) {

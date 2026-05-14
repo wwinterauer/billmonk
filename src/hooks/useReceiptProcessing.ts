@@ -153,6 +153,11 @@ export function useReceiptProcessing(
               updateData.vat_amount = Number((grossAmount - updateData.amount_net).toFixed(2));
             }
           }
+
+          // Apply vendor default tax_type if AI didn't detect one
+          if (vendorResult.vendor.default_tax_type && !(normalized as any).tax_type) {
+            updateData.tax_type = vendorResult.vendor.default_tax_type;
+          }
         } else if (vendorResult.isNew) {
           // No match found and not auto-created - create new vendor
           const newVendor = await createVendorForReceipt(finalVendorName);
@@ -180,6 +185,9 @@ export function useReceiptProcessing(
               updateData.amount_net = Number((grossAmount / (1 + vatRate / 100)).toFixed(2));
               updateData.vat_amount = Number((grossAmount - updateData.amount_net).toFixed(2));
             }
+          }
+          if (matchedVendor.default_tax_type && !(normalized as any).tax_type) {
+            updateData.tax_type = matchedVendor.default_tax_type;
           }
         }
       }
@@ -279,6 +287,7 @@ export function useReceiptProcessing(
       detected_names: data.detected_names || [],
       default_category_id: data.default_category_id,
       default_vat_rate: data.default_vat_rate,
+      default_tax_type: data.default_tax_type ?? null,
       default_category: data.default_category
     };
   };
@@ -316,6 +325,9 @@ export function useReceiptProcessing(
           updateData.amount_net = Number((grossAmount / (1 + vatRate / 100)).toFixed(2));
           updateData.vat_amount = Number((grossAmount - updateData.amount_net).toFixed(2));
         }
+      }
+      if (vendor.default_tax_type && !extractedData.tax_type) {
+        updateData.tax_type = vendor.default_tax_type;
       }
 
       // Add detected name as variant if provided

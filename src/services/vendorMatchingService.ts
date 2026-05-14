@@ -9,6 +9,7 @@ export interface MatchedVendor {
   detected_names: string[];
   default_category_id: string | null;
   default_vat_rate: number | null;
+  default_tax_type: string | null;
   default_category?: {
     id: string;
     name: string;
@@ -504,6 +505,7 @@ function mapVendor(data: any): MatchedVendor {
     detected_names: data.detected_names || [],
     default_category_id: data.default_category_id,
     default_vat_rate: data.default_vat_rate,
+    default_tax_type: data.default_tax_type ?? null,
     default_category: data.default_category ? {
       id: data.default_category.id,
       name: data.default_category.name,
