@@ -277,6 +277,7 @@ export function useVendors() {
     const hasDefaultUpdates =
       updates.default_category_id !== undefined ||
       updates.default_vat_rate !== undefined ||
+      updates.default_tax_type !== undefined ||
       updates.field_defaults !== undefined ||
       updates.default_tag_id !== undefined;
 
