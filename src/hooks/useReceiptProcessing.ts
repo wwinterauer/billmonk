@@ -279,6 +279,7 @@ export function useReceiptProcessing(
       detected_names: data.detected_names || [],
       default_category_id: data.default_category_id,
       default_vat_rate: data.default_vat_rate,
+      default_tax_type: data.default_tax_type ?? null,
       default_category: data.default_category
     };
   };
