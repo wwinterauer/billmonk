@@ -10,7 +10,6 @@ interface TagSelectorProps {
   receiptId?: string;              // Einzelner Beleg
   receiptIds?: string[];           // Mehrere Belege (Bulk-Modus)
   onChange?: () => void;           // Callback nach Änderung
-  maxVisibleTags?: number;         // Default: 6
   size?: 'sm' | 'md';              // Default: 'md'
   disabled?: boolean;
 }
