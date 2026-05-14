@@ -352,7 +352,7 @@ const Review = () => {
     // Default category id -> resolve to category name asynchronously
     if (vendorData.default_category_id && !formData.category) {
       supabase
-        .from('user_categories')
+        .from('categories')
         .select('name')
         .eq('id', vendorData.default_category_id)
         .maybeSingle()
