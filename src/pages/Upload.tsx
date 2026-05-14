@@ -114,51 +114,52 @@ const Upload = () => {
     MAX_FILES 
   } = useReceipts();
 
-  // Load pending/processing receipts from database on mount
-  useEffect(() => {
-    const loadPendingReceipts = async () => {
-      if (!user) {
-        setLoadingPendingReceipts(false);
-        return;
+  // Load pending/processing receipts from database (used on mount and as a
+  // refresh callback for realtime + polling while uploads are in flight).
+  const loadPendingReceipts = useCallback(async () => {
+    if (!user) {
+      setLoadingPendingReceipts(false);
+      return;
+    }
+
+    try {
+      // Get the timestamp for 2 hours ago to show recently processed receipts
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+      const { data, error } = await supabase
+        .from('receipts')
+        .select('id, file_name, file_url, status, ai_confidence, created_at, vendor, amount_gross, notes, auto_approved')
+        .eq('user_id', user.id)
+        .or(`status.in.(processing,pending,not_a_receipt,duplicate),and(status.in.(review,rejected,approved),created_at.gte.${twoHoursAgo})`)
+        .order('created_at', { ascending: false })
+        .limit(1000);
+
+      if (error) {
+        console.error('Error loading pending receipts:', error);
+      } else if (data) {
+        setPendingReceipts(data.map(r => ({
+          id: r.id,
+          fileName: r.file_name || 'Unbekannte Datei',
+          fileUrl: r.file_url,
+          status: r.status as PendingReceiptFromDB['status'],
+          aiConfidence: r.ai_confidence,
+          createdAt: r.created_at,
+          vendor: r.vendor,
+          amountGross: r.amount_gross,
+          notes: r.notes,
+          autoApproved: r.auto_approved ?? false,
+        })));
       }
-
-      try {
-        // Get the timestamp for 2 hours ago to show recently processed receipts
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-
-        const { data, error } = await supabase
-          .from('receipts')
-          .select('id, file_name, file_url, status, ai_confidence, created_at, vendor, amount_gross, notes, auto_approved')
-          .eq('user_id', user.id)
-          .or(`status.in.(processing,pending,not_a_receipt,duplicate),and(status.in.(review,rejected,approved),created_at.gte.${twoHoursAgo})`)
-          .order('created_at', { ascending: false })
-          .limit(200);
-
-        if (error) {
-          console.error('Error loading pending receipts:', error);
-        } else if (data) {
-          setPendingReceipts(data.map(r => ({
-            id: r.id,
-            fileName: r.file_name || 'Unbekannte Datei',
-            fileUrl: r.file_url,
-            status: r.status as PendingReceiptFromDB['status'],
-            aiConfidence: r.ai_confidence,
-            createdAt: r.created_at,
-            vendor: r.vendor,
-            amountGross: r.amount_gross,
-            notes: r.notes,
-            autoApproved: r.auto_approved ?? false,
-          })));
-        }
-      } catch (err) {
-        console.error('Failed to load pending receipts:', err);
-      } finally {
-        setLoadingPendingReceipts(false);
-      }
-    };
-
-    loadPendingReceipts();
+    } catch (err) {
+      console.error('Failed to load pending receipts:', err);
+    } finally {
+      setLoadingPendingReceipts(false);
+    }
   }, [user]);
+
+  useEffect(() => {
+    loadPendingReceipts();
+  }, [loadPendingReceipts]);
 
   // Detect an unfinished upload session left over from a previous reload/crash.
   useEffect(() => {
@@ -172,6 +173,34 @@ const Upload = () => {
     }
     setRecoveredQueue(existing);
   }, [user]);
+
+  // Realtime subscription: keep the pending-receipts list (and the status
+  // counter chips) in sync while uploads are happening in the background,
+  // so the user sees Erfolgreich/Wartend/… counts update live without a
+  // page reload.
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`upload-page-receipts-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'receipts', filter: `user_id=eq.${user.id}` },
+        () => { loadPendingReceipts(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, loadPendingReceipts]);
+
+  // Fallback polling while uploads are in flight — covers the case where
+  // realtime briefly drops or the tab was backgrounded.
+  useEffect(() => {
+    const hasActiveUploads = Array.from(uploads.values()).some(
+      u => u.status === 'uploading' || u.status === 'processing'
+    );
+    if (!hasActiveUploads) return;
+    const interval = setInterval(() => { loadPendingReceipts(); }, 3000);
+    return () => clearInterval(interval);
+  }, [uploads, loadPendingReceipts]);
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
