@@ -1064,7 +1064,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           tax_rate_details: extractedData.tax_rate_details || null,
           receipt_date: extractedData.receipt_date,
           category: finalCategory,
-          tax_type: extractedData.tax_type || null,
+          tax_type: validateTaxType(extractedData.tax_type, extractedData.vendor_country),
           // payment_method no longer set from AI extraction
           invoice_number: extractedData.invoice_number,
           ai_confidence: extractedData.confidence,
