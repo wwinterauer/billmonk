@@ -289,35 +289,7 @@ export function TagSelector({
 
   return (
     <div className={cn('flex flex-wrap items-center', classes.container)}>
-      {/* Visible tags */}
-      {visibleTags.map(tag => renderTagChip(tag))}
-
-      {/* Overflow popover */}
-      {overflowTags.length > 0 && (
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className={cn(
-                'rounded-full',
-                size === 'sm' ? 'h-5 px-2 text-xs' : 'h-7 px-2.5 text-sm'
-              )}
-            >
-              <MoreHorizontal className={classes.icon} />
-              <span className="ml-1">+{overflowTags.length}</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            className="w-auto p-2"
-            align="start"
-          >
-            <div className={cn('flex flex-wrap max-w-xs', classes.container)}>
-              {overflowTags.map(tag => renderTagChip(tag))}
-            </div>
-          </PopoverContent>
-        </Popover>
-      )}
+      {tagStates.map(tag => renderTagChip(tag))}
     </div>
   );
 }
