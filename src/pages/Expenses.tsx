@@ -113,6 +113,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useAuth } from '@/contexts/AuthContext';
 import { SplitSuggestionDialog } from '@/components/receipts/SplitSuggestionDialog';
 import { SourceBadge, NoReceiptBadge } from '@/components/receipts/SourceBadge';
+import { PageMeta } from '@/components/PageMeta';
 
 type SortField = 'receipt_date' | 'vendor' | 'invoice_number' | 'amount_gross';
 type SortDirection = 'asc' | 'desc';
@@ -1449,6 +1450,8 @@ const Expenses = () => {
   }, [dateFrom, dateTo]);
 
   return (
+    <>
+      <PageMeta title="Ausgaben — BillMonk" description="Alle Ausgaben verwalten, filtern und für die Buchhaltung exportieren." canonical="/expenses" noindex />
     <DashboardLayout>
       <div className="p-6 lg:p-8">
         {/* Header */}
@@ -3000,6 +3003,8 @@ const Expenses = () => {
         />
       )}
     </DashboardLayout>
+  
+    </>
   );
 };
 

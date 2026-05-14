@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, FileCheck, AlertCircle, Upload, Share2 } from 'lucide-react';
+import { PageMeta } from '@/components/PageMeta';
 
 type Status = 'processing' | 'success' | 'error' | 'no-files' | 'auth-required';
 
@@ -202,6 +203,8 @@ export default function ShareReceive() {
   };
 
   return (
+    <>
+      <PageMeta title="Geteilten Beleg empfangen — BillMonk" description="Belege empfangen, die über die Teilen-Funktion an BillMonk gesendet wurden." canonical="/share-receive" noindex />
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardContent className="pt-6">
@@ -275,6 +278,8 @@ export default function ShareReceive() {
         </CardContent>
       </Card>
     </div>
+  
+    </>
   );
 }
 

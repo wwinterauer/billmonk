@@ -84,6 +84,7 @@ import { useVatRates } from '@/hooks/useVatRates';
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
 import { PAYMENT_METHODS } from '@/lib/constants';
+import { PageMeta } from '@/components/PageMeta';
 
 interface TaxRateDetail {
   rate: number;
@@ -600,7 +601,11 @@ const Review = () => {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return (
+      <>
+        <PageMeta title="Belege prüfen — BillMonk" description="Erkannte Belege kontrollieren, Kategorien anpassen und freigeben." canonical="/review" noindex />
+      </>
+    ) => window.removeEventListener('keydown', handleKeyDown);
   }, [currentIndex, goToReceipt]);
 
   // Reviewed count for progress

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { PageMeta } from '@/components/PageMeta';
 
 const PASSWORD_RULES = [
   { key: 'length', label: 'Mindestens 8 Zeichen', test: (p: string) => p.length >= 8 },
@@ -39,7 +40,11 @@ const ResetPassword = () => {
       setIsRecovery(true);
     }
 
-    return () => subscription.unsubscribe();
+    return (
+      <>
+        <PageMeta title="Passwort zurücksetzen — BillMonk" description="Lege ein neues Passwort für dein BillMonk-Konto fest." canonical="/reset-password" noindex />
+      </>
+    ) => subscription.unsubscribe();
   }, []);
 
   const allRulesPass = PASSWORD_RULES.every(r => r.test(password));

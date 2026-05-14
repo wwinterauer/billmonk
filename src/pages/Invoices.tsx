@@ -24,6 +24,7 @@ import { PdfPreviewDialog } from '@/components/invoices/PdfPreviewDialog';
 import { format, startOfMonth, endOfMonth, subMonths, startOfQuarter, endOfQuarter, subQuarters, startOfYear, endOfYear, subYears } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { PageMeta } from '@/components/PageMeta';
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Entwurf', variant: 'secondary' },
@@ -232,6 +233,8 @@ const Invoices = () => {
   };
 
   return (
+    <>
+      <PageMeta title="Rechnungen — BillMonk" description="Rechnungen erstellen, versenden und den Status deiner Forderungen verfolgen." canonical="/invoices" noindex />
     <DashboardLayout>
       <FeatureGate feature="invoiceModule">
       <div className="p-6 lg:p-8 space-y-6">
@@ -667,6 +670,8 @@ const Invoices = () => {
         </AlertDialogContent>
       </AlertDialog>
     </DashboardLayout>
+  
+    </>
   );
 };
 

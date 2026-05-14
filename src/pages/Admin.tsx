@@ -16,6 +16,7 @@ import { CommunityLearning } from '@/components/admin/CommunityLearning';
 import { ABTestManager } from '@/components/admin/ABTestManager';
 import { Shield, Users, CreditCard, BarChart3, Mail, HeartPulse, Blocks, Activity, Megaphone, MessageSquare, HelpCircle, KeyRound, Brain, FlaskConical } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { PageMeta } from '@/components/PageMeta';
 
 export default function Admin() {
   const [healthData, setHealthData] = useState<any>(null);
@@ -45,6 +46,8 @@ export default function Admin() {
   }, []);
 
   return (
+    <>
+      <PageMeta title="Administration — BillMonk" description="Interner Admin-Bereich für die Verwaltung von BillMonk." canonical="/admin" noindex />
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center gap-3">
@@ -153,5 +156,7 @@ export default function Admin() {
         </Tabs>
       </div>
     </DashboardLayout>
+  
+    </>
   );
 }

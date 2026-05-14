@@ -35,6 +35,7 @@ import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { PageMeta } from '@/components/PageMeta';
 
 interface FileUpload extends UploadProgress {
   file: File;
@@ -897,9 +898,13 @@ const Upload = () => {
     // Check for duplicate status
     if (upload.isDuplicate) {
       return (
+        <>
+          <PageMeta title="Belege hochladen — BillMonk" description="Belege per Foto, Datei oder E-Mail hochladen und automatisch erfassen lassen." canonical="/upload" noindex />
         <div className="h-8 w-8 rounded-full bg-warning flex items-center justify-center">
           <Copy className="h-4 w-4 text-warning-foreground" />
         </div>
+      
+        </>
       );
     }
 
