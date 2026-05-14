@@ -438,18 +438,13 @@ serve(async (req) => {
       if (!skipMultiCheck && isPdf && pageCount > 1 && LOVABLE_API_KEY) {
         const multiCheck = await checkForMultipleInvoices(imageBase64, mimeType, pageCount, LOVABLE_API_KEY);
         if (multiCheck.contains_multiple_invoices && multiCheck.confidence >= 0.7 && multiCheck.invoice_count >= 2) {
-          console.log(`Multiple invoices detected: ${multiCheck.invoice_count}`);
+          console.log(`Multiple invoices detected: ${multiCheck.invoice_count} — saving suggestion, continuing extraction so user has data in Review`);
+          // Save split suggestion but DO NOT block extraction. Receipt will land in Review,
+          // where MultiInvoiceAlert (triggered by split_suggestion) lets the user split or keep as one.
           await supabase.from('receipts').update({
-            status: 'needs_splitting',
             split_suggestion: multiCheck,
-            notes: `${multiCheck.invoice_count} separate Rechnungen erkannt. Bitte aufteilen.`,
-            ai_processed_at: new Date().toISOString(),
+            notes: `${multiCheck.invoice_count} separate Rechnungen erkannt. In der Review aufteilen oder als einzelne Rechnung behalten.`,
           }).eq('id', receiptId);
-
-          return new Response(
-            JSON.stringify({ success: true, needs_splitting: true, invoice_count: multiCheck.invoice_count, suggestion: multiCheck, receiptId }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
         }
       }
 
