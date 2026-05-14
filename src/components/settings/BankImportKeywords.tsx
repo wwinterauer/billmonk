@@ -477,22 +477,15 @@ export function BankImportKeywords() {
 
               <div className="space-y-2">
                 <Label>Steuerart (optional)</Label>
-                <Select
-                  value={formData.tax_type || NONE_VALUE}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, tax_type: value === NONE_VALUE ? '' : value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Keine Voreinstellung" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE_VALUE}>Keine Voreinstellung</SelectItem>
-                    {taxCategories.map((c) => (
-                      <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={formData.tax_type || ''}
+                  onChange={(value) => setFormData({ ...formData, tax_type: value })}
+                  options={taxCategories.map((c) => ({ value: c.name, label: c.name }))}
+                  placeholder="Keine Voreinstellung"
+                  searchPlaceholder="Buchungsart suchen..."
+                  allowClear
+                  clearLabel="Keine Voreinstellung"
+                />
                 <p className="text-xs text-muted-foreground">
                   Wird beim automatisch erstellten Beleg als Steuer-Buchungsart gesetzt.
                 </p>
