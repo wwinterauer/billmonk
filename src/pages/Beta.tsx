@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Lock, ArrowRight, Loader2, UserPlus, KeyRound, CheckCircle2 } from 'lucide-react';
+import { Lock, ArrowRight, Loader2, UserPlus, KeyRound, CheckCircle2, LogIn } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { Hero } from '@/components/landing/Hero';
 import { ProblemSolution } from '@/components/landing/ProblemSolution';
@@ -43,15 +44,23 @@ export default function Beta() {
             <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">Preise</a>
             <a href="#beta-signup" className="text-muted-foreground hover:text-foreground transition-colors">Beta-Zugang</a>
           </nav>
-          <Button size="sm" variant="outline" onClick={() => {
-            setActiveTab('code');
-            setTimeout(() => {
-              document.getElementById('beta-signup')?.scrollIntoView({ behavior: 'smooth' });
-            }, 100);
-          }} className="gap-1.5">
-            <KeyRound className="h-3.5 w-3.5" />
-            Code eingeben
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link to="/login">
+              <Button size="sm" variant="ghost" className="gap-1.5">
+                <LogIn className="h-3.5 w-3.5" />
+                Login
+              </Button>
+            </Link>
+            <Button size="sm" variant="outline" onClick={() => {
+              setActiveTab('code');
+              setTimeout(() => {
+                document.getElementById('beta-signup')?.scrollIntoView({ behavior: 'smooth' });
+              }, 100);
+            }} className="gap-1.5">
+              <KeyRound className="h-3.5 w-3.5" />
+              Code eingeben
+            </Button>
+          </div>
         </div>
       </header>
 
