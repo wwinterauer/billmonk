@@ -1195,7 +1195,18 @@ const Review = () => {
                           onChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
                           options={userCategories.map(cat => ({ value: cat.name, label: cat.name }))}
                           placeholder="Nicht zugeordnet"
-                          searchPlaceholder="Kategorie suchen..."
+                          searchPlaceholder="Kategorie suchen oder anlegen..."
+                          allowClear
+                          onCreate={async (name) => {
+                            try {
+                              const cat = await addCategory(name);
+                              setFormData(prev => ({ ...prev, category: cat.name }));
+                              toast({ title: 'Kategorie angelegt', description: cat.name });
+                            } catch (e) {
+                              toast({ variant: 'destructive', title: 'Fehler', description: e instanceof Error ? e.message : 'Konnte Kategorie nicht anlegen' });
+                            }
+                          }}
+                          createLabel={(q) => `„${q}" als neue Kategorie anlegen`}
                         />
                       </div>
 
