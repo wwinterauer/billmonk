@@ -326,6 +326,9 @@ export function useReceiptProcessing(
           updateData.vat_amount = Number((grossAmount - updateData.amount_net).toFixed(2));
         }
       }
+      if (vendor.default_tax_type && !extractedData.tax_type) {
+        updateData.tax_type = vendor.default_tax_type;
+      }
 
       // Add detected name as variant if provided
       if (detectedName) {
