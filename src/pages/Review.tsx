@@ -21,6 +21,7 @@ import {
   Tag,
   ExternalLink,
   Trash2,
+  Zap,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -68,6 +69,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
@@ -136,6 +139,8 @@ const Review = () => {
   const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
+  const [vendorAutoApprove, setVendorAutoApprove] = useState(false);
+  const [vendorAutoApproveMinConfidence, setVendorAutoApproveMinConfidence] = useState(0.8);
   const [formData, setFormData] = useState<FormData>({
     vendor: '',
     vendor_brand: '',
@@ -298,6 +303,23 @@ const Review = () => {
     });
     setAiConfidence(receipt.ai_confidence ?? null);
     setSelectedVendorId(receipt.vendor_id ?? null);
+    // Load vendor auto_approve settings if vendor exists
+    if (receipt.vendor_id) {
+      supabase
+        .from('vendors')
+        .select('auto_approve, auto_approve_min_confidence')
+        .eq('id', receipt.vendor_id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            setVendorAutoApprove(data.auto_approve ?? false);
+            setVendorAutoApproveMinConfidence(data.auto_approve_min_confidence ?? 0.8);
+          }
+        });
+    } else {
+      setVendorAutoApprove(false);
+      setVendorAutoApproveMinConfidence(0.8);
+    }
   };
 
   // Handle reanalysis updates
@@ -368,6 +390,18 @@ const Review = () => {
           }
         });
     }
+    // Load vendor auto_approve settings
+    supabase
+      .from('vendors')
+      .select('auto_approve, auto_approve_min_confidence')
+      .eq('id', vendorData.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setVendorAutoApprove(data.auto_approve ?? false);
+          setVendorAutoApproveMinConfidence(data.auto_approve_min_confidence ?? 0.8);
+        }
+      });
   }, [defaultVatRate, formData.category]);
   const goToReceipt = useCallback((index: number) => {
     if (index >= 0 && index < receipts.length) {
@@ -1080,6 +1114,72 @@ const Review = () => {
                         hideLabel
                         placeholder="z.B. troii Software GmbH"
                       />
+                      {/* Auto Approve Toggle */}
+                      {selectedVendorId && (
+                        <div className="mt-2 space-y-2 rounded-lg border border-border/50 bg-muted/30 p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Zap className="h-3.5 w-3.5 text-yellow-500" />
+                              <Label htmlFor="auto-approve" className="text-sm cursor-pointer">
+                                Automatische Freigabe
+                              </Label>
+                            </div>
+                            <Switch
+                              id="auto-approve"
+                              checked={vendorAutoApprove}
+                              onCheckedChange={async (checked) => {
+                                setVendorAutoApprove(checked);
+                                if (selectedVendorId) {
+                                  const { error } = await supabase
+                                    .from('vendors')
+                                    .update({
+                                      auto_approve: checked,
+                                      auto_approve_min_confidence: vendorAutoApproveMinConfidence,
+                                    })
+                                    .eq('id', selectedVendorId);
+                                  if (error) {
+                                    toast({
+                                      variant: 'destructive',
+                                      title: 'Fehler',
+                                      description: 'Automatische Freigabe konnte nicht gespeichert werden.',
+                                    });
+                                    setVendorAutoApprove(!checked);
+                                  } else {
+                                    toast({
+                                      title: checked ? 'Automatische Freigabe aktiviert' : 'Automatische Freigabe deaktiviert',
+                                    });
+                                  }
+                                }
+                              }}
+                            />
+                          </div>
+                          {vendorAutoApprove && (
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">Mindest-Konfidenz</span>
+                                <span className="text-xs font-medium">{Math.round(vendorAutoApproveMinConfidence * 100)}%</span>
+                              </div>
+                              <Slider
+                                value={[Math.round(vendorAutoApproveMinConfidence * 100)]}
+                                onValueChange={async ([value]) => {
+                                  const newVal = value / 100;
+                                  setVendorAutoApproveMinConfidence(newVal);
+                                  if (selectedVendorId) {
+                                    await supabase
+                                      .from('vendors')
+                                      .update({ auto_approve_min_confidence: newVal })
+                                      .eq('id', selectedVendorId);
+                                  }
+                                }}
+                                min={50}
+                                max={100}
+                                step={5}
+                                className="w-full"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Description */}
