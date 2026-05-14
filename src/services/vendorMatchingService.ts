@@ -307,7 +307,7 @@ export async function findOrCreateVendor(
 /**
  * Create a new vendor internally
  */
-async function createVendorInternal(
+export async function createVendorInternal(
   userId: string,
   name: string,
   legalName?: string

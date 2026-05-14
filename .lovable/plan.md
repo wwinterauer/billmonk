@@ -1,31 +1,42 @@
-# Dashboard "Nach Kategorie" / "Nach Buchungsart" Fix
+# Fix: "+ als neuen Lieferanten" legt tatsächlich einen Lieferanten an
 
-## Probleme
+## Problem
+In `src/components/receipts/VendorAutocomplete.tsx` öffnet sich beim Tippen ein Dropdown mit dem Button **"„{name}" als neuen Lieferanten"** (Z. 305–317) sowie im Empty-State **"„{name}" verwenden"** (Z. 253–260). Beide Buttons rufen `handleUseCustomValue` (Z. 179–182) auf, das ausschließlich `onChange(vendorSearch, null)` ausführt — also nur das Inputfeld befüllt und `vendor_id` explizit auf `null` setzt.
 
-Im Selektor (`src/pages/Dashboard.tsx` Zeile 522) sehe ich im Legendentext u.a. zwei UUIDs (`af1b199b-…`, `ac5bf110-…`) sowie ~15 Kategorien. Das erklärt alle drei Beschwerden:
+Es wird **nie** ein Insert in die Tabelle `vendors` ausgeführt. Beim Speichern in `Review.tsx` (Z. 454) wird dann `vendor_id: selectedVendorId` (=null) am Beleg gespeichert, der Name landet nur als Freitext in `vendor_brand`. Daraus folgt: "Fertigputze Haslinger GmbH" existiert nirgends in `vendors`, taucht im Dropdown nicht wieder auf, hat keine Defaults, keine Statistik.
 
-1. **Unübersichtlich**: Das `<Legend>` rechts vom Pie zeigt _alle_ Kategorien des Monats. Bei 15+ Einträgen quillt die Legende über die Karte und überlagert die Toggle-Buttons im `CardHeader` → wirkt "kaputt".
-2. **UUID statt Name**: In `useDashboardData.ts` (Z. 217–243) wird `r.category` / `line.category` direkt als Schlüssel verwendet. Wenn ein Beleg eine Kategorie-ID statt des Namens gespeichert hat (alte/gelöschte Kategorien, Splits), erscheint die rohe UUID im Chart.
-3. **Toggle "Buchungsart" reagiert nicht**: vermutlich nur visuell verdeckt durch die überlaufende Legende — beim Klick passiert nichts Sichtbares, weil die Buchungsart-Liste ebenfalls überlange Namen ("Reparatur, Wartung, Ausbesserungsarbeiten" etc.) hat und das gleiche Layoutproblem produziert.
+## Lösung — nur Frontend
 
-## Änderungen — nur Frontend
+### A) `src/services/vendorMatchingService.ts`
+- `createVendorInternal` exportieren (aktuell `async function` ohne `export`, Z. 310). Umbenennen ist nicht nötig — einfach `export async function createVendorInternal(...)` setzen, damit das UI eine direkte, eindeutige "Neu anlegen"-Aktion hat (ohne Matching-Heuristik, die den Namen sonst wieder mit einem ähnlichen verbindet).
 
-### A) `src/hooks/useDashboardData.ts`
-- Beim Aufbau der `categoryMap` und `taxTypeMap`: Wenn der Wert wie eine UUID aussieht (`/^[0-9a-f-]{36}$/i`), per `categories`-Lookup auf den **Namen** mappen. Wenn nicht auflösbar → in einen Eimer **„Unbekannt"** legen statt UUID anzuzeigen.
+### B) `src/components/receipts/VendorAutocomplete.tsx`
+1. Imports ergänzen: `useAuth` ist da, zusätzlich `createVendorInternal` aus `@/services/vendorMatchingService` und `useToast` aus `@/hooks/use-toast`.
+2. Neuer Handler `handleCreateNewVendor()`:
+   - Validiert Name (trim, min. 2 Zeichen).
+   - Setzt lokales `isCreating`-State (Button-Disabled + Spinner-Text).
+   - Ruft `createVendorInternal(user.id, name)` auf.
+   - Bei Erfolg: 
+     - `loadAllVendors()` neu laden, damit der neue Lieferant sofort im Dropdown auftaucht.
+     - In das `VendorWithCategory`-Shape mappen (mit `receipt_count: 0`, `default_category: null`, `default_tag_id`/`field_defaults` optional auf null) und `onVendorSelect(newVendor)` aufrufen → das setzt im `Review` `selectedVendorId`, sodass beim Speichern `vendor_id` korrekt gesetzt wird.
+     - Dropdown schließen, Suchfeld leeren.
+     - `toast({ title: 'Lieferant angelegt' })`.
+   - Bei Fehler: `toast({ variant: 'destructive', title: 'Anlegen fehlgeschlagen', description: error.message })` und Dropdown offen lassen.
+3. Beide Buttons (Empty-State Z. 253 + Footer Z. 307) auf `handleCreateNewVendor` umstellen. Der bisherige Free-Text-Pfad „nur ins Inputfeld übernehmen" wird abgeschafft, da das genau die jetzige Lücke ist und der User explizit „neuen Lieferanten anlegen" erwartet.
+4. Button-Label klarer: „`{vendorSearch}` als neuen Lieferanten anlegen" (mit "anlegen") und im Empty-State analog.
 
-### B) `src/pages/Dashboard.tsx` (Z. 118–131, 497–572)
-- **Top-N + Sonstige**: `chartData` auf die **Top 6** Einträge begrenzen; Restbetrag als einen Eintrag „Sonstige" (grau) zusammenfassen. Gilt für beide Ansichten.
-- **Legende kompakt**: Legende bei vielen Einträgen unter dem Chart (`align="center"`, `verticalAlign="bottom"`) statt rechts, mit `wrapperStyle` für Zeilenumbruch und max. Höhe + scroll. Lange Namen per `text-ellipsis` truncaten (Voller Name bleibt im Tooltip sichtbar).
-- **Toggle-Buttons** außerhalb des Chart-Containers ins eigene `flex-shrink-0`-Header packen, damit sie nie von der Legende verdeckt werden. Falls weiter problematisch, Toggle als kleiner `Tabs`/`SegmentedControl` direkt unter dem Titel platzieren.
-- Karten-Mindesthöhe (`min-h`) entfernen falls nötig, damit Layout stabil bleibt.
-
-### C) Sicherheitsnetz für leere Buchungsart
-- Wenn `taxTypeData` nur den Bucket `Offen` enthält, klare Empty-State-Meldung „Noch keine Buchungsarten zugewiesen" anzeigen, damit der Toggle sichtbar Wirkung zeigt.
+### C) Sicherheitsnetz
+- Wenn `createVendorInternal` `null` zurückgibt (z.B. RLS-Fehler), Fehler-Toast mit „Bitte erneut versuchen" und Konsole-Log behalten.
+- Edge: leerer Username → Button disabled.
 
 ## Nicht im Scope
-- Keine DB-Migration; UUID-Werte in `receipts.category` werden _angezeigt_ aufgelöst, aber nicht umgeschrieben (separates Thema).
-- Keine Änderungen an Tag-Statistik, Stats-Karten, Routing.
+- Keine DB-Migration, keine Änderung an RLS oder Schema.
+- Kein Backfill für Belege, bei denen früher nur Freitext gespeichert wurde — der User legt diesen Lieferanten jetzt manuell sauber neu an.
+- `Upload.tsx` nutzt bereits `createVendorForReceipt` korrekt — bleibt unverändert.
 
 ## Verifikation
 - Build prüfen.
-- Im Preview Dashboard öffnen: Pie zeigt max. 7 Slices (6 + Sonstige), keine UUIDs, Toggle wechselt sichtbar zwischen Kategorie/Buchungsart, Tooltip zeigt vollen Namen + Betrag + %.
+- Im Preview Review öffnen, im Lieferanten-Feld "Fertigputze Haslinger GmbH" tippen → "+ als neuen Lieferanten anlegen" klicken.
+  - Erwartung: Toast „Lieferant angelegt", Eingabefeld zeigt den Namen, `vendor_id` ist gesetzt (Edit-Icon „Lieferanten bearbeiten" erscheint, Z. 1012–1024).
+  - Beleg speichern → in DB: `receipts.vendor_id IS NOT NULL`, ein neuer Eintrag in `vendors` mit `display_name = 'Fertigputze Haslinger GmbH'` ist vorhanden.
+  - Anderen Beleg öffnen → Lieferant erscheint im Dropdown.
