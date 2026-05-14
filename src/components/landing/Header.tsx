@@ -24,7 +24,7 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-lg">
       <div className="container flex h-16 items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
-          <img src={logoTeal} alt="BillMonk" className="h-8" />
+          <img src={logoTeal} alt="BillMonk" className="h-8" width="133" height="32" />
           <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
             Beta
           </Badge>

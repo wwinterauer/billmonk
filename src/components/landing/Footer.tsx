@@ -12,7 +12,7 @@ export function Footer() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <img src={logoTeal} alt="BillMonk" className="h-7" />
+              <img src={logoTeal} alt="BillMonk" className="h-7" width="117" height="28" />
               <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
                 Beta
               </Badge>
