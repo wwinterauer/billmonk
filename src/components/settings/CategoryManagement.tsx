@@ -554,7 +554,11 @@ export function CategoryManagement() {
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
-          {category.name === 'Keine Rechnung' ? (
+          {category.id.startsWith('tax:') ? (
+            <Badge variant="outline" className="text-xs text-muted-foreground">
+              System
+            </Badge>
+          ) : category.name === 'Keine Rechnung' ? (
             <Badge variant="outline" className="text-xs text-muted-foreground">
               Geschützt
             </Badge>
