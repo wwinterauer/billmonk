@@ -36,6 +36,9 @@ import { de } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageMeta } from '@/components/PageMeta';
+import { saveQueue, loadQueue, clearQueue, runWithConcurrency, type UploadQueueState } from '@/lib/upload-queue';
+
+const UPLOAD_CONCURRENCY = 3;
 
 interface FileUpload extends UploadProgress {
   file: File;
@@ -96,6 +99,8 @@ const Upload = () => {
   const [applyToAll, setApplyToAll] = useState(false);
   const [isProcessingVendor, setIsProcessingVendor] = useState(false);
   
+  const [recoveredQueue, setRecoveredQueue] = useState<UploadQueueState | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -153,6 +158,19 @@ const Upload = () => {
     };
 
     loadPendingReceipts();
+  }, [user]);
+
+  // Detect an unfinished upload session left over from a previous reload/crash.
+  useEffect(() => {
+    if (!user) return;
+    const existing = loadQueue(user.id);
+    if (!existing) return;
+    const unfinished = existing.items.filter(i => i.status !== 'complete' && i.status !== 'error');
+    if (unfinished.length === 0) {
+      clearQueue(user.id);
+      return;
+    }
+    setRecoveredQueue(existing);
   }, [user]);
 
   const formatFileSize = (bytes: number) => {
@@ -400,15 +418,36 @@ const Upload = () => {
       });
     }
 
-    // Start uploading files sequentially
-    for (const { upload, isDuplicate, duplicateOfId } of filesToUpload) {
+    // Persist a snapshot of the planned queue so that, if the tab is reloaded
+    // or crashes mid-upload, we can show the user a recovery hint with the
+    // list of filenames that never finished.
+    if (user) {
+      saveQueue(user.id, {
+        startedAt: Date.now(),
+        total: filesToUpload.length,
+        items: filesToUpload.map(({ upload }) => ({
+          fileName: upload.fileName,
+          fileSize: upload.fileSize,
+          fileHash: upload.fileHash,
+          status: 'pending',
+        })),
+      });
+    }
+
+    // Upload with bounded concurrency instead of strictly sequential — keeps
+    // the edge function from being hammered while drastically improving
+    // throughput on large drops.
+    await runWithConcurrency(filesToUpload, UPLOAD_CONCURRENCY, async ({ upload, isDuplicate, duplicateOfId }) => {
       await uploadFile(upload, {
         skipDuplicateCheck: true,
         markAsDuplicate: isDuplicate,
         duplicateOfId,
         fileHash: upload.fileHash,
       });
-    }
+    });
+
+    // All done — drop the recovery snapshot.
+    if (user) clearQueue(user.id);
   };
 
   const uploadFile = async (upload: FileUpload, options?: { skipDuplicateCheck?: boolean; markAsDuplicate?: boolean; duplicateOfId?: string; fileHash?: string }) => {
@@ -1019,6 +1058,48 @@ const Upload = () => {
           <h1 className="text-2xl font-bold text-foreground">Belege hochladen</h1>
           <p className="text-muted-foreground">Lade deine Belege hoch und lass die KI sie analysieren</p>
         </div>
+
+        {/* Recovery banner: previous upload session was interrupted */}
+        {recoveredQueue && user && (() => {
+          const unfinished = recoveredQueue.items.filter(i => i.status !== 'complete' && i.status !== 'error');
+          if (unfinished.length === 0) return null;
+          return (
+            <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Letzter Upload nicht abgeschlossen
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Von {recoveredQueue.total} Dateien wurden {unfinished.length} vor dem Abschluss unterbrochen
+                    (z. B. durch Tab-Wechsel oder Reload). Bitte ziehe die fehlenden Dateien erneut in den Upload —
+                    bereits verarbeitete werden automatisch als Duplikat erkannt und übersprungen.
+                  </p>
+                  <details className="mt-2">
+                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                      Liste der nicht abgeschlossenen Dateien anzeigen
+                    </summary>
+                    <ul className="mt-2 max-h-40 overflow-y-auto text-xs text-muted-foreground space-y-0.5 pl-2">
+                      {unfinished.map((i, idx) => (
+                        <li key={idx} className="truncate">• {i.fileName}</li>
+                      ))}
+                    </ul>
+                  </details>
+                  <div className="mt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { clearQueue(user.id); setRecoveredQueue(null); }}
+                    >
+                      Hinweis ausblenden
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* File Check Progress - shown during checking phase */}
         {uploadPhase === 'checking' && (

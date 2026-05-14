@@ -1,0 +1,1 @@
+UPDATE public.receipts SET status = 'review', updated_at = now() WHERE id IN ('1c8bd610-f07c-4525-892a-698c16556666', '24d16c82-315e-472e-9047-600579ceb2d6') AND status = 'processing';
