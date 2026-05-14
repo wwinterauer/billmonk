@@ -821,7 +821,7 @@ const Review = () => {
 
               <CardContent>
                 {/* Multi-Invoice Alert for PDFs with multiple invoices */}
-                {currentReceipt?.status === 'needs_splitting' && (
+                {(currentReceipt?.split_suggestion as any)?.contains_multiple_invoices && (
                   <div className="mb-6">
                     <MultiInvoiceAlert
                       receiptId={currentReceipt.id}
