@@ -17,13 +17,15 @@ export interface ReceiptData {
 }
 
 /**
- * Apply vendor filter: exact match for short names (<6 chars), ilike prefix for longer names
+ * Apply vendor filter using the first meaningful token (handles abbreviations
+ * like "W H" vs "Würth Hochenburger"). Falls back to ilike on whole string.
  */
 function applyVendorFilter(query: any, vendor: string) {
-  if (vendor.length < 6) {
-    return query.eq('vendor', vendor);
-  }
-  return query.ilike('vendor', `%${vendor.substring(0, 10)}%`);
+  const cleaned = vendor.trim();
+  const tokens = cleaned.split(/\s+/).filter(Boolean);
+  const firstLong = tokens.find(t => t.length >= 3) || tokens[0] || cleaned;
+  const needle = firstLong.substring(0, 10);
+  return query.ilike('vendor', `%${needle}%`);
 }
 
 /**
