@@ -418,15 +418,36 @@ const Upload = () => {
       });
     }
 
-    // Start uploading files sequentially
-    for (const { upload, isDuplicate, duplicateOfId } of filesToUpload) {
+    // Persist a snapshot of the planned queue so that, if the tab is reloaded
+    // or crashes mid-upload, we can show the user a recovery hint with the
+    // list of filenames that never finished.
+    if (user) {
+      saveQueue(user.id, {
+        startedAt: Date.now(),
+        total: filesToUpload.length,
+        items: filesToUpload.map(({ upload }) => ({
+          fileName: upload.fileName,
+          fileSize: upload.fileSize,
+          fileHash: upload.fileHash,
+          status: 'pending',
+        })),
+      });
+    }
+
+    // Upload with bounded concurrency instead of strictly sequential — keeps
+    // the edge function from being hammered while drastically improving
+    // throughput on large drops.
+    await runWithConcurrency(filesToUpload, UPLOAD_CONCURRENCY, async ({ upload, isDuplicate, duplicateOfId }) => {
       await uploadFile(upload, {
         skipDuplicateCheck: true,
         markAsDuplicate: isDuplicate,
         duplicateOfId,
         fileHash: upload.fileHash,
       });
-    }
+    });
+
+    // All done — drop the recovery snapshot.
+    if (user) clearQueue(user.id);
   };
 
   const uploadFile = async (upload: FileUpload, options?: { skipDuplicateCheck?: boolean; markAsDuplicate?: boolean; duplicateOfId?: string; fileHash?: string }) => {
