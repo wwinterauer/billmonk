@@ -247,10 +247,10 @@ export function TagSelector({
         }}
         title={
           isBulkMode
-            ? `${tag.assignmentCount} von ${tag.totalCount} Belegen`
+            ? `${tag.name} – ${tag.assignmentCount} von ${tag.totalCount} Belegen`
             : tag.isAssigned
-              ? 'Klicken zum Entfernen'
-              : 'Klicken zum Hinzufügen'
+              ? `${tag.name} – Klicken zum Entfernen`
+              : `${tag.name} – Klicken zum Hinzufügen`
         }
       >
         {/* Icon */}
