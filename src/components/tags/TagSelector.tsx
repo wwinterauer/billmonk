@@ -262,7 +262,7 @@ export function TagSelector({
         )}
 
         {/* Name */}
-        <span className="truncate max-w-[120px]">{tag.name}</span>
+        <span className="truncate max-w-[120px]" title={tag.name}>{tag.name}</span>
       </button>
     );
   };
