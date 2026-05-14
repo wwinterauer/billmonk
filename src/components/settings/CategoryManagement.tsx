@@ -503,7 +503,31 @@ export function CategoryManagement() {
 
   // Split into two groups
   const userCategories = useMemo(() => categories.filter(c => !c.is_system || !c.country), [categories]);
-  const taxCategories = useMemo(() => categories.filter(c => c.is_system && !!c.country), [categories]);
+
+  // Buchungsarten kommen aus taxCategoryInfo.ts (statisches DACH-Set), nicht aus DB.
+  // Gefiltert nach userland; rein informativ (Anzeige + Info-Dialog).
+  const taxCategories = useMemo<Category[]>(() => {
+    const counts: Record<string, number> = {};
+    return Object.keys(TAX_CATEGORY_INFO)
+      .filter(name => {
+        const m = name.match(/\(([A-Z]{2})\)\s*$/);
+        return m ? m[1] === selectedCountry : false;
+      })
+      .map((name, idx) => ({
+        id: `tax:${name}`,
+        user_id: null,
+        name,
+        icon: 'FileText',
+        color: '#64748B',
+        is_system: true,
+        is_hidden: false,
+        sort_order: idx,
+        created_at: '',
+        country: selectedCountry,
+        tax_code: null,
+        receipt_count: counts[name] || 0,
+      }));
+  }, [selectedCountry]);
 
   const renderCategoryRow = (category: Category, showTaxCodeCol: boolean) => (
     <TableRow 
