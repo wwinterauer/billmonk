@@ -226,6 +226,21 @@ function buildTaxTypeList(country: string | null): string {
   return list.join(', ');
 }
 
+// Validates a tax_type against the allowed list for the country.
+// Returns the value if valid, or null if hallucinated/unknown.
+function validateTaxType(value: string | null | undefined, country: string | null): string | null {
+  if (!value || typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const countryList = TAX_TYPES_BY_COUNTRY[(country || 'AT').toUpperCase()] || [];
+  if (countryList.includes(trimmed)) return trimmed;
+  // Allow values from any country list (in case vendor_country was misdetected)
+  const allKnown = new Set(Object.values(TAX_TYPES_BY_COUNTRY).flat());
+  if (allKnown.has(trimmed)) return trimmed;
+  console.log(`[Tax Type Validation] Rejecting hallucinated tax_type "${trimmed}" (country: ${country || 'AT'})`);
+  return null;
+}
+
 // ── Expenses-only prompt builder (deduplicated) ────────────────────
 function buildExpensesOnlyPrompt(keywords: string[], hint: string): string {
   let prompt = '';
@@ -616,7 +631,8 @@ Wähle NUR aus dieser Liste eine passende User-Kategorie aus, oder lasse leer ("
 WICHTIG: category ist KEIN Steuer-Begriff. Nimm hier NIE Werte wie "KFZ-Kosten (AT)" oder "Bewirtung 50%" – die gehören ausschließlich in tax_type.
 
 BUCHUNGSART (tax_type, steuerliche Einordnung – UNABHÄNGIG von category):
-Wähle NUR aus dieser Liste den passenden Eintrag (oder "" wenn unklar): ${taxTypeList}${taxTypeHints}
+STRIKT: Wähle EXAKT einen Wert aus dieser Liste ODER lass leer (""). NIEMALS einen anderen Begriff erfinden (z.B. "Betriebsausgabe", "Sonstiges", "Aufwand"). Im Zweifel "" zurückgeben.
+Erlaubte Werte: ${taxTypeList}${taxTypeHints}
 MwSt-ERKENNUNG:
 - Suche explizite %-Angaben auf dem Beleg (20%, 19%, 10%, 7% etc.)
 - Berechne: MwSt = Brutto × Satz/(100+Satz). Validiere: Netto + MwSt = Brutto (±0.05€)
@@ -1049,7 +1065,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           tax_rate_details: extractedData.tax_rate_details || null,
           receipt_date: extractedData.receipt_date,
           category: finalCategory,
-          tax_type: extractedData.tax_type || null,
+          tax_type: validateTaxType(extractedData.tax_type, extractedData.vendor_country),
           // payment_method no longer set from AI extraction
           invoice_number: extractedData.invoice_number,
           ai_confidence: extractedData.confidence,
