@@ -214,13 +214,25 @@ export function useDashboardData(year: number, month: number) {
         splitByReceipt.set(line.receipt_id, lines);
       });
 
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const categoryByIdMap = new Map((categories || []).map((c: any) => [c.id, c.name]));
+      const categoryNameSet = new Set((categories || []).map((c: any) => c.name));
+      const resolveCategoryName = (raw: string | null | undefined): string | null => {
+        if (!raw) return null;
+        if (categoryNameSet.has(raw)) return raw;
+        if (UUID_RE.test(raw)) {
+          return categoryByIdMap.get(raw) || 'Unbekannt';
+        }
+        return raw;
+      };
+
       const categoryMap = new Map<string, number>();
       billableReceipts.forEach(r => {
         if ((r as any).is_split_booking) {
           const lines = splitByReceipt.get(r.id);
           if (lines && lines.length > 0) {
             lines.forEach((line: any) => {
-              const cat = line.category || r.category;
+              const cat = resolveCategoryName(line.category || r.category);
               if (cat) {
                 categoryMap.set(cat, (categoryMap.get(cat) || 0) + (line.amount_gross || 0));
               }
@@ -228,8 +240,9 @@ export function useDashboardData(year: number, month: number) {
             return;
           }
         }
-        if (r.category) {
-          categoryMap.set(r.category, (categoryMap.get(r.category) || 0) + (r.amount_gross || 0));
+        const cat = resolveCategoryName(r.category);
+        if (cat) {
+          categoryMap.set(cat, (categoryMap.get(cat) || 0) + (r.amount_gross || 0));
         }
       });
 
