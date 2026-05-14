@@ -662,26 +662,6 @@ export function CategoryManagement() {
               <span className="text-muted-foreground text-xs">(aus deinem Profil)</span>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleToggleTaxCategories(!allTaxVisible)}
-              disabled={togglingTax}
-            >
-              {togglingTax && <Loader2 className="h-3 w-3 mr-2 animate-spin" />}
-              {allTaxVisible ? (
-                <>
-                  <EyeOff className="h-3.5 w-3.5 mr-1.5" />
-                  Steuer-Kategorien ausblenden
-                </>
-              ) : (
-                <>
-                  <Eye className="h-3.5 w-3.5 mr-1.5" />
-                  Steuer-Kategorien einblenden
-                </>
-              )}
-            </Button>
-
             <div className="flex items-center gap-2 ml-auto">
               <Label htmlFor="show-tax-codes" className="text-xs text-muted-foreground cursor-pointer">
                 Steuernummern anzeigen
@@ -695,7 +675,7 @@ export function CategoryManagement() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            {visibleTaxCats.length} von {taxCatsForCountry.length} {COUNTRY_LABELS[selectedCountry]}-Kategorien aktiv
+            {taxCategories.length} Buchungsarten für {COUNTRY_LABELS[selectedCountry]}. Werden automatisch von der KI erkannt und sind systemweit fix.
           </p>
         </div>
 
