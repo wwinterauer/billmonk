@@ -1,34 +1,41 @@
-## Problem
-
-Wenn man in der Review die "Automatische Freigabe" für einen Lieferanten aktiviert, werden andere bereits in der Review liegende Belege desselben Lieferanten **nicht** rückwirkend freigegeben. Erst das Speichern in den Lieferanteneinstellungen löst das aus.
+# Bug: Kategorie-Dropdown zeigt UUID statt Name
 
 ## Ursache
 
-In `src/pages/Review.tsx` (Switch + Slider, Zeilen 1127–1180) wird direkt `supabase.from('vendors').update(...)` aufgerufen.
+Die `receipts.category`-Spalte speichert den **Namen** der Kategorie (z. B. `"Blumen & Dekoration"`), nicht die ID. In `src/hooks/useReceiptProcessing.ts` wird beim Anwenden der Vendor-Defaults aber an drei Stellen direkt die UUID `vendor.default_category_id` in `updateData.category` geschrieben, ohne den Namen aufzulösen:
 
-In `src/components/settings/VendorManagement.tsx` läuft das Update dagegen über den Hook `updateVendor` aus `src/hooks/useVendors.ts` (Zeilen 382–479). Genau dort steckt die retroaktive Logik: Wenn `auto_approve = true`, sucht der Hook alle passenden Belege im Status `review` (verknüpfte + per Name/Brand erkannte) mit ausreichender Konfidenz, verknüpft sie ggf. mit dem Lieferanten und setzt sie auf `approved` / `auto_approved = true`.
+- Zeile 142–144 (Vendor-Auto-Match)
+- Zeile 176–178 (Legacy-Pfad `matchOrCreateVendor`)
+- Zeile 316–318 (`finalizeReceiptWithVendor`)
 
-Die Review umgeht diesen Hook → keine retroaktive Freigabe.
+Bestätigte falsche Daten in der DB:
+- 6× Stripe/PayPal mit `category = ac5bf110-...` → korrekt: **Zahlungsdienstleister**
+- 3× Naturwerkstatt mit `category = af1b199b-...` → korrekt: **Blumen & Dekoration**
 
-## Lösung
+Im Review-Dropdown erscheint nur die rohe UUID, weil sie keiner Kategorie-Option entspricht.
 
-Den Switch und den Slider in `Review.tsx` so umbauen, dass sie **dieselbe Funktion** verwenden wie die Lieferantenverwaltung.
+## Plan
 
-### Änderungen in `src/pages/Review.tsx`
+### 1. `src/hooks/useReceiptProcessing.ts` — Helper + 3 Fixes
+- Kleinen Helper hinzufügen, der zu einer `default_category_id` den Kategorienamen aus `categories` lädt (`select name`, `eq id`, `maybeSingle`).
+- An allen drei Stellen statt `updateData.category = vendor.default_category_id` den aufgelösten **Namen** schreiben. Ist die Kategorie nicht (mehr) auffindbar, `category` nicht setzen.
 
-1. `useVendors`-Hook importieren und `updateVendor` daraus beziehen.
-2. `onCheckedChange` des Switches: statt direktem `supabase.update`
-   - `await updateVendor(selectedVendorId, { auto_approve: checked, auto_approve_min_confidence: vendorAutoApproveMinConfidence })`
-   - Bei Aktivierung: Toast "Automatische Freigabe aktiviert" + Hinweis, falls Belege rückwirkend freigegeben wurden (z. B. "X Beleg(e) automatisch freigegeben"). Den Count kann `updateVendor` bereits zurückliefern — falls nicht, kleinen Rückgabewert ergänzen oder die offene Liste danach refetchen.
-   - Liste der Review-Belege im Anschluss neu laden, damit der zweite Beleg in der UI verschwindet.
-3. `onValueChange` des Sliders: ebenfalls über `updateVendor` speichern (damit ein Hochsetzen ggf. neue Belege erfasst, ein Heruntersetzen erfasst keine neuen Belege rückwirkend nicht – Verhalten bleibt wie bisher in der Lieferantenverwaltung).
-4. Fehlerbehandlung wie bisher (Toast + State-Rollback bei Fehler).
+### 2. Bestehende fehlerhafte Receipts reparieren (Daten-Update)
+```sql
+UPDATE receipts r
+SET category = c.name
+FROM categories c
+WHERE r.category ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+  AND r.category::uuid = c.id;
 
-### Optional (klein)
+-- UUIDs ohne passende Kategorie -> NULL
+UPDATE receipts
+SET category = NULL
+WHERE category ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+```
+Effekt: Naturwerkstatt-Belege → "Blumen & Dekoration", Stripe/PayPal → "Zahlungsdienstleister".
 
-In `useVendors.ts` `updateVendor` zusätzlich `autoApprovedReceipts` im Rückgabeobjekt mitgeben, falls noch nicht vorhanden, damit der Toast in der Review die Anzahl anzeigen kann ("2 Belege rückwirkend freigegeben").
-
-## Out of Scope
-
-- Keine Änderung an der Auto-Approve-Logik selbst (Konfidenzschwelle, Name-Matching, Duplikatfilter bleiben gleich).
-- Keine Änderungen an `VendorManagement.tsx`.
+### Out of Scope
+- `extract-receipt` Edge Function: löst Namen bereits korrekt auf — keine Änderung.
+- `Review.tsx` Vendor-Wechsel-Logik: bereits korrekt, bleibt unverändert.
+- Keine UI-/Vendor-Management-Änderungen.
