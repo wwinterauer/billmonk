@@ -452,19 +452,14 @@ export function BankImportKeywords() {
               <>
               <div className="space-y-2">
                 <Label>Kategorie</Label>
-                <Select
+                <SearchableSelect
                   value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Kategorie wählen..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map((cat) => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(value) => setFormData({ ...formData, category: value })}
+                  options={CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
+                  placeholder="Kategorie wählen..."
+                  searchPlaceholder="Kategorie suchen..."
+                  allowClear
+                />
               </div>
 
               <VendorAutocomplete
