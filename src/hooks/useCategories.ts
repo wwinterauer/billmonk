@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { TAX_CATEGORY_INFO } from '@/components/settings/taxCategoryInfo';
 
 export interface Category {
   id: string;
@@ -19,6 +20,7 @@ export interface Category {
 export function useCategories(options?: { includeHidden?: boolean }) {
   const { user } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [userCountry, setUserCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const includeHidden = options?.includeHidden ?? false;
@@ -26,6 +28,7 @@ export function useCategories(options?: { includeHidden?: boolean }) {
   const fetchCategories = async () => {
     if (!user) {
       setCategories([]);
+      setUserCountry(null);
       setLoading(false);
       return;
     }
@@ -45,13 +48,15 @@ export function useCategories(options?: { includeHidden?: boolean }) {
         query = query.eq('is_hidden', false);
       }
 
-      const { data, error: fetchError } = await query;
+      const [{ data, error: fetchError }, { data: profile }] = await Promise.all([
+        query,
+        supabase.from('profiles').select('country').eq('id', user.id).maybeSingle(),
+      ]);
 
       if (fetchError) {
         throw new Error(fetchError.message);
       }
 
-      // Map data with defaults for new columns
       const mappedData = (data || []).map(cat => ({
         ...cat,
         is_hidden: cat.is_hidden ?? false,
@@ -59,6 +64,7 @@ export function useCategories(options?: { includeHidden?: boolean }) {
       })) as Category[];
 
       setCategories(mappedData);
+      setUserCountry((profile?.country || 'AT').toUpperCase());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Laden der Kategorien');
     } finally {
@@ -148,10 +154,30 @@ export function useCategories(options?: { includeHidden?: boolean }) {
     [categories]
   );
 
-  const taxCategories = useMemo(
-    () => categories.filter(c => c.is_system && !!c.country),
-    [categories]
-  );
+  // Tax-Buchungsarten kommen aus taxCategoryInfo.ts (nicht mehr aus categories-Tabelle).
+  // Gefiltert nach Userland (AT/DE/CH). Synthese in Category-Form, damit alle Konsumenten
+  // (Dropdowns, CategoryManagement-Anzeige) ohne Anpassung weiterlaufen.
+  const taxCategories = useMemo(() => {
+    const country = userCountry || 'AT';
+    return Object.keys(TAX_CATEGORY_INFO)
+      .filter(name => {
+        const m = name.match(/\(([A-Z]{2})\)\s*$/);
+        return m ? m[1] === country : false;
+      })
+      .map<Category>((name, idx) => ({
+        id: `tax:${name}`,
+        user_id: null,
+        name,
+        icon: null,
+        color: null,
+        is_system: true,
+        is_hidden: false,
+        sort_order: idx,
+        created_at: '',
+        country,
+        tax_code: null,
+      }));
+  }, [userCountry]);
 
   return {
     categories,

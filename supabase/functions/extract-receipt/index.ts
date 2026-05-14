@@ -197,6 +197,35 @@ CH-spezifisch:${has('KFZ') ? ' Km-Pauschale 0,70 CHF/km.' : ''}${has('Geringwert
   return hints;
 }
 
+// ── Tax-Type-Liste pro Land (Quelle: src/components/settings/taxCategoryInfo.ts) ────
+const TAX_TYPES_BY_COUNTRY: Record<string, string[]> = {
+  AT: [
+    "Bewirtung 50% (AT)", "Reisekosten (AT)", "KFZ-Kosten (AT)", "Büromaterial (AT)",
+    "Telefon & Internet (AT)", "Versicherungen (AT)", "Miete & Betriebskosten (AT)",
+    "Fortbildung (AT)", "Werbung & Marketing (AT)", "Rechts-/Beratungskosten (AT)",
+    "Bankgebühren (AT)", "Geringwertige WG (AT)", "Abschreibungen AfA (AT)",
+    "Sozialversicherung SVS (AT)", "Kammerumlage WKO (AT)",
+  ],
+  DE: [
+    "Bewirtung 70% (DE)", "Reisekosten (DE)", "KFZ-Kosten (DE)", "Bürobedarf (DE)",
+    "Telekommunikation (DE)", "Versicherungen (DE)", "Raumkosten/Miete (DE)",
+    "Fortbildungskosten (DE)", "Werbekosten (DE)", "Rechts-/Beratungskosten (DE)",
+    "Geringwertige WG (DE)", "Abschreibungen AfA (DE)", "Leasingkosten (DE)",
+    "Geschenke §4 Abs.5 (DE)", "IHK-Beiträge (DE)",
+  ],
+  CH: [
+    "Geschäftsbewirtung (CH)", "Reisekosten (CH)", "Fahrzeugkosten (CH)", "Büromaterial (CH)",
+    "Telekommunikation (CH)", "Versicherungsprämien (CH)", "Mietaufwand (CH)",
+    "Weiterbildung (CH)", "Werbeaufwand (CH)", "Beratungskosten (CH)",
+    "Abschreibungen (CH)", "AHV/IV/EO-Beiträge (CH)", "BVG-Beiträge (CH)",
+  ],
+};
+
+function buildTaxTypeList(country: string | null): string {
+  const list = TAX_TYPES_BY_COUNTRY[(country || 'AT').toUpperCase()] || [];
+  return list.join(', ');
+}
+
 // ── Expenses-only prompt builder (deduplicated) ────────────────────
 function buildExpensesOnlyPrompt(keywords: string[], hint: string): string {
   let prompt = '';
@@ -508,7 +537,8 @@ serve(async (req) => {
     console.log(`Expenses-only mode: ${expensesOnlyPrompt ? 'ACTIVE' : 'inactive'} (flag: ${expensesOnly}, keywords: ${extractionKeywords.length})`);
 
     // ── Fetch categories ───────────────────────────────────────────
-    let categoryList = 'Sonstiges';
+    let categoryList = '(keine eigenen Kategorien definiert)';
+    let userCountry: string | null = null;
     let userId: string | null = receipt?.user_id || null;
     if (!userId) {
       const authHeader = req.headers.get('authorization');
@@ -520,24 +550,23 @@ serve(async (req) => {
 
     if (userId) {
       const { data: userProfile } = await supabase.from('profiles').select('country').eq('id', userId).single();
-      const userCountry = userProfile?.country?.toUpperCase() || null;
+      userCountry = userProfile?.country?.toUpperCase() || null;
 
-      let query = supabase.from('categories').select('name, country').eq('is_hidden', false).order('sort_order');
-      if (userCountry) {
-        query = query.or(`user_id.eq.${userId},and(is_system.eq.true,country.eq.${userCountry})`);
-      } else {
-        query = query.or(`user_id.eq.${userId},is_system.eq.true`);
-      }
+      // category-Liste = NUR persönliche User-Kategorien + globale System-Einträge ohne Land.
+      // Steuer-Buchungsarten (KFZ-Kosten (AT) etc.) gehen NICHT mehr hier rein, sondern in tax_type.
+      const { data: userCategories } = await supabase
+        .from('categories')
+        .select('name, country')
+        .eq('is_hidden', false)
+        .or(`user_id.eq.${userId},and(is_system.eq.true,country.is.null)`)
+        .order('sort_order');
 
-      const { data: userCategories } = await query;
       if (userCategories && userCategories.length > 0) {
         const catNames = userCategories.map(c => c.name).filter(n => n !== 'Keine Rechnung');
         if (catNames.length > 0) {
           categoryList = catNames.join(', ');
-          const categoryHints = buildCategoryHints(userCountry, catNames);
-          if (categoryHints) categoryList += categoryHints;
 
-          // Community patterns (limited to 15)
+          // Community patterns (limited to 15) — gelten nur für User-Kategorien
           const { data: communityPatterns } = await supabase
             .from('community_patterns')
             .select('vendor_name_normalized, suggested_category, contributor_count')
@@ -552,14 +581,18 @@ serve(async (req) => {
               .map(cp => `- "${cp.vendor_name_normalized}" → ${cp.suggested_category}`)
               .join('\n');
             if (communityHints) {
-              categoryList += `\n\nVERIFIZIERTE ZUORDNUNGEN:\n${communityHints}`;
+              categoryList += `\n\nVERIFIZIERTE ZUORDNUNGEN (User-Kategorien):\n${communityHints}`;
             }
           }
 
-          console.log(`Using ${catNames.length} categories (country: ${userCountry}, community: ${communityPatterns?.length || 0})`);
+          console.log(`Using ${catNames.length} user categories (country: ${userCountry}, community: ${communityPatterns?.length || 0})`);
         }
       }
     }
+
+    // Buchungsarten-Liste (steuerliche Einordnung) – NICHT mehr in categories-Tabelle.
+    const taxTypeList = buildTaxTypeList(userCountry);
+    const taxTypeHints = buildCategoryHints(userCountry, TAX_TYPES_BY_COUNTRY[(userCountry || 'AT').toUpperCase()] || []);
 
     // ── V2 compressed user prompt ──────────────────────────────────
     const userPrompt = `Analysiere dieses Dokument:
@@ -578,11 +611,12 @@ LIEFERANT:
 
 BESCHREIBUNG: Alle Positionen zusammenfassen, max 100 Zeichen, keine Preise.
 
-KATEGORIE: Wähle passendste aus: ${categoryList}
+KATEGORIE (category, persönliches User-Label – UNABHÄNGIG von Steuerrecht):
+Wähle NUR aus dieser Liste eine passende User-Kategorie aus, oder lasse leer ("") wenn keine passt: ${categoryList}
+WICHTIG: category ist KEIN Steuer-Begriff. Nimm hier NIE Werte wie "KFZ-Kosten (AT)" oder "Bewirtung 50%" – die gehören ausschließlich in tax_type.
 
-BUCHUNGSART (tax_type): Steuerliche Einordnung nach DACH-Steuerrecht.
-Mögliche Werte: Betriebsausgabe, GWG bis 1.000€, Bewirtung 50%, Bewirtung 100%, Vorsteuer abzugsfähig, Reisekosten, Kfz-Kosten, Repräsentation, Abschreibung, Sonstige.
-Regeln: Gerät/Hardware >1.000€ netto → Abschreibung. Gerät ≤1.000€ → GWG bis 1.000€. Restaurant/Bewirtung → Bewirtung 50%. Tankstelle/Mietwagen → Kfz-Kosten. Hotel/Flug/Bahn → Reisekosten. Nur wenn eindeutig erkennbar, sonst "".
+BUCHUNGSART (tax_type, steuerliche Einordnung – UNABHÄNGIG von category):
+Wähle NUR aus dieser Liste den passenden Eintrag (oder "" wenn unklar): ${taxTypeList}${taxTypeHints}
 MwSt-ERKENNUNG:
 - Suche explizite %-Angaben auf dem Beleg (20%, 19%, 10%, 7% etc.)
 - Berechne: MwSt = Brutto × Satz/(100+Satz). Validiere: Netto + MwSt = Brutto (±0.05€)
