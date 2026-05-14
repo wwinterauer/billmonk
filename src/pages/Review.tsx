@@ -69,6 +69,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useReceipts, type Receipt } from '@/hooks/useReceipts';
