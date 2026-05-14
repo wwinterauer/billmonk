@@ -315,11 +315,12 @@ export function useCorrectionTracking() {
             const keywords = await extractReceiptKeywords(receiptId);
               
             for (const keyword of keywords) {
-              // Upsert: if keyword exists, update category_name and increment match_count
+              // Vendor-scoped rule: same keyword can map to different categories per vendor
               const { data: existing } = await supabase
                 .from('category_rules')
                 .select('id, match_count')
                 .eq('user_id', user.id)
+                .eq('vendor_id', vendorId)
                 .eq('keyword', keyword)
                 .maybeSingle();
               
@@ -337,6 +338,7 @@ export function useCorrectionTracking() {
                   .from('category_rules')
                   .insert({
                     user_id: user.id,
+                    vendor_id: vendorId,
                     keyword,
                     category_name: String(correctedValue),
                     match_count: 1,
