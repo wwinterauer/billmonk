@@ -115,8 +115,8 @@ const Dashboard = () => {
     setDetailPanelOpen(true);
   };
 
-  // Prepare chart data based on view
-  const chartData = chartView === 'category'
+  // Prepare chart data based on view: Top 6 + "Sonstige" aggregation
+  const rawChartData = chartView === 'category'
     ? categoryData.map((cat, index) => ({
         name: cat.category,
         value: cat.total,
@@ -127,6 +127,17 @@ const Dashboard = () => {
         value: tt.total,
         color: tt.color,
       }));
+
+  const TOP_N = 6;
+  const chartData = (() => {
+    if (rawChartData.length <= TOP_N + 1) return rawChartData;
+    const top = rawChartData.slice(0, TOP_N);
+    const restSum = rawChartData.slice(TOP_N).reduce((s, d) => s + d.value, 0);
+    if (restSum > 0) {
+      top.push({ name: 'Sonstige', value: restSum, color: 'hsl(var(--muted-foreground))' });
+    }
+    return top;
+  })();
 
   const totalCategorySum = chartData.reduce((sum, d) => sum + d.value, 0);
 
