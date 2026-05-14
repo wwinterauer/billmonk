@@ -153,6 +153,11 @@ export function useReceiptProcessing(
               updateData.vat_amount = Number((grossAmount - updateData.amount_net).toFixed(2));
             }
           }
+
+          // Apply vendor default tax_type if AI didn't detect one
+          if (vendorResult.vendor.default_tax_type && !normalized.tax_type) {
+            updateData.tax_type = vendorResult.vendor.default_tax_type;
+          }
         } else if (vendorResult.isNew) {
           // No match found and not auto-created - create new vendor
           const newVendor = await createVendorForReceipt(finalVendorName);
