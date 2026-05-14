@@ -40,11 +40,7 @@ const ResetPassword = () => {
       setIsRecovery(true);
     }
 
-    return (
-      <>
-        <PageMeta title="Passwort zurücksetzen — BillMonk" description="Lege ein neues Passwort für dein BillMonk-Konto fest." canonical="/reset-password" noindex />
-      </>
-    ) => subscription.unsubscribe();
+    return () => subscription.unsubscribe();
   }, []);
 
   const allRulesPass = PASSWORD_RULES.every(r => r.test(password));
