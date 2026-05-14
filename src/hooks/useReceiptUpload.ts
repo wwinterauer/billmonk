@@ -10,7 +10,7 @@ import {
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_FILES = 200;
+const MAX_FILES = 500;
 
 export function useReceiptUpload(
   processReceiptWithAI: (
