@@ -220,17 +220,23 @@ export function CategoryManagement() {
 
       const { data: countData, error: countError } = await supabase
         .from('receipts')
-        .select('category')
+        .select('category, tax_type')
         .eq('user_id', user.id);
 
       if (countError) throw countError;
 
       const counts: Record<string, number> = {};
+      const taxCounts: Record<string, number> = {};
       countData?.forEach(r => {
         if (r.category) {
           counts[r.category] = (counts[r.category] || 0) + 1;
         }
+        if ((r as any).tax_type) {
+          const t = (r as any).tax_type as string;
+          taxCounts[t] = (taxCounts[t] || 0) + 1;
+        }
       });
+      setTaxTypeCounts(taxCounts);
 
       const categoriesWithCounts = (catData || [])
         .filter(cat => {
