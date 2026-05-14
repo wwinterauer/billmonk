@@ -177,16 +177,7 @@ export function TagSelector({
     }
   };
 
-  // Split tags for overflow display
-  const { visibleTags, overflowTags } = useMemo(() => {
-    if (tagStates.length <= maxVisibleTags) {
-      return { visibleTags: tagStates, overflowTags: [] };
-    }
-    return {
-      visibleTags: tagStates.slice(0, maxVisibleTags - 1),
-      overflowTags: tagStates.slice(maxVisibleTags - 1),
-    };
-  }, [tagStates, maxVisibleTags]);
+
 
   // Size classes
   const sizeClasses = {
