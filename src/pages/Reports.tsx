@@ -167,11 +167,7 @@ const Reports = () => {
       if (error) throw error;
       
       // Transform tags into flat array
-      return (
-        <>
-          <PageMeta title="Auswertungen — BillMonk" description="Berichte und Auswertungen über Umsätze, Ausgaben und Steuern erstellen." canonical="/reports" noindex />data || []
-        </>
-      ).map(r => ({
+      return (data || []).map(r => ({
         ...r,
         tags: (r.receipt_tags || [])
           .map((rt: { tag: { id: string; name: string; color: string } | null }) => rt.tag)

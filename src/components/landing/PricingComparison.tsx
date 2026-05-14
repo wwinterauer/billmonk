@@ -99,8 +99,8 @@ const featureGroups: { group: string; features: FeatureRow[] }[] = [
 
 function CellContent({ value }: { value: CellValue }) {
   if (value === true) return <Check className="h-4 w-4 text-success mx-auto" />;
-  if (value === false) return <X className="h-4 w-4 text-muted-foreground/40 mx-auto" />;
-  if (value === '–') return <Minus className="h-4 w-4 text-muted-foreground/40 mx-auto" />;
+  if (value === false) return <X className="h-4 w-4 text-muted-foreground mx-auto" aria-label="Nicht enthalten" />;
+  if (value === '–') return <Minus className="h-4 w-4 text-muted-foreground mx-auto" aria-label="Nicht verfügbar" />;
   return <span className="text-sm font-medium text-foreground">{value}</span>;
 }
 

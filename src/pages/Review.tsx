@@ -601,11 +601,7 @@ const Review = () => {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return (
-      <>
-        <PageMeta title="Belege prüfen — BillMonk" description="Erkannte Belege kontrollieren, Kategorien anpassen und freigeben." canonical="/review" noindex />
-      </>
-    ) => window.removeEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentIndex, goToReceipt]);
 
   // Reviewed count for progress

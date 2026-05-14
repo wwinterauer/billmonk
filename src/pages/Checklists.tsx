@@ -126,11 +126,7 @@ export default function Checklists() {
         .eq('user_id', user.id)
         .order('sort_order', { ascending: true });
 
-      return (
-        <>
-          <PageMeta title="Checklisten — BillMonk" description="Monatliche und jährliche Checklisten für deine Buchhaltung abarbeiten." canonical="/checklists" noindex />lists || []
-        </>
-      ).map(list => ({
+      return (lists || []).map(list => ({
         ...list,
         items: (items || []).filter(item => item.checklist_id === list.id).map(item => ({
           ...item,
