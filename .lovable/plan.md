@@ -1,48 +1,62 @@
-# Was passiert ist
+# Was du siehst und warum
 
-Ich habe in der Datenbank nachgesehen — von deinen 214 Dateien sind tatsächlich nur **14 Belege** angekommen (12 in Review, 2 hängen in „processing"). Das Bild aus dem UI stimmt also mit der DB überein, nichts ist „verschwunden".
+Ich habe die DB geprüft. Befund: **209 Belege in den letzten 4 Stunden** — das Hochladen hat also tatsächlich funktioniert, nur die Anzeige täuscht.
 
-**Ursache (Hypothese, sehr wahrscheinlich):**
+| Status | Anzahl |
+|---|---|
+| review (zur Prüfung bereit) | 176 |
+| approved | 23 |
+| **pending (hängend)** | **8** |
+| needs_splitting | 2 |
 
-1. `validateFiles` kürzt jeden Drop hart auf `MAX_FILES = 200` — die 14 überzähligen Dateien wurden mit der Toast-Meldung „nicht mehr als 200" weggeworfen (`src/hooks/useReceiptUpload.ts:51-53`).
-2. Die verbleibenden ~200 Dateien werden in `Upload.tsx:404-411` **rein sequentiell** in einer `for`-Schleife hochgeladen (~7-9 s pro PDF, also ~25 Minuten Gesamtdauer für 200 Stück).
-3. Die Schleife läuft nur, solange die Upload-Seite offen bleibt. Die DB-Timestamps zeigen genau 1 m 54 s ununterbrochene Verarbeitung (12:36:42 → 12:38:36) und dann Stopp — passt zu Tab-Wechsel, Reload, Schließen, Verbindungsabbruch oder einem unauffangenen Fehler nach Datei 14.
-4. Es gibt **keine Persistenz der Queue**. Sobald der Tab den State verliert, sind die noch nicht gestarteten Dateien weg — sie waren nie in der DB, also kann auch nichts „rückgängig gemacht" werden.
-5. Die 2 Belege in `processing` hängen vermutlich, weil sie auf eine Vendor-Entscheidung warten (`Upload.tsx:457-491`), die nie beantwortet wurde.
+## Drei verschiedene Probleme, die zusammen das Bild ergeben
 
-# Sofortlösung für deine 214 Dateien
+### 1. Verstecktes 200er-Limit in der Anzeige (`Upload.tsx:135`)
+Die Upload-Seite lädt beim Mount nur die ersten **200** Belege:
+```ts
+.limit(200)
+```
+Du hast aber **209** — die letzten 9 fallen aus der Liste, deshalb sieht es aus, als wäre wieder etwas „verschwunden". `MAX_FILES` haben wir zwar auf 500 erhöht, aber dieses zweite, separate Limit war übersehen.
 
-Nichts rückgängig machen — die 14 sind echte Belege und du willst sie behalten. Stattdessen:
+### 2. UI aktualisiert sich nicht während des Uploads (`Upload.tsx:118-161, 882-908`)
+- `pendingReceipts` wird **nur einmal beim Seitenaufruf** geladen (`useEffect` mit `[user]`).
+- Die Status-Counts „Alle / Erfolgreich / Wartend / …" rechnen ausschließlich aus `pendingReceipts`, nicht aus den laufenden In-Memory-Uploads.
+- Während neue Belege im Hintergrund in die DB geschrieben werden, weiß die Seite nichts davon → erst Reload zeigt die echten Zahlen.
 
-1. Die zwei `processing`-Belege bekommen wir frei, indem du den Vendor-Dialog auf `/upload` abschließt (oder ich setze sie per Migration auf `review`, wenn der Dialog nicht mehr erscheint).
-2. Du ziehst die restlichen ~200 Dateien einfach nochmal in den Upload — die **Duplikat-Prüfung per File-Hash** (`Upload.tsx:202-213`) filtert die schon vorhandenen 14 automatisch raus, sodass nur die fehlenden hochgeladen werden.
+### 3. Die 8 „pending" sind echt hängend (Konsolen-Logs)
+Die Console zeigt für genau diesen Zeitraum:
+- `Edge Function returned a non-2xx status code`
+- `Keine Daten in der KI-Antwort`
 
-# Damit das nicht wieder passiert
+Die KI-Extraktion ist für 8 Belege fehlgeschlagen (vermutlich AI-Gateway-Throttle bei 3 parallelen Edge-Function-Calls + großen PDFs). Der Upload-Flow setzt im Fehlerfall den Status aber nicht zurück → Beleg bleibt in `pending` hängen statt in `review` oder `error` zu landen.
 
-Drei kleine, klar abgegrenzte Verbesserungen am Upload-Flow:
+# Plan
 
-### 1. Upload-Fenster vergrößern und Hard-Cut entschärfen
-- `MAX_FILES` von 200 → 500 anheben (passt zur Stack-Overflow-Empfehlung und zur Edge-Function-Kapazität, da pro Datei eine eigene Edge-Function-Invocation läuft, kein einziger 200-MB-Request).
-- Statt Files >Limit stillschweigend wegzuschneiden: dem User klar sagen „X von Y Dateien werden in diesem Schwung verarbeitet, bitte den Rest danach erneut droppen".
+## Schritt 1 — Sofort: 8 hängende Belege freischalten
+Migration: die 8 `pending`-Belege von Benutzer `bb51fc98…` auf `review` setzen, damit du sie manuell ergänzen kannst (KI-Daten fehlen, Datei und Storage-Pfad sind aber vorhanden).
 
-### 2. Begrenzte Parallelität statt rein sequentiell
-- In `startUploading` (`Upload.tsx:404-411`) eine kleine Concurrency-Grenze (z. B. 3 parallele Uploads) einführen. Bringt den Durchsatz von ~7 s/Datei auf ~2-3 s/Datei effektiv, ohne die Edge Function zu überlasten.
-- Vendor-Decision-Files überspringen den Slot nicht, sondern blockieren ihn nur — Reihenfolge bleibt erhalten.
+## Schritt 2 — Anzeige-Limit raus (`src/pages/Upload.tsx`)
+- Zeile 135: `.limit(200)` entfernen bzw. auf z. B. `.limit(1000)` heben (Supabase-Default-Cap).
+- Optional: nur Belege der letzten 24 h zeigen, damit die Liste nicht unendlich wächst.
 
-### 3. Persistente Upload-Queue (gegen Reload-Verlust)
-- Zu uploadende Dateien können nicht in `localStorage` (zu groß), aber die Liste „dies sind die geplanten Hashes + Dateinamen" plus deren Status schon.
-- Beim Mount von `/upload` prüfen wir, ob eine unvollendete Queue existiert, und zeigen einen Banner „X Dateien aus deinem letzten Upload wurden nicht beendet — erneut starten?". Der User muss dann die fehlenden Dateien nochmal aussuchen, aber wir wissen wenigstens, was offen war.
-- Optional Phase 2 (nicht in diesem Plan): echte Server-seitige Queue über die existierende `pgmq`-Infrastruktur, damit auch bei geschlossenem Tab weiterläuft. Sage Bescheid, wenn du das willst — ist dann ein eigener, größerer Schritt.
+## Schritt 3 — Live-Refresh der Status-Counts
+Zwei kleine Ergänzungen, beide in `src/pages/Upload.tsx`:
 
-# Technische Details
+a) **Realtime-Subscription** auf `receipts`-Tabelle (gefiltert per `user_id`). Bei jedem `INSERT`/`UPDATE` den entsprechenden Eintrag in `pendingReceipts` patchen. Realtime ist im Projekt schon eingerichtet (`useReceipts.ts` nutzt es bereits) — wir hängen uns einfach an.
 
-- Geänderte Dateien: `src/hooks/useReceiptUpload.ts` (Limit + Validierungstext), `src/pages/Upload.tsx` (Concurrency-Loop + localStorage-Persistenz + Recovery-Banner).
-- Neue Helper-Datei: `src/lib/upload-queue.ts` für `saveQueue / loadQueue / clearQueue` mit Versionierung und User-ID-Scoping.
-- Concurrency wird über eine simple Promise-Pool-Implementierung gemacht — keine neue Dependency.
-- Keine DB-Migrationen nötig, kein Backend-Touch, RLS unverändert.
+b) **Fallback-Polling**: solange `isAnyProcessing === true`, alle 3 s `loadPendingReceipts()` neu aufrufen. Das deckt den Fall ab, dass Realtime kurz hängt oder die Tab-Verbindung schläft.
+
+## Schritt 4 — Hängende Belege im Fehlerfall sauber abschließen
+In `useReceiptUpload.ts` / `useReceiptProcessing.ts`: wenn die KI-Extraktion fehlschlägt, den Beleg **nicht in `pending` lassen**, sondern direkt auf `review` (mit leeren Feldern) oder einen neuen `error`-Status setzen, damit der User sofort sieht, was nachzubearbeiten ist. Aktuell bleibt der Beleg unsichtbar in der DB hängen.
 
 # Reihenfolge
 
-1. Die 2 hängenden `processing`-Belege per einmaliger Migration auf `review` setzen (mit deiner Bestätigung).
-2. Die drei Code-Verbesserungen oben implementieren.
-3. Du droppst die ~200 fehlenden Dateien nochmal — Duplicate-Check filtert die 14 vorhandenen automatisch.
+1. Migration für die 8 stuck-Belege (mit deiner Bestätigung).
+2. Code-Änderungen Schritt 2-4 in einem Rutsch.
+3. Du lädst die nächsten Belege — Counts laufen jetzt live mit, kein 200er-Cap mehr, fehlerhafte AI-Extraktionen landen sichtbar in der Liste statt zu verschwinden.
+
+# Technische Details
+
+- Geänderte Dateien: `src/pages/Upload.tsx` (Limit + Realtime + Polling), `src/hooks/useReceiptUpload.ts` und/oder `src/hooks/useReceiptProcessing.ts` (Fehler-Status-Handling).
+- Eine Migration für die 8 hängenden Belege (`status='pending' → 'review'`).
+- Keine neuen Dependencies, keine Backend-Änderungen, RLS unverändert.
