@@ -168,6 +168,7 @@ export function useVendors() {
         default_category_id: options?.defaultCategoryId || null,
         default_tag_id: options?.defaultTagId || null,
         default_vat_rate: options?.defaultVatRate || null,
+        default_tax_type: options?.defaultTaxType || null,
         field_defaults: Object.keys(fieldDefaults).length > 0 ? fieldDefaults : {},
         notes: options?.notes || null,
         website: options?.website || null,
