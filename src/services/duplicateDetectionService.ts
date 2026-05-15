@@ -165,13 +165,18 @@ export async function checkForDuplicates(
     }
 
     // 6. Amount + date only (60% - possible)
+    // Strict rule: if new receipt has invoice_number, candidate must have same one or none
     if (receiptData.amount_gross && receiptData.receipt_date) {
-      const { data: amountDateMatch } = await supabase
+      let adQuery = supabase
         .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date, status')
+        .select('id, vendor, amount_gross, receipt_date, invoice_number, status')
         .eq('user_id', userId)
         .eq('amount_gross', receiptData.amount_gross)
-        .eq('receipt_date', receiptData.receipt_date)
+        .eq('receipt_date', receiptData.receipt_date);
+      if (receiptData.invoice_number) {
+        adQuery = adQuery.or(`invoice_number.eq.${receiptData.invoice_number},invoice_number.is.null`);
+      }
+      const { data: amountDateMatch } = await adQuery
         .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
