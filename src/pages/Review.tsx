@@ -473,6 +473,66 @@ const Review = () => {
         vatAmount = gross - (net ?? (gross / (1 + vatRate / 100)));
       }
 
+      // === Vendor "marry" logic: link brand <-> legal name ===
+      let resolvedVendorId: string | null = selectedVendorId;
+      const brand = (formData.vendor_brand || '').trim();
+      const legal = (formData.vendor || '').trim();
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+
+      if (userId && brand) {
+        // Find vendor by display_name (case-insensitive)
+        const { data: brandMatches } = await supabase
+          .from('vendors')
+          .select('id, display_name, legal_names')
+          .eq('user_id', userId)
+          .ilike('display_name', brand);
+        let brandVendor = (brandMatches || []).find(
+          v => v.display_name.toLowerCase() === brand.toLowerCase()
+        );
+
+        // No vendor with this brand → create one
+        if (!brandVendor) {
+          const { data: created } = await supabase
+            .from('vendors')
+            .insert({
+              user_id: userId,
+              display_name: brand,
+              legal_names: legal ? [legal] : [],
+              detected_names: [brand],
+            })
+            .select('id, display_name, legal_names')
+            .single();
+          if (created) {
+            brandVendor = created;
+            if (legal) {
+              toast({
+                title: 'Marke angelegt',
+                description: `"${brand}" mit Händler "${legal}" verknüpft.`,
+              });
+            }
+          }
+        }
+
+        if (brandVendor) {
+          resolvedVendorId = brandVendor.id;
+          // Append legal name if missing (case-insensitive dedupe)
+          if (legal) {
+            const existing = brandVendor.legal_names || [];
+            const has = existing.some(n => n.toLowerCase() === legal.toLowerCase());
+            if (!has) {
+              await supabase
+                .from('vendors')
+                .update({ legal_names: [...existing, legal] })
+                .eq('id', brandVendor.id);
+              toast({
+                title: 'Händler verknüpft',
+                description: `"${legal}" zur Marke "${brandVendor.display_name}" hinzugefügt.`,
+              });
+            }
+          }
+        }
+      }
+
       const updateData: Record<string, unknown> = {
         vendor: formData.vendor || null,
         vendor_brand: formData.vendor_brand || null,
@@ -488,11 +548,16 @@ const Review = () => {
         is_mixed_tax_rate: formData.is_mixed_tax_rate,
         tax_rate_details: formData.is_mixed_tax_rate ? formData.tax_rate_details : null,
         payment_method: formData.payment_method || null,
-        vendor_id: selectedVendorId,
+        vendor_id: resolvedVendorId,
       };
 
       if (newStatus) {
         updateData.status = newStatus as Receipt['status'];
+      }
+
+      // Update local selectedVendorId so UI stays in sync
+      if (resolvedVendorId !== selectedVendorId) {
+        setSelectedVendorId(resolvedVendorId);
       }
 
       await updateReceipt(currentReceipt.id, updateData as Partial<Receipt>);
