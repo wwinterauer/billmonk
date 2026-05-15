@@ -4,6 +4,7 @@ import type { Json } from '@/integrations/supabase/types';
 import type { Receipt, VendorDecisionPending } from './useReceipts';
 import { extractReceiptDataById, normalizeExtractionResult, fetchDescriptionSettings, extractReceiptDataWithLearning, findVendorIdByName } from '@/services/aiService';
 import { matchOrCreateVendor, findOrCreateVendor, addVendorVariant, type MatchedVendor } from '@/services/vendorMatchingService';
+import { checkForDuplicates } from '@/services/duplicateDetectionService';
 
 export function useReceiptProcessing(
   updateReceipt: (id: string, data: Partial<Receipt>) => Promise<Receipt>
