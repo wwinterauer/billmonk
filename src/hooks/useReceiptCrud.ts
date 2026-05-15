@@ -174,7 +174,19 @@ export function useReceiptCrud() {
       throw new Error('Beleg nicht gefunden');
     }
 
-    // Delete from database first
+    // Unmark any other receipts that referenced this one as their duplicate original
+    await supabase
+      .from('receipts')
+      .update({
+        is_duplicate: false,
+        duplicate_of: null,
+        duplicate_score: null,
+        duplicate_checked_at: new Date().toISOString(),
+      })
+      .eq('user_id', user.id)
+      .eq('duplicate_of', id);
+
+    // Delete from database
     const { error: dbError } = await supabase
       .from('receipts')
       .delete()
