@@ -212,6 +212,39 @@ export function useReceiptProcessing(
         }
       }
 
+      // Automatic duplicate check after extraction (content-based: vendor + amount + date + invoice#)
+      try {
+        const { data: currentReceipt } = await supabase
+          .from('receipts')
+          .select('file_hash')
+          .eq('id', receiptId)
+          .maybeSingle();
+
+        const dupResult = await checkForDuplicates(
+          user.id,
+          currentReceipt?.file_hash ?? null,
+          {
+            vendor: updateData.vendor ?? null,
+            amount_gross: updateData.amount_gross ?? null,
+            receipt_date: updateData.receipt_date ?? null,
+            invoice_number: updateData.invoice_number ?? null,
+          },
+          receiptId
+        );
+
+        if (dupResult.isDuplicate && dupResult.duplicateOf) {
+          updateData.is_duplicate = true;
+          (updateData as any).duplicate_of = dupResult.duplicateOf;
+          (updateData as any).duplicate_score = dupResult.score;
+          (updateData as any).duplicate_checked_at = new Date().toISOString();
+          updateData.status = 'duplicate';
+        } else {
+          (updateData as any).duplicate_checked_at = new Date().toISOString();
+        }
+      } catch (dupErr) {
+        console.warn('Auto duplicate check failed:', dupErr);
+      }
+
       // Auto-approve logic: check if vendor has auto_approve enabled
       if (updateData.vendor_id) {
         const { data: vendorData } = await supabase
