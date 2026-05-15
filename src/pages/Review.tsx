@@ -88,6 +88,7 @@ import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
 import { useVendors } from '@/hooks/useVendors';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
 import { VendorAutocomplete } from '@/components/receipts/VendorAutocomplete';
+import { VendorBrandAutocomplete } from '@/components/receipts/VendorBrandAutocomplete';
 import { PAYMENT_METHODS } from '@/lib/constants';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PageMeta } from '@/components/PageMeta';
