@@ -462,12 +462,11 @@ const Expenses = () => {
     setFoundDuplicates([]);
 
     try {
-      // Get all receipts in the selected date range that are not already marked as duplicates
+      // Get all receipts in the selected date range (also re-evaluate already marked duplicates)
       const { data: receiptsToCheck, error } = await supabase
         .from('receipts')
         .select('*')
         .eq('user_id', user.id)
-        .eq('is_duplicate', false)
         .order('receipt_date', { ascending: false });
 
       if (error) throw error;
@@ -482,7 +481,6 @@ const Expenses = () => {
         const receipt = receiptsList[i];
         setCheckProgress({ current: i + 1, total: receiptsList.length });
 
-        // Check for duplicates (only against older receipts)
         const result = await checkForDuplicates(
           user.id,
           receipt.file_hash,
@@ -504,7 +502,6 @@ const Expenses = () => {
             matchReasons: result.matchReasons
           });
 
-          // Mark as duplicate in DB
           await supabase
             .from('receipts')
             .update({
@@ -515,48 +512,16 @@ const Expenses = () => {
             })
             .eq('id', receipt.id);
         } else {
-          // Mark as checked
+          // No match by current rules — unmark if previously flagged
           await supabase
             .from('receipts')
             .update({
+              is_duplicate: false,
+              duplicate_of: null,
+              duplicate_score: null,
               duplicate_checked_at: new Date().toISOString()
             })
             .eq('id', receipt.id);
-        }
-      }
-
-      // Re-validate existing duplicates — check if originals still exist
-      const { data: existingDuplicates } = await supabase
-        .from('receipts')
-        .select('id, duplicate_of')
-        .eq('user_id', user.id)
-        .eq('is_duplicate', true);
-
-      if (existingDuplicates) {
-        for (const dup of existingDuplicates) {
-          if (!dup.duplicate_of) {
-            await supabase.from('receipts').update({
-              is_duplicate: false,
-              duplicate_of: null,
-              duplicate_score: null,
-              duplicate_checked_at: new Date().toISOString()
-            }).eq('id', dup.id);
-            continue;
-          }
-          const { data: original } = await supabase
-            .from('receipts')
-            .select('id, status')
-            .eq('id', dup.duplicate_of)
-            .single();
-
-          if (!original || original.status === 'rejected') {
-            await supabase.from('receipts').update({
-              is_duplicate: false,
-              duplicate_of: null,
-              duplicate_score: null,
-              duplicate_checked_at: new Date().toISOString()
-            }).eq('id', dup.id);
-          }
         }
       }
 

@@ -110,6 +110,7 @@ export async function checkForDuplicates(
     }
 
     // 3. Amount + date + vendor match (90% - very likely)
+    // Strict rule: if new receipt has invoice_number, candidate must have same one or none
     if (receiptData.amount_gross && receiptData.receipt_date && receiptData.vendor) {
       let amountQuery = supabase
         .from('receipts')
@@ -118,6 +119,9 @@ export async function checkForDuplicates(
         .eq('amount_gross', receiptData.amount_gross)
         .eq('receipt_date', receiptData.receipt_date);
       amountQuery = applyVendorFilter(amountQuery, receiptData.vendor);
+      if (receiptData.invoice_number) {
+        amountQuery = amountQuery.or(`invoice_number.eq.${receiptData.invoice_number},invoice_number.is.null`);
+      }
       const { data: amountMatch } = await amountQuery
         .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
@@ -135,38 +139,7 @@ export async function checkForDuplicates(
       }
     }
 
-    // 4. Amount + vendor within ±3 days (75% - likely)
-    if (receiptData.amount_gross && receiptData.receipt_date && receiptData.vendor) {
-      const date = new Date(receiptData.receipt_date);
-      const dateFrom = new Date(date);
-      dateFrom.setDate(date.getDate() - 3);
-      const dateTo = new Date(date);
-      dateTo.setDate(date.getDate() + 3);
-
-      let nearQuery = supabase
-        .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date, status')
-        .eq('user_id', userId)
-        .eq('amount_gross', receiptData.amount_gross)
-        .gte('receipt_date', dateFrom.toISOString().split('T')[0])
-        .lte('receipt_date', dateTo.toISOString().split('T')[0]);
-      nearQuery = applyVendorFilter(nearQuery, receiptData.vendor);
-      const { data: nearMatch } = await nearQuery
-        .in('status', activeStatuses)
-        .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
-        .limit(1)
-        .maybeSingle();
-
-      if (nearMatch) {
-        return {
-          isDuplicate: true,
-          duplicateOf: nearMatch.id,
-          score: 75,
-          matchType: 'likely',
-          matchReasons: ['Gleicher Betrag', 'Ähnliches Datum (±3 Tage)', 'Gleicher Lieferant']
-        };
-      }
-    }
+    // 4. (entfernt) ±3 Tage Fuzzy-Match — abweichendes Datum = kein Duplikat per Regel
 
     // 5. Invoice number only match (70% - likely)
     if (receiptData.invoice_number) {
@@ -192,13 +165,18 @@ export async function checkForDuplicates(
     }
 
     // 6. Amount + date only (60% - possible)
+    // Strict rule: if new receipt has invoice_number, candidate must have same one or none
     if (receiptData.amount_gross && receiptData.receipt_date) {
-      const { data: amountDateMatch } = await supabase
+      let adQuery = supabase
         .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date, status')
+        .select('id, vendor, amount_gross, receipt_date, invoice_number, status')
         .eq('user_id', userId)
         .eq('amount_gross', receiptData.amount_gross)
-        .eq('receipt_date', receiptData.receipt_date)
+        .eq('receipt_date', receiptData.receipt_date);
+      if (receiptData.invoice_number) {
+        adQuery = adQuery.or(`invoice_number.eq.${receiptData.invoice_number},invoice_number.is.null`);
+      }
+      const { data: amountDateMatch } = await adQuery
         .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
         .limit(1)
