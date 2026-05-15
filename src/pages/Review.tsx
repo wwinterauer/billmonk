@@ -1074,14 +1074,16 @@ const Review = () => {
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                      <Input
-                        id="vendor_brand"
+                      <VendorBrandAutocomplete
                         value={formData.vendor_brand}
-                        onChange={(e) => setFormData(prev => ({ ...prev, vendor_brand: e.target.value }))}
-                        placeholder="z.B. timr, Amazon, A1"
-                        readOnly={!!selectedVendorId}
-                        disabled={!!selectedVendorId}
-                        className={cn(selectedVendorId && 'text-muted-foreground bg-muted/50')}
+                        onChange={(brand) => setFormData(prev => ({ ...prev, vendor_brand: brand }))}
+                        onBrandSelect={(v) => {
+                          // Switching brand: link to that brand vendor
+                          setSelectedVendorId(v.id);
+                          setFormData(prev => ({ ...prev, vendor_brand: v.display_name }));
+                        }}
+                        disabled={saving}
+                        hideLabel
                       />
                     </div>
 
