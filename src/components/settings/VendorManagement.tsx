@@ -1499,13 +1499,13 @@ export function VendorManagement() {
               <Textarea
                 value={formData.extraction_hint}
                 onChange={(e) => setFormData(prev => ({ ...prev, extraction_hint: e.target.value.slice(0, 500) }))}
-                placeholder={`z.B. "Wenn Zählernummer 12345 erkannt wird, setze Tag 'Gschwandt 54' und ergänze Beschreibung mit Präfix 'Gschwandt 54 - '." oder "Beträge in Klammern als positive Kosten behandeln."`}
+                placeholder={`Beispiele: "Belege dieses Lieferanten immer unter Kategorie 'Versicherung' buchen." — "Wenn eine Zählernummer erkannt wird, setze den Tag 'Gschwandt 54' und füge der Beschreibung den Präfix 'Gschwandt 54 - ' hinzu." — "Rechnungsnummern beginnen immer mit EVN- gefolgt von 8 Ziffern."`}
                 rows={3}
                 maxLength={500}
                 className="text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                {formData.extraction_hint.length}/500 Zeichen — Diese Hinweise werden der KI bei jeder Analyse dieses Lieferanten mitgegeben (Kategorisierung, Tag-Auswahl, Beschreibungs-Anpassung, Betragserkennung).
+                {formData.extraction_hint.length}/500 Zeichen — Trage lieferantenspezifische Regeln ein (z.B. feste Kategorie, Tag-Logik, Beschreibungs-Präfixe, Rechnungsnummern-Muster). Die KI berücksichtigt sie bei jedem neuen Beleg.
               </p>
             </div>
 
