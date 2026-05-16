@@ -716,7 +716,28 @@ export function ReceiptDetailPanel({
     }
   };
 
-  // Execute save after dialog confirmation
+  // Mark current receipt as "Keine Rechnung" (no actual invoice document)
+  const markAsNoReceipt = async () => {
+    if (!receipt) return;
+    setSaving(true);
+    try {
+      await updateReceipt(receipt.id, {
+        status: 'approved',
+        is_no_receipt_entry: true,
+        category: NO_RECEIPT_CATEGORY,
+      } as Partial<Receipt>);
+      toast({ title: 'Als „Keine Rechnung" markiert' });
+      onUpdate();
+      onClose();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler beim Speichern',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setSaving(false);
+    }
   const executeSaveWithLearning = () => {
     const pendingStatus = (window as unknown as { pendingSaveStatus?: 'approved' | 'rejected' | 'review' | 'completed' }).pendingSaveStatus;
     setShowSaveDialog(false);
