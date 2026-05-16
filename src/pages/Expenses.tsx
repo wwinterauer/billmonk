@@ -3039,6 +3039,10 @@ const Expenses = () => {
         duplicateId={duplicateComparisonIds.duplicateId}
         originalId={duplicateComparisonIds.originalId}
         onRefresh={loadReceipts}
+        onViewReceipt={(id) => {
+          setDuplicateComparisonOpen(false);
+          openReceiptDetail(id);
+        }}
       />
 
       {/* Bulk AI Reanalyze Confirmation Dialog */}
