@@ -150,13 +150,17 @@ export function ReceiptAssignmentModal({
   const [filterSimilarAmount, setFilterSimilarAmount] = useState(true);
   const [filterSimilarDate, setFilterSimilarDate] = useState(false);
   const [filterUnassigned, setFilterUnassigned] = useState(true);
-  
+
+  // Split-line selection (step 2)
+  const [selectedSplitLine, setSelectedSplitLine] = useState<string | null>(null);
+
   const debouncedSearch = useDebounce(searchQuery, 300);
 
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
       setSelectedReceipt(null);
+      setSelectedSplitLine(null);
       setSearchQuery('');
     }
   }, [open]);
