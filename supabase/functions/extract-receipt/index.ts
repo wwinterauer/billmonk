@@ -172,16 +172,7 @@ function buildCategoryHints(country: string | null, categories: string[]): strin
 
   let hints = `
 
-KATEGORIE-ZUORDNUNGSHILFE:
-Ordne NUR Kategorien aus der obigen Liste zu. Spezifischere Kategorie bevorzugen, "Sonstiges" nur als Fallback.
-
-TYPISCHE ZUORDNUNGEN:
-- Tankstellen → KFZ; Restaurants/Hotels → Bewirtung; Bahn/Flug/Booking → Reisekosten
-- Telekom → Telefon/Internet; Google/Meta Ads → Werbung; Steuerberater/Anwalt → Beratung
-- Bürobedarf → Büromaterial; Banken → Bankgebühren; Versicherungen → Versicherung
-- Einzelgeräte (Laptop, Monitor) → GWG; Software-Abos → Software/EDV
-- Parkgebühren auf Reise → Reisekosten; tägliches Parken → KFZ
-- Amazon: nach INHALT kategorisieren`;
+ZUORDNUNGSHILFE (länderspezifisch, betrifft NUR tax_type bzw. die obige Liste – KEINE category-Werte erfinden):`;
 
   if (country === 'AT') {
     hints += `
