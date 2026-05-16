@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { RecurringExpensesTab } from '@/components/expenses/RecurringExpensesTab';
 import { Repeat } from 'lucide-react';
