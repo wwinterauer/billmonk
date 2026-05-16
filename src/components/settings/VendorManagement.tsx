@@ -1489,17 +1489,37 @@ export function VendorManagement() {
               )}
             </div>
 
-            {/* Nur Ausgaben extrahieren */}
+            {/* Sonstige KI-Hinweise (immer sichtbar) */}
+            <Separator />
+            <div className="space-y-1.5">
+              <Label className="text-sm flex items-center gap-2">
+                <Euro className="h-4 w-4 text-primary" />
+                Sonstige KI-Hinweise (Kategorie, Tags, Beschreibung, etc.)
+              </Label>
+              <Textarea
+                value={formData.extraction_hint}
+                onChange={(e) => setFormData(prev => ({ ...prev, extraction_hint: e.target.value.slice(0, 500) }))}
+                placeholder={`z.B. "Wenn Zählernummer 12345 erkannt wird, setze Tag 'Gschwandt 54' und ergänze Beschreibung mit Präfix 'Gschwandt 54 - '." oder "Beträge in Klammern als positive Kosten behandeln."`}
+                rows={3}
+                maxLength={500}
+                className="text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                {formData.extraction_hint.length}/500 Zeichen — Diese Hinweise werden der KI bei jeder Analyse dieses Lieferanten mitgegeben (Kategorisierung, Tag-Auswahl, Beschreibungs-Anpassung, Betragserkennung).
+              </p>
+            </div>
+
+            {/* Vertiefte Betragserkennung */}
             <Separator />
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="expenses_only" className="flex items-center gap-2">
                     <Euro className="h-4 w-4 text-primary" />
-                    Nur Ausgaben extrahieren
+                    Vertiefte Betragserkennung via Hinweis
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Einnahmen/Gutschriften ignorieren (z.B. Monta, Marketplace-Anbieter)
+                    Aktivieren, wenn auf der Rechnung Einnahmen/Gutschriften mit Ausgaben gemischt sind (z.B. Monta, Marketplace) und nur Kosten extrahiert werden sollen.
                   </p>
                 </div>
                 <Switch
@@ -1579,22 +1599,6 @@ export function VendorManagement() {
                       ? 'Ohne Schlagwörter werden allgemein alle Kosten erfasst.'
                       : 'Die KI extrahiert nur Zeilen die diese Begriffe enthalten.'}
                   </p>
-
-                  {/* Extraction Hint Textarea */}
-                  <div className="space-y-1.5 pt-1">
-                    <Label className="text-sm">Extraktions-Hinweis für die KI (optional)</Label>
-                    <Textarea
-                      value={formData.extraction_hint}
-                      onChange={(e) => setFormData(prev => ({ ...prev, extraction_hint: e.target.value.slice(0, 500) }))}
-                      placeholder="z.B. Beträge in Klammern sind Kosten und sollen als positive Werte behandelt werden"
-                      rows={3}
-                      maxLength={500}
-                      className="text-sm"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {formData.extraction_hint.length}/500 Zeichen — Dieser Hinweis wird der KI bei jeder Analyse mitgegeben.
-                    </p>
-                  </div>
                 </div>
               )}
             </div>
