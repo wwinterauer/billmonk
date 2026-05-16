@@ -2627,6 +2627,7 @@ const Expenses = () => {
                             })}
                           </SortableContext>
                         </DndContext>
+                        <TableHead aria-hidden className="p-0" />
                         <TableHead
                           className="text-right relative group px-2"
                           style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}
