@@ -620,7 +620,7 @@ LIEFERANT:
 BESCHREIBUNG: Alle Positionen zusammenfassen, max 100 Zeichen, keine Preise.
 
 KATEGORIE (category, persönliches User-Label – UNABHÄNGIG von Steuerrecht):
-Wähle NUR aus dieser Liste eine passende User-Kategorie aus, oder lasse leer ("") wenn keine passt: ${categoryList}
+STRIKT: Verwende EXAKT einen Namen aus dieser Liste (case-insensitive, zeichengetreu) ODER lasse leer (""). NIEMALS einen Namen erfinden, abwandeln, übersetzen, kombinieren oder ergänzen (z.B. "Software/EDV" statt "Software", "Reisekosten/Hotel" statt "Reisekosten"). Im Zweifel "" zurückgeben. Liste: ${categoryList}
 WICHTIG: category ist KEIN Steuer-Begriff. Nimm hier NIE Werte wie "KFZ-Kosten (AT)" oder "Bewirtung 50%" – die gehören ausschließlich in tax_type.
 
 BUCHUNGSART (tax_type, steuerliche Einordnung – UNABHÄNGIG von category):
