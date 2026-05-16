@@ -2595,6 +2595,8 @@ const Expenses = () => {
               ) : (
                 <>
                   <div className="overflow-x-auto">
+                  <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleColumnDragEnd}>
+                  <SortableContext items={orderedVisibleColumns} strategy={horizontalListSortingStrategy}>
                   <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
                     <TableHeader>
                       <TableRow>
@@ -2604,30 +2606,25 @@ const Expenses = () => {
                             onCheckedChange={handleSelectAll}
                           />
                         </TableHead>
-                        <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleColumnDragEnd}>
-                          <SortableContext items={orderedVisibleColumns} strategy={horizontalListSortingStrategy}>
-                            {orderedVisibleColumns.map(key => {
-                              const cfg = COLUMN_CONFIG.find(c => c.key === key)!;
-                              const isSorted = cfg.sortField && sortField === cfg.sortField
-                                ? sortDirection
-                                : false as const;
-                              return (
-                                <EditableTableHead
-                                  key={key}
-                                  id={key}
-                                  label={cfg.label}
-                                  width={columnWidths[key]}
-                                  sortable={!!cfg.sortField}
-                                  isSorted={isSorted}
-                                  align={cfg.align}
-                                  onSort={cfg.sortField ? () => handleSort(cfg.sortField!) : undefined}
-                                  onResize={(w) => handleColumnResize(key, w)}
-                                />
-                              );
-                            })}
-                          </SortableContext>
-                        </DndContext>
-                        <TableHead aria-hidden className="p-0" />
+                        {orderedVisibleColumns.map(key => {
+                          const cfg = COLUMN_CONFIG.find(c => c.key === key)!;
+                          const isSorted = cfg.sortField && sortField === cfg.sortField
+                            ? sortDirection
+                            : false as const;
+                          return (
+                            <EditableTableHead
+                              key={key}
+                              id={key}
+                              label={cfg.label}
+                              width={columnWidths[key]}
+                              sortable={!!cfg.sortField}
+                              isSorted={isSorted}
+                              align={cfg.align}
+                              onSort={cfg.sortField ? () => handleSort(cfg.sortField!) : undefined}
+                              onResize={(w) => handleColumnResize(key, w)}
+                            />
+                          );
+                        })}
                         <TableHead
                           className="text-right relative group px-2"
                           style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}
