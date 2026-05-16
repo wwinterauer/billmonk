@@ -57,8 +57,16 @@ interface ReceiptAssignmentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: BankTransaction | null;
-  onAssign: (transactionId: string, receiptId: string) => void;
+  onAssign: (transactionId: string, receiptId: string, splitLineId?: string | null) => void;
   onUploadNew: () => void;
+}
+
+interface SplitLine {
+  id: string;
+  description: string | null;
+  amount_gross: number;
+  sort_order: number;
+  matched_tx_id: string | null;
 }
 
 // Calculate match score between transaction and receipt
