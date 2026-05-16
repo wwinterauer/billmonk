@@ -1,66 +1,40 @@
-# Automatische Berechnung Netto/MwSt im Beleg-Editor
+## Ursache
 
-## Ziel
+In `src/pages/Expenses.tsx` zeigt das Browser-Layout der Spalte „Aktionen" zu viel Leerraum, weil die HTML-Tabelle mit **`table-layout: auto`** und **`w-full`** läuft. Bei diesem Layout werden gesetzte `width`-Styles auf `<td>`/`<th>` nur als *Hinweis* behandelt — übrig bleibender horizontaler Platz wird auf alle Spalten verteilt, und die letzte Spalte (Aktionen) bekommt überproportional viel davon ab. Das `width: 96px` greift faktisch nicht.
 
-Im Review/Detail-Panel sollen sich Netto- und MwSt-Betrag wechselseitig automatisch berechnen, sobald der Brutto-Betrag eingegeben ist:
+Die Icons selbst sind im Cell-Inhalt korrekt `justify-end` ausgerichtet — aber die Cell ist deutlich breiter als 96 px, dadurch wirken sie wie „in einer anderen Spalte" und der Header „Aktionen" steht weit rechts davon.
 
-- Brutto + MwSt-Betrag → Netto wird berechnet
-- Brutto + Netto → MwSt-Betrag wird berechnet
-- Brutto + MwSt-Satz (wie bisher) → beide werden berechnet
+## Fix
 
-Berechnete Werte werden — wie heute — als Placeholder mit Zusatz "(berechnet)" im grauen Feld angezeigt und beim Speichern verwendet, solange der User das Feld nicht selbst überschrieben hat.
+Eine **flexible Füll-Spalte** zwischen den letzten Datenspalten und der Aktionen-Spalte einbauen. Sie absorbiert den verbleibenden Platz, sodass „Aktionen" tatsächlich nur ihre echten 96 px belegt und Icons + Header bündig übereinanderstehen.
 
-## Scope
+### Änderungen ausschließlich in `src/pages/Expenses.tsx`
 
-Nur Frontend, eine Datei:
-- `src/components/receipts/ReceiptDetailPanel.tsx`
+1. **Header-Zeile** (ca. Zeile 2628, direkt vor dem `<TableHead>` für „Aktionen"):
+   ```tsx
+   <TableHead aria-hidden className="p-0" />
+   ```
+   Kein `width`-Style → wird zur Flex-Spalte und schluckt den Restplatz.
 
-Keine DB-Änderungen, keine Edge-Function-Änderungen, keine Änderungen an Speicher-Payload (`amountNetOverride` / `vatAmountOverride` werden bereits beim Speichern berücksichtigt).
+2. **Body-Zeile** (ca. Zeile 2654, direkt vor dem Aktionen-`<TableCell>`):
+   ```tsx
+   <TableCell aria-hidden className="p-0" />
+   ```
 
-## Änderungen
+3. **Default-Breite** der Aktionen-Spalte bei `90 px` belassen (4 Icons × 32 px = 128 px wären zu breit für das Wunschbild — die Icons in der User-Vorlage wirken wie ca. 24 px). Alternativ auf `120 px` setzen, falls die Icons sonst zu eng aneinander kleben. Empfehlung: **96 px** beibehalten und `gap-0.5` lassen.
 
-### 1. `calculatedValues` (≈ Zeile 230) erweitern
+4. **`flex-wrap` aus dem inneren Div entfernen** (Zeile 2656), da die Spalte jetzt garantiert die volle Icon-Breite hat — Wrapping würde nur stören:
+   ```tsx
+   <div className="flex items-center justify-end gap-0.5">
+   ```
 
-Aktuell:
-- Mixed Tax: aus `taxRateDetails`
-- Sonst: `net = gross / (1 + rate/100)`, `vat = gross - net`
+### Warum keine globale `table-fixed`-Umstellung
 
-Neu (Reihenfolge bestimmt Priorität):
+`table-layout: fixed` würde das Problem zwar prinzipiell auch lösen, zwingt aber **alle** Spalten in starre Breiten und überschreibt das bestehende dynamische Resize-/Sort-Verhalten der anderen Spalten (`EditableTableHead`). Die Filler-Spalte ist die punktuelle, risikoarme Lösung.
 
-```text
-1. Mixed Tax → wie bisher
-2. Wenn vatAmountOverride gesetzt UND amountNetOverride leer:
-     net = gross - vatOverride
-     vat = vatOverride
-3. Wenn amountNetOverride gesetzt UND vatAmountOverride leer:
-     net = netOverride
-     vat = gross - netOverride
-4. Wenn beide Overrides gesetzt: keine Berechnung (User hat alles selbst)
-5. Sonst (nur gross + vat_rate): wie bisher (net = gross/(1+rate/100))
-```
+### Ergebnis
 
-Negative Ergebnisse oder gross=0 → fallback auf 0 (keine "(berechnet)" Anzeige).
-
-### 2. Placeholder-Logik in den beiden Input-Feldern (≈ Zeile 1668–1701)
-
-Bleibt unverändert in Form: Placeholder zeigt `calculatedValues.net` bzw. `calculatedValues.vat` mit Suffix "(berechnet)". Da die neuen Fälle 2/3 jeweils das jeweils andere Feld berechnen, taucht "(berechnet)" automatisch nur im noch leeren Feld auf.
-
-Kleine UX-Verbesserung: wenn der User den Override eines Feldes wieder löscht, soll das andere Feld zurück in den "berechnet"-Modus fallen — das passiert mit der neuen Logik automatisch, weil `calculatedValues` reagiert.
-
-### 3. Speichern (≈ Zeile 754–788 / 655)
-
-Bereits korrekt: beim Save wird `amountNetOverride ? parseFloat(...) : calculatedValues.net` verwendet. Da `calculatedValues` jetzt auch die neuen Fälle abdeckt, funktioniert der bestehende Save-Pfad ohne Anpassung.
-
-Eine Sicherheitsprüfung: falls beide Overrides leer sind, aber `calculatedValues` aus Fall 5 (gross+rate) leer wäre (rate=0), bleibt das Verhalten wie heute (null gespeichert).
-
-## Technische Details
-
-- Keine neuen Imports nötig.
-- `useMemo`-Deps werden um `amountNetOverride` und `vatAmountOverride` erweitert.
-- Toleranz: Wenn `Math.abs(gross - net - vat) > 0.01` und beide Overrides gesetzt sind, wird trotzdem nicht automatisch korrigiert — User-Eingaben haben Vorrang.
-- Numerik: kleine negative Differenzen (z.B. -0.001 durch Rundung) auf 0 clampen.
-
-## Was sich für den User ändert
-
-Vorher: Eingabe von Brutto + MwSt-Betrag → Netto-Feld bleibt leer (Placeholder "—").
-Nachher: Netto-Feld zeigt automatisch `(berechnet)`-Vorschlag = Brutto − MwSt. Analog umgekehrt.
+- „Aktionen"-Header steht exakt über den 4 Icons (Copy, Eye, Pencil, Trash).
+- Kein weißer Leerraum mehr rechts neben dem Header oder zwischen Icons und Spaltenkante.
+- Resize-Griff der Aktionen-Spalte bleibt erhalten.
+- Andere Spalten (DnD-Reihenfolge, Sort, Resize) bleiben unverändert.
