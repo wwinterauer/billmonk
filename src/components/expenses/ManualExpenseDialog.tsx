@@ -32,6 +32,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories } from '@/hooks/useCategories';
 import { useVatRates } from '@/hooks/useVatRates';
+import { useTags } from '@/hooks/useTags';
 import { VendorAutocomplete } from '@/components/receipts/VendorAutocomplete';
 import { PAYMENT_METHODS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -49,6 +50,7 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
   const { toast } = useToast();
   const { userCategories, taxCategories } = useCategories();
   const { vatRateGroups, defaultVatRate } = useVatRates();
+  const { activeTags } = useTags();
 
   const [saving, setSaving] = useState(false);
   const [keepOpen, setKeepOpen] = useState(false);
@@ -68,6 +70,7 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
   const [paymentMethod, setPaymentMethod] = useState('Bar');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [notes, setNotes] = useState('');
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
   // Sync default VAT once loaded
   useEffect(() => {
@@ -115,6 +118,7 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
     setPaymentMethod('Bar');
     setInvoiceNumber('');
     setNotes('');
+    setSelectedTagIds([]);
   };
 
   const handleVendorSelect = (v: {
@@ -165,7 +169,7 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
           ? vatRate === 'mixed' ? null : 0
           : parseFloat(vatRate);
 
-      const { error } = await supabase.from('receipts').insert({
+      const { data: inserted, error } = await supabase.from('receipts').insert({
         user_id: user.id,
         file_url: null,
         file_name: null,
@@ -189,9 +193,19 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
         notes: notes.trim() || null,
         ai_confidence: null,
         auto_approved: false,
-      });
+      }).select('id').single();
 
       if (error) throw error;
+
+      // Tags zuweisen
+      if (inserted?.id && selectedTagIds.length > 0) {
+        const tagRows = selectedTagIds.map((tagId) => ({
+          receipt_id: inserted.id,
+          tag_id: tagId,
+        }));
+        const { error: tagErr } = await supabase.from('receipt_tags').insert(tagRows);
+        if (tagErr) console.error('Tag-Zuweisung fehlgeschlagen:', tagErr);
+      }
 
       toast({ title: 'Ausgabe erfasst', description: `${vendor} – ${gross.toFixed(2)} ${currency}` });
       onCreated();
@@ -402,6 +416,39 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
               />
             </div>
           </div>
+
+          {/* Tags */}
+          {activeTags.length > 0 && (
+            <div className="space-y-2">
+              <Label>Schlagwörter (optional)</Label>
+              <div className="flex flex-wrap gap-2">
+                {activeTags.map((tag) => {
+                  const isSelected = selectedTagIds.includes(tag.id);
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      disabled={saving}
+                      onClick={() =>
+                        setSelectedTagIds((prev) =>
+                          isSelected ? prev.filter((id) => id !== tag.id) : [...prev, tag.id],
+                        )
+                      }
+                      className={cn(
+                        'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                        isSelected
+                          ? 'border-transparent text-white'
+                          : 'bg-background border-border text-foreground hover:bg-muted',
+                      )}
+                      style={isSelected ? { backgroundColor: tag.color } : undefined}
+                    >
+                      {tag.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Notes */}
           <div className="space-y-2">
