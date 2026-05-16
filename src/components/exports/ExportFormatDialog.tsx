@@ -1064,6 +1064,9 @@ export function ExportFormatDialog({
         await saveExportFile(content, `belege_export_${exportDate}.zip`, subfolder);
         setExportedCount(successCount);
         setExportComplete(true);
+      } else {
+        setIsExporting(false);
+        onOpenChange(false);
       }
     } catch (error) {
       console.error('Export error:', error);
