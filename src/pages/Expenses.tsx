@@ -130,6 +130,8 @@ import { useSplitLines } from '@/hooks/useSplitLines';
 import { SplitSuggestionDialog } from '@/components/receipts/SplitSuggestionDialog';
 import { SourceBadge, NoReceiptBadge } from '@/components/receipts/SourceBadge';
 import { PageMeta } from '@/components/PageMeta';
+import { ManualExpenseDialog } from '@/components/expenses/ManualExpenseDialog';
+import { PenLine } from 'lucide-react';
 
 type SortField =
   | 'receipt_date'
