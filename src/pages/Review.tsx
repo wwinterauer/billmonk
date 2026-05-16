@@ -22,6 +22,8 @@ import {
   ExternalLink,
   Trash2,
   Zap,
+  Copy,
+  GitCompare,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -92,6 +94,8 @@ import { VendorBrandAutocomplete } from '@/components/receipts/VendorBrandAutoco
 import { PAYMENT_METHODS } from '@/lib/constants';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PageMeta } from '@/components/PageMeta';
+import { DuplicateComparisonModal } from '@/components/receipts/DuplicateComparisonModal';
+import { checkForDuplicates } from '@/services/duplicateDetectionService';
 
 interface TaxRateDetail {
   rate: number;
@@ -141,6 +145,8 @@ const Review = () => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
   const [vendorAutoApprove, setVendorAutoApprove] = useState(false);
   const [vendorAutoApproveMinConfidence, setVendorAutoApproveMinConfidence] = useState(0.8);
@@ -690,7 +696,100 @@ const Review = () => {
     }
   };
 
-  // Approve all with high confidence
+  // Manual duplicate check for current receipt
+  const handleCheckDuplicate = async () => {
+    if (!currentReceipt) return;
+    setCheckingDuplicate(true);
+    try {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) throw new Error('Nicht angemeldet');
+      const { data: hashRow } = await supabase
+        .from('receipts')
+        .select('file_hash')
+        .eq('id', currentReceipt.id)
+        .maybeSingle();
+      const result = await checkForDuplicates(
+        userId,
+        hashRow?.file_hash ?? null,
+        {
+          vendor: formData.vendor || currentReceipt.vendor,
+          amount_gross: formData.amount_gross ? parseFloat(formData.amount_gross) : currentReceipt.amount_gross,
+          receipt_date: formData.receipt_date ? format(formData.receipt_date, 'yyyy-MM-dd') : currentReceipt.receipt_date,
+          invoice_number: formData.invoice_number || currentReceipt.invoice_number,
+        },
+        currentReceipt.id
+      );
+
+      const nowIso = new Date().toISOString();
+      if (result.isDuplicate && result.score >= 70 && result.duplicateOf) {
+        await supabase
+          .from('receipts')
+          .update({
+            is_duplicate: true,
+            duplicate_of: result.duplicateOf,
+            duplicate_score: result.score,
+            duplicate_checked_at: nowIso,
+          })
+          .eq('id', currentReceipt.id);
+        // Update local
+        setReceipts(prev => prev.map((r, i) => i === currentIndex
+          ? { ...r, is_duplicate: true, duplicate_of: result.duplicateOf, duplicate_score: result.score, duplicate_checked_at: nowIso } as Receipt
+          : r));
+        toast({ title: 'Duplikat gefunden', description: `Übereinstimmung: ${result.score}%` });
+      } else {
+        await supabase
+          .from('receipts')
+          .update({
+            is_duplicate: false,
+            duplicate_of: null,
+            duplicate_score: null,
+            duplicate_checked_at: nowIso,
+          })
+          .eq('id', currentReceipt.id);
+        setReceipts(prev => prev.map((r, i) => i === currentIndex
+          ? { ...r, is_duplicate: false, duplicate_of: null, duplicate_score: null, duplicate_checked_at: nowIso } as Receipt
+          : r));
+        toast({ title: 'Kein Duplikat gefunden' });
+      }
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Prüfung fehlgeschlagen',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setCheckingDuplicate(false);
+    }
+  };
+
+  // Clear duplicate marking (when user decides it's not a duplicate)
+  const handleClearDuplicate = async () => {
+    if (!currentReceipt) return;
+    try {
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from('receipts')
+        .update({
+          is_duplicate: false,
+          duplicate_of: null,
+          duplicate_score: null,
+          duplicate_checked_at: nowIso,
+        })
+        .eq('id', currentReceipt.id);
+      setReceipts(prev => prev.map((r, i) => i === currentIndex
+        ? { ...r, is_duplicate: false, duplicate_of: null, duplicate_score: null, duplicate_checked_at: nowIso } as Receipt
+        : r));
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      toast({ title: 'Duplikat-Markierung entfernt' });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    }
+  };
   const canApproveAll = useMemo(() => {
     return receipts.every(r => 
       r.ai_confidence !== null && 
@@ -959,6 +1058,21 @@ const Review = () => {
                         }}
                       />
                     )}
+                    {currentReceipt && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCheckDuplicate}
+                        disabled={checkingDuplicate || imageLoading}
+                      >
+                        {checkingDuplicate ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Copy className="h-4 w-4 mr-2" />
+                        )}
+                        Duplikat prüfen
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -975,6 +1089,43 @@ const Review = () => {
                         queryClient.invalidateQueries({ queryKey: ['receipts'] });
                       }}
                     />
+                  </div>
+                )}
+
+                {/* Duplicate banner */}
+                {currentReceipt?.is_duplicate && currentReceipt?.duplicate_of && (
+                  <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground">
+                        Dieser Beleg wurde als Duplikat erkannt
+                        {currentReceipt.duplicate_score != null && (
+                          <span className="text-sm text-muted-foreground font-normal ml-2">
+                            ({currentReceipt.duplicate_score}% Übereinstimmung)
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Zum Löschen den Löschen-Button unten rechts verwenden.
+                      </p>
+                      <div className="flex gap-2 mt-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setDuplicateModalOpen(true)}
+                        >
+                          <GitCompare className="h-4 w-4 mr-2" />
+                          Original vergleichen
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleClearDuplicate}
+                        >
+                          Kein Duplikat
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -1807,6 +1958,18 @@ const Review = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Duplicate Comparison Modal */}
+        <DuplicateComparisonModal
+          open={duplicateModalOpen}
+          onOpenChange={setDuplicateModalOpen}
+          duplicateId={currentReceipt?.id ?? null}
+          originalId={currentReceipt?.duplicate_of ?? null}
+          onRefresh={() => {
+            queryClient.invalidateQueries({ queryKey: ['receipts'] });
+            loadReceipts();
+          }}
+        />
       </div>
     </DashboardLayout>
   );

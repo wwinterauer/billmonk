@@ -1,11 +1,29 @@
-## Änderung in `src/pages/Review.tsx` (Funktion `handleVendorSelect`, Zeile ~365–382)
+## Duplikat-Anzeige & manuelle Prüfung in Review
 
-Aktuell überschreibt die Auswahl eines Rechtsnamens aus dem Dropdown immer das Feld `vendor_brand` mit `vendorData.display_name`.
+### 1. Banner für bereits markierte Duplikate
+In `src/pages/Review.tsx` im CardContent (nach dem Multi-Invoice-Alert) ein Hinweis-Banner rendern, wenn `currentReceipt.is_duplicate && currentReceipt.duplicate_of`:
 
-**Neu:** `vendor_brand` nur dann setzen, wenn das Feld aktuell leer ist. Andernfalls den vom User getippten/erkannten Markennamen unangetastet lassen.
+- Amber-styled Banner: "⚠️ Dieser Beleg wurde als Duplikat erkannt" + Score
+- Buttons:
+  - **"Original vergleichen"** → öffnet `DuplicateComparisonModal` mit `duplicateId=currentReceipt.id, originalId=currentReceipt.duplicate_of`
+  - **"Kein Duplikat"** → setzt `is_duplicate=false, duplicate_of=null, duplicate_score=null` (analog zu `Expenses.tsx` Zeile 392–395)
 
-```ts
-vendor_brand: prev.vendor_brand?.trim() ? prev.vendor_brand : vendorData.display_name,
-```
+Hinweis im Banner: "Zum Löschen den vorhandenen Löschen-Button unten verwenden." (kein zusätzlicher Delete-Button).
 
-Sonst keine Änderungen. Die "Verheiraten"-Logik in `handleSave` bleibt unberührt — sie übernimmt beim Speichern weiterhin das, was im Brand-Feld steht (egal ob leer, gleich oder abweichend vom display_name).
+### 2. "Duplikat prüfen"-Button
+Im Confidence-Header neben `ReanalyzeOptions` (Zeile ~907) `<Button variant="outline" size="sm">` mit Copy-Icon: **"Duplikat prüfen"**.
+
+Handler:
+- `checkForDuplicates(user.id, currentReceipt.file_hash, { vendor, amount_gross, receipt_date, invoice_number }, currentReceipt.id)`
+- Treffer (`isDuplicate && score >= 70`): Receipt updaten (`is_duplicate=true, duplicate_of, duplicate_score, duplicate_checked_at`), Toast "Duplikat gefunden" → Banner aus Schritt 1 erscheint nach Refetch
+- Kein Treffer: nur `duplicate_checked_at` setzen, ggf. bestehende Markierung entfernen, Toast "Kein Duplikat gefunden"
+- Loading-State via lokalem `useState`
+
+### 3. Modal-Integration
+`DuplicateComparisonModal` einmal am Ende der Review-Seite mounten (analog zu Expenses), gesteuert über lokalen `open`/`ids`-State. Nach Schließen: `queryClient.invalidateQueries(['receipts'])`.
+
+### Unverändert
+- `useReceiptProcessing` (Auto-Check), `duplicateDetectionService`, Expenses-Seite, bestehender Lösch-Button in Review.
+
+### Out of scope
+- Bulk-Prüfung in Review, Schwellwert-Konfiguration.
