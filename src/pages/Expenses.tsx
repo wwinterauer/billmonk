@@ -873,6 +873,26 @@ const Expenses = () => {
           aVal = a.amount_gross || 0;
           bVal = b.amount_gross || 0;
           break;
+        case 'description':
+          aVal = a.description?.toLowerCase() || '';
+          bVal = b.description?.toLowerCase() || '';
+          break;
+        case 'category':
+          aVal = a.category?.toLowerCase() || '';
+          bVal = b.category?.toLowerCase() || '';
+          break;
+        case 'tax_type':
+          aVal = (a as any).tax_type?.toLowerCase() || '';
+          bVal = (b as any).tax_type?.toLowerCase() || '';
+          break;
+        case 'ai_confidence':
+          aVal = a.ai_confidence ?? -1;
+          bVal = b.ai_confidence ?? -1;
+          break;
+        case 'status':
+          aVal = a.status || '';
+          bVal = b.status || '';
+          break;
       }
 
       if (aVal === null || bVal === null) return 0;
