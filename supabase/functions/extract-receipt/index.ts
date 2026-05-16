@@ -477,6 +477,7 @@ serve(async (req) => {
     let receipt: Record<string, any> | null = null; // Consolidated receipt data
     const forceExtract = body.forceExtract === true;
     const skipMultiCheck = body.skipMultiCheck === true;
+    const forceTreatAsReceipt = body.forceTreatAsReceipt === true;
     const expensesOnly = body.expensesOnly === true;
     const extractionKeywords: string[] = Array.isArray(body.extractionKeywords) ? body.extractionKeywords : [];
     const extractionHint: string = typeof body.extractionHint === 'string' ? body.extractionHint.trim() : '';
