@@ -490,6 +490,10 @@ export function ExportFormatDialog({
       case 'split_vat_rate': return (receipt as any)._split_vat_rate ?? '';
       case 'split_vat_amount': return (receipt as any)._split_vat_amount ?? '';
       case 'split_is_private': return (receipt as any)._split_is_private ? 'Ja' : '';
+      case 'tags': {
+        const tags = (receipt as any).tags as Array<{ name: string }> | undefined;
+        return tags && tags.length > 0 ? tags.map(t => t.name).join('; ') : '';
+      }
       default: return (receipt as unknown as Record<string, unknown>)[field];
     }
   };
@@ -559,6 +563,31 @@ export function ExportFormatDialog({
     // Filter out "Keine Rechnung" if option is enabled (not for ZIP)
     if (excludeNoReceipt && exportFormat !== 'zip') {
       sortedReceipts = sortedReceipts.filter(r => r.category !== 'Keine Rechnung');
+    }
+
+    // Attach tags to receipts (needed for the 'tags' column)
+    if (user && sortedReceipts.length > 0) {
+      const receiptIds = sortedReceipts.map(r => r.id);
+      const { data: tagRows } = await supabase
+        .from('receipt_tags')
+        .select('receipt_id, tags(id, name, color)')
+        .in('receipt_id', receiptIds);
+
+      if (tagRows && tagRows.length > 0) {
+        const tagsByReceipt = new Map<string, Array<{ id: string; name: string; color: string }>>();
+        for (const row of tagRows as Array<{ receipt_id: string; tags: { id: string; name: string; color: string } | null }>) {
+          if (!row.tags) continue;
+          const list = tagsByReceipt.get(row.receipt_id) || [];
+          list.push(row.tags);
+          tagsByReceipt.set(row.receipt_id, list);
+        }
+        sortedReceipts = sortedReceipts.map(r => ({
+          ...r,
+          tags: tagsByReceipt.get(r.id) || [],
+        } as any));
+      } else {
+        sortedReceipts = sortedReceipts.map(r => ({ ...r, tags: [] } as any));
+      }
     }
 
     // Expand split bookings into multiple rows
