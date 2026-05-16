@@ -1499,7 +1499,7 @@ export function VendorManagement() {
               <Textarea
                 value={formData.extraction_hint}
                 onChange={(e) => setFormData(prev => ({ ...prev, extraction_hint: e.target.value.slice(0, 500) }))}
-                placeholder={`z.B. "Wenn Zählernummer 12345 erkannt wird, setze Tag 'Gschwandt 54' und ergänze Beschreibung mit Präfix 'Gschwandt 54 - '." oder "Beträge in Klammern als positive Kosten behandeln."`}
+                placeholder={`Beispiele: "Belege dieses Lieferanten immer unter Kategorie 'Versicherung' buchen." — "Wenn eine Zählernummer erkannt wird, setze den Tag 'Gschwandt 54' und füge der Beschreibung den Präfix 'Gschwandt 54 - ' hinzu." — "Rechnungsnummern beginnen immer mit EVN- gefolgt von 8 Ziffern."`}
                 rows={3}
                 maxLength={500}
                 className="text-sm"
