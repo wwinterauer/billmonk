@@ -94,6 +94,8 @@ import { VendorBrandAutocomplete } from '@/components/receipts/VendorBrandAutoco
 import { PAYMENT_METHODS } from '@/lib/constants';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PageMeta } from '@/components/PageMeta';
+import { DuplicateComparisonModal } from '@/components/receipts/DuplicateComparisonModal';
+import { checkForDuplicates } from '@/services/duplicateDetectionService';
 
 interface TaxRateDetail {
   rate: number;
