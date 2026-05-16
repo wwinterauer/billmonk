@@ -22,6 +22,8 @@ import {
   ExternalLink,
   Trash2,
   Zap,
+  Copy,
+  GitCompare,
 } from 'lucide-react';
 import {
   AlertDialog,
