@@ -480,19 +480,30 @@ export default function Reconciliation() {
     setShowAssignModal(true);
   };
 
-  const handleAssign = async (transactionId: string, receiptId: string) => {
+  const handleAssign = async (
+    transactionId: string,
+    receiptId: string,
+    splitLineId?: string | null,
+  ) => {
     try {
       const { error: txError } = await supabase
         .from('bank_transactions')
-        .update({ status: 'matched', receipt_id: receiptId })
+        .update({
+          status: 'matched',
+          receipt_id: receiptId,
+          receipt_split_line_id: splitLineId ?? null,
+        })
         .eq('id', transactionId);
       if (txError) throw txError;
 
-      const { error: rcptError } = await supabase
-        .from('receipts')
-        .update({ bank_transaction_id: transactionId })
-        .eq('id', receiptId);
-      if (rcptError) throw rcptError;
+      // Only attach to receipt itself for whole-receipt matches
+      if (!splitLineId) {
+        const { error: rcptError } = await supabase
+          .from('receipts')
+          .update({ bank_transaction_id: transactionId })
+          .eq('id', receiptId);
+        if (rcptError) throw rcptError;
+      }
 
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
