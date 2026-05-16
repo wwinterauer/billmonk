@@ -374,7 +374,7 @@ const Review = () => {
     setFormData(prev => ({
       ...prev,
       vendor: legalName,
-      vendor_brand: vendorData.display_name,
+      vendor_brand: prev.vendor_brand?.trim() ? prev.vendor_brand : vendorData.display_name,
       // Pre-fill VAT only if currently empty/default
       vat_rate: (prev.vat_rate === '' || prev.vat_rate === defaultVatRate) && vendorData.default_vat_rate !== null
         ? vendorData.default_vat_rate.toString()
