@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { PAYMENT_METHODS } from '@/lib/constants';
-import { Repeat } from 'lucide-react';
+import { PAYMENT_METHODS, NO_RECEIPT_CATEGORY } from '@/lib/constants';
+import { Repeat, FileX } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
@@ -713,6 +713,30 @@ export function ReceiptDetailPanel({
       (window as unknown as { pendingSaveStatus?: typeof newStatus }).pendingSaveStatus = newStatus;
     } else {
       handleSave(newStatus);
+    }
+  };
+
+  // Mark current receipt as "Keine Rechnung" (no actual invoice document)
+  const markAsNoReceipt = async () => {
+    if (!receipt) return;
+    setSaving(true);
+    try {
+      await updateReceipt(receipt.id, {
+        status: 'approved',
+        is_no_receipt_entry: true,
+        category: NO_RECEIPT_CATEGORY,
+      } as Partial<Receipt>);
+      toast({ title: 'Als „Keine Rechnung" markiert' });
+      onUpdate();
+      onClose();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler beim Speichern',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1898,6 +1922,15 @@ export function ReceiptDetailPanel({
                     Löschen
                   </Button>
                   <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={markAsNoReceipt}
+                      disabled={saving || receipt.is_no_receipt_entry === true}
+                      title="Diesen Eintrag als 'Keine Rechnung' kennzeichnen (z. B. Kontoauszug, Werbung)"
+                    >
+                      <FileX className="h-4 w-4 mr-2" />
+                      {receipt.is_no_receipt_entry ? 'Keine Rechnung ✓' : 'Keine Rechnung'}
+                    </Button>
                     <Button
                       variant="destructive"
                       onClick={() => handleSaveClick('rejected')}

@@ -24,6 +24,7 @@ import {
   Zap,
   Copy,
   GitCompare,
+  FileX,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -91,7 +92,7 @@ import { useVendors } from '@/hooks/useVendors';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
 import { VendorAutocomplete } from '@/components/receipts/VendorAutocomplete';
 import { VendorBrandAutocomplete } from '@/components/receipts/VendorBrandAutocomplete';
-import { PAYMENT_METHODS } from '@/lib/constants';
+import { PAYMENT_METHODS, NO_RECEIPT_CATEGORY } from '@/lib/constants';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PageMeta } from '@/components/PageMeta';
 import { DuplicateComparisonModal } from '@/components/receipts/DuplicateComparisonModal';
@@ -678,6 +679,41 @@ const Review = () => {
       goToReceipt(currentIndex + 1);
     } else if (currentIndex > 0) {
       goToReceipt(currentIndex - 1);
+    }
+  };
+
+  // Mark current receipt as "Keine Rechnung" and remove from queue
+  const markAsNoReceipt = async () => {
+    if (!currentReceipt) return;
+    setSaving(true);
+    try {
+      await updateReceipt(currentReceipt.id, {
+        status: 'approved',
+        is_no_receipt_entry: true,
+        category: NO_RECEIPT_CATEGORY,
+      } as Partial<Receipt>);
+
+      const newReceipts = receipts.filter((_, i) => i !== currentIndex);
+      setReceipts(newReceipts);
+      if (newReceipts.length > 0) {
+        const nextIndex = Math.min(currentIndex, newReceipts.length - 1);
+        setCurrentIndex(nextIndex);
+        populateForm(newReceipts[nextIndex]);
+        loadImage(newReceipts[nextIndex]);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      window.dispatchEvent(new CustomEvent('refresh-review-count'));
+
+      toast({ title: 'Als „Keine Rechnung" markiert' });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler beim Speichern',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1860,6 +1896,15 @@ const Review = () => {
                       >
                         <X className="h-4 w-4 mr-2" />
                         Ablehnen
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={markAsNoReceipt}
+                        disabled={saving || currentReceipt?.is_no_receipt_entry === true}
+                        title="Diesen Eintrag als 'Keine Rechnung' kennzeichnen (z. B. Kontoauszug, Werbung)"
+                      >
+                        <FileX className="h-4 w-4 mr-2" />
+                        {currentReceipt?.is_no_receipt_entry ? 'Keine Rechnung ✓' : 'Keine Rechnung'}
                       </Button>
                       <Button
                         variant="ghost"
