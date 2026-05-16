@@ -450,31 +450,49 @@ export function VendorManagement() {
     setVendorDuplicates(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Build a fresh merge preview from a source/target pair
+  const buildMergePreview = (source: Vendor, target: Vendor): MergePreview => {
+    const allDetectedNames = [
+      ...new Set([
+        ...(target.detected_names || []),
+        ...(source.detected_names || []),
+        source.display_name,
+      ]),
+    ];
+    const mergedLegalNames = [
+      ...new Set([...(target.legal_names || []), ...(source.legal_names || [])]),
+    ];
+    return {
+      display_name: target.display_name,
+      legal_names: mergedLegalNames,
+      primary_legal_name: mergedLegalNames[0] ?? null,
+      detected_names: allDetectedNames,
+      default_category_id: target.default_category_id || source.default_category_id,
+      default_vat_rate: target.default_vat_rate ?? source.default_vat_rate,
+      total_receipts: (target.receipt_count || 0) + (source.receipt_count || 0),
+      total_amount: (target.total_amount || 0) + (source.total_amount || 0),
+    };
+  };
+
   // Open detailed merge dialog for a specific duplicate pair
   const openMergePairDialog = (duplicate: Vendor, original: Vendor) => {
     setMergeSource(duplicate);
     setMergeTarget(original);
-
-    // Calculate merge preview
-    const allDetectedNames = [
-      ...new Set([
-        ...(original.detected_names || []),
-        ...(duplicate.detected_names || []),
-        duplicate.display_name // Add source name as variant
-      ])
-    ];
-
-    setMergePreview({
-      display_name: original.display_name,
-      legal_names: [...new Set([...(original.legal_names || []), ...(duplicate.legal_names || [])])],
-      detected_names: allDetectedNames,
-      default_category_id: original.default_category_id || duplicate.default_category_id,
-      default_vat_rate: original.default_vat_rate || duplicate.default_vat_rate,
-      total_receipts: (original.receipt_count || 0) + (duplicate.receipt_count || 0),
-      total_amount: (original.total_amount || 0) + (duplicate.total_amount || 0)
-    });
-
+    setMergePreview(buildMergePreview(duplicate, original));
+    setNewLegalNameInput('');
     setShowMergeDialog(true);
+  };
+
+  // Swap merge direction: source <-> target
+  const swapMergeDirection = () => {
+    if (!mergeSource || !mergeTarget) return;
+    const newSource = mergeTarget;
+    const newTarget = mergeSource;
+    setMergeSource(newSource);
+    setMergeTarget(newTarget);
+    setMergePreview(buildMergePreview(newSource, newTarget));
+    setNewLegalNameInput('');
+    toast.info('Richtung getauscht – Vorschau aktualisiert');
   };
 
   // Execute detailed merge
