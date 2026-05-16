@@ -1532,6 +1532,201 @@ const Expenses = () => {
     return '';
   }, [dateFrom, dateTo]);
 
+  // Ordered list of visible columns
+  const orderedVisibleColumns = useMemo(
+    () => columnOrder.filter(k => visibleColumns.has(k)),
+    [columnOrder, visibleColumns],
+  );
+
+  // Render a single cell for a given column key
+  const renderCell = (receipt: Receipt, key: ColumnKey) => {
+    const width = columnWidths[key];
+    const cellStyle = { width, minWidth: width, maxWidth: width } as const;
+    switch (key) {
+      case 'date':
+        return (
+          <TableCell key={key} style={cellStyle} className="font-medium truncate">
+            {receipt.receipt_date
+              ? format(new Date(receipt.receipt_date), 'dd.MM.yyyy')
+              : format(new Date(receipt.created_at), 'dd.MM.yyyy')}
+          </TableCell>
+        );
+      case 'vendor':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            {receipt.vendor_brand && receipt.vendor_brand !== receipt.vendor ? (
+              <div className="min-w-0">
+                <span className="font-medium block truncate">{receipt.vendor_brand}</span>
+                <span className="block text-xs text-muted-foreground truncate" title={receipt.vendor || ''}>
+                  {receipt.vendor}
+                </span>
+              </div>
+            ) : (
+              <span className="block truncate" title={receipt.vendor || ''}>{receipt.vendor || '—'}</span>
+            )}
+          </TableCell>
+        );
+      case 'invoice_number':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            {receipt.invoice_number ? (
+              <span className="font-mono text-sm block truncate" title={receipt.invoice_number}>
+                {receipt.invoice_number}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">–</span>
+            )}
+          </TableCell>
+        );
+      case 'description':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            <span className="truncate block" title={receipt.description || undefined}>
+              {truncateText(receipt.description)}
+            </span>
+          </TableCell>
+        );
+      case 'category':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            {receipt.category ? (
+              <Badge
+                variant="outline"
+                style={{
+                  borderColor: getCategoryColor(receipt.category) || undefined,
+                  color: getCategoryColor(receipt.category) || undefined,
+                }}
+              >
+                {receipt.category}
+              </Badge>
+            ) : '—'}
+          </TableCell>
+        );
+      case 'tax_type':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            {(receipt as any).tax_type ? (
+              <Badge variant="outline" className="text-xs">{(receipt as any).tax_type}</Badge>
+            ) : (
+              <span className="text-xs text-muted-foreground">Offen</span>
+            )}
+          </TableCell>
+        );
+      case 'tags':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className="flex items-center gap-1 hover:opacity-80 cursor-pointer min-h-[24px]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {receiptTagsCache[receipt.id]?.length > 0 ? (
+                    <>
+                      {receiptTagsCache[receipt.id].slice(0, 2).map(tag => (
+                        <Badge
+                          key={tag.id}
+                          variant="secondary"
+                          className="text-xs py-0.5 px-1.5 text-white"
+                          style={{ backgroundColor: tag.color }}
+                          title={tag.name}
+                        >
+                          {tag.name}
+                        </Badge>
+                      ))}
+                      {receiptTagsCache[receipt.id].length > 2 && (
+                        <Badge variant="outline" className="text-xs py-0.5 px-1.5">
+                          +{receiptTagsCache[receipt.id].length - 2}
+                        </Badge>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-3" align="start">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium mb-2">Tags zuweisen</p>
+                  <TagSelector receiptId={receipt.id} size="sm" onChange={loadReceipts} />
+                </div>
+              </PopoverContent>
+            </Popover>
+          </TableCell>
+        );
+      case 'amount':
+        return (
+          <TableCell key={key} style={cellStyle} className="text-right font-medium">
+            {formatCurrency(receipt.amount_gross)}
+          </TableCell>
+        );
+      case 'ai':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            {receipt.ai_confidence !== null && receipt.ai_confidence !== undefined ? (
+              <Badge
+                variant={
+                  receipt.ai_confidence >= 0.8 ? 'default'
+                    : receipt.ai_confidence >= 0.5 ? 'secondary' : 'destructive'
+                }
+                className="text-xs"
+              >
+                <Sparkles className="h-3 w-3 mr-1" />
+                {Math.round(receipt.ai_confidence * 100)}%
+              </Badge>
+            ) : (
+              <span className="text-xs text-muted-foreground">—</span>
+            )}
+          </TableCell>
+        );
+      case 'status':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Badge variant="outline" className={STATUS_CONFIG[receipt.status]?.color || ''}>
+                {receipt.status === 'split' && <Scissors className="w-3 h-3 mr-1" />}
+                {receipt.status === 'needs_splitting' && <Scissors className="w-3 h-3 mr-1" />}
+                {STATUS_CONFIG[receipt.status]?.label || receipt.status}
+              </Badge>
+              {(receipt as any).auto_approved && (receipt.status === 'approved' || receipt.status === 'split') && (
+                <Badge variant="outline" className="bg-success/10 text-success border-success/30 text-xs">
+                  <Zap className="w-3 h-3 mr-1" />
+                  Automatisch freigegeben
+                </Badge>
+              )}
+              {receipt.split_from_receipt_id && (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                  <Layers className="w-3 h-3 mr-1" />
+                  Teil
+                  {receipt.original_pages && receipt.original_pages.length > 0 && (
+                    <span className="ml-1 opacity-75">(S. {receipt.original_pages.join(', ')})</span>
+                  )}
+                </Badge>
+              )}
+              {receipt.is_duplicate && (
+                <Badge
+                  variant="outline"
+                  className="bg-warning/10 text-warning border-warning/30 cursor-pointer text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (receipt.duplicate_of) openDuplicateComparison(receipt.id, receipt.duplicate_of);
+                  }}
+                >
+                  <Copy className="w-3 h-3 mr-1" />
+                  {receipt.duplicate_score || 0}%
+                </Badge>
+              )}
+              {splitBookingEnabled && (receipt as any).is_split_booking && (
+                <Layers className="w-3.5 h-3.5 text-violet-600" />
+              )}
+              {receipt.source?.startsWith('email_') && <SourceBadge receipt={receipt} compact />}
+              {receipt.is_no_receipt_entry && <NoReceiptBadge compact />}
+            </div>
+          </TableCell>
+        );
+    }
+  };
+
   return (
     <>
       <PageMeta title="Ausgaben — BillMonk" description="Alle Ausgaben verwalten, filtern und für die Buchhaltung exportieren." canonical="/expenses" noindex />
