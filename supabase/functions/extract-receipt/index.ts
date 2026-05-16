@@ -544,6 +544,7 @@ serve(async (req) => {
 
     // ── Fetch categories ───────────────────────────────────────────
     let categoryList = '(keine eigenen Kategorien definiert)';
+    let userCategoryNames: string[] = [];
     let userCountry: string | null = null;
     let userId: string | null = receipt?.user_id || null;
     if (!userId) {
