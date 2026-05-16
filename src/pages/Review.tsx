@@ -176,8 +176,15 @@ const Review = () => {
       
       setReceipts(allData);
       if (allData.length > 0) {
-        populateForm(allData[0]);
-        loadImage(allData[0]);
+        const lastId = sessionStorage.getItem('review-last-receipt-id');
+        const restoredIdx = lastId ? allData.findIndex(r => r.id === lastId) : -1;
+        const idx = restoredIdx >= 0 ? restoredIdx : 0;
+        if (restoredIdx < 0 && lastId) {
+          sessionStorage.removeItem('review-last-receipt-id');
+        }
+        setCurrentIndex(idx);
+        populateForm(allData[idx]);
+        loadImage(allData[idx]);
       }
     } catch (error) {
       toast({
@@ -195,6 +202,13 @@ const Review = () => {
   }, []);
 
   const currentReceipt = receipts[currentIndex] || null;
+
+  // Persist current receipt id across navigation
+  useEffect(() => {
+    if (currentReceipt?.id) {
+      sessionStorage.setItem('review-last-receipt-id', currentReceipt.id);
+    }
+  }, [currentReceipt?.id]);
 
   // Vendor extraction data for ReanalyzeOptions
   const [currentVendorData, setCurrentVendorData] = useState<{
