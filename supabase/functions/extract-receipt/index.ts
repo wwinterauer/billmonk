@@ -1045,6 +1045,20 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           }
         }
 
+        // Validate finalCategory strictly against the user's category list.
+        // Anything that doesn't exactly (case-insensitive) match a real user category → null.
+        if (finalCategory && userCategoryNames.length > 0) {
+          const match = userCategoryNames.find(n => n.toLowerCase() === finalCategory!.toLowerCase());
+          if (!match) {
+            console.log(`[Category Validation] Dropping invented category "${finalCategory}" (not in user list)`);
+            finalCategory = null;
+          } else if (match !== finalCategory) {
+            finalCategory = match; // normalize casing
+          }
+        } else if (finalCategory && userCategoryNames.length === 0) {
+          finalCategory = null;
+        }
+
         const { error: updateError } = await supabase.from('receipts').update({
           vendor: extractedData.vendor,
           vendor_brand: extractedData.vendor_brand,
