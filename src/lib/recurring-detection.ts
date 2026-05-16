@@ -16,6 +16,7 @@ export interface RecurringGroup {
   amount: number;
   count: number;
   cadence: 'monthly' | 'quarterly' | 'irregular';
+  confidence: 'high' | 'medium';
   avgIntervalDays: number;
   firstDate: string;
   lastDate: string;
