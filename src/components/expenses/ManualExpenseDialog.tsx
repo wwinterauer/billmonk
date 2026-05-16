@@ -118,6 +118,7 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
     setPaymentMethod('Bar');
     setInvoiceNumber('');
     setNotes('');
+    setSelectedTagIds([]);
   };
 
   const handleVendorSelect = (v: {
