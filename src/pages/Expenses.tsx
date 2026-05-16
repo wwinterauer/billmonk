@@ -336,7 +336,68 @@ const Expenses = () => {
   const [sortField, setSortField] = useState<SortField>('receipt_date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // Selection state
+  // Column order state
+  const [columnOrder, setColumnOrder] = useState<ColumnKey[]>(() => {
+    const saved = localStorage.getItem('expenses-column-order');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as ColumnKey[];
+        const valid = parsed.filter(k => DEFAULT_COLUMN_ORDER.includes(k));
+        // append any new columns missing from saved
+        for (const k of DEFAULT_COLUMN_ORDER) if (!valid.includes(k)) valid.push(k);
+        return valid;
+      } catch {
+        return DEFAULT_COLUMN_ORDER;
+      }
+    }
+    return DEFAULT_COLUMN_ORDER;
+  });
+
+  // Column widths state
+  const [columnWidths, setColumnWidths] = useState<Record<ColumnKey, number>>(() => {
+    const saved = localStorage.getItem('expenses-column-widths');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as Record<ColumnKey, number>;
+        return { ...DEFAULT_COLUMN_WIDTHS, ...parsed };
+      } catch {
+        return DEFAULT_COLUMN_WIDTHS;
+      }
+    }
+    return DEFAULT_COLUMN_WIDTHS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('expenses-column-order', JSON.stringify(columnOrder));
+  }, [columnOrder]);
+
+  useEffect(() => {
+    localStorage.setItem('expenses-column-widths', JSON.stringify(columnWidths));
+  }, [columnWidths]);
+
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleColumnDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setColumnOrder(prev => {
+      const oldIndex = prev.indexOf(active.id as ColumnKey);
+      const newIndex = prev.indexOf(over.id as ColumnKey);
+      if (oldIndex < 0 || newIndex < 0) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  };
+
+  const handleColumnResize = (key: ColumnKey, width: number) => {
+    setColumnWidths(prev => ({ ...prev, [key]: width }));
+  };
+
+  const resetColumnLayout = () => {
+    setColumnOrder(DEFAULT_COLUMN_ORDER);
+    setColumnWidths(DEFAULT_COLUMN_WIDTHS);
+    setVisibleColumns(new Set(COLUMN_CONFIG.filter(c => c.defaultVisible).map(c => c.key)));
+  };
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Pagination state
