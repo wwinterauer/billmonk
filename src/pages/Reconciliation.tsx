@@ -938,55 +938,82 @@ export default function Reconciliation() {
                       </div>
                     ) : (
                       <div className="overflow-x-auto">
-                      <Table>
+                      <invCols.DndContext sensors={invCols.sensors} collisionDetection={invCols.closestCenter} onDragEnd={invCols.handleDragEnd}>
+                      <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Rechnungsnr.</TableHead>
-                            <TableHead>Kunde</TableHead>
-                            <TableHead className="text-right">Betrag</TableHead>
-                            <TableHead>Fälligkeitsdatum</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Aktionen</TableHead>
+                            <SortableContext items={invCols.order} strategy={horizontalListSortingStrategy}>
+                              {invCols.order.map((key) => {
+                                const def = invCols.defByKey[key];
+                                return (
+                                  <EditableTableHead
+                                    key={key}
+                                    id={key}
+                                    label={def.label}
+                                    width={invCols.widths[key]}
+                                    sortable={false}
+                                    isSorted={false}
+                                    align={def.align}
+                                    onResize={(w) => invCols.setWidth(key, w)}
+                                  />
+                                );
+                              })}
+                            </SortableContext>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {openInvoicesList.map((invoice: any) => {
                             const overdueDays = getOverdueDays(invoice.due_date);
                             const isOverdue = overdueDays > 0;
-                            return (
-                              <TableRow key={invoice.id}>
-                                <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-                                <TableCell>{(invoice.customers as any)?.display_name || '–'}</TableCell>
-                                <TableCell className="text-right font-mono">{formatAmount(invoice.total)}</TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    {invoice.due_date ? format(new Date(invoice.due_date), 'dd.MM.yyyy', { locale: de }) : '–'}
-                                    {isOverdue && (
-                                      <Badge className="bg-destructive/10 text-destructive border-0 text-xs">
-                                        <Clock className="h-3 w-3 mr-1" />
-                                        {overdueDays} Tage
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  {invoice.status === 'overdue' ? (
-                                    <Badge className="bg-destructive/10 text-destructive border-0">Überfällig</Badge>
-                                  ) : (
-                                    <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0">Gesendet</Badge>
+                            const cells: Record<InvCol, React.ReactNode> = {
+                              number: <span className="font-medium">{invoice.invoice_number}</span>,
+                              customer: <span className="truncate block">{(invoice.customers as any)?.display_name || '–'}</span>,
+                              amount: <span className="font-mono">{formatAmount(invoice.total)}</span>,
+                              due: (
+                                <div className="flex items-center gap-2">
+                                  <span className="whitespace-nowrap">{invoice.due_date ? format(new Date(invoice.due_date), 'dd.MM.yyyy', { locale: de }) : '–'}</span>
+                                  {isOverdue && (
+                                    <Badge className="bg-destructive/10 text-destructive border-0 text-xs">
+                                      <Clock className="h-3 w-3 mr-1" />
+                                      {overdueDays} Tage
+                                    </Badge>
                                   )}
-                                </TableCell>
-                                <TableCell className="text-right">
+                                </div>
+                              ),
+                              status: invoice.status === 'overdue' ? (
+                                <Badge className="bg-destructive/10 text-destructive border-0">Überfällig</Badge>
+                              ) : (
+                                <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0">Gesendet</Badge>
+                              ),
+                              actions: (
+                                <div className="flex justify-end">
                                   <Button variant="outline" size="sm" onClick={() => navigate(`/invoices/${invoice.id}/edit`)}>
                                     <Eye className="mr-1 h-3 w-3" />
                                     Anzeigen
                                   </Button>
-                                </TableCell>
+                                </div>
+                              ),
+                            };
+                            return (
+                              <TableRow key={invoice.id}>
+                                {invCols.order.map((key) => {
+                                  const def = invCols.defByKey[key];
+                                  return (
+                                    <TableCell
+                                      key={key}
+                                      style={{ width: invCols.widths[key], minWidth: invCols.widths[key], maxWidth: invCols.widths[key] }}
+                                      className={cn('overflow-hidden', def.align === 'right' && 'text-right')}
+                                    >
+                                      {cells[key]}
+                                    </TableCell>
+                                  );
+                                })}
                               </TableRow>
                             );
                           })}
                         </TableBody>
                       </Table>
+                      </invCols.DndContext>
                       </div>
                     )}
                   </CardContent>
