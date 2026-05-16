@@ -1,56 +1,33 @@
-## Ziel
+## Antwort auf deine Frage
 
-In der Ausgabenübersicht (`/expenses`) sollen Rechnungen mit Splitbuchung (`is_split_booking = true`) zwei neue Funktionen bekommen:
+Technisch wird der `extraction_hint` bereits **immer** als generischer "LIEFERANTEN-HINWEIS" an die KI mitgegeben — nicht nur für Geldwerte (siehe `extract-receipt/index.ts` Z. 581-603). In der UI ist das Feld aktuell aber **versteckt** unter dem "Nur Ausgaben extrahieren"-Toggle, was den Eindruck erweckt, es gelte nur für die Betragserkennung.
 
-1. **Aufklappbare Tabellenzeilen**, die die einzelnen Buchungssätze (Splitlines) direkt in der Tabelle zeigen.
-2. **Ein Filter**, mit dem nur Rechnungen mit Splitbuchungen angezeigt werden können.
+Du kannst also bereits heute Hinweise wie "wenn Zählernummer XX → Tag Gschwandt 54" eintragen — die KI bekommt diese mit. Aber das Feld ist eben unsichtbar, wenn der Toggle aus ist.
 
-## Darstellungs-Konzept (Aufklappen)
+## Plan
 
-- In der ersten Spalte (Checkbox-Spalte) bekommt jede Zeile eines Splitbuchungs-Belegs zusätzlich einen kleinen **Chevron-Button** (▶ / ▼) links neben oder anstelle eines kleinen Indikators. Nur sichtbar wenn `is_split_booking === true`.
-- Klick auf Chevron toggelt einen lokalen `expandedIds: Set<string>` State.
-- Beim Aufklappen wird **direkt unter** der Belegzeile eine zusätzliche `<TableRow>` mit einer einzigen `<TableCell colSpan={...}>` eingefügt. Innerhalb dieser Zelle wird eine **kompakte Sub-Tabelle** der Splitlines gerendert (leicht eingerückt, dezenter Hintergrund `bg-muted/30`, schmalerer Text).
-- Spalten der Sub-Tabelle:
-  - Beschreibung
-  - Kategorie
-  - Buchungsart (Tax Type)
-  - MwSt %
-  - Netto
-  - MwSt
-  - Brutto
-  - Privat-Badge (wenn `is_private`)
-- Daten kommen aus dem bereits vorhandenen Hook `useSplitLines` (siehe `src/hooks/useSplitLines.ts`). Wir laden die Splitlines für **alle aktuell sichtbaren Splitbuchungs-Belege auf der Seite** in einem Query (`receiptIds` = IDs der `paginatedReceipts` mit `is_split_booking`), damit das Aufklappen sofort funktioniert ohne Nachladen.
-- Falls für einen Beleg keine Splitlines gefunden werden, zeigt die Sub-Zeile einen dezenten Hinweis "Keine Buchungssätze gefunden".
+### 1. `extraction_hint` als eigenes Feld herausziehen
+In `src/components/settings/VendorManagement.tsx` (Z. 1583-1597) das Textarea aus dem `expenses_only_extraction`-Block herausnehmen und als **eigenen, immer sichtbaren Abschnitt** „Sonstige Hinweise für die KI" oberhalb des Toggle-Blocks platzieren.
 
-## Filter
+- Label: **„Sonstige KI-Hinweise (Kategorie, Tags, Beschreibung, etc.)"**
+- Placeholder mit deinem Beispiel erweitern:
+  > z.B. „Wenn Zählernummer 12345 erkannt wird, setze Tag 'Gschwandt 54' und ergänze Beschreibung mit Präfix 'Gschwandt 54 - '." oder „Beträge in Klammern als positive Kosten behandeln."
+- Hilfetext: „Diese Hinweise werden der KI bei jeder Analyse dieses Lieferanten mitgegeben — für Kategorisierung, Tag-Auswahl, Beschreibungs-Anpassung oder Betragserkennung."
+- 500-Zeichen-Limit bleibt.
 
-- Neuer Filter-State `splitFilter: 'all' | 'split' | 'no_split'` (Default `'all'`).
-- Neues Dropdown in der Filterleiste neben dem bestehenden „Rechnungsnr."-Filter mit Optionen:
-  - Alle Belege
-  - Nur mit Splitbuchung
-  - Nur ohne Splitbuchung
-- Anwendung in `filteredReceipts`-Memo (Standard-Filter-Pattern wie bestehende Filter).
-- Filter wird in den Reset-Effekt für `currentPage` aufgenommen.
-- Filter ist nur sichtbar/aktivierbar wenn `splitBookingEnabled` (Feature-Flag aus `usePlan`).
+### 2. Toggle „Nur Ausgaben extrahieren" umbenennen
+In Z. 1497-1503:
+- Label: **„Vertiefte Betragserkennung via Hinweis"**
+- Beschreibung: **„Aktivieren, wenn auf der Rechnung Einnahmen/Gutschriften mit Ausgaben gemischt sind (z.B. Monta, Marketplace) und nur Kosten extrahiert werden sollen."**
 
-## Technische Details
+Schlagwort-Chips bleiben innerhalb dieses Blocks (sind nur relevant, wenn aktiv).
 
-**Datei:** `src/pages/Expenses.tsx`
+### 3. Backend — keine Änderung nötig
+`extract-receipt/index.ts` nutzt den Hint bereits generisch. Der Hint wird in beiden Fällen (expenses_only on/off) sauber an den Prompt angehängt.
 
-- Neuer State: `const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())`.
-- Neuer State: `const [splitFilter, setSplitFilter] = useState<'all'|'split'|'no_split'>('all')`.
-- IDs der sichtbaren Split-Belege per Memo:
-  ```ts
-  const visibleSplitReceiptIds = useMemo(
-    () => paginatedReceipts.filter(r => (r as any).is_split_booking).map(r => r.id),
-    [paginatedReceipts]
-  );
-  ```
-- `useSplitLines(splitBookingEnabled && visibleSplitReceiptIds.length > 0, visibleSplitReceiptIds)` zum Laden.
-- Im `paginatedReceipts.map`-Render-Block: nach der `<TableRow>` ggf. eine zweite `<TableRow>` mit Sub-Tabelle ausgeben, wenn `expandedIds.has(receipt.id)`. ColSpan = `1 (checkbox) + orderedVisibleColumns.length + 1 (actions)`.
-- Chevron-Toggle in der Checkbox-Zelle als kleines Icon links neben der Checkbox (nur wenn Splitbuchung). Verwendung `ChevronRight` / `ChevronDown` aus lucide-react.
-- Splitlines pro Beleg gruppieren via `useMemo` `Map<receiptId, SplitLine[]>`.
-- `filteredReceipts`-Memo um Split-Filter erweitern und `splitFilter` zur Dependency-Liste hinzufügen.
-- Page-Reset-Effekt um `splitFilter` ergänzen.
+### 4. Nicht angefasst
+- Spalten/Datenbank: kein neues Feld, da `extraction_hint` semantisch bereits passt und der Backend-Code schon korrekt ist.
+- Andere Stellen (Review.tsx, ReceiptDetailPanel.tsx) verwenden das Feld bereits — kein Refactor nötig.
 
-**Keine Schemaänderungen, keine Backend-Änderungen.** Reine UI-Erweiterung auf vorhandenen Daten (`receipts.is_split_booking`, Tabelle `receipt_split_lines` via `useSplitLines`).
+### Optional (auf Rückfrage)
+Falls du Hint und „Expenses-Only-Hinweis" semantisch trennen möchtest, könnten wir eine neue Spalte `general_ai_notes` einführen und `extraction_hint` ausschließlich für den expenses_only-Kontext lassen. Aktuell halte ich das aber für unnötigen Overhead, weil der KI ein einziger Hinweis-Block reicht.
