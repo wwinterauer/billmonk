@@ -357,7 +357,9 @@ export default function BankImport() {
                 user_id: user.id,
                 vendor: (matchedKeyword.vendor_id && vendorNameMap[matchedKeyword.vendor_id]) || matchedKeyword.keyword,
                 vendor_id: matchedKeyword.vendor_id ?? null,
-                description: matchedKeyword.description_template || tx.description,
+                description: matchedKeyword.description_template
+                  ? `${matchedKeyword.description_template} – ${tx.description}`
+                  : tx.description,
                 amount_gross: tx.amount,
                 receipt_date: format(tx.date, 'yyyy-MM-dd'),
                 category: matchedKeyword.category,
