@@ -1,27 +1,58 @@
-## Ursache
+## Ziel
 
-In `supabase/functions/extract-receipt/index.ts` enthält `buildCategoryHints()` (Zeilen 168–198) hartkodierte Beispiel-Kategorienamen wie **„Software/EDV"**, „GWG", „Bewirtung". Diese landen im KI-Prompt, auch wenn der User diese Kategorien gar nicht hat. Die KI hat „Software-Abos → Software/EDV" wortwörtlich übernommen, obwohl bei dir nur „Software" existiert. Anschließend wird der AI-Wert ungeprüft als `finalCategory` gespeichert.
+Die Tabelle auf `/expenses` bekommt eine klassische Spalten-Bearbeitung:
 
-## Plan
+1. **Sichtbarkeit** (existiert bereits via "Spalten"-Dropdown) — bleibt
+2. **Reihenfolge per Drag & Drop** am Spaltenkopf
+3. **Spaltenbreite per Ziehen** an der rechten Kante des Spaltenkopfes
+4. **Sortierung per Klick** auf jeden sortierbaren Spaltenkopf (auf/ab, mit Indikator)
+5. Alle Einstellungen werden pro Nutzer in `localStorage` persistiert (analog zur bestehenden `expenses-visible-columns`)
 
-### 1. Hartkodierte Kategorienamen aus Hints entfernen
-`buildCategoryHints()` (Zeilen 168–198): Beispielzeilen so umbauen, dass entweder
-- nur generische Konzepte genannt werden (ohne konkrete Namen), oder
-- jede Beispielzeile dynamisch nur dann ausgegeben wird, wenn ein passender Name in `categories` existiert (Helper `has()` ist schon vorhanden).
+## Umsetzung
 
-Zeile 182 („Software-Abos → Software/EDV") und analoge Zeilen entsprechend bereinigen.
+### Neue Hilfsstrukturen in `src/pages/Expenses.tsx`
 
-### 2. AI-Kategorie strikt gegen User-Liste validieren
-Im Bereich um Zeile 933 (`let finalCategory = extractedData.category`):
-- Vor dem Speichern prüfen, ob `finalCategory` (case-insensitive) **exakt** einer der geladenen User-Kategorien entspricht.
-- Wenn nicht: `finalCategory = null` setzen → Feld bleibt leer (wie vom User gewünscht), kein Fuzzy-Matching, keine erfundenen Namen.
-- Bestehende Vendor-Default- und Category-Learning-Logik bleibt unberührt, da diese ohnehin echte IDs/Namen aus der DB liefert.
+- `SortField` wird auf alle sinnvollen Spalten erweitert: `date | vendor | invoice_number | description | category | tax_type | amount | ai_confidence | status`. `tags` bleibt nicht sortierbar (Mehrwert-Feld).
+- Drei neue State-Hooks + Persistenz:
+  - `columnOrder: ColumnKey[]` → key `expenses-column-order`
+  - `columnWidths: Record<ColumnKey, number>` (px) → key `expenses-column-widths`
+  - Bestehender `visibleColumns` bleibt
+- Default-Werte aus `COLUMN_CONFIG` (Reihenfolge = Definition, Breite = sinnvolle Defaults pro Spalte).
 
-### 3. Prompt-Hinweis verschärfen
-Im KATEGORIE-Block (Zeilen ~629–631) noch deutlicher: **ausschließlich** Namen aus der Liste, sonst leer lassen — keine Variationen, keine Kombinationen, keine Erfindungen.
+### Rendering der Tabelle
 
-## Technisch betroffene Stellen
+- Aktuell ist jeder `TableHead`/`TableCell` einzeln hartkodiert. Refactor: ein gemeinsames Mapping `ColumnKey → { headerLabel, sortField?, renderCell(receipt) }`, dann wird `<TableHead>`/`<TableCell>` per `columnOrder.filter(isVisible).map(...)` gerendert.
+- Vorteil: Reihenfolge, Breite und Sort-Hook greifen einheitlich; bestehende Zellinhalte werden 1:1 in die Renderer übernommen (kein UI-/Daten-Verhalten verändert).
 
-- `supabase/functions/extract-receipt/index.ts` Zeilen 168–198 (Hints)
-- `supabase/functions/extract-receipt/index.ts` Zeilen ~629–631 (Prompt)
-- `supabase/functions/extract-receipt/index.ts` Zeilen ~933 ff. (finalCategory-Validierung)
+### Drag & Drop für Spaltenreihenfolge
+
+- `@dnd-kit/core` + `@dnd-kit/sortable` (bereits Projektstandard in shadcn-Umgebungen, sonst hinzufügen).
+- `SortableContext` um die `TableRow` im `TableHeader`, jeder `TableHead` ist ein `useSortable`-Item mit kleinem Drag-Handle-Icon links neben dem Label.
+- `onDragEnd` schreibt neue `columnOrder` in State + `localStorage`.
+
+### Resize
+
+- Jeder `TableHead` bekommt rechts eine 4 px breite Resize-Handle (`absolute right-0 top-0 h-full cursor-col-resize`).
+- `onMouseDown` startet Resize, `mousemove` aktualisiert Breite (min 60 px, max 600 px), `mouseup` persistiert.
+- Breite wird per `style={{ width }}` auf `TableHead` und zugehörige `TableCell` gesetzt; Tabelle bekommt `table-layout: fixed` damit Breiten greifen.
+
+### Sortierung auf allen Spalten
+
+- Vorhandene `handleSort`/`getSortIcon`-Logik bleibt, wird auf den vollen `SortField`-Union erweitert.
+- `result.sort` im `useMemo` bekommt weitere Cases (`description`, `category`, `tax_type`, `status`, `ai_confidence` — string-vergleich bzw. nummerisch).
+- Klick auf Header toggelt asc/desc; aktiver Sort wird per Pfeil-Icon angezeigt (existiert bereits).
+- Drag-Handle und Resize-Handle stoppen `pointerdown`-Propagation, damit Sortierklick nicht ausgelöst wird.
+
+### Reset
+
+- Im bestehenden "Spalten"-Dropdown ein "Layout zurücksetzen"-Button → löscht die drei `localStorage`-Keys und setzt State auf Defaults.
+
+## Betroffene Dateien
+
+- `src/pages/Expenses.tsx` (Refactor Header/Body-Rendering, neue State + Persistenz, DnD, Resize, erweiterte Sort)
+- ggf. `package.json` (`@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`) falls nicht vorhanden
+
+## Bewusst NICHT enthalten
+
+- Server-seitige Persistenz pro Nutzer (bleibt lokal im Browser, wie heute schon die Sichtbarkeit)
+- Neue Datenfelder/Spalten jenseits der heute schon konfigurierten 10 — "neue Spalten hinzufügen" meint im Kontext der Übersicht das Wieder-Einblenden über das vorhandene Set
