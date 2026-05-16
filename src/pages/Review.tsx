@@ -203,6 +203,13 @@ const Review = () => {
 
   const currentReceipt = receipts[currentIndex] || null;
 
+  // Persist current receipt id across navigation
+  useEffect(() => {
+    if (currentReceipt?.id) {
+      sessionStorage.setItem('review-last-receipt-id', currentReceipt.id);
+    }
+  }, [currentReceipt?.id]);
+
   // Vendor extraction data for ReanalyzeOptions
   const [currentVendorData, setCurrentVendorData] = useState<{
     expenses_only_extraction: boolean;
