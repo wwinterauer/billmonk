@@ -108,6 +108,20 @@ import { cn } from '@/lib/utils';
 import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
 import { Folder } from 'lucide-react';
 import { Copy, Scissors, Layers, Zap } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { EditableTableHead } from '@/components/expenses/EditableTableHead';
 import { checkForDuplicates, type DuplicateCheckResult } from '@/services/duplicateDetectionService';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -116,23 +130,45 @@ import { SplitSuggestionDialog } from '@/components/receipts/SplitSuggestionDial
 import { SourceBadge, NoReceiptBadge } from '@/components/receipts/SourceBadge';
 import { PageMeta } from '@/components/PageMeta';
 
-type SortField = 'receipt_date' | 'vendor' | 'invoice_number' | 'amount_gross';
+type SortField =
+  | 'receipt_date'
+  | 'vendor'
+  | 'invoice_number'
+  | 'description'
+  | 'category'
+  | 'tax_type'
+  | 'amount_gross'
+  | 'ai_confidence'
+  | 'status';
 type SortDirection = 'asc' | 'desc';
 
 type ColumnKey = 'date' | 'vendor' | 'invoice_number' | 'description' | 'category' | 'tax_type' | 'tags' | 'amount' | 'ai' | 'status';
 
-const COLUMN_CONFIG: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
-  { key: 'date', label: 'Datum', defaultVisible: true },
-  { key: 'vendor', label: 'Lieferant', defaultVisible: true },
-  { key: 'invoice_number', label: 'Rechnungsnr.', defaultVisible: true },
-  { key: 'description', label: 'Beschreibung', defaultVisible: true },
-  { key: 'category', label: 'Kategorie', defaultVisible: true },
-  { key: 'tax_type', label: 'Buchungsart', defaultVisible: true },
-  { key: 'tags', label: 'Tags', defaultVisible: true },
-  { key: 'amount', label: 'Betrag', defaultVisible: true },
-  { key: 'ai', label: 'KI', defaultVisible: true },
-  { key: 'status', label: 'Status', defaultVisible: true },
+const COLUMN_CONFIG: {
+  key: ColumnKey;
+  label: string;
+  defaultVisible: boolean;
+  defaultWidth: number;
+  sortField?: SortField;
+  align?: 'left' | 'right';
+}[] = [
+  { key: 'date', label: 'Datum', defaultVisible: true, defaultWidth: 110, sortField: 'receipt_date' },
+  { key: 'vendor', label: 'Lieferant', defaultVisible: true, defaultWidth: 200, sortField: 'vendor' },
+  { key: 'invoice_number', label: 'Rechnungsnr.', defaultVisible: true, defaultWidth: 140, sortField: 'invoice_number' },
+  { key: 'description', label: 'Beschreibung', defaultVisible: true, defaultWidth: 220, sortField: 'description' },
+  { key: 'category', label: 'Kategorie', defaultVisible: true, defaultWidth: 150, sortField: 'category' },
+  { key: 'tax_type', label: 'Buchungsart', defaultVisible: true, defaultWidth: 150, sortField: 'tax_type' },
+  { key: 'tags', label: 'Tags', defaultVisible: true, defaultWidth: 160 },
+  { key: 'amount', label: 'Betrag', defaultVisible: true, defaultWidth: 120, sortField: 'amount_gross', align: 'right' },
+  { key: 'ai', label: 'KI', defaultVisible: true, defaultWidth: 90, sortField: 'ai_confidence' },
+  { key: 'status', label: 'Status', defaultVisible: true, defaultWidth: 200, sortField: 'status' },
 ];
+
+const DEFAULT_COLUMN_ORDER: ColumnKey[] = COLUMN_CONFIG.map(c => c.key);
+const DEFAULT_COLUMN_WIDTHS: Record<ColumnKey, number> = COLUMN_CONFIG.reduce(
+  (acc, c) => { acc[c.key] = c.defaultWidth; return acc; },
+  {} as Record<ColumnKey, number>,
+);
 
 const INVOICE_FILTER_OPTIONS = [
   { value: 'all', label: 'Alle' },
@@ -300,7 +336,68 @@ const Expenses = () => {
   const [sortField, setSortField] = useState<SortField>('receipt_date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // Selection state
+  // Column order state
+  const [columnOrder, setColumnOrder] = useState<ColumnKey[]>(() => {
+    const saved = localStorage.getItem('expenses-column-order');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as ColumnKey[];
+        const valid = parsed.filter(k => DEFAULT_COLUMN_ORDER.includes(k));
+        // append any new columns missing from saved
+        for (const k of DEFAULT_COLUMN_ORDER) if (!valid.includes(k)) valid.push(k);
+        return valid;
+      } catch {
+        return DEFAULT_COLUMN_ORDER;
+      }
+    }
+    return DEFAULT_COLUMN_ORDER;
+  });
+
+  // Column widths state
+  const [columnWidths, setColumnWidths] = useState<Record<ColumnKey, number>>(() => {
+    const saved = localStorage.getItem('expenses-column-widths');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as Record<ColumnKey, number>;
+        return { ...DEFAULT_COLUMN_WIDTHS, ...parsed };
+      } catch {
+        return DEFAULT_COLUMN_WIDTHS;
+      }
+    }
+    return DEFAULT_COLUMN_WIDTHS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('expenses-column-order', JSON.stringify(columnOrder));
+  }, [columnOrder]);
+
+  useEffect(() => {
+    localStorage.setItem('expenses-column-widths', JSON.stringify(columnWidths));
+  }, [columnWidths]);
+
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleColumnDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setColumnOrder(prev => {
+      const oldIndex = prev.indexOf(active.id as ColumnKey);
+      const newIndex = prev.indexOf(over.id as ColumnKey);
+      if (oldIndex < 0 || newIndex < 0) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  };
+
+  const handleColumnResize = (key: ColumnKey, width: number) => {
+    setColumnWidths(prev => ({ ...prev, [key]: width }));
+  };
+
+  const resetColumnLayout = () => {
+    setColumnOrder(DEFAULT_COLUMN_ORDER);
+    setColumnWidths(DEFAULT_COLUMN_WIDTHS);
+    setVisibleColumns(new Set(COLUMN_CONFIG.filter(c => c.defaultVisible).map(c => c.key)));
+  };
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Pagination state
@@ -775,6 +872,26 @@ const Expenses = () => {
         case 'amount_gross':
           aVal = a.amount_gross || 0;
           bVal = b.amount_gross || 0;
+          break;
+        case 'description':
+          aVal = a.description?.toLowerCase() || '';
+          bVal = b.description?.toLowerCase() || '';
+          break;
+        case 'category':
+          aVal = a.category?.toLowerCase() || '';
+          bVal = b.category?.toLowerCase() || '';
+          break;
+        case 'tax_type':
+          aVal = (a as any).tax_type?.toLowerCase() || '';
+          bVal = (b as any).tax_type?.toLowerCase() || '';
+          break;
+        case 'ai_confidence':
+          aVal = a.ai_confidence ?? -1;
+          bVal = b.ai_confidence ?? -1;
+          break;
+        case 'status':
+          aVal = a.status || '';
+          bVal = b.status || '';
           break;
       }
 
@@ -1415,6 +1532,201 @@ const Expenses = () => {
     return '';
   }, [dateFrom, dateTo]);
 
+  // Ordered list of visible columns
+  const orderedVisibleColumns = useMemo(
+    () => columnOrder.filter(k => visibleColumns.has(k)),
+    [columnOrder, visibleColumns],
+  );
+
+  // Render a single cell for a given column key
+  const renderCell = (receipt: Receipt, key: ColumnKey) => {
+    const width = columnWidths[key];
+    const cellStyle = { width, minWidth: width, maxWidth: width } as const;
+    switch (key) {
+      case 'date':
+        return (
+          <TableCell key={key} style={cellStyle} className="font-medium truncate">
+            {receipt.receipt_date
+              ? format(new Date(receipt.receipt_date), 'dd.MM.yyyy')
+              : format(new Date(receipt.created_at), 'dd.MM.yyyy')}
+          </TableCell>
+        );
+      case 'vendor':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            {receipt.vendor_brand && receipt.vendor_brand !== receipt.vendor ? (
+              <div className="min-w-0">
+                <span className="font-medium block truncate">{receipt.vendor_brand}</span>
+                <span className="block text-xs text-muted-foreground truncate" title={receipt.vendor || ''}>
+                  {receipt.vendor}
+                </span>
+              </div>
+            ) : (
+              <span className="block truncate" title={receipt.vendor || ''}>{receipt.vendor || '—'}</span>
+            )}
+          </TableCell>
+        );
+      case 'invoice_number':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            {receipt.invoice_number ? (
+              <span className="font-mono text-sm block truncate" title={receipt.invoice_number}>
+                {receipt.invoice_number}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">–</span>
+            )}
+          </TableCell>
+        );
+      case 'description':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            <span className="truncate block" title={receipt.description || undefined}>
+              {truncateText(receipt.description)}
+            </span>
+          </TableCell>
+        );
+      case 'category':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            {receipt.category ? (
+              <Badge
+                variant="outline"
+                style={{
+                  borderColor: getCategoryColor(receipt.category) || undefined,
+                  color: getCategoryColor(receipt.category) || undefined,
+                }}
+              >
+                {receipt.category}
+              </Badge>
+            ) : '—'}
+          </TableCell>
+        );
+      case 'tax_type':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            {(receipt as any).tax_type ? (
+              <Badge variant="outline" className="text-xs">{(receipt as any).tax_type}</Badge>
+            ) : (
+              <span className="text-xs text-muted-foreground">Offen</span>
+            )}
+          </TableCell>
+        );
+      case 'tags':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className="flex items-center gap-1 hover:opacity-80 cursor-pointer min-h-[24px]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {receiptTagsCache[receipt.id]?.length > 0 ? (
+                    <>
+                      {receiptTagsCache[receipt.id].slice(0, 2).map(tag => (
+                        <Badge
+                          key={tag.id}
+                          variant="secondary"
+                          className="text-xs py-0.5 px-1.5 text-white"
+                          style={{ backgroundColor: tag.color }}
+                          title={tag.name}
+                        >
+                          {tag.name}
+                        </Badge>
+                      ))}
+                      {receiptTagsCache[receipt.id].length > 2 && (
+                        <Badge variant="outline" className="text-xs py-0.5 px-1.5">
+                          +{receiptTagsCache[receipt.id].length - 2}
+                        </Badge>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-3" align="start">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium mb-2">Tags zuweisen</p>
+                  <TagSelector receiptId={receipt.id} size="sm" onChange={loadReceipts} />
+                </div>
+              </PopoverContent>
+            </Popover>
+          </TableCell>
+        );
+      case 'amount':
+        return (
+          <TableCell key={key} style={cellStyle} className="text-right font-medium">
+            {formatCurrency(receipt.amount_gross)}
+          </TableCell>
+        );
+      case 'ai':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            {receipt.ai_confidence !== null && receipt.ai_confidence !== undefined ? (
+              <Badge
+                variant={
+                  receipt.ai_confidence >= 0.8 ? 'default'
+                    : receipt.ai_confidence >= 0.5 ? 'secondary' : 'destructive'
+                }
+                className="text-xs"
+              >
+                <Sparkles className="h-3 w-3 mr-1" />
+                {Math.round(receipt.ai_confidence * 100)}%
+              </Badge>
+            ) : (
+              <span className="text-xs text-muted-foreground">—</span>
+            )}
+          </TableCell>
+        );
+      case 'status':
+        return (
+          <TableCell key={key} style={cellStyle}>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Badge variant="outline" className={STATUS_CONFIG[receipt.status]?.color || ''}>
+                {receipt.status === 'split' && <Scissors className="w-3 h-3 mr-1" />}
+                {receipt.status === 'needs_splitting' && <Scissors className="w-3 h-3 mr-1" />}
+                {STATUS_CONFIG[receipt.status]?.label || receipt.status}
+              </Badge>
+              {(receipt as any).auto_approved && (receipt.status === 'approved' || receipt.status === 'split') && (
+                <Badge variant="outline" className="bg-success/10 text-success border-success/30 text-xs">
+                  <Zap className="w-3 h-3 mr-1" />
+                  Automatisch freigegeben
+                </Badge>
+              )}
+              {receipt.split_from_receipt_id && (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                  <Layers className="w-3 h-3 mr-1" />
+                  Teil
+                  {receipt.original_pages && receipt.original_pages.length > 0 && (
+                    <span className="ml-1 opacity-75">(S. {receipt.original_pages.join(', ')})</span>
+                  )}
+                </Badge>
+              )}
+              {receipt.is_duplicate && (
+                <Badge
+                  variant="outline"
+                  className="bg-warning/10 text-warning border-warning/30 cursor-pointer text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (receipt.duplicate_of) openDuplicateComparison(receipt.id, receipt.duplicate_of);
+                  }}
+                >
+                  <Copy className="w-3 h-3 mr-1" />
+                  {receipt.duplicate_score || 0}%
+                </Badge>
+              )}
+              {splitBookingEnabled && (receipt as any).is_split_booking && (
+                <Layers className="w-3.5 h-3.5 text-violet-600" />
+              )}
+              {receipt.source?.startsWith('email_') && <SourceBadge receipt={receipt} compact />}
+              {receipt.is_no_receipt_entry && <NoReceiptBadge compact />}
+            </div>
+          </TableCell>
+        );
+    }
+  };
+
   return (
     <>
       <PageMeta title="Ausgaben — BillMonk" description="Alle Ausgaben verwalten, filtern und für die Buchhaltung exportieren." canonical="/expenses" noindex />
@@ -1745,6 +2057,14 @@ const Expenses = () => {
                   <span>{col.label}</span>
                 </DropdownMenuItem>
               ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={(e) => { e.preventDefault(); resetColumnLayout(); }}
+                className="flex items-center gap-2 text-muted-foreground"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Layout zurücksetzen</span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -2248,293 +2568,54 @@ const Expenses = () => {
               ) : (
                 <>
                   <div className="overflow-x-auto">
-                  <Table>
+                  <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-12">
+                        <TableHead style={{ width: 48, minWidth: 48, maxWidth: 48 }}>
                           <Checkbox
                             checked={isAllSelected}
                             onCheckedChange={handleSelectAll}
                           />
                         </TableHead>
-                        {visibleColumns.has('date') && (
-                          <TableHead 
-                            className="cursor-pointer hover:text-foreground"
-                            onClick={() => handleSort('receipt_date')}
-                          >
-                            Datum {getSortIcon('receipt_date')}
-                          </TableHead>
-                        )}
-                        {visibleColumns.has('vendor') && (
-                          <TableHead 
-                            className="cursor-pointer hover:text-foreground"
-                            onClick={() => handleSort('vendor')}
-                          >
-                            Lieferant {getSortIcon('vendor')}
-                          </TableHead>
-                        )}
-                        {visibleColumns.has('invoice_number') && (
-                          <TableHead 
-                            className="cursor-pointer hover:text-foreground w-[120px]"
-                            onClick={() => handleSort('invoice_number')}
-                          >
-                            Rechnungsnr. {getSortIcon('invoice_number')}
-                          </TableHead>
-                        )}
-                        {visibleColumns.has('description') && (
-                          <TableHead>Beschreibung</TableHead>
-                        )}
-                        {visibleColumns.has('category') && (
-                          <TableHead>Kategorie</TableHead>
-                        )}
-                        {visibleColumns.has('tax_type') && (
-                          <TableHead>Buchungsart</TableHead>
-                        )}
-                        {visibleColumns.has('tags') && (
-                          <TableHead>Tags</TableHead>
-                        )}
-                        {visibleColumns.has('amount') && (
-                          <TableHead 
-                            className="text-right cursor-pointer hover:text-foreground"
-                            onClick={() => handleSort('amount_gross')}
-                          >
-                            Betrag {getSortIcon('amount_gross')}
-                          </TableHead>
-                        )}
-                        {visibleColumns.has('ai') && (
-                          <TableHead>KI</TableHead>
-                        )}
-                        {visibleColumns.has('status') && (
-                          <TableHead>Status</TableHead>
-                        )}
-                        <TableHead className="text-right">Aktionen</TableHead>
+                        <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleColumnDragEnd}>
+                          <SortableContext items={orderedVisibleColumns} strategy={horizontalListSortingStrategy}>
+                            {orderedVisibleColumns.map(key => {
+                              const cfg = COLUMN_CONFIG.find(c => c.key === key)!;
+                              const isSorted = cfg.sortField && sortField === cfg.sortField
+                                ? sortDirection
+                                : false as const;
+                              return (
+                                <EditableTableHead
+                                  key={key}
+                                  id={key}
+                                  label={cfg.label}
+                                  width={columnWidths[key]}
+                                  sortable={!!cfg.sortField}
+                                  isSorted={isSorted}
+                                  align={cfg.align}
+                                  onSort={cfg.sortField ? () => handleSort(cfg.sortField!) : undefined}
+                                  onResize={(w) => handleColumnResize(key, w)}
+                                />
+                              );
+                            })}
+                          </SortableContext>
+                        </DndContext>
+                        <TableHead className="text-right" style={{ width: 160, minWidth: 160 }}>Aktionen</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedReceipts.map((receipt) => (
                         <TableRow key={receipt.id}>
-                          <TableCell>
+                          <TableCell style={{ width: 48, minWidth: 48, maxWidth: 48 }}>
                             <Checkbox
                               checked={selectedIds.has(receipt.id)}
-                              onCheckedChange={(checked) => 
+                              onCheckedChange={(checked) =>
                                 handleSelectOne(receipt.id, checked as boolean)
                               }
                             />
                           </TableCell>
-                          {visibleColumns.has('date') && (
-                            <TableCell className="font-medium">
-                              {receipt.receipt_date 
-                                ? format(new Date(receipt.receipt_date), 'dd.MM.yyyy')
-                                : format(new Date(receipt.created_at), 'dd.MM.yyyy')
-                              }
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('vendor') && (
-                            <TableCell>
-                              {receipt.vendor_brand && receipt.vendor_brand !== receipt.vendor ? (
-                                <div>
-                                  <span className="font-medium">{receipt.vendor_brand}</span>
-                                  <span 
-                                    className="block text-xs text-muted-foreground truncate max-w-[180px]"
-                                    title={receipt.vendor || ''}
-                                  >
-                                    {receipt.vendor}
-                                  </span>
-                                </div>
-                              ) : (
-                                receipt.vendor || '—'
-                              )}
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('invoice_number') && (
-                            <TableCell className="w-[120px]">
-                              {receipt.invoice_number ? (
-                                receipt.invoice_number.length > 15 ? (
-                                  <span 
-                                    className="font-mono text-sm truncate block max-w-[100px]" 
-                                    title={receipt.invoice_number}
-                                  >
-                                    {receipt.invoice_number.slice(0, 12)}...
-                                  </span>
-                                ) : (
-                                  <span className="font-mono text-sm">{receipt.invoice_number}</span>
-                                )
-                              ) : (
-                                <span className="text-muted-foreground">–</span>
-                              )}
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('description') && (
-                            <TableCell className="max-w-[200px]">
-                              <span 
-                                className="truncate block" 
-                                title={receipt.description || undefined}
-                              >
-                                {truncateText(receipt.description)}
-                              </span>
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('category') && (
-                            <TableCell>
-                              {receipt.category ? (
-                                <Badge 
-                                  variant="outline"
-                                  style={{ 
-                                    borderColor: getCategoryColor(receipt.category) || undefined,
-                                    color: getCategoryColor(receipt.category) || undefined,
-                                  }}
-                                >
-                                  {receipt.category}
-                                </Badge>
-                              ) : '—'}
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('tax_type') && (
-                            <TableCell>
-                              {(receipt as any).tax_type ? (
-                                <Badge variant="outline" className="text-xs">
-                                  {(receipt as any).tax_type}
-                                </Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">Offen</span>
-                              )}
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('tags') && (
-                            <TableCell>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <button 
-                                    className="flex items-center gap-1 hover:opacity-80 cursor-pointer min-h-[24px]"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {receiptTagsCache[receipt.id]?.length > 0 ? (
-                                      <>
-                                        {receiptTagsCache[receipt.id].slice(0, 2).map(tag => (
-                                          <Badge
-                                            key={tag.id}
-                                            variant="secondary"
-                                            className="text-xs py-0.5 px-1.5 text-white"
-                                            style={{ backgroundColor: tag.color }}
-                                            title={tag.name}
-                                          >
-                                            {tag.name}
-                                          </Badge>
-                                        ))}
-                                        {receiptTagsCache[receipt.id].length > 2 && (
-                                          <Badge variant="outline" className="text-xs py-0.5 px-1.5">
-                                            +{receiptTagsCache[receipt.id].length - 2}
-                                          </Badge>
-                                        )}
-                                      </>
-                                    ) : (
-                                      <span className="text-xs text-muted-foreground">—</span>
-                                    )}
-                                  </button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-3" align="start">
-                                  <div className="space-y-2">
-                                    <p className="text-sm font-medium mb-2">Tags zuweisen</p>
-                                    <TagSelector
-                                      receiptId={receipt.id}
-                                      size="sm"
-                                      onChange={loadReceipts}
-                                    />
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('amount') && (
-                            <TableCell className="text-right font-medium">
-                              {formatCurrency(receipt.amount_gross)}
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('ai') && (
-                            <TableCell>
-                              {receipt.ai_confidence !== null && receipt.ai_confidence !== undefined ? (
-                                <Badge 
-                                  variant={
-                                    receipt.ai_confidence >= 0.8 ? 'default' :
-                                    receipt.ai_confidence >= 0.5 ? 'secondary' : 'destructive'
-                                  }
-                                  className="text-xs"
-                                >
-                                  <Sparkles className="h-3 w-3 mr-1" />
-                                  {Math.round(receipt.ai_confidence * 100)}%
-                                </Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('status') && (
-                            <TableCell>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <Badge 
-                                  variant="outline" 
-                                  className={STATUS_CONFIG[receipt.status]?.color || ''}
-                                >
-                                  {receipt.status === 'split' && <Scissors className="w-3 h-3 mr-1" />}
-                                  {receipt.status === 'needs_splitting' && <Scissors className="w-3 h-3 mr-1" />}
-                                  {STATUS_CONFIG[receipt.status]?.label || receipt.status}
-                                </Badge>
-                                {/* Auto-approved badge */}
-                                {(receipt as any).auto_approved && (receipt.status === 'approved' || receipt.status === 'split') && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="bg-success/10 text-success border-success/30 text-xs"
-                                  >
-                                    <Zap className="w-3 h-3 mr-1" />
-                                    Automatisch freigegeben
-                                  </Badge>
-                                )}
-                                {/* Split-from indicator for child receipts */}
-                                {receipt.split_from_receipt_id && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
-                                  >
-                                    <Layers className="w-3 h-3 mr-1" />
-                                    Teil
-                                    {receipt.original_pages && receipt.original_pages.length > 0 && (
-                                      <span className="ml-1 opacity-75">
-                                        (S. {receipt.original_pages.join(', ')})
-                                      </span>
-                                    )}
-                                  </Badge>
-                                )}
-                                {receipt.is_duplicate && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="bg-warning/10 text-warning border-warning/30 cursor-pointer text-xs"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (receipt.duplicate_of) {
-                                        openDuplicateComparison(receipt.id, receipt.duplicate_of);
-                                      }
-                                    }}
-                                  >
-                                    <Copy className="w-3 h-3 mr-1" />
-                                    {receipt.duplicate_score || 0}%
-                                  </Badge>
-                                )}
-                                {/* Split Booking icon */}
-                                {splitBookingEnabled && (receipt as any).is_split_booking && (
-                                  <Layers className="w-3.5 h-3.5 text-violet-600" />
-                                )}
-                                {/* Source Badge for email imports */}
-                                {receipt.source?.startsWith('email_') && (
-                                  <SourceBadge receipt={receipt} compact />
-                                )}
-                                {/* No Receipt Badge */}
-                                {receipt.is_no_receipt_entry && (
-                                  <NoReceiptBadge compact />
-                                )}
-                              </div>
-                            </TableCell>
-                          )}
-                          <TableCell className="text-right">
+                          {orderedVisibleColumns.map(key => renderCell(receipt, key))}
+                          <TableCell className="text-right" style={{ width: 160, minWidth: 160 }}>
                             <div className="flex items-center justify-end gap-1">
                               {/* Duplicate comparison button */}
                               {receipt.is_duplicate && receipt.duplicate_of && (
@@ -2559,7 +2640,7 @@ const Expenses = () => {
                                       Kein Duplikat
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem 
+                                    <DropdownMenuItem
                                       className="text-destructive"
                                       onClick={() => handleDeleteClick(receipt.id)}
                                     >
@@ -2569,7 +2650,6 @@ const Expenses = () => {
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               )}
-                              {/* Split button for needs_splitting status */}
                               {receipt.status === 'needs_splitting' && (
                                 <Button
                                   variant="ghost"
@@ -2581,7 +2661,6 @@ const Expenses = () => {
                                   <Scissors className="h-4 w-4" />
                                 </Button>
                               )}
-                              {/* "Doch ein Beleg" button for not_a_receipt status */}
                               {receipt.status === 'not_a_receipt' && (
                                 <Button
                                   variant="ghost"
