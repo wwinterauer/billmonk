@@ -60,6 +60,7 @@ interface ReceiptAssignmentModalProps {
   transaction: BankTransaction | null;
   onAssign: (transactionId: string, receiptId: string, splitLineId?: string | null) => void;
   onUploadNew: () => void;
+  onCreateAsExpense?: (transactionId: string) => void | Promise<void>;
 }
 
 interface SplitLine {
