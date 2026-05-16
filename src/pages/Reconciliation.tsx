@@ -778,91 +778,118 @@ export default function Reconciliation() {
                   ) : (
                     <>
                       <div className="overflow-x-auto">
-                      <Table>
+                      <txCols.DndContext sensors={txCols.sensors} collisionDetection={txCols.closestCenter} onDragEnd={txCols.handleDragEnd}>
+                      <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('transaction_date')}>
-                              <div className="flex items-center gap-1">
-                                Datum
-                                {sortField === 'transaction_date' && <ArrowUpDown className="h-3 w-3" />}
-                              </div>
-                            </TableHead>
-                            <TableHead>Beschreibung</TableHead>
-                            <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => handleSort('amount')}>
-                              <div className="flex items-center justify-end gap-1">
-                                Betrag
-                                {sortField === 'amount' && <ArrowUpDown className="h-3 w-3" />}
-                              </div>
-                            </TableHead>
-                            <TableHead>Quelle</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Zugeordneter Beleg</TableHead>
-                            <TableHead className="text-right">Aktionen</TableHead>
+                            <SortableContext items={txCols.order} strategy={horizontalListSortingStrategy}>
+                              {txCols.order.map((key) => {
+                                const def = txCols.defByKey[key];
+                                const sortFieldMap: Partial<Record<TxCol, SortField>> = { date: 'transaction_date', amount: 'amount' };
+                                const sf = sortFieldMap[key];
+                                return (
+                                  <EditableTableHead
+                                    key={key}
+                                    id={key}
+                                    label={def.label}
+                                    width={txCols.widths[key]}
+                                    sortable={!!def.sortable}
+                                    isSorted={sf && sortField === sf ? sortOrder : false}
+                                    align={def.align}
+                                    onSort={sf ? () => handleSort(sf) : undefined}
+                                    onResize={(w) => txCols.setWidth(key, w)}
+                                  />
+                                );
+                              })}
+                            </SortableContext>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {transactions.map((transaction) => (
-                            <TableRow key={transaction.id}>
-                              <TableCell className="font-medium whitespace-nowrap">
-                                {transaction.transaction_date ? format(new Date(transaction.transaction_date), 'dd.MM.yyyy', { locale: de }) : '–'}
-                              </TableCell>
-                              <TableCell>
-                                <span title={transaction.description || ''}>{truncateText(transaction.description)}</span>
-                              </TableCell>
-                              <TableCell className={cn('text-right font-mono whitespace-nowrap', transaction.amount && transaction.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400')}>
-                                {formatAmount(transaction.amount)}
-                              </TableCell>
-                              <TableCell>
+                          {transactions.map((transaction) => {
+                            const cells: Record<TxCol, React.ReactNode> = {
+                              date: (
+                                <span className="font-medium whitespace-nowrap">
+                                  {transaction.transaction_date ? format(new Date(transaction.transaction_date), 'dd.MM.yyyy', { locale: de }) : '–'}
+                                </span>
+                              ),
+                              description: (
+                                <span title={transaction.description || ''} className="block truncate">{truncateText(transaction.description)}</span>
+                              ),
+                              amount: (
+                                <span className={cn('font-mono whitespace-nowrap', transaction.amount && transaction.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400')}>
+                                  {formatAmount(transaction.amount)}
+                                </span>
+                              ),
+                              source: (
                                 <Badge variant="secondary" className="text-xs">
                                   {(transaction as any).source === 'live' ? 'Live-Bank' : 'CSV-Import'}
                                 </Badge>
-                              </TableCell>
-                              <TableCell>{getStatusBadge(transaction.status)}</TableCell>
-                              <TableCell>
-                                {transaction.status === 'matched' && transaction.receipt ? (
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <LinkIcon className="h-3 w-3 text-muted-foreground" />
-                                    <span>{transaction.receipt.vendor || 'Beleg'}</span>
-                                    <span className="text-muted-foreground">({formatAmount(transaction.receipt.amount_gross)})</span>
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground">–</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {transaction.status === 'unmatched' && (
-                                  <div className="flex justify-end gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => handleAssignClick(transaction)}>
-                                      <FileText className="mr-1 h-3 w-3" />
-                                      Beleg zuordnen
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleIgnore(transaction.id)} className="text-muted-foreground hover:text-destructive">
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                )}
-                                {transaction.status === 'matched' && (
-                                  <div className="flex justify-end gap-2">
-                                    <Button variant="ghost" size="sm" onClick={() => transaction.receipt && handleViewReceipt(transaction.receipt.id)}>
-                                      <Eye className="mr-1 h-3 w-3" />
-                                      Anzeigen
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleUnmatch(transaction.id, transaction.receipt_id)} className="text-muted-foreground">
-                                      Trennen
-                                    </Button>
-                                  </div>
-                                )}
-                                {transaction.status === 'ignored' && (
-                                  <Button variant="ghost" size="sm" onClick={() => handleRestore(transaction.id)} className="text-muted-foreground">
-                                    <RotateCcw className="mr-1 h-3 w-3" />
-                                    Wiederherstellen
-                                  </Button>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                              ),
+                              status: getStatusBadge(transaction.status),
+                              matched: transaction.status === 'matched' && transaction.receipt ? (
+                                <div className="flex items-center gap-2 text-sm min-w-0">
+                                  <LinkIcon className="h-3 w-3 text-muted-foreground shrink-0" />
+                                  <span className="truncate">{transaction.receipt.vendor || 'Beleg'}</span>
+                                  <span className="text-muted-foreground shrink-0">({formatAmount(transaction.receipt.amount_gross)})</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">–</span>
+                              ),
+                              actions: (
+                                <>
+                                  {transaction.status === 'unmatched' && (
+                                    <div className="flex justify-end gap-2">
+                                      <Button variant="outline" size="sm" onClick={() => handleAssignClick(transaction)}>
+                                        <FileText className="mr-1 h-3 w-3" />
+                                        Beleg zuordnen
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => handleIgnore(transaction.id)} className="text-muted-foreground hover:text-destructive">
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                  {transaction.status === 'matched' && (
+                                    <div className="flex justify-end gap-2">
+                                      <Button variant="ghost" size="sm" onClick={() => transaction.receipt && handleViewReceipt(transaction.receipt.id)}>
+                                        <Eye className="mr-1 h-3 w-3" />
+                                        Anzeigen
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => handleUnmatch(transaction.id, transaction.receipt_id)} className="text-muted-foreground">
+                                        Trennen
+                                      </Button>
+                                    </div>
+                                  )}
+                                  {transaction.status === 'ignored' && (
+                                    <div className="flex justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => handleRestore(transaction.id)} className="text-muted-foreground">
+                                        <RotateCcw className="mr-1 h-3 w-3" />
+                                        Wiederherstellen
+                                      </Button>
+                                    </div>
+                                  )}
+                                </>
+                              ),
+                            };
+                            return (
+                              <TableRow key={transaction.id}>
+                                {txCols.order.map((key) => {
+                                  const def = txCols.defByKey[key];
+                                  return (
+                                    <TableCell
+                                      key={key}
+                                      style={{ width: txCols.widths[key], minWidth: txCols.widths[key], maxWidth: txCols.widths[key] }}
+                                      className={cn('overflow-hidden', def.align === 'right' && 'text-right')}
+                                    >
+                                      {cells[key]}
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
+                      </txCols.DndContext>
                       </div>
 
                       {totalPages > 1 && (
