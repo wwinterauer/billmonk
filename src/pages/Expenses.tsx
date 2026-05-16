@@ -1853,6 +1853,13 @@ const Expenses = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Button
+              variant="outline"
+              onClick={() => setManualExpenseOpen(true)}
+            >
+              <PenLine className="h-4 w-4 mr-2" />
+              Manuell erfassen
+            </Button>
             <Button 
               className="gradient-primary hover:opacity-90"
               onClick={() => navigate('/upload')}
@@ -1862,6 +1869,12 @@ const Expenses = () => {
             </Button>
           </div>
         </div>
+
+        <ManualExpenseDialog
+          open={manualExpenseOpen}
+          onOpenChange={setManualExpenseOpen}
+          onCreated={loadReceipts}
+        />
 
         <Tabs defaultValue="all" className="w-full">
           <TabsList className="mb-4">
