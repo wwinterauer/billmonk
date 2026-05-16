@@ -2652,8 +2652,8 @@ const Expenses = () => {
                             />
                           </TableCell>
                           {orderedVisibleColumns.map(key => renderCell(receipt, key))}
-                          <TableCell className="text-right" style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}>
-                            <div className="flex items-center justify-end gap-1">
+                          <TableCell className="text-right px-2" style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}>
+                            <div className="flex items-center justify-end gap-0.5 flex-wrap">
                               {/* Duplicate comparison button */}
                               {receipt.is_duplicate && receipt.duplicate_of && (
                                 <DropdownMenu>
