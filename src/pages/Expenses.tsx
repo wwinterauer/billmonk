@@ -2740,6 +2740,8 @@ const Expenses = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  </SortableContext>
+                  </DndContext>
                   </div>
 
                   {/* Pagination */}
