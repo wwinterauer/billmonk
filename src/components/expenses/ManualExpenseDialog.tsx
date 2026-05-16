@@ -50,6 +50,7 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
   const { toast } = useToast();
   const { userCategories, taxCategories } = useCategories();
   const { vatRateGroups, defaultVatRate } = useVatRates();
+  const { activeTags } = useTags();
 
   const [saving, setSaving] = useState(false);
   const [keepOpen, setKeepOpen] = useState(false);
