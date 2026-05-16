@@ -77,11 +77,18 @@ interface BankTransaction {
   amount: number | null;
   status: string | null;
   receipt_id: string | null;
+  receipt_split_line_id?: string | null;
   is_expense?: boolean | null;
   source?: string;
   receipt?: {
     id: string;
     vendor: string | null;
+    amount_gross: number | null;
+    is_split_booking?: boolean | null;
+  } | null;
+  split_line?: {
+    id: string;
+    description: string | null;
     amount_gross: number | null;
   } | null;
 }
