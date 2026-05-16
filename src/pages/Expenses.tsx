@@ -2691,15 +2691,36 @@ const Expenses = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedReceipts.map((receipt) => (
+                      {paginatedReceipts.map((receipt) => {
+                        const isSplit = splitBookingEnabled && (receipt as any).is_split_booking === true;
+                        const isExpanded = expandedIds.has(receipt.id);
+                        const splitLines = splitLinesByReceiptId.get(receipt.id) || [];
+                        const totalCols = 1 + orderedVisibleColumns.length + 1;
+                        return (
+                        <>
                         <TableRow key={receipt.id}>
                           <TableCell style={{ width: 48, minWidth: 48, maxWidth: 48 }}>
-                            <Checkbox
-                              checked={selectedIds.has(receipt.id)}
-                              onCheckedChange={(checked) =>
-                                handleSelectOne(receipt.id, checked as boolean)
-                              }
-                            />
+                            <div className="flex items-center gap-1">
+                              {isSplit ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 -ml-1 text-muted-foreground hover:text-foreground"
+                                  onClick={() => toggleExpand(receipt.id)}
+                                  title={isExpanded ? 'Buchungssätze ausblenden' : 'Buchungssätze anzeigen'}
+                                >
+                                  {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                </Button>
+                              ) : (
+                                <span className="inline-block w-5" />
+                              )}
+                              <Checkbox
+                                checked={selectedIds.has(receipt.id)}
+                                onCheckedChange={(checked) =>
+                                  handleSelectOne(receipt.id, checked as boolean)
+                                }
+                              />
+                            </div>
                           </TableCell>
                           {orderedVisibleColumns.map(key => renderCell(receipt, key))}
                           <TableCell className="text-right px-2" style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}>
@@ -2788,7 +2809,63 @@ const Expenses = () => {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        {isSplit && isExpanded && (
+                          <TableRow key={receipt.id + '-split'} className="bg-muted/30 hover:bg-muted/30">
+                            <TableCell colSpan={totalCols} className="p-0">
+                              <div className="px-12 py-3">
+                                <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                                  <Layers className="h-3.5 w-3.5" />
+                                  Buchungssätze ({splitLines.length})
+                                </div>
+                                {splitLines.length === 0 ? (
+                                  <div className="text-xs text-muted-foreground italic py-2">
+                                    Keine Buchungssätze gefunden
+                                  </div>
+                                ) : (
+                                  <div className="rounded-md border bg-background overflow-hidden">
+                                    <table className="w-full text-xs">
+                                      <thead className="bg-muted/50">
+                                        <tr className="text-left text-muted-foreground">
+                                          <th className="px-3 py-2 font-medium">Beschreibung</th>
+                                          <th className="px-3 py-2 font-medium">Kategorie</th>
+                                          <th className="px-3 py-2 font-medium">Buchungsart</th>
+                                          <th className="px-3 py-2 font-medium text-right">MwSt %</th>
+                                          <th className="px-3 py-2 font-medium text-right">Netto</th>
+                                          <th className="px-3 py-2 font-medium text-right">MwSt</th>
+                                          <th className="px-3 py-2 font-medium text-right">Brutto</th>
+                                          <th className="px-3 py-2 font-medium">Privat</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {splitLines.map(line => (
+                                          <tr key={line.id} className="border-t">
+                                            <td className="px-3 py-2">{line.description || <span className="text-muted-foreground">—</span>}</td>
+                                            <td className="px-3 py-2">{line.category || <span className="text-muted-foreground">—</span>}</td>
+                                            <td className="px-3 py-2">{line.tax_type || <span className="text-muted-foreground">—</span>}</td>
+                                            <td className="px-3 py-2 text-right tabular-nums">{(line.vat_rate ?? 0).toFixed(2)}%</td>
+                                            <td className="px-3 py-2 text-right tabular-nums">{(line.amount_net ?? 0).toFixed(2)}</td>
+                                            <td className="px-3 py-2 text-right tabular-nums">{(line.vat_amount ?? 0).toFixed(2)}</td>
+                                            <td className="px-3 py-2 text-right tabular-nums font-medium">{(line.amount_gross ?? 0).toFixed(2)}</td>
+                                            <td className="px-3 py-2">
+                                              {line.is_private ? (
+                                                <Badge variant="outline" className="text-[10px] h-5">Privat</Badge>
+                                              ) : (
+                                                <span className="text-muted-foreground">—</span>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        </>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                   </SortableContext>
