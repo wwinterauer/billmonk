@@ -1,21 +1,37 @@
-## Plan
+## Ziel
 
-Ich behebe die Verschiebung der Aktionsspalte an der eigentlichen Ursache: Die Header-Zeile ist aktuell ungültiges Tabellen-HTML, weil `DndContext` direkt innerhalb von `<tr>` rendert und zusätzliche `<div>`-Elemente erzeugt. Dadurch kann der Browser die Spalten automatisch reparieren/verschieben — genau deshalb wirken „Aktionen“ und die Buttons wie zwei verschiedene Spalten.
+Im "Lieferanten zusammenführen"-Dialog sollen zwei Dinge möglich werden:
 
-### Änderungen
+1. **Richtung wählen**: Welcher Lieferant bleibt erhalten (Ziel) und welcher wird gelöscht (Quelle) — austauschbar per Klick.
+2. **Rechtlichen Firmennamen wählen/eingeben**: Im Bereich „Ergebnis nach Zusammenführung" soll ein primärer Rechtlicher Firmenname festgelegt werden können (Auswahl aus den vorhandenen Legal Names beider Lieferanten oder Freitext).
 
-1. **Ungültige Tabellenstruktur korrigieren**
-   - `DndContext` und `SortableContext` werden außerhalb der `<Table>`-Struktur platziert.
-   - Innerhalb von `<TableRow>` bleiben nur gültige Tabellenzellen (`<th>`/`<td>`).
+## Änderungen in `src/components/settings/VendorManagement.tsx`
 
-2. **Füllspalte wieder entfernen**
-   - Die zuletzt eingefügte leere `aria-hidden`-Spalte wird entfernt, weil sie bei korrigierter Struktur nicht mehr nötig ist und die optische Trennung eher verstärkt.
+### 1. Richtungswechsel im Dialog
+- Im Vergleichsbereich (Zeilen 1945–1983) einen **„Tauschen"-Button** (ArrowLeftRight-Icon) zwischen / über den beiden Karten einbauen.
+- Klick tauscht `mergeSource` ↔ `mergeTarget` und berechnet `mergePreview` neu (gleiche Logik wie `openMergePairDialog`, ausgelagert in `recomputeMergePreview(source, target, primaryLegalName?)`).
+- Display-Name im Preview wird standardmäßig vom neuen Target übernommen (falls Nutzer nichts manuell geändert hat).
 
-3. **Aktionen-Spalte fest und kompakt halten**
-   - Header und Body-Zelle bekommen dieselbe feste Breite.
-   - Header-Text und Buttons werden beide rechtsbündig mit identischem Padding ausgerichtet.
-   - Die Buttons bleiben in einer Zeile direkt unter „Aktionen“.
+### 2. Primärer Rechtlicher Firmenname
+- `MergePreview` um Feld `primary_legal_name: string | null` erweitern.
+- Im Abschnitt „Rechtliche Firmennamen" (Zeilen 2003–2016):
+  - Liste als klickbare Badges darstellen — die ausgewählte Badge wird hervorgehoben (z. B. `variant="default"`), die anderen bleiben `secondary`.
+  - Darunter Input-Feld „Eigenen Namen eingeben" mit Plus-Button: fügt einen neuen Namen zur `legal_names`-Liste hinzu UND setzt ihn als primären.
+  - X-Button auf jeder Badge zum Entfernen aus der Liste (analog zu detected_names).
+- Beim Speichern in `executeMerge`:
+  - `legal_names` so sortieren, dass `primary_legal_name` an erster Stelle steht (Konvention im Projekt: erstes Element = primärer Name; siehe `vendor_brand`-Memory).
+  - Wenn kein primärer Name gewählt: bisheriges Verhalten.
 
-4. **Validierung**
-   - Danach prüfe ich die Browser-Konsole auf das verschwundene `validateDOMNesting`-Warning.
-   - Zusätzlich kontrolliere ich visuell, dass „Aktionen“ und die Icons in derselben Spalte stehen.
+### 3. Hinweistext anpassen
+- Warntext (Zeile 2060) dynamisch: nutzt aktuelle `mergeSource`/`mergeTarget`-Werte (passiert automatisch durch State).
+
+## Technische Hinweise
+
+- `recomputeMergePreview` als Helper-Funktion oberhalb `openMergePairDialog` extrahieren; sowohl beim Öffnen als auch beim Richtungswechsel aufrufen.
+- Beim Tauschen: User-Edits am `display_name` gehen verloren (akzeptabel, da Tauschen explizite Aktion ist) — alternativ: nur sortieren, Edits beibehalten. **Empfehlung: zurücksetzen mit Toast „Vorschau aktualisiert".**
+- Keine DB-Schema-Änderungen nötig — `vendors.legal_names` ist bereits `text[]`.
+
+## Validierung
+
+- Manuell im Dialog: Lieferanten tauschen, Legal Name auswählen, eigenen Namen hinzufügen, Merge ausführen.
+- Prüfen, dass nach Merge der korrekte Vendor erhalten bleibt und `legal_names[0]` der gewählte primäre Name ist.
