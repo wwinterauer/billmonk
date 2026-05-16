@@ -110,6 +110,77 @@ export default function Reconciliation() {
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
   const [showReceiptPanel, setShowReceiptPanel] = useState(false);
 
+  // Auto-reconcile (skonto) state
+  const [reconcileRunning, setReconcileRunning] = useState(false);
+  const [reconcileApplying, setReconcileApplying] = useState(false);
+  const [reconcileDialogOpen, setReconcileDialogOpen] = useState(false);
+  const [skontoCandidates, setSkontoCandidates] = useState<SkontoCandidate[]>([]);
+  const [reconcileSummary, setReconcileSummary] = useState<{ exact: number; scanned: number }>({ exact: 0, scanned: 0 });
+
+  const runAutoReconcile = async () => {
+    setReconcileRunning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('reconcile-with-skonto', {
+        body: { mode: 'preview' },
+      });
+      if (error) throw error;
+      const exact = data?.exact_applied ?? 0;
+      const scanned = data?.scanned_transactions ?? 0;
+      const candidates: SkontoCandidate[] = data?.skonto_candidates ?? [];
+      setSkontoCandidates(candidates);
+      setReconcileSummary({ exact, scanned });
+
+      // Always refresh after exact matches
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-unmatched-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-receipts-without-payment'] });
+      queryClient.invalidateQueries({ queryKey: ['missing-receipts-list'] });
+
+      if (candidates.length > 0) {
+        setReconcileDialogOpen(true);
+      } else {
+        toast({
+          title: 'Abgleich abgeschlossen',
+          description: exact > 0
+            ? `${exact} Buchung${exact === 1 ? '' : 'en'} exakt zugeordnet. Keine Skonto-Vorschläge.`
+            : 'Keine passenden Belege gefunden.',
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unbekannter Fehler';
+      toast({ title: 'Fehler beim Abgleich', description: msg, variant: 'destructive' });
+    } finally {
+      setReconcileRunning(false);
+    }
+  };
+
+  const applySkontoMatches = async (accepted: { transaction_id: string; receipt_id: string }[]) => {
+    setReconcileApplying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('reconcile-with-skonto', {
+        body: { mode: 'apply', accepted_pairs: accepted },
+      });
+      if (error) throw error;
+      const applied = data?.applied ?? 0;
+      toast({
+        title: 'Skonto-Zuordnungen übernommen',
+        description: `${applied} Buchung${applied === 1 ? '' : 'en'} verknüpft.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-unmatched-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-receipts-without-payment'] });
+      queryClient.invalidateQueries({ queryKey: ['missing-receipts-list'] });
+      setReconcileDialogOpen(false);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unbekannter Fehler';
+      toast({ title: 'Fehler beim Übernehmen', description: msg, variant: 'destructive' });
+    } finally {
+      setReconcileApplying(false);
+    }
+  };
+
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
