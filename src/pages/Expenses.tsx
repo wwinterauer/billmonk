@@ -475,6 +475,7 @@ const Expenses = () => {
   }
   const [foundDuplicates, setFoundDuplicates] = useState<FoundDuplicate[]>([]);
   const [showDuplicateResults, setShowDuplicateResults] = useState(false);
+  const [manualExpenseOpen, setManualExpenseOpen] = useState(false);
 
   // Split suggestion dialog state
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
