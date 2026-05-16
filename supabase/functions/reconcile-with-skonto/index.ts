@@ -125,23 +125,24 @@ serve(async (req) => {
 
     if (!txs || txs.length === 0) {
       return new Response(
-        JSON.stringify({ exact_applied: 0, skonto_candidates: [], scanned_transactions: 0 }),
+        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, skonto_candidates: [], scanned_transactions: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 2) Compute date window with ±5 day buffer
+    // 2) Compute date window — generous so high-confidence (text-signal) matches
+    // can pick up bank bookings up to ±60 days from the receipt date.
     const datedTxs = txs.filter((t) => t.transaction_date);
     if (datedTxs.length === 0) {
       return new Response(
-        JSON.stringify({ exact_applied: 0, skonto_candidates: [], scanned_transactions: txs.length }),
+        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, skonto_candidates: [], scanned_transactions: txs.length }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     const minDate = new Date(Math.min(...datedTxs.map((t) => new Date(t.transaction_date!).getTime())));
     const maxDate = new Date(Math.max(...datedTxs.map((t) => new Date(t.transaction_date!).getTime())));
-    minDate.setDate(minDate.getDate() - 5);
-    maxDate.setDate(maxDate.getDate() + 5);
+    minDate.setDate(minDate.getDate() - 60);
+    maxDate.setDate(maxDate.getDate() + 60);
 
     // 3) Load candidate receipts in that window, not yet linked
     const { data: receipts } = await supabase
@@ -156,39 +157,87 @@ serve(async (req) => {
     const pool = (receipts || []).filter((r) => r.amount_gross != null);
 
     let exactApplied = 0;
+    let highConfidenceApplied = 0;
     const skontoCandidates: SkontoCandidate[] = [];
     const usedReceiptIds = new Set<string>();
+    const matchedTxIds = new Set<string>();
 
-    // 4) First pass: exact matches (auto-apply)
+    const applyMatch = async (txId: string, receiptId: string): Promise<boolean> => {
+      const { error: e1 } = await supabase
+        .from("bank_transactions")
+        .update({ status: "matched", receipt_id: receiptId })
+        .eq("id", txId);
+      if (e1) return false;
+      const { error: e2 } = await supabase
+        .from("receipts")
+        .update({ bank_transaction_id: txId })
+        .eq("id", receiptId);
+      if (e2) return false;
+      usedReceiptIds.add(receiptId);
+      matchedTxIds.add(txId);
+      return true;
+    };
+
+    // 4a) High-confidence pass: exact amount + invoice-number/vendor signal, ±60 days
     for (const tx of datedTxs) {
       if (!tx.amount) continue;
       const txAmt = Math.abs(tx.amount);
-      const match = pool.find((r) => {
-        if (usedReceiptIds.has(r.id)) return false;
-        if (!r.receipt_date) return false;
-        if (daysBetween(r.receipt_date, tx.transaction_date!) > 5) return false;
-        return Math.abs(Number(r.amount_gross) - txAmt) < 0.02;
-      });
-      if (match) {
-        const { error: e1 } = await supabase
-          .from("bank_transactions")
-          .update({ status: "matched", receipt_id: match.id })
-          .eq("id", tx.id);
-        if (e1) continue;
-        const { error: e2 } = await supabase
-          .from("receipts")
-          .update({ bank_transaction_id: tx.id })
-          .eq("id", match.id);
-        if (e2) continue;
-        usedReceiptIds.add(match.id);
-        exactApplied++;
+      const descNorm = normalize(tx.description);
+      const descNoSpace = descNorm.replace(/\s+/g, "");
+      if (!descNorm) continue;
+
+      type Scored = { r: typeof pool[number]; viaInvoice: boolean; viaVendor: boolean };
+      const matches: Scored[] = [];
+      for (const r of pool) {
+        if (usedReceiptIds.has(r.id)) continue;
+        if (!r.receipt_date) continue;
+        if (Math.abs(Number(r.amount_gross) - txAmt) >= 0.02) continue;
+        if (daysBetween(r.receipt_date, tx.transaction_date!) > 60) continue;
+
+        let viaInvoice = false;
+        if (r.invoice_number) {
+          const inv = normalize(r.invoice_number).replace(/\s+/g, "");
+          if (inv.length >= 4 && descNoSpace.includes(inv)) viaInvoice = true;
+        }
+        let viaVendor = false;
+        const vendorTokens = tokensOf(r.vendor);
+        if (vendorTokens.length > 0 && vendorTokens.every((t) => descNorm.includes(t))) {
+          viaVendor = true;
+        }
+        if (viaInvoice || viaVendor) matches.push({ r, viaInvoice, viaVendor });
+      }
+
+      let pick: typeof pool[number] | null = null;
+      const inv = matches.filter((m) => m.viaInvoice);
+      if (inv.length === 1) pick = inv[0].r;
+      else if (inv.length === 0 && matches.length === 1) pick = matches[0].r;
+
+      if (pick && await applyMatch(tx.id, pick.id)) {
+        highConfidenceApplied++;
       }
     }
 
-    // 5) Second pass: skonto candidates (1-5% deviation, vendor or invoice nr in description)
+    // 4b) Exact-amount pass within ±14 days — only unambiguous (single candidate)
     for (const tx of datedTxs) {
       if (!tx.amount) continue;
-      // Skip if already matched in pass 1
+      if (matchedTxIds.has(tx.id)) continue;
+      const txAmt = Math.abs(tx.amount);
+
+      const candidates = pool.filter((r) => {
+        if (usedReceiptIds.has(r.id)) return false;
+        if (!r.receipt_date) return false;
+        if (Math.abs(Number(r.amount_gross) - txAmt) >= 0.02) return false;
+        return daysBetween(r.receipt_date, tx.transaction_date!) <= 14;
+      });
+      if (candidates.length === 1) {
+        if (await applyMatch(tx.id, candidates[0].id)) exactApplied++;
+      }
+    }
+
+    // 5) Skonto pass: 1–5% deviation, vendor or invoice nr in description, ±30 days
+    for (const tx of datedTxs) {
+      if (!tx.amount) continue;
+      if (matchedTxIds.has(tx.id)) continue;
       const txAmt = Math.abs(tx.amount);
       const descNorm = normalize(tx.description);
       if (!descNorm) continue;
@@ -196,21 +245,20 @@ serve(async (req) => {
       for (const r of pool) {
         if (usedReceiptIds.has(r.id)) continue;
         if (!r.receipt_date) continue;
-        if (daysBetween(r.receipt_date, tx.transaction_date!) > 5) continue;
+        if (daysBetween(r.receipt_date, tx.transaction_date!) > 30) continue;
 
         const receiptAmt = Number(r.amount_gross);
         if (receiptAmt <= 0) continue;
         // Bank amount must be lower than receipt (skonto deducted)
         if (txAmt >= receiptAmt) continue;
 
-        const deviation = (receiptAmt - txAmt) / receiptAmt; // positive
+        const deviation = (receiptAmt - txAmt) / receiptAmt;
         const deviationPct = deviation * 100;
         if (deviationPct < 1 || deviationPct > 5) continue;
 
-        // Match signal: vendor token(s) or invoice number in description
         const matchedVia: ("vendor" | "invoice_number")[] = [];
         const vendorTokens = tokensOf(r.vendor);
-        if (vendorTokens.some((t) => descNorm.includes(t))) {
+        if (vendorTokens.length > 0 && vendorTokens.every((t) => descNorm.includes(t))) {
           matchedVia.push("vendor");
         }
         if (r.invoice_number && r.invoice_number.length >= 4) {
@@ -236,8 +284,6 @@ serve(async (req) => {
           skonto_amount: Math.round((receiptAmt - txAmt) * 100) / 100,
           matched_via: matchedVia,
         });
-        // Don't break — keep multiple candidates so user can pick best; but to avoid
-        // explosion we cap one receipt per transaction in the candidates list
         break;
       }
     }
@@ -245,6 +291,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         exact_applied: exactApplied,
+        high_confidence_applied: highConfidenceApplied,
         skonto_candidates: skontoCandidates,
         scanned_transactions: txs.length,
       }),
