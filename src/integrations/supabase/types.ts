@@ -405,6 +405,7 @@ export type Database = {
           is_expense: boolean | null
           raw_data: Json | null
           receipt_id: string | null
+          receipt_split_line_id: string | null
           source: string
           status: string | null
           transaction_date: string | null
@@ -423,6 +424,7 @@ export type Database = {
           is_expense?: boolean | null
           raw_data?: Json | null
           receipt_id?: string | null
+          receipt_split_line_id?: string | null
           source?: string
           status?: string | null
           transaction_date?: string | null
@@ -441,6 +443,7 @@ export type Database = {
           is_expense?: boolean | null
           raw_data?: Json | null
           receipt_id?: string | null
+          receipt_split_line_id?: string | null
           source?: string
           status?: string | null
           transaction_date?: string | null
@@ -467,6 +470,13 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_receipt_split_line_id_fkey"
+            columns: ["receipt_split_line_id"]
+            isOneToOne: false
+            referencedRelation: "receipt_split_lines"
             referencedColumns: ["id"]
           },
           {

@@ -25,88 +25,169 @@ function daysBetween(a: string, b: string): number {
   return Math.abs((new Date(a).getTime() - new Date(b).getTime()) / (1000 * 60 * 60 * 24));
 }
 
-interface ReceiptRow {
-  id: string;
+interface Candidate {
+  // unique key for "used" tracking
+  key: string;
+  receipt_id: string;
+  split_line_id: string | null;
   amount_gross: number | null;
   receipt_date: string | null;
   vendor: string | null;
   invoice_number: string | null;
+  // extra text tokens (split line description) merged into vendor token check
+  extra_text: string | null;
 }
 
-/**
- * Try to find a receipt that matches a transaction with exact amount AND a strong
- * text signal (invoice number or vendor tokens in the bank description).
- * Returns the match only if it is unambiguous.
- */
 function findHighConfidenceMatch(
   tx: { transaction_date: string | null; amount: number; description: string | null },
-  pool: ReceiptRow[],
+  pool: Candidate[],
   used: Set<string>,
   maxDays: number,
-): ReceiptRow | null {
+): Candidate | null {
   if (!tx.transaction_date) return null;
   const txAmt = Math.abs(tx.amount);
   const descNorm = normalize(tx.description);
   const descNoSpace = descNorm.replace(/\s+/g, "");
   if (!descNorm) return null;
 
-  type Scored = { r: ReceiptRow; viaInvoice: boolean; viaVendor: boolean };
+  type Scored = { c: Candidate; viaInvoice: boolean; viaVendor: boolean };
   const matches: Scored[] = [];
 
-  for (const r of pool) {
-    if (used.has(r.id)) continue;
-    if (r.amount_gross == null) continue;
-    if (Math.abs(Number(r.amount_gross) - txAmt) >= 0.02) continue;
-    if (!r.receipt_date) continue;
-    if (daysBetween(r.receipt_date, tx.transaction_date) > maxDays) continue;
+  for (const c of pool) {
+    if (used.has(c.key)) continue;
+    if (c.amount_gross == null) continue;
+    if (Math.abs(Number(c.amount_gross) - txAmt) >= 0.02) continue;
+    if (!c.receipt_date) continue;
+    if (daysBetween(c.receipt_date, tx.transaction_date) > maxDays) continue;
 
     let viaInvoice = false;
-    if (r.invoice_number) {
-      const inv = normalize(r.invoice_number).replace(/\s+/g, "");
+    if (c.invoice_number) {
+      const inv = normalize(c.invoice_number).replace(/\s+/g, "");
       if (inv.length >= 4 && descNoSpace.includes(inv)) viaInvoice = true;
     }
 
     let viaVendor = false;
-    const vendorTokens = tokensOf(r.vendor);
-    if (vendorTokens.length > 0 && vendorTokens.every((t) => descNorm.includes(t))) {
-      viaVendor = true;
+    // For split candidates the line description (e.g. "Diemut Winterauer") is the strongest
+    // signal — combine vendor + extra_text tokens.
+    const vendorTokens = tokensOf([c.vendor, c.extra_text].filter(Boolean).join(" "));
+    if (vendorTokens.length > 0 && vendorTokens.some((t) => descNorm.includes(t))) {
+      // For split lines we accept any token hit (single name often suffices); for whole
+      // receipts we keep the stricter "every token" rule.
+      if (c.split_line_id) {
+        viaVendor = true;
+      } else {
+        const allTokens = tokensOf(c.vendor);
+        if (allTokens.length > 0 && allTokens.every((t) => descNorm.includes(t))) {
+          viaVendor = true;
+        }
+      }
     }
 
-    if (viaInvoice || viaVendor) {
-      matches.push({ r, viaInvoice, viaVendor });
-    }
+    if (viaInvoice || viaVendor) matches.push({ c, viaInvoice, viaVendor });
   }
 
   if (matches.length === 0) return null;
-  // Prefer invoice-number matches — they are essentially unique
   const invMatches = matches.filter((m) => m.viaInvoice);
-  if (invMatches.length === 1) return invMatches[0].r;
-  if (invMatches.length > 1) return null; // ambiguous
-  // Otherwise vendor-only: only accept if unique
-  if (matches.length === 1) return matches[0].r;
+  if (invMatches.length === 1) return invMatches[0].c;
+  if (invMatches.length > 1) return null;
+  if (matches.length === 1) return matches[0].c;
   return null;
 }
 
-/**
- * Exact amount match within tighter date window. Only accept if unambiguous
- * (no other unused receipt with same amount in window).
- */
 function findExactMatch(
   tx: { transaction_date: string | null; amount: number },
-  pool: ReceiptRow[],
+  pool: Candidate[],
   used: Set<string>,
   maxDays: number,
-): ReceiptRow | null {
+): Candidate | null {
   if (!tx.transaction_date) return null;
   const txAmt = Math.abs(tx.amount);
-  const candidates = pool.filter((r) => {
-    if (used.has(r.id)) return false;
-    if (r.amount_gross == null || !r.receipt_date) return false;
-    if (Math.abs(Number(r.amount_gross) - txAmt) >= 0.02) return false;
-    return daysBetween(r.receipt_date, tx.transaction_date!) <= maxDays;
+  const candidates = pool.filter((c) => {
+    if (used.has(c.key)) return false;
+    if (c.amount_gross == null || !c.receipt_date) return false;
+    if (Math.abs(Number(c.amount_gross) - txAmt) >= 0.02) return false;
+    return daysBetween(c.receipt_date, tx.transaction_date!) <= maxDays;
   });
   if (candidates.length === 1) return candidates[0];
   return null;
+}
+
+async function buildCandidatePool(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<Candidate[]> {
+  // Load all receipts that could still receive a payment match. A receipt is
+  // eligible when (a) it has no bank_transaction_id yet, OR (b) it has split lines
+  // (split lines are matched independently — parent receipts.bank_transaction_id
+  // is not used for them).
+  const { data: receipts } = await supabase
+    .from("receipts")
+    .select("id, amount_gross, receipt_date, vendor, invoice_number, bank_transaction_id")
+    .eq("user_id", userId)
+    .in("status", ["approved", "completed", "review"]);
+
+  const all = receipts ?? [];
+  if (all.length === 0) return [];
+
+  const receiptIds = all.map((r: any) => r.id);
+
+  // Load all split lines for these receipts
+  const { data: splitLines } = await supabase
+    .from("receipt_split_lines")
+    .select("id, receipt_id, amount_gross, description")
+    .in("receipt_id", receiptIds);
+
+  const linesByReceipt = new Map<string, any[]>();
+  for (const l of splitLines ?? []) {
+    const arr = linesByReceipt.get(l.receipt_id) ?? [];
+    arr.push(l);
+    linesByReceipt.set(l.receipt_id, arr);
+  }
+
+  // Find split lines already consumed by a bank transaction
+  const { data: matchedLines } = await supabase
+    .from("bank_transactions")
+    .select("receipt_split_line_id")
+    .eq("user_id", userId)
+    .not("receipt_split_line_id", "is", null);
+  const usedLineIds = new Set<string>(
+    (matchedLines ?? []).map((m: any) => m.receipt_split_line_id),
+  );
+
+  const pool: Candidate[] = [];
+  for (const r of all as any[]) {
+    const lines = linesByReceipt.get(r.id);
+    if (lines && lines.length > 0) {
+      // Split receipt → only the unmatched lines are candidates
+      for (const l of lines) {
+        if (usedLineIds.has(l.id)) continue;
+        pool.push({
+          key: `line:${l.id}`,
+          receipt_id: r.id,
+          split_line_id: l.id,
+          amount_gross: l.amount_gross,
+          receipt_date: r.receipt_date,
+          vendor: r.vendor,
+          invoice_number: r.invoice_number,
+          extra_text: l.description,
+        });
+      }
+    } else {
+      // Whole receipt — only if not already matched
+      if (r.bank_transaction_id) continue;
+      pool.push({
+        key: `receipt:${r.id}`,
+        receipt_id: r.id,
+        split_line_id: null,
+        amount_gross: r.amount_gross,
+        receipt_date: r.receipt_date,
+        vendor: r.vendor,
+        invoice_number: r.invoice_number,
+        extra_text: null,
+      });
+    }
+  }
+  return pool;
 }
 
 serve(async (req) => {
@@ -154,30 +235,31 @@ serve(async (req) => {
     const expenses = transactions.filter((t) => t.is_expense === true);
     const income = transactions.filter((t) => t.is_expense === false);
 
-    // --- Match expenses against receipts ---
+    // --- Match expenses against receipts (including split lines) ---
     if (expenses.length > 0) {
-      const { data: receipts } = await supabase
-        .from("receipts")
-        .select("id, amount_gross, receipt_date, vendor, invoice_number")
-        .eq("user_id", user.id)
-        .is("bank_transaction_id", null)
-        .in("status", ["approved", "completed", "review"]);
-
-      const pool: ReceiptRow[] = receipts ?? [];
+      const pool = await buildCandidatePool(supabase, user.id);
       const used = new Set<string>();
 
-      const applyMatch = async (tx: any, match: ReceiptRow) => {
+      const applyMatch = async (tx: any, c: Candidate) => {
+        const txUpdate: Record<string, unknown> = {
+          status: "matched",
+          receipt_id: c.receipt_id,
+          receipt_split_line_id: c.split_line_id,
+        };
         const { error: e1 } = await supabase
           .from("bank_transactions")
-          .update({ status: "matched", receipt_id: match.id })
+          .update(txUpdate)
           .eq("id", tx.id);
         if (e1) return false;
-        const { error: e2 } = await supabase
-          .from("receipts")
-          .update({ bank_transaction_id: tx.id })
-          .eq("id", match.id);
-        if (e2) return false;
-        used.add(match.id);
+        // Only set receipts.bank_transaction_id for whole-receipt matches
+        if (!c.split_line_id) {
+          const { error: e2 } = await supabase
+            .from("receipts")
+            .update({ bank_transaction_id: tx.id })
+            .eq("id", c.receipt_id);
+          if (e2) return false;
+        }
+        used.add(c.key);
         return true;
       };
 
@@ -189,16 +271,13 @@ serve(async (req) => {
           if (m && await applyMatch(tx, m)) {
             highConfidenceMatched++;
             matchedReceipts++;
+            (tx as any).__matched = true;
           }
         }
 
         // Pass 2: pure exact amount, tighter window (±14 days), unambiguous only
         for (const tx of expenses) {
           if (!tx.amount) continue;
-          if (tx.status === "matched") continue; // safety
-          // Skip transactions we already matched in pass 1 by checking used + receipt linkage isn't trivial here;
-          // since we don't reload, simply attempt — applyMatch would fail if tx already matched, but we also
-          // need to avoid wasting work. Use a local in-memory set:
           if ((tx as any).__matched) continue;
           const m = findExactMatch(tx, pool, used, 14);
           if (m && await applyMatch(tx, m)) {

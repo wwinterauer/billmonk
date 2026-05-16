@@ -57,8 +57,16 @@ interface ReceiptAssignmentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: BankTransaction | null;
-  onAssign: (transactionId: string, receiptId: string) => void;
+  onAssign: (transactionId: string, receiptId: string, splitLineId?: string | null) => void;
   onUploadNew: () => void;
+}
+
+interface SplitLine {
+  id: string;
+  description: string | null;
+  amount_gross: number;
+  sort_order: number;
+  matched_tx_id: string | null;
 }
 
 // Calculate match score between transaction and receipt
@@ -142,13 +150,17 @@ export function ReceiptAssignmentModal({
   const [filterSimilarAmount, setFilterSimilarAmount] = useState(true);
   const [filterSimilarDate, setFilterSimilarDate] = useState(false);
   const [filterUnassigned, setFilterUnassigned] = useState(true);
-  
+
+  // Split-line selection (step 2)
+  const [selectedSplitLine, setSelectedSplitLine] = useState<string | null>(null);
+
   const debouncedSearch = useDebounce(searchQuery, 300);
 
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
       setSelectedReceipt(null);
+      setSelectedSplitLine(null);
       setSearchQuery('');
     }
   }, [open]);
@@ -241,23 +253,73 @@ export function ReceiptAssignmentModal({
     return others.slice(0, 5);
   }, [receipts, transaction, filterSimilarAmount, filterSimilarDate]);
 
+  // Fetch split lines for the currently selected receipt (only when needed)
+  const { data: splitLines } = useQuery({
+    queryKey: ['receipt-split-lines-for-matching', selectedReceipt],
+    queryFn: async (): Promise<SplitLine[]> => {
+      if (!selectedReceipt) return [];
+      const [linesRes, txRes] = await Promise.all([
+        supabase
+          .from('receipt_split_lines')
+          .select('id, description, amount_gross, sort_order')
+          .eq('receipt_id', selectedReceipt)
+          .order('sort_order', { ascending: true }),
+        supabase
+          .from('bank_transactions')
+          .select('id, receipt_split_line_id')
+          .eq('receipt_id', selectedReceipt)
+          .not('receipt_split_line_id', 'is', null),
+      ]);
+      if (linesRes.error) throw linesRes.error;
+      const matchedMap = new Map<string, string>();
+      for (const t of txRes.data ?? []) {
+        if (t.receipt_split_line_id) matchedMap.set(t.receipt_split_line_id, t.id);
+      }
+      return (linesRes.data ?? []).map((l: any) => ({
+        id: l.id,
+        description: l.description,
+        amount_gross: Number(l.amount_gross),
+        sort_order: l.sort_order ?? 0,
+        matched_tx_id: matchedMap.get(l.id) ?? null,
+      }));
+    },
+    enabled: !!selectedReceipt,
+  });
+
+  const hasSplitLines = !!splitLines && splitLines.length > 0;
+
+  // Auto-suggest the split line whose amount matches the bank tx (within 1 cent)
+  useEffect(() => {
+    if (!hasSplitLines || !transaction) {
+      setSelectedSplitLine(null);
+      return;
+    }
+    const txAmt = Math.abs(transaction.amount);
+    const exact = splitLines!.find(
+      (l) => !l.matched_tx_id && Math.abs(Number(l.amount_gross) - txAmt) < 0.02,
+    );
+    setSelectedSplitLine(exact?.id ?? null);
+  }, [hasSplitLines, splitLines, transaction]);
+
   if (!transaction) return null;
 
   const handleAssign = async () => {
-    if (selectedReceipt) {
-      setIsAssigning(true);
-      try {
-        await onAssign(transaction.id, selectedReceipt);
-      } finally {
-        setIsAssigning(false);
-        setSelectedReceipt(null);
-        setSearchQuery('');
-      }
+    if (!selectedReceipt) return;
+    if (hasSplitLines && !selectedSplitLine) return;
+    setIsAssigning(true);
+    try {
+      await onAssign(transaction.id, selectedReceipt, hasSplitLines ? selectedSplitLine : null);
+    } finally {
+      setIsAssigning(false);
+      setSelectedReceipt(null);
+      setSelectedSplitLine(null);
+      setSearchQuery('');
     }
   };
 
   const handleClose = () => {
     setSelectedReceipt(null);
+    setSelectedSplitLine(null);
     setSearchQuery('');
     onOpenChange(false);
   };
@@ -481,6 +543,59 @@ export function ReceiptAssignmentModal({
           </ScrollArea>
         </div>
 
+        {/* Split line picker (step 2) */}
+        {hasSplitLines && (
+          <div className="px-6 pt-4 pb-2 border-t bg-muted/30">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              Splitzeile auswählen
+            </p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Dieser Beleg ist in {splitLines!.length} Zeilen aufgeteilt. Wähle die Zeile, die zu dieser Bankbuchung gehört.
+            </p>
+            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              {splitLines!.map((line) => {
+                const txAmt = Math.abs(transaction.amount);
+                const amountMatches = Math.abs(Number(line.amount_gross) - txAmt) < 0.02;
+                const taken = !!line.matched_tx_id;
+                return (
+                  <button
+                    key={line.id}
+                    type="button"
+                    disabled={taken}
+                    onClick={() => setSelectedSplitLine(line.id)}
+                    className={cn(
+                      'w-full flex items-center justify-between gap-3 p-2.5 rounded-md border text-sm transition-all text-left',
+                      selectedSplitLine === line.id
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                        : 'border-border hover:border-primary/50 hover:bg-muted/30',
+                      taken && 'opacity-50 cursor-not-allowed',
+                    )}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">
+                        {line.description || `Zeile ${line.sort_order + 1}`}
+                      </p>
+                      {taken && (
+                        <p className="text-xs text-muted-foreground">Bereits zugeordnet</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {amountMatches && !taken && (
+                        <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0">
+                          Betrag passt
+                        </Badge>
+                      )}
+                      <span className="font-semibold tabular-nums">
+                        {formatAmount(Number(line.amount_gross))}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <DialogFooter className="px-6 py-4 border-t bg-muted/30">
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button variant="ghost" onClick={handleClose} className="sm:order-1">
@@ -490,9 +605,9 @@ export function ReceiptAssignmentModal({
               <Upload className="mr-2 h-4 w-4" />
               Neuen Beleg hochladen
             </Button>
-            <Button 
-              onClick={handleAssign} 
-              disabled={!selectedReceipt || isAssigning}
+            <Button
+              onClick={handleAssign}
+              disabled={!selectedReceipt || isAssigning || (hasSplitLines && !selectedSplitLine)}
               className="sm:order-3"
             >
               {isAssigning ? (

@@ -480,19 +480,30 @@ export default function Reconciliation() {
     setShowAssignModal(true);
   };
 
-  const handleAssign = async (transactionId: string, receiptId: string) => {
+  const handleAssign = async (
+    transactionId: string,
+    receiptId: string,
+    splitLineId?: string | null,
+  ) => {
     try {
       const { error: txError } = await supabase
         .from('bank_transactions')
-        .update({ status: 'matched', receipt_id: receiptId })
+        .update({
+          status: 'matched',
+          receipt_id: receiptId,
+          receipt_split_line_id: splitLineId ?? null,
+        })
         .eq('id', transactionId);
       if (txError) throw txError;
 
-      const { error: rcptError } = await supabase
-        .from('receipts')
-        .update({ bank_transaction_id: transactionId })
-        .eq('id', receiptId);
-      if (rcptError) throw rcptError;
+      // Only attach to receipt itself for whole-receipt matches
+      if (!splitLineId) {
+        const { error: rcptError } = await supabase
+          .from('receipts')
+          .update({ bank_transaction_id: transactionId })
+          .eq('id', receiptId);
+        if (rcptError) throw rcptError;
+      }
 
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
@@ -534,10 +545,24 @@ export default function Reconciliation() {
 
   const handleUnmatch = async (transactionId: string, receiptId: string | null) => {
     try {
+      // Only unlink the receipt's bank_transaction_id if it was actually pointing at this tx
+      // (split-line matches don't set receipts.bank_transaction_id at all).
       if (receiptId) {
-        await supabase.from('receipts').update({ bank_transaction_id: null }).eq('id', receiptId);
+        await supabase
+          .from('receipts')
+          .update({ bank_transaction_id: null })
+          .eq('id', receiptId)
+          .eq('bank_transaction_id', transactionId);
       }
-      await updateStatusMutation.mutateAsync({ transactionId, status: 'unmatched' });
+      await supabase
+        .from('bank_transactions')
+        .update({ status: 'unmatched', receipt_id: null, receipt_split_line_id: null })
+        .eq('id', transactionId);
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-unmatched-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-receipts-without-payment'] });
+      queryClient.invalidateQueries({ queryKey: ['missing-receipts-list'] });
       toast({ title: 'Zuordnung aufgehoben', description: 'Die Verknüpfung wurde entfernt.' });
     } catch (error) {
       toast({ title: 'Fehler', description: 'Die Zuordnung konnte nicht aufgehoben werden.', variant: 'destructive' });
