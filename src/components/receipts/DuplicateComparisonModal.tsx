@@ -491,8 +491,12 @@ export function DuplicateComparisonModal({
   };
 
   const handleViewDetails = (receiptId: string) => {
-    // Navigate to expenses page with receipt selected
-    window.location.href = `/expenses?receipt=${receiptId}`;
+    onOpenChange(false);
+    if (onViewReceipt) {
+      onViewReceipt(receiptId);
+    } else {
+      navigate(`/expenses?receipt=${receiptId}`);
+    }
   };
 
   return (
