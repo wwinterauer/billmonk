@@ -827,10 +827,10 @@ const Expenses = () => {
   const filteredReceipts = useMemo(() => {
     let result = [...receipts];
 
-    // Status filter - special handling for 'duplicate'
+    // Status filter - special handling for 'duplicate' and split-booking filters
     if (statusFilter === 'duplicate') {
       result = result.filter(r => r.is_duplicate === true && r.duplicate_of);
-    } else if (statusFilter !== 'all') {
+    } else if (statusFilter !== 'all' && statusFilter !== '__split__' && statusFilter !== '__no_split__') {
       result = result.filter(r => r.status === statusFilter);
     }
 
