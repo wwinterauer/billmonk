@@ -63,6 +63,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePlan } from '@/hooks/usePlan';
 import { PageMeta } from '@/components/PageMeta';
+import { detectRecurringGroups, type RecurringGroup } from '@/lib/recurring-detection';
+import { RecurringSuggestionsPanel } from '@/components/reconciliation/RecurringSuggestionsPanel';
 
 type StatusFilter = 'all' | 'unmatched' | 'matched' | 'ignored';
 type SortField = 'transaction_date' | 'amount';
@@ -384,7 +386,70 @@ export default function Reconciliation() {
     enabled: !!user?.id,
   });
 
-  // Update status mutation
+  // ===== Recurring (Akonto) detection =====
+  const [dismissedRecurring, setDismissedRecurring] = useState<Set<string>>(new Set());
+  const [bulkIgnoreBusy, setBulkIgnoreBusy] = useState(false);
+
+  const { data: allUnmatchedTxs } = useQuery({
+    queryKey: ['bank-transactions-all-unmatched', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('bank_transactions')
+        .select('id, transaction_date, description, amount')
+        .eq('user_id', user.id)
+        .eq('status', 'unmatched')
+        .eq('is_expense', true)
+        .order('transaction_date', { ascending: true })
+        .limit(2000);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  const recurringGroups: RecurringGroup[] = useMemo(
+    () => (allUnmatchedTxs ? detectRecurringGroups(allUnmatchedTxs) : []),
+    [allUnmatchedTxs]
+  );
+
+  const recurringTxIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const g of recurringGroups) {
+      if (dismissedRecurring.has(g.key)) continue;
+      for (const t of g.transactions) set.add(t.id);
+    }
+    return set;
+  }, [recurringGroups, dismissedRecurring]);
+
+  const handleBulkIgnoreRecurring = async (group: RecurringGroup) => {
+    setBulkIgnoreBusy(true);
+    try {
+      const ids = group.transactions.map(t => t.id);
+      const { error } = await supabase
+        .from('bank_transactions')
+        .update({ status: 'ignored' })
+        .in('id', ids);
+      if (error) throw error;
+      toast({
+        title: 'Akontobuchungen ignoriert',
+        description: `${ids.length} Buchungen von „${group.vendorLabel}" wurden als ignoriert markiert.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-all-unmatched', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-unmatched-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['missing-receipts-list'] });
+    } catch (e) {
+      toast({
+        title: 'Fehler',
+        description: 'Buchungen konnten nicht ignoriert werden.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkIgnoreBusy(false);
+    }
+  };
   const updateStatusMutation = useMutation({
     mutationFn: async ({ transactionId, status }: { transactionId: string; status: string }) => {
       const updates: any = { status };
@@ -737,6 +802,21 @@ export default function Reconciliation() {
                 </div>
               )}
 
+              {/* Recurring (Akonto) suggestions */}
+              <RecurringSuggestionsPanel
+                groups={recurringGroups}
+                dismissedKeys={dismissedRecurring}
+                onDismiss={(key) =>
+                  setDismissedRecurring(prev => {
+                    const next = new Set(prev);
+                    next.add(key);
+                    return next;
+                  })
+                }
+                onIgnoreAll={handleBulkIgnoreRecurring}
+                isBusy={bulkIgnoreBusy}
+              />
+
               {/* Transactions Table */}
               <Card>
                 <CardContent className="p-0">
@@ -815,10 +895,20 @@ export default function Reconciliation() {
                               description: (
                                 <Tooltip delayDuration={300}>
                                   <TooltipTrigger asChild>
-                                    <span className="block truncate cursor-default">{truncateText(transaction.description)}</span>
+                                    <span className="flex items-center gap-2 min-w-0 cursor-default">
+                                      <span className="block truncate">{truncateText(transaction.description)}</span>
+                                      {recurringTxIds.has(transaction.id) && (
+                                        <Badge variant="outline" className="shrink-0 text-[10px] gap-1 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300">
+                                          wiederkehrend
+                                        </Badge>
+                                      )}
+                                    </span>
                                   </TooltipTrigger>
                                   <TooltipContent side="bottom" align="start" className="max-w-md whitespace-pre-wrap break-words">
                                     <p>{transaction.description || '–'}</p>
+                                    {recurringTxIds.has(transaction.id) && (
+                                      <p className="mt-1 text-xs text-blue-300">Teil einer erkannten wiederkehrenden Buchungsserie (Akonto).</p>
+                                    )}
                                   </TooltipContent>
                                 </Tooltip>
                               ),
