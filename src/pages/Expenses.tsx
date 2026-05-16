@@ -375,6 +375,33 @@ const Expenses = () => {
     localStorage.setItem('expenses-column-widths', JSON.stringify(columnWidths));
   }, [columnWidths]);
 
+  // Actions column width (resizable)
+  const [actionsColWidth, setActionsColWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('expenses-actions-col-width');
+    const n = saved ? parseInt(saved, 10) : NaN;
+    return Number.isFinite(n) ? Math.max(60, Math.min(400, n)) : 120;
+  });
+  useEffect(() => {
+    localStorage.setItem('expenses-actions-col-width', String(actionsColWidth));
+  }, [actionsColWidth]);
+  const handleActionsResizeDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = actionsColWidth;
+    const onMove = (ev: PointerEvent) => {
+      // Resize handle is on the LEFT side; dragging left increases width
+      const delta = startX - ev.clientX;
+      setActionsColWidth(Math.min(400, Math.max(60, startWidth + delta)));
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
   const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const handleColumnDragEnd = (event: DragEndEvent) => {
