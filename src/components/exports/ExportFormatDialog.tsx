@@ -592,6 +592,14 @@ export function ExportFormatDialog({
               lines.forEach((line, idx) => {
                 expanded.push({
                   ...receipt,
+                  // Override standard fields with split line values so Excel rows are usable standalone
+                  amount_gross: line.amount_gross,
+                  amount_net: line.amount_net,
+                  vat_rate: line.vat_rate,
+                  vat_amount: line.vat_amount,
+                  category: line.category ?? receipt.category,
+                  description: line.description ?? receipt.description,
+                  tax_type: line.tax_type ?? receipt.tax_type,
                   _split_position: idx + 1,
                   _split_description: line.description,
                   _split_category: line.category,
