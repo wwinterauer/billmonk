@@ -201,52 +201,49 @@ export function TagSelector({
     const isPartial = isBulkMode && tag.assignmentCount! > 0 && tag.assignmentCount !== tag.totalCount;
     const isFullyAssigned = isBulkMode ? tag.assignmentCount === tag.totalCount : tag.isAssigned;
 
-    return (
-      <button
-        key={tag.id}
-        type="button"
-        onClick={() => handleTagClick(tag)}
-        disabled={disabled || isAssigning || isRemoving}
-        className={cn(
-          'inline-flex items-center rounded-full font-medium transition-all duration-150',
-          'cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50',
-          classes.badge,
-          disabled && 'opacity-50 cursor-not-allowed',
-          // Assigned state
-          isFullyAssigned && 'text-white',
-          // Partial state (bulk mode)
-          isPartial && 'text-white',
-          // Not assigned state
-          !isFullyAssigned && !isPartial && 'border bg-transparent hover:bg-opacity-10',
-        )}
-        style={{
-          backgroundColor: isFullyAssigned
-            ? tag.color
-            : isPartial
-              ? `${tag.color}99` // 60% opacity
-              : 'transparent',
-          borderColor: !isFullyAssigned && !isPartial ? tag.color : 'transparent',
-          color: !isFullyAssigned && !isPartial ? tag.color : 'white',
-        }}
-        title={
-          isBulkMode
-            ? `${tag.name} – ${tag.assignmentCount} von ${tag.totalCount} Belegen`
-            : tag.isAssigned
-              ? `${tag.name} – Klicken zum Entfernen`
-              : `${tag.name} – Klicken zum Hinzufügen`
-        }
-      >
-        {/* Icon */}
-        {isFullyAssigned && (
-          <Check className={cn(classes.icon, 'flex-shrink-0')} />
-        )}
-        {isPartial && (
-          <Minus className={cn(classes.icon, 'flex-shrink-0')} />
-        )}
+    const tooltipLabel = isBulkMode
+      ? `${tag.name} – ${tag.assignmentCount} von ${tag.totalCount} Belegen`
+      : tag.isAssigned
+        ? `${tag.name} – Klicken zum Entfernen`
+        : `${tag.name} – Klicken zum Hinzufügen`;
 
-        {/* Name */}
-        <span className="truncate max-w-[120px]" title={tag.name}>{tag.name}</span>
-      </button>
+    return (
+      <Tooltip key={tag.id} delayDuration={150}>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => handleTagClick(tag)}
+            disabled={disabled || isAssigning || isRemoving}
+            className={cn(
+              'inline-flex items-center rounded-full font-medium transition-all duration-150',
+              'cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50',
+              classes.badge,
+              disabled && 'opacity-50 cursor-not-allowed',
+              isFullyAssigned && 'text-white',
+              isPartial && 'text-white',
+              !isFullyAssigned && !isPartial && 'border bg-transparent hover:bg-opacity-10',
+            )}
+            style={{
+              backgroundColor: isFullyAssigned
+                ? tag.color
+                : isPartial
+                  ? `${tag.color}99`
+                  : 'transparent',
+              borderColor: !isFullyAssigned && !isPartial ? tag.color : 'transparent',
+              color: !isFullyAssigned && !isPartial ? tag.color : 'white',
+            }}
+          >
+            {isFullyAssigned && (
+              <Check className={cn(classes.icon, 'flex-shrink-0')} />
+            )}
+            {isPartial && (
+              <Minus className={cn(classes.icon, 'flex-shrink-0')} />
+            )}
+            <span className="truncate max-w-[120px]">{tag.name}</span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">{tooltipLabel}</TooltipContent>
+      </Tooltip>
     );
   };
 
