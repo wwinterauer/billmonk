@@ -425,7 +425,7 @@ async function checkForMultipleInvoices(
             ],
           },
         ],
-        max_tokens: 2048,
+        max_tokens: 8192,
         temperature: 0.1,
       }),
     });
@@ -731,7 +731,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
             ],
           },
         ],
-        max_tokens: 2048,
+        max_tokens: 8192,
         temperature: 0.1,
         response_format: {
           type: "json_schema",
