@@ -665,8 +665,8 @@ export default function Reconciliation() {
                 </CardContent>
               </Card>
 
-              {/* Warning Banner */}
-              {unmatchedCount !== undefined && unmatchedCount > 0 && statusFilter !== 'unmatched' && (
+              {/* Auto-Reconcile Banner */}
+              {unmatchedCount !== undefined && unmatchedCount > 0 && (
                 <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
@@ -676,11 +676,27 @@ export default function Reconciliation() {
                   </div>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button size="sm" variant="outline" disabled className="opacity-50">
-                        Automatisch matchen
+                      <Button
+                        size="sm"
+                        onClick={runAutoReconcile}
+                        disabled={reconcileRunning}
+                      >
+                        {reconcileRunning ? (
+                          <>
+                            <Clock className="mr-2 h-4 w-4 animate-spin" />
+                            Wird abgeglichen…
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Automatisch matchen
+                          </>
+                        )}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent><p>Kommt bald</p></TooltipContent>
+                    <TooltipContent>
+                      <p>Exakte Treffer werden direkt zugeordnet. Bei 1–5 % Abweichung mit Lieferant/Rechnungsnummer in der Beschreibung wird ein Skonto-Vorschlag zur Bestätigung angezeigt.</p>
+                    </TooltipContent>
                   </Tooltip>
                 </div>
               )}
