@@ -130,6 +130,8 @@ import { useSplitLines } from '@/hooks/useSplitLines';
 import { SplitSuggestionDialog } from '@/components/receipts/SplitSuggestionDialog';
 import { SourceBadge, NoReceiptBadge } from '@/components/receipts/SourceBadge';
 import { PageMeta } from '@/components/PageMeta';
+import { ManualExpenseDialog } from '@/components/expenses/ManualExpenseDialog';
+import { PenLine } from 'lucide-react';
 
 type SortField =
   | 'receipt_date'
@@ -473,6 +475,7 @@ const Expenses = () => {
   }
   const [foundDuplicates, setFoundDuplicates] = useState<FoundDuplicate[]>([]);
   const [showDuplicateResults, setShowDuplicateResults] = useState(false);
+  const [manualExpenseOpen, setManualExpenseOpen] = useState(false);
 
   // Split suggestion dialog state
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
@@ -1850,6 +1853,13 @@ const Expenses = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Button
+              variant="outline"
+              onClick={() => setManualExpenseOpen(true)}
+            >
+              <PenLine className="h-4 w-4 mr-2" />
+              Manuell erfassen
+            </Button>
             <Button 
               className="gradient-primary hover:opacity-90"
               onClick={() => navigate('/upload')}
@@ -1859,6 +1869,12 @@ const Expenses = () => {
             </Button>
           </div>
         </div>
+
+        <ManualExpenseDialog
+          open={manualExpenseOpen}
+          onOpenChange={setManualExpenseOpen}
+          onCreated={loadReceipts}
+        />
 
         <Tabs defaultValue="all" className="w-full">
           <TabsList className="mb-4">
