@@ -909,15 +909,16 @@ const Expenses = () => {
       }
     }
 
-    // Search filter (extended to include invoice_number and vendor_brand)
+    // Search filter (extended to include invoice_number, vendor_brand and split-line content)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(r => 
+      result = result.filter(r =>
         r.vendor?.toLowerCase().includes(query) ||
         r.vendor_brand?.toLowerCase().includes(query) ||
         r.description?.toLowerCase().includes(query) ||
         r.invoice_number?.toLowerCase().includes(query) ||
-        r.file_name?.toLowerCase().includes(query)
+        r.file_name?.toLowerCase().includes(query) ||
+        splitSearchTextByReceiptId.get(r.id)?.includes(query)
       );
     }
 
