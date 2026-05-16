@@ -172,16 +172,7 @@ function buildCategoryHints(country: string | null, categories: string[]): strin
 
   let hints = `
 
-KATEGORIE-ZUORDNUNGSHILFE:
-Ordne NUR Kategorien aus der obigen Liste zu. Spezifischere Kategorie bevorzugen, "Sonstiges" nur als Fallback.
-
-TYPISCHE ZUORDNUNGEN:
-- Tankstellen → KFZ; Restaurants/Hotels → Bewirtung; Bahn/Flug/Booking → Reisekosten
-- Telekom → Telefon/Internet; Google/Meta Ads → Werbung; Steuerberater/Anwalt → Beratung
-- Bürobedarf → Büromaterial; Banken → Bankgebühren; Versicherungen → Versicherung
-- Einzelgeräte (Laptop, Monitor) → GWG; Software-Abos → Software/EDV
-- Parkgebühren auf Reise → Reisekosten; tägliches Parken → KFZ
-- Amazon: nach INHALT kategorisieren`;
+ZUORDNUNGSHILFE (länderspezifisch, betrifft NUR tax_type bzw. die obige Liste – KEINE category-Werte erfinden):`;
 
   if (country === 'AT') {
     hints += `
@@ -553,6 +544,7 @@ serve(async (req) => {
 
     // ── Fetch categories ───────────────────────────────────────────
     let categoryList = '(keine eigenen Kategorien definiert)';
+    let userCategoryNames: string[] = [];
     let userCountry: string | null = null;
     let userId: string | null = receipt?.user_id || null;
     if (!userId) {
@@ -578,6 +570,7 @@ serve(async (req) => {
 
       if (userCategories && userCategories.length > 0) {
         const catNames = userCategories.map(c => c.name).filter(n => n !== 'Keine Rechnung');
+        userCategoryNames = catNames;
         if (catNames.length > 0) {
           categoryList = catNames.join(', ');
 
@@ -627,7 +620,7 @@ LIEFERANT:
 BESCHREIBUNG: Alle Positionen zusammenfassen, max 100 Zeichen, keine Preise.
 
 KATEGORIE (category, persönliches User-Label – UNABHÄNGIG von Steuerrecht):
-Wähle NUR aus dieser Liste eine passende User-Kategorie aus, oder lasse leer ("") wenn keine passt: ${categoryList}
+STRIKT: Verwende EXAKT einen Namen aus dieser Liste (case-insensitive, zeichengetreu) ODER lasse leer (""). NIEMALS einen Namen erfinden, abwandeln, übersetzen, kombinieren oder ergänzen (z.B. "Software/EDV" statt "Software", "Reisekosten/Hotel" statt "Reisekosten"). Im Zweifel "" zurückgeben. Liste: ${categoryList}
 WICHTIG: category ist KEIN Steuer-Begriff. Nimm hier NIE Werte wie "KFZ-Kosten (AT)" oder "Bewirtung 50%" – die gehören ausschließlich in tax_type.
 
 BUCHUNGSART (tax_type, steuerliche Einordnung – UNABHÄNGIG von category):
@@ -1050,6 +1043,20 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
               }
             }
           }
+        }
+
+        // Validate finalCategory strictly against the user's category list.
+        // Anything that doesn't exactly (case-insensitive) match a real user category → null.
+        if (finalCategory && userCategoryNames.length > 0) {
+          const match = userCategoryNames.find(n => n.toLowerCase() === finalCategory!.toLowerCase());
+          if (!match) {
+            console.log(`[Category Validation] Dropping invented category "${finalCategory}" (not in user list)`);
+            finalCategory = null;
+          } else if (match !== finalCategory) {
+            finalCategory = match; // normalize casing
+          }
+        } else if (finalCategory && userCategoryNames.length === 0) {
+          finalCategory = null;
         }
 
         const { error: updateError } = await supabase.from('receipts').update({
