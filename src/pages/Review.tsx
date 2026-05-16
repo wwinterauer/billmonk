@@ -1092,6 +1092,43 @@ const Review = () => {
                   </div>
                 )}
 
+                {/* Duplicate banner */}
+                {currentReceipt?.is_duplicate && currentReceipt?.duplicate_of && (
+                  <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground">
+                        Dieser Beleg wurde als Duplikat erkannt
+                        {currentReceipt.duplicate_score != null && (
+                          <span className="text-sm text-muted-foreground font-normal ml-2">
+                            ({currentReceipt.duplicate_score}% Übereinstimmung)
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Zum Löschen den Löschen-Button unten rechts verwenden.
+                      </p>
+                      <div className="flex gap-2 mt-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setDuplicateModalOpen(true)}
+                        >
+                          <GitCompare className="h-4 w-4 mr-2" />
+                          Original vergleichen
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleClearDuplicate}
+                        >
+                          Kein Duplikat
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Hint for non-receipt documents */}
                 {currentReceipt?.category === 'Keine Rechnung' && (
                   <div className="mb-6 p-4 bg-muted/50 border border-muted-foreground/20 rounded-lg flex items-start gap-3">
