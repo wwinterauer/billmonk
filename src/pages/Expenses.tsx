@@ -2628,7 +2628,7 @@ const Expenses = () => {
                           </SortableContext>
                         </DndContext>
                         <TableHead
-                          className="text-right relative group"
+                          className="text-right relative group px-2"
                           style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}
                         >
                           <div
