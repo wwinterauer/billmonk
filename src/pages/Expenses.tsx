@@ -799,6 +799,17 @@ const Expenses = () => {
     }
   }, [searchParams]);
 
+  // Handle URL-based receipt detail (from DuplicateComparisonModal fallback)
+  useEffect(() => {
+    const receiptId = searchParams.get('receipt');
+    if (receiptId) {
+      openReceiptDetail(receiptId);
+      const params = new URLSearchParams(searchParams);
+      params.delete('receipt');
+      setSearchParams(params, { replace: true });
+    }
+  }, [searchParams]);
+
   // Handle preset selection
   const handlePresetChange = (preset: DateRangePreset) => {
     setDatePreset(preset);
@@ -3028,6 +3039,10 @@ const Expenses = () => {
         duplicateId={duplicateComparisonIds.duplicateId}
         originalId={duplicateComparisonIds.originalId}
         onRefresh={loadReceipts}
+        onViewReceipt={(id) => {
+          setDuplicateComparisonOpen(false);
+          openReceiptDetail(id);
+        }}
       />
 
       {/* Bulk AI Reanalyze Confirmation Dialog */}

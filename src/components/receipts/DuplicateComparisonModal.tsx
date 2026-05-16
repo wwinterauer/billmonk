@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   GitCompare, 
   Copy, 
@@ -67,6 +68,7 @@ interface DuplicateComparisonModalProps {
   duplicateId: string | null;
   originalId: string | null;
   onRefresh?: () => void;
+  onViewReceipt?: (receiptId: string) => void;
 }
 
 interface ComparisonRowProps {
@@ -370,8 +372,10 @@ export function DuplicateComparisonModal({
   onOpenChange, 
   duplicateId, 
   originalId,
-  onRefresh 
+  onRefresh,
+  onViewReceipt
 }: DuplicateComparisonModalProps) {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [duplicate, setDuplicate] = useState<ReceiptData | null>(null);
@@ -487,8 +491,12 @@ export function DuplicateComparisonModal({
   };
 
   const handleViewDetails = (receiptId: string) => {
-    // Navigate to expenses page with receipt selected
-    window.location.href = `/expenses?receipt=${receiptId}`;
+    onOpenChange(false);
+    if (onViewReceipt) {
+      onViewReceipt(receiptId);
+    } else {
+      navigate(`/expenses?receipt=${receiptId}`);
+    }
   };
 
   return (
