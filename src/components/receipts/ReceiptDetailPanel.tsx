@@ -1322,13 +1322,43 @@ export function ReceiptDetailPanel({
                       <Alert className="bg-muted/50 border-muted-foreground/20">
                         <FileText className="h-4 w-4 text-muted-foreground" />
                         <AlertDescription>
-                          <div className="space-y-1">
+                          <div className="space-y-2">
                             <p className="font-medium text-foreground">
                               Erkannt als: {receipt.notes?.replace('Dokumenttyp: ', '').split('.')[0] || 'Sonstiges Dokument'}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              Dieses Dokument wurde nicht als Rechnung erkannt. Sie können die Kategorie ändern falls es doch ein Beleg ist.
+                              Dieses Dokument wurde nicht als Rechnung erkannt. Sie können die KI-Extraktion trotzdem erzwingen oder die Felder manuell ausfüllen.
                             </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                if (!receipt?.id) return;
+                                try {
+                                  const { data, error } = await supabase.functions.invoke('extract-receipt', {
+                                    body: {
+                                      receiptId: receipt.id,
+                                      forceExtract: true,
+                                      skipMultiCheck: true,
+                                      forceTreatAsReceipt: true,
+                                    },
+                                  });
+                                  if (error) throw error;
+                                  if (data?.success) {
+                                    toast({ title: 'KI-Extraktion erzwungen', description: 'Felder wurden neu erkannt.' });
+                                    onUpdate();
+                                  } else {
+                                    throw new Error(data?.error || 'Extraktion fehlgeschlagen');
+                                  }
+                                } catch (e) {
+                                  toast({ variant: 'destructive', title: 'Fehler', description: e instanceof Error ? e.message : 'Unbekannter Fehler' });
+                                }
+                              }}
+                            >
+                              <Sparkles className="w-4 h-4 mr-2" />
+                              Trotzdem KI-Extraktion versuchen
+                            </Button>
                           </div>
                         </AlertDescription>
                       </Alert>
