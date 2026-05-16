@@ -1970,7 +1970,7 @@ export function VendorManagement() {
 
           <div className="py-4 space-y-4">
             {/* Before/After Comparison */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-stretch">
               {/* Left: Will be deleted */}
               <Card className="border-destructive/30 bg-destructive/5">
                 <CardHeader className="pb-2">
@@ -1989,6 +1989,20 @@ export function VendorManagement() {
                   </p>
                 </CardContent>
               </Card>
+
+              {/* Swap direction button */}
+              <div className="flex items-center justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={swapMergeDirection}
+                  title="Richtung tauschen"
+                  aria-label="Richtung tauschen"
+                >
+                  <ArrowLeftRight className="w-4 h-4" />
+                </Button>
+              </div>
 
               {/* Right: Will be kept */}
               <Card className="border-success/30 bg-success/5">
@@ -2030,16 +2044,101 @@ export function VendorManagement() {
 
                 {/* Legal Names */}
                 <div>
-                  <Label className="text-xs text-muted-foreground">Rechtliche Firmennamen</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    Rechtlicher Firmenname (primär auswählen)
+                  </Label>
                   <div className="flex flex-wrap gap-1 p-2 bg-muted/30 rounded-lg min-h-[40px]">
-                    {mergePreview?.legal_names.map((name, i) => (
-                      <Badge key={i} variant="secondary" className="text-xs">
-                        {name}
-                      </Badge>
-                    ))}
+                    {mergePreview?.legal_names.map((name, i) => {
+                      const isPrimary = mergePreview?.primary_legal_name === name;
+                      return (
+                        <Badge
+                          key={`${name}-${i}`}
+                          variant={isPrimary ? 'default' : 'secondary'}
+                          className="text-xs cursor-pointer gap-1"
+                          onClick={() =>
+                            setMergePreview((prev) =>
+                              prev ? { ...prev, primary_legal_name: name } : null
+                            )
+                          }
+                        >
+                          {isPrimary && <Check className="w-3 h-3" />}
+                          {name}
+                          <button
+                            type="button"
+                            className="ml-1 hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMergePreview((prev) => {
+                                if (!prev) return null;
+                                const remaining = prev.legal_names.filter((_, j) => j !== i);
+                                return {
+                                  ...prev,
+                                  legal_names: remaining,
+                                  primary_legal_name:
+                                    prev.primary_legal_name === name
+                                      ? remaining[0] ?? null
+                                      : prev.primary_legal_name,
+                                };
+                              });
+                            }}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
                     {(!mergePreview?.legal_names.length) && (
                       <span className="text-xs text-muted-foreground">Keine</span>
                     )}
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      placeholder="Eigenen Firmennamen hinzufügen…"
+                      value={newLegalNameInput}
+                      onChange={(e) => setNewLegalNameInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const name = newLegalNameInput.trim();
+                          if (!name) return;
+                          setMergePreview((prev) => {
+                            if (!prev) return null;
+                            if (prev.legal_names.includes(name)) {
+                              return { ...prev, primary_legal_name: name };
+                            }
+                            return {
+                              ...prev,
+                              legal_names: [...prev.legal_names, name],
+                              primary_legal_name: name,
+                            };
+                          });
+                          setNewLegalNameInput('');
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const name = newLegalNameInput.trim();
+                        if (!name) return;
+                        setMergePreview((prev) => {
+                          if (!prev) return null;
+                          if (prev.legal_names.includes(name)) {
+                            return { ...prev, primary_legal_name: name };
+                          }
+                          return {
+                            ...prev,
+                            legal_names: [...prev.legal_names, name],
+                            primary_legal_name: name,
+                          };
+                        });
+                        setNewLegalNameInput('');
+                      }}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
 
