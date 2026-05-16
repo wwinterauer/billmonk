@@ -966,8 +966,27 @@ export default function Reconciliation() {
                               matched: transaction.status === 'matched' && transaction.receipt ? (
                                 <div className="flex items-center gap-2 text-sm min-w-0">
                                   <LinkIcon className="h-3 w-3 text-muted-foreground shrink-0" />
-                                  <span className="truncate">{transaction.receipt.vendor || 'Beleg'}</span>
-                                  <span className="text-muted-foreground shrink-0">({formatAmount(transaction.receipt.amount_gross)})</span>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="truncate">
+                                      {transaction.receipt.vendor || 'Beleg'}
+                                      {transaction.split_line && (
+                                        <span className="text-muted-foreground"> — {transaction.split_line.description || 'Splitzeile'}</span>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {transaction.split_line ? (
+                                        <>
+                                          {formatAmount(transaction.split_line.amount_gross)}
+                                          <span className="ml-1 opacity-70">/ Beleg {formatAmount(transaction.receipt.amount_gross)}</span>
+                                        </>
+                                      ) : (
+                                        formatAmount(transaction.receipt.amount_gross)
+                                      )}
+                                    </div>
+                                  </div>
+                                  {transaction.split_line && (
+                                    <Badge variant="outline" className="shrink-0 text-[10px]">Splitzeile</Badge>
+                                  )}
                                 </div>
                               ) : (
                                 <span className="text-muted-foreground">–</span>
