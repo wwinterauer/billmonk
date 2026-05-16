@@ -73,6 +73,11 @@ export function RecurringSuggestionsPanel({ groups, dismissedKeys, onDismiss, on
                         <span className="font-medium truncate">{g.vendorLabel}</span>
                         <span className="font-mono text-sm">{fmtEur(g.amount)}</span>
                         <Badge variant="outline" className="text-xs">{cadenceLabel(g.cadence)}</Badge>
+                        {g.confidence === 'medium' && (
+                          <Badge variant="outline" className="text-[10px] border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300">
+                            wahrscheinlich
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {g.count} Buchungen · Ø {g.avgIntervalDays} Tage ·{' '}
