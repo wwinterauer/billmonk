@@ -560,8 +560,8 @@ export function ExportFormatDialog({
     const columns = visibleColumns;
     let sortedReceipts = [...receipts];
 
-    // Filter out "Keine Rechnung" if option is enabled (not for ZIP)
-    if (excludeNoReceipt && exportFormat !== 'zip') {
+    // Filter out "Keine Rechnung" if option is enabled
+    if (excludeNoReceipt) {
       sortedReceipts = sortedReceipts.filter(r => r.category !== 'Keine Rechnung');
     }
 
@@ -896,8 +896,11 @@ export function ExportFormatDialog({
   const generateZIPBlob = async (): Promise<Blob> => {
     const zip = new JSZip();
     const usedNames = new Map<string, number>();
+    const zipReceipts = excludeNoReceipt
+      ? receipts.filter(r => r.category !== 'Keine Rechnung')
+      : receipts;
 
-    for (let i = 0; i < receipts.length; i++) {
+    for (let i = 0; i < zipReceipts.length; i++) {
       if (abortRef.current) break;
 
       const receipt = receipts[i];
