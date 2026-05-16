@@ -338,10 +338,17 @@ export default function Reconciliation() {
           amount,
           status,
           receipt_id,
+          receipt_split_line_id,
           source,
           receipts:receipt_id (
             id,
             vendor,
+            amount_gross,
+            is_split_booking
+          ),
+          split_line:receipt_split_line_id (
+            id,
+            description,
             amount_gross
           )
         `, { count: 'exact' })
@@ -371,6 +378,7 @@ export default function Reconciliation() {
       const transactions = (data || []).map((t: any) => ({
         ...t,
         receipt: t.receipts,
+        split_line: t.split_line,
       }));
 
       return { transactions, total: count || 0 };
