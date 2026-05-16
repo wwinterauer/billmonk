@@ -229,25 +229,42 @@ export function ReceiptDetailPanel({
   // Calculated values
   const calculatedValues = useMemo(() => {
     const gross = parseFloat(amountGross) || 0;
-    
-    // Bei gemischten Steuersätzen: Netto direkt aus den Details berechnen
+
+    // 1. Bei gemischten Steuersätzen: Netto/MwSt direkt aus den Details
     if (isMixedTaxRate && taxRateDetails && taxRateDetails.length > 0) {
       const totalNet = taxRateDetails.reduce((sum, d) => sum + (d.net_amount || 0), 0);
       const totalVat = taxRateDetails.reduce((sum, d) => sum + (d.tax_amount || 0), 0);
-      return {
-        net: totalNet,
-        vat: totalVat,
-      };
+      return { net: totalNet, vat: totalVat };
     }
-    
+
+    const clampNonNeg = (n: number) => (isNaN(n) || n < 0 ? 0 : n);
+    const netOverrideNum = amountNetOverride !== '' ? parseFloat(amountNetOverride) : NaN;
+    const vatOverrideNum = vatAmountOverride !== '' ? parseFloat(vatAmountOverride) : NaN;
+    const hasNetOverride = !isNaN(netOverrideNum);
+    const hasVatOverride = !isNaN(vatOverrideNum);
+
+    // 2. Brutto + MwSt-Override → Netto berechnen
+    if (gross > 0 && hasVatOverride && !hasNetOverride) {
+      return { net: clampNonNeg(gross - vatOverrideNum), vat: clampNonNeg(vatOverrideNum) };
+    }
+
+    // 3. Brutto + Netto-Override → MwSt berechnen
+    if (gross > 0 && hasNetOverride && !hasVatOverride) {
+      return { net: clampNonNeg(netOverrideNum), vat: clampNonNeg(gross - netOverrideNum) };
+    }
+
+    // 4. Beide Overrides gesetzt → User entscheidet, keine Auto-Berechnung
+    if (hasNetOverride && hasVatOverride) {
+      return { net: clampNonNeg(netOverrideNum), vat: clampNonNeg(vatOverrideNum) };
+    }
+
+    // 5. Fallback: Brutto + MwSt-Satz
     const rate = parseFloat(vatRate) || 0;
     const net = gross / (1 + rate / 100);
     const vat = gross - net;
-    return {
-      net: isNaN(net) ? 0 : net,
-      vat: isNaN(vat) ? 0 : vat,
-    };
-  }, [amountGross, vatRate, isMixedTaxRate, taxRateDetails]);
+    return { net: clampNonNeg(net), vat: clampNonNeg(vat) };
+  }, [amountGross, vatRate, isMixedTaxRate, taxRateDetails, amountNetOverride, vatAmountOverride]);
+
 
   // Generated filename based on current form values
   const generatedFilename = useMemo(() => {
