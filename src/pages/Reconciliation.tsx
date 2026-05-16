@@ -1037,6 +1037,16 @@ export default function Reconciliation() {
           queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
         }}
       />
+
+      <SkontoReconcileDialog
+        open={reconcileDialogOpen}
+        onOpenChange={setReconcileDialogOpen}
+        candidates={skontoCandidates}
+        exactApplied={reconcileSummary.exact}
+        scanned={reconcileSummary.scanned}
+        onApply={applySkontoMatches}
+        isApplying={reconcileApplying}
+      />
       </FeatureGate>
     </DashboardLayout>
   
