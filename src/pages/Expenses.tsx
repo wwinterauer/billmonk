@@ -314,7 +314,7 @@ const Expenses = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [taxTypeFilter, setTaxTypeFilter] = useState<string>('all');
   const [invoiceFilter, setInvoiceFilter] = useState<string>('all');
-  const [splitFilter, setSplitFilter] = useState<'all' | 'split' | 'no_split'>('all');
+  
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -855,10 +855,10 @@ const Expenses = () => {
       result = result.filter(r => !r.invoice_number || r.invoice_number.trim() === '');
     }
 
-    // Split booking filter
-    if (splitFilter === 'split') {
+    // Split booking filter (via status dropdown)
+    if (statusFilter === '__split__') {
       result = result.filter(r => (r as any).is_split_booking === true);
-    } else if (splitFilter === 'no_split') {
+    } else if (statusFilter === '__no_split__') {
       result = result.filter(r => !(r as any).is_split_booking);
     }
 
@@ -940,7 +940,7 @@ const Expenses = () => {
     });
 
     return result;
-  }, [receipts, statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, splitFilter, tagFilter, receiptTagsCache, searchQuery, sortField, sortDirection]);
+  }, [receipts, statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, tagFilter, receiptTagsCache, searchQuery, sortField, sortDirection]);
 
   // Pagination
   const totalPages = Math.ceil(filteredReceipts.length / ITEMS_PER_PAGE);
@@ -980,7 +980,7 @@ const Expenses = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, splitFilter, tagFilter, searchQuery]);
+  }, [statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, tagFilter, searchQuery]);
 
   // Save column visibility to localStorage
   useEffect(() => {
@@ -1976,6 +1976,23 @@ const Expenses = () => {
                   Duplikate {duplicateCount > 0 && `(${duplicateCount})`}
                 </div>
               </SelectItem>
+              {splitBookingEnabled && (
+                <>
+                  <SelectSeparator />
+                  <SelectItem value="__split__">
+                    <div className="flex items-center">
+                      <Layers className="w-4 h-4 mr-2 text-chart-4" />
+                      Mit Splitbuchung
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="__no_split__">
+                    <div className="flex items-center">
+                      <Layers className="w-4 h-4 mr-2 text-muted-foreground" />
+                      Ohne Splitbuchung
+                    </div>
+                  </SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
 
@@ -2016,20 +2033,6 @@ const Expenses = () => {
               ))}
             </SelectContent>
           </Select>
-
-          {splitBookingEnabled && (
-            <Select value={splitFilter} onValueChange={(v) => setSplitFilter(v as any)}>
-              <SelectTrigger className="w-[180px]">
-                <Layers className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Splitbuchung" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle Belege</SelectItem>
-                <SelectItem value="split">Nur mit Splitbuchung</SelectItem>
-                <SelectItem value="no_split">Nur ohne Splitbuchung</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
 
           {/* Tag Filter */}
           <DropdownMenu>
