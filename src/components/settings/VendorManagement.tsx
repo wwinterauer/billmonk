@@ -1499,7 +1499,7 @@ export function VendorManagement() {
               <Textarea
                 value={formData.extraction_hint}
                 onChange={(e) => setFormData(prev => ({ ...prev, extraction_hint: e.target.value.slice(0, 500) }))}
-                placeholder="z.B. „Wenn Zählernummer 12345 erkannt wird, setze Tag 'Gschwandt 54' und ergänze Beschreibung mit Präfix 'Gschwandt 54 - '." oder „Beträge in Klammern als positive Kosten behandeln."
+                placeholder={`z.B. "Wenn Zählernummer 12345 erkannt wird, setze Tag 'Gschwandt 54' und ergänze Beschreibung mit Präfix 'Gschwandt 54 - '." oder "Beträge in Klammern als positive Kosten behandeln."`}
                 rows={3}
                 maxLength={500}
                 className="text-sm"
