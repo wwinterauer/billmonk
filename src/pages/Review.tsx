@@ -696,7 +696,100 @@ const Review = () => {
     }
   };
 
-  // Approve all with high confidence
+  // Manual duplicate check for current receipt
+  const handleCheckDuplicate = async () => {
+    if (!currentReceipt) return;
+    setCheckingDuplicate(true);
+    try {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) throw new Error('Nicht angemeldet');
+      const { data: hashRow } = await supabase
+        .from('receipts')
+        .select('file_hash')
+        .eq('id', currentReceipt.id)
+        .maybeSingle();
+      const result = await checkForDuplicates(
+        userId,
+        hashRow?.file_hash ?? null,
+        {
+          vendor: formData.vendor || currentReceipt.vendor,
+          amount_gross: formData.amount_gross ? parseFloat(formData.amount_gross) : currentReceipt.amount_gross,
+          receipt_date: formData.receipt_date ? format(formData.receipt_date, 'yyyy-MM-dd') : currentReceipt.receipt_date,
+          invoice_number: formData.invoice_number || currentReceipt.invoice_number,
+        },
+        currentReceipt.id
+      );
+
+      const nowIso = new Date().toISOString();
+      if (result.isDuplicate && result.score >= 70 && result.duplicateOf) {
+        await supabase
+          .from('receipts')
+          .update({
+            is_duplicate: true,
+            duplicate_of: result.duplicateOf,
+            duplicate_score: result.score,
+            duplicate_checked_at: nowIso,
+          })
+          .eq('id', currentReceipt.id);
+        // Update local
+        setReceipts(prev => prev.map((r, i) => i === currentIndex
+          ? { ...r, is_duplicate: true, duplicate_of: result.duplicateOf, duplicate_score: result.score, duplicate_checked_at: nowIso } as Receipt
+          : r));
+        toast({ title: 'Duplikat gefunden', description: `Übereinstimmung: ${result.score}%` });
+      } else {
+        await supabase
+          .from('receipts')
+          .update({
+            is_duplicate: false,
+            duplicate_of: null,
+            duplicate_score: null,
+            duplicate_checked_at: nowIso,
+          })
+          .eq('id', currentReceipt.id);
+        setReceipts(prev => prev.map((r, i) => i === currentIndex
+          ? { ...r, is_duplicate: false, duplicate_of: null, duplicate_score: null, duplicate_checked_at: nowIso } as Receipt
+          : r));
+        toast({ title: 'Kein Duplikat gefunden' });
+      }
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Prüfung fehlgeschlagen',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    } finally {
+      setCheckingDuplicate(false);
+    }
+  };
+
+  // Clear duplicate marking (when user decides it's not a duplicate)
+  const handleClearDuplicate = async () => {
+    if (!currentReceipt) return;
+    try {
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from('receipts')
+        .update({
+          is_duplicate: false,
+          duplicate_of: null,
+          duplicate_score: null,
+          duplicate_checked_at: nowIso,
+        })
+        .eq('id', currentReceipt.id);
+      setReceipts(prev => prev.map((r, i) => i === currentIndex
+        ? { ...r, is_duplicate: false, duplicate_of: null, duplicate_score: null, duplicate_checked_at: nowIso } as Receipt
+        : r));
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      toast({ title: 'Duplikat-Markierung entfernt' });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      });
+    }
+  };
   const canApproveAll = useMemo(() => {
     return receipts.every(r => 
       r.ai_confidence !== null && 
