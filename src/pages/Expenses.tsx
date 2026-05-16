@@ -384,9 +384,6 @@ const Expenses = () => {
   useEffect(() => {
     localStorage.setItem('expenses-actions-col-width-v2', String(actionsColWidth));
   }, [actionsColWidth]);
-  useEffect(() => {
-    localStorage.setItem('expenses-actions-col-width', String(actionsColWidth));
-  }, [actionsColWidth]);
   const handleActionsResizeDown = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
