@@ -596,6 +596,133 @@ export default function Reconciliation() {
     }
   };
 
+  const handleCreateAsExpense = async (transactionId: string) => {
+    if (!user) return;
+    try {
+      // Find the transaction in the current dataset
+      const tx = (transactionsData?.transactions ?? []).find((t: any) => t.id === transactionId)
+        || (selectedTransaction?.id === transactionId ? selectedTransaction : null);
+      if (!tx) throw new Error('Buchung nicht gefunden');
+
+      const description: string = tx.description || '';
+      const amount = Math.abs(Number(tx.amount) || 0);
+      const txDate = tx.transaction_date
+        ? format(new Date(tx.transaction_date), 'yyyy-MM-dd')
+        : format(new Date(), 'yyyy-MM-dd');
+
+      // Extract vendor heuristically from bank description
+      const extractVendor = (desc: string): string => {
+        if (!desc) return 'Unbekannter Lieferant';
+        // Try common SEPA labels (DE/AT)
+        const patterns = [
+          /Empf[äa]nger:\s*([^]+?)(?=\s+(?:Verwendungszweck|Zahlungsreferenz|IBAN|BIC|Beitr\.|KtoNr|Mandat|Ref\.?|Kundendaten|Auftraggeber)|$)/i,
+          /Auftraggeber:\s*([^]+?)(?=\s+(?:Verwendungszweck|Zahlungsreferenz|IBAN|BIC|Beitr\.|KtoNr|Mandat|Ref\.?|Kundendaten|Empf)|$)/i,
+          /Zahlungspflichtiger:\s*([^]+?)(?=\s+(?:Verwendungszweck|IBAN|BIC|Ref\.?)|$)/i,
+        ];
+        for (const re of patterns) {
+          const m = desc.match(re);
+          if (m && m[1]) return m[1].trim().replace(/\s+/g, ' ').slice(0, 120);
+        }
+        // Fallback: first 60 chars without "Online Banking..." preamble
+        const cleaned = desc
+          .replace(/^Online Banking vom \d{1,2}\.\d{1,2}(?:\.\d{2,4})? um \d{1,2}:\d{2}\s*/i, '')
+          .replace(/^SEPA[- ]?(?:Überweisung|Lastschrift|Gutschrift|Dauerauftrag)[:\s]*/i, '')
+          .trim();
+        return (cleaned.split(/\s{2,}|·|\||–/)[0] || cleaned).slice(0, 80) || 'Unbekannter Lieferant';
+      };
+
+      const vendorName = extractVendor(description);
+
+      // Try matching a bank_import_keyword for category/tax defaults
+      const { data: keywords } = await supabase
+        .from('bank_import_keywords')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .eq('is_ignore', false);
+
+      const matchedKeyword = (keywords ?? []).find((kw: any) =>
+        description.toLowerCase().includes((kw.keyword || '').toLowerCase())
+      );
+
+      let vendorId: string | null = null;
+      let vendorDisplay = vendorName;
+      if (matchedKeyword?.vendor_id) {
+        vendorId = matchedKeyword.vendor_id;
+        const { data: v } = await supabase
+          .from('vendors')
+          .select('display_name')
+          .eq('id', matchedKeyword.vendor_id)
+          .maybeSingle();
+        if (v?.display_name) vendorDisplay = v.display_name;
+      }
+
+      const isIncome = (Number(tx.amount) || 0) > 0;
+
+      const { data: newReceipt, error: insertErr } = await supabase
+        .from('receipts')
+        .insert({
+          user_id: user.id,
+          vendor: vendorDisplay,
+          vendor_id: vendorId,
+          description: matchedKeyword?.description_template
+            ? `${matchedKeyword.description_template} – ${description}`.slice(0, 500)
+            : description.slice(0, 500),
+          amount_gross: amount,
+          receipt_date: txDate,
+          category: matchedKeyword?.category ?? null,
+          tax_type: matchedKeyword?.tax_type ?? null,
+          vat_rate: matchedKeyword?.tax_rate ?? 0,
+          payment_method: 'bank_transfer',
+          currency: 'EUR',
+          status: 'review',
+          source: 'bank_import',
+          is_no_receipt_entry: true,
+          bank_import_keyword_id: matchedKeyword?.id ?? null,
+          bank_transaction_reference: description.slice(0, 500),
+          bank_transaction_id: transactionId,
+          notes: isIncome
+            ? 'Aus Bankbuchung erfasst (Hinweis: Einnahme/positiver Betrag) – bitte prüfen.'
+            : 'Aus Bankbuchung erfasst – bitte vervollständigen.',
+        })
+        .select('id')
+        .single();
+
+      if (insertErr) throw insertErr;
+
+      const { error: txErr } = await supabase
+        .from('bank_transactions')
+        .update({
+          status: 'matched',
+          receipt_id: newReceipt.id,
+          receipt_split_line_id: null,
+        })
+        .eq('id', transactionId);
+      if (txErr) throw txErr;
+
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-unmatched-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-receipts-without-payment'] });
+      queryClient.invalidateQueries({ queryKey: ['missing-receipts-list'] });
+
+      toast({
+        title: 'Ausgabe erstellt',
+        description: 'Bitte ergänze Lieferant, Rechnungsnummer und Kategorie.',
+      });
+
+      setShowAssignModal(false);
+      setSelectedReceiptId(newReceipt.id);
+      setShowReceiptPanel(true);
+    } catch (error: any) {
+      toast({
+        title: 'Fehler',
+        description: error?.message || 'Die Ausgabe konnte nicht erstellt werden.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleIgnore = async (transactionId: string) => {
     try {
       await updateStatusMutation.mutateAsync({ transactionId, status: 'ignored' });
