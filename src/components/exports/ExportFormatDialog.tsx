@@ -903,9 +903,9 @@ export function ExportFormatDialog({
     for (let i = 0; i < zipReceipts.length; i++) {
       if (abortRef.current) break;
 
-      const receipt = receipts[i];
+      const receipt = zipReceipts[i];
       setCurrentItem(i + 1);
-      setProgress(Math.round(((i + 1) / receipts.length) * 100));
+      setProgress(Math.round(((i + 1) / zipReceipts.length) * 100));
 
       if (!receipt.file_url) continue;
 
