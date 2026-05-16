@@ -128,6 +128,66 @@ const extractionSchema = {
   additionalProperties: false,
 };
 
+// Legal form suffixes for DACH + common international forms
+const LEGAL_FORM_REGEX = /\b(GmbH(?:\s*&\s*Co\.?\s*KG)?|AG|KG|OG|OHG|e\.?\s*U\.?|EU|UG(?:\s*\(haftungsbeschr[äa]nkt\))?|SE|S\.E\.|Ltd\.?|LLC|Inc\.?|Corp\.?|S\.à\s*r\.?l\.?|S\.A\.|S\.A\.S\.|S\.r\.l\.?|S\.p\.A\.|B\.V\.|N\.V\.|Co\.?\s*KG|Kft\.?|sp\.?\s*z\s*o\.?o\.?|d\.o\.o\.?|GbR|PartG)\b/i;
+
+function hasLegalForm(name: string | null | undefined): boolean {
+  if (!name) return false;
+  return LEGAL_FORM_REGEX.test(name);
+}
+
+// Normalize vendor name for matching: lowercase, strip legal form, collapse whitespace/punct.
+function normalizeVendorName(name: string | null | undefined): string {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .replace(LEGAL_FORM_REGEX, "")
+    .replace(/[.,&]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Combine AI vendor_name with vendor_legal_form if the name doesn't already contain a legal form.
+function combineVendorWithLegalForm(name: string | null | undefined, legalForm: string | null | undefined): string | null {
+  if (!name) return null;
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  if (!legalForm) return trimmed;
+  const lf = legalForm.trim();
+  if (!lf) return trimmed;
+  // Already contains a legal form → keep AI name as-is
+  if (hasLegalForm(trimmed)) return trimmed;
+  // Append legal form
+  return `${trimmed} ${lf}`.replace(/\s+/g, " ").trim();
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const v0 = new Array(b.length + 1);
+  const v1 = new Array(b.length + 1);
+  for (let i = 0; i <= b.length; i++) v0[i] = i;
+  for (let i = 0; i < a.length; i++) {
+    v1[0] = i + 1;
+    for (let j = 0; j < b.length; j++) {
+      const cost = a[i] === b[j] ? 0 : 1;
+      v1[j + 1] = Math.min(v1[j] + 1, v0[j + 1] + 1, v0[j] + cost);
+    }
+    for (let j = 0; j <= b.length; j++) v0[j] = v1[j];
+  }
+  return v1[b.length];
+}
+
+// Similarity 0..1 based on Levenshtein
+function nameSimilarity(a: string, b: string): number {
+  if (!a && !b) return 1;
+  if (!a || !b) return 0;
+  const maxLen = Math.max(a.length, b.length);
+  if (maxLen === 0) return 1;
+  return 1 - levenshtein(a, b) / maxLen;
+}
+
 // ── Map structured output → internal ExtractionResult ──────────────
 function mapSchemaToResult(raw: Record<string, any>): ExtractionResult {
   const taxRateStr = raw.tax_rate || "";
@@ -137,11 +197,14 @@ function mapSchemaToResult(raw: Record<string, any>): ExtractionResult {
     if (!isNaN(parsed)) vatRate = parsed;
   }
 
+  // Combine vendor_name + vendor_legal_form when AI returned them separately
+  const combinedVendor = combineVendorWithLegalForm(raw.vendor_name, raw.vendor_legal_form);
+
   return {
     is_receipt: raw.is_financial_document === true,
     document_type: raw.document_type || undefined,
     reason: raw.reason || undefined,
-    vendor: raw.vendor_name || null,
+    vendor: combinedVendor,
     vendor_brand: raw.vendor_brand || null,
     description: raw.description || null,
     amount_gross: raw.total_amount || null,
@@ -611,9 +674,10 @@ Wenn NEIN: is_financial_document=false, document_type angeben, reason ausfüllen
 SCHRITT 2: Beleg-Daten extrahieren.
 
 LIEFERANT:
-- vendor_name = Offizieller Firmenname MIT Rechtsform aus Impressum/Fußbereich
+- vendor_name = Offizieller Firmenname IMMER MIT Rechtsform aus Impressum/Fußbereich/AGB-Block. PFLICHT: Suche aktiv im Fußbereich, Impressum und neben der UID-Nr. Wenn dort eine Rechtsform steht (GmbH, AG, KG, OG, e.U., UG, Ltd. etc.), MUSS sie Teil von vendor_name sein – auch wenn im Kopf nur die Marke prangt (z.B. "Sowana" im Kopf, "Sowana Handels GmbH" im Fuß → vendor_name = "Sowana Handels GmbH").
+- vendor_legal_form = NUR die Rechtsform separat (z.B. "GmbH", "Handels GmbH", "e.U."), leer wenn keine erkennbar.
 - Rechtsform erkennen: GmbH/AG/KG/OG/e.U./EU/UG/Ltd./LLC/Inc./S.à r.l./B.V./S.r.l. etc.
-- vendor_brand = Markenname falls abweichend (sonst "")
+- vendor_brand = Markenname falls abweichend vom Firmennamen (sonst "")
 - vendor_country = ISO-2-Code aus UID-Nr (ATU→AT, DE→DE, CHE→CH) oder Adresse
 - Bei mehreren Firmen: RECHNUNGSSTELLER nehmen, nicht Empfänger
 
@@ -928,28 +992,101 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         const receiptUserId = receipt?.user_id || null;
 
         if (receiptUserId && extractedData.vendor) {
-          // Vendor matching
-          const { data: vendorMatch } = await supabase
-            .from('vendors')
-            .select('id, expenses_only_extraction, legal_names, default_category_id')
-            .eq('user_id', receiptUserId)
-            .or(`display_name.ilike.${extractedData.vendor}`)
-            .maybeSingle();
+          // Vendor matching: load all user vendors and match by normalized name
+          // (strip legal form + lowercase) with Levenshtein fallback. This lets
+          // "Sowana Handels GmbH" and "sowana" resolve to the same vendor.
+          const extractedNorm = normalizeVendorName(extractedData.vendor);
+          const extractedLower = (extractedData.vendor || "").toLowerCase().trim();
 
-          let finalVendorMatch = vendorMatch;
-          if (!finalVendorMatch) {
-            const { data: allVendors } = await supabase
-              .from('vendors')
-              .select('id, expenses_only_extraction, legal_names, default_category_id')
-              .eq('user_id', receiptUserId);
-            if (allVendors) {
+          const { data: allVendors } = await supabase
+            .from('vendors')
+            .select('id, display_name, expenses_only_extraction, legal_names, default_category_id')
+            .eq('user_id', receiptUserId);
+
+          let finalVendorMatch: any = null;
+          if (allVendors && allVendors.length > 0) {
+            // 1. Exact (case-insensitive) display_name match
+            finalVendorMatch = allVendors.find(v =>
+              (v.display_name || '').toLowerCase().trim() === extractedLower
+            ) || null;
+
+            // 2. Exact legal_names match
+            if (!finalVendorMatch) {
               finalVendorMatch = allVendors.find(v =>
-                (v.legal_names || []).some((ln: string) => ln.toLowerCase() === extractedData.vendor!.toLowerCase())
+                (v.legal_names || []).some((ln: string) => ln.toLowerCase().trim() === extractedLower)
               ) || null;
+            }
+
+            // 3. Normalized match (strip legal form) on display_name OR legal_names
+            if (!finalVendorMatch && extractedNorm) {
+              finalVendorMatch = allVendors.find(v => {
+                if (normalizeVendorName(v.display_name) === extractedNorm) return true;
+                return (v.legal_names || []).some((ln: string) => normalizeVendorName(ln) === extractedNorm);
+              }) || null;
+            }
+
+            // 4. Fuzzy fallback (similarity ≥ 0.88) on normalized names — guard short names
+            if (!finalVendorMatch && extractedNorm && extractedNorm.length >= 4) {
+              let bestScore = 0;
+              let bestVendor: any = null;
+              for (const v of allVendors) {
+                const candidates = [v.display_name, ...(v.legal_names || [])]
+                  .map(normalizeVendorName)
+                  .filter(n => n.length >= 4);
+                for (const cand of candidates) {
+                  const score = nameSimilarity(extractedNorm, cand);
+                  if (score > bestScore) { bestScore = score; bestVendor = v; }
+                }
+              }
+              if (bestScore >= 0.88) {
+                finalVendorMatch = bestVendor;
+                console.log(`[Vendor Match] Fuzzy matched "${extractedData.vendor}" → "${bestVendor.display_name}" (score ${bestScore.toFixed(2)})`);
+              }
             }
           }
 
           const vendorId = receipt?.vendor_id || finalVendorMatch?.id;
+
+          // Auto-learn legal_names: if AI extracted a name with legal form and
+          // the matched vendor doesn't yet know it, add it. Also upgrade
+          // display_name when current display_name lacks a legal form but the
+          // new one provides it.
+          if (finalVendorMatch && extractedData.vendor) {
+            const aiName = extractedData.vendor.trim();
+            const aiNameLower = aiName.toLowerCase();
+            const currentDisplay = (finalVendorMatch.display_name || '').trim();
+            const knownNames = new Set<string>([
+              currentDisplay.toLowerCase(),
+              ...(finalVendorMatch.legal_names || []).map((n: string) => n.toLowerCase()),
+            ]);
+
+            const updates: Record<string, any> = {};
+            if (hasLegalForm(aiName) && !knownNames.has(aiNameLower)) {
+              const newLegalNames = [...(finalVendorMatch.legal_names || []), aiName];
+              updates.legal_names = newLegalNames;
+            }
+            // Upgrade display_name when current is the bare brand and AI gave the full legal name
+            if (
+              hasLegalForm(aiName) &&
+              !hasLegalForm(currentDisplay) &&
+              normalizeVendorName(currentDisplay) === normalizeVendorName(aiName) &&
+              currentDisplay.toLowerCase() !== aiNameLower
+            ) {
+              updates.display_name = aiName;
+            }
+            if (Object.keys(updates).length > 0) {
+              const { error: vendorUpdateError } = await supabase
+                .from('vendors')
+                .update(updates)
+                .eq('id', finalVendorMatch.id);
+              if (vendorUpdateError) {
+                console.warn(`[Vendor Learning] Failed to update vendor ${finalVendorMatch.id}:`, vendorUpdateError);
+              } else {
+                console.log(`[Vendor Learning] Updated vendor ${finalVendorMatch.id}:`, updates);
+              }
+            }
+          }
+
 
           // Category & tax_type learning: vendor-scoped keyword > global keyword > vendor default > AI
           if (extractedData.description) {
