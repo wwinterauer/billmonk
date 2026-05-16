@@ -674,9 +674,10 @@ Wenn NEIN: is_financial_document=false, document_type angeben, reason ausfüllen
 SCHRITT 2: Beleg-Daten extrahieren.
 
 LIEFERANT:
-- vendor_name = Offizieller Firmenname MIT Rechtsform aus Impressum/Fußbereich
+- vendor_name = Offizieller Firmenname IMMER MIT Rechtsform aus Impressum/Fußbereich/AGB-Block. PFLICHT: Suche aktiv im Fußbereich, Impressum und neben der UID-Nr. Wenn dort eine Rechtsform steht (GmbH, AG, KG, OG, e.U., UG, Ltd. etc.), MUSS sie Teil von vendor_name sein – auch wenn im Kopf nur die Marke prangt (z.B. "Sowana" im Kopf, "Sowana Handels GmbH" im Fuß → vendor_name = "Sowana Handels GmbH").
+- vendor_legal_form = NUR die Rechtsform separat (z.B. "GmbH", "Handels GmbH", "e.U."), leer wenn keine erkennbar.
 - Rechtsform erkennen: GmbH/AG/KG/OG/e.U./EU/UG/Ltd./LLC/Inc./S.à r.l./B.V./S.r.l. etc.
-- vendor_brand = Markenname falls abweichend (sonst "")
+- vendor_brand = Markenname falls abweichend vom Firmennamen (sonst "")
 - vendor_country = ISO-2-Code aus UID-Nr (ATU→AT, DE→DE, CHE→CH) oder Adresse
 - Bei mehreren Firmen: RECHNUNGSSTELLER nehmen, nicht Empfänger
 
