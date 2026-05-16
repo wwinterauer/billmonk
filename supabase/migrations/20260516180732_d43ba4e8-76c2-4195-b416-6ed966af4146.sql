@@ -1,0 +1,2 @@
+ALTER TABLE public.bank_transactions ADD COLUMN IF NOT EXISTS receipt_split_line_id uuid REFERENCES public.receipt_split_lines(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_bank_transactions_receipt_split_line_id ON public.bank_transactions(receipt_split_line_id);
