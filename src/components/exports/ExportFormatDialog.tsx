@@ -1346,17 +1346,15 @@ export function ExportFormatDialog({
                   </>
                 )}
 
-                {/* Exclude "Keine Rechnung" option (not for ZIP) */}
-                {exportFormat !== 'zip' && (
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="excludeNoReceipt">„Keine Rechnung" ausschließen</Label>
-                    <Switch
-                      id="excludeNoReceipt"
-                      checked={excludeNoReceipt}
-                      onCheckedChange={setExcludeNoReceipt}
-                    />
-                  </div>
-                )}
+                {/* Exclude "Keine Rechnung" option */}
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="excludeNoReceipt">„Keine Rechnung" ausschließen</Label>
+                  <Switch
+                    id="excludeNoReceipt"
+                    checked={excludeNoReceipt}
+                    onCheckedChange={setExcludeNoReceipt}
+                  />
+                </div>
 
                 {/* Split bookings option (only when feature enabled, not for ZIP) */}
                 {splitBookingEnabled && exportFormat !== 'zip' && (
