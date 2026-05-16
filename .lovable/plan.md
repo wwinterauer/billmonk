@@ -1,31 +1,23 @@
 ## Ziel
+Beim Beleg-ZIP-Export sollen Einträge ohne hinterlegtes Dokument (manuelle Ausgaben ohne Beleg, Schlagwort-Buchungen aus dem Kontoabgleich, "Keine Rechnung"-Markierungen) korrekt herausgefiltert werden – inkl. richtiger Zählung und klarer Hinweismeldung.
 
-Beleg im Review-Flow und im `ReceiptDetailPanel` als **"Keine Rechnung"** markieren können – ohne Umweg über Löschen oder eine Kategorie. Der Beleg wird dabei als "kein Rechnungsbeleg" gekennzeichnet, aus dem Review-Workflow entfernt, bleibt aber als Eintrag (z. B. für Bank-Abgleich) erhalten.
+## Änderungen
 
-## Lösung
+**`src/components/exports/ExportDialog.tsx`**
 
-Neuer Button **"Keine Rechnung"** in beiden Action-Footern (zwischen *Ablehnen* und *Überspringen* bzw. *Überprüfen*). Klick setzt:
-- `is_no_receipt_entry = true`
-- `status = 'approved'` (raus aus Review/Pending)
-- `category = 'Keine Rechnung'` (Konstante `NO_RECEIPT_CATEGORY` aus `src/lib/constants.ts`)
+1. Am Anfang der Komponente abgeleitete Liste bilden:
+   ```ts
+   const exportableReceipts = receipts.filter(
+     r => r.file_url && !r.is_no_receipt_entry
+   );
+   const skippedCount = receipts.length - exportableReceipts.length;
+   ```
+2. Überall wo bisher `receipts` für ZIP-Export, Fortschritt, Header-Zähler (`${receipts.length} Belege exportieren`) und `generateFileName` verwendet wird → `exportableReceipts` benutzen.
+3. Hinweisbox (Zeile 516) ersetzen: Wenn `skippedCount > 0`, Text auf
+   "{skippedCount} Eintrag/Einträge ohne Dokument werden übersprungen (z.B. manuelle Ausgaben oder Schlagwort-Buchungen aus dem Kontoabgleich)."
+4. Export-Button deaktivieren wenn `exportableReceipts.length === 0`.
+5. Innerhalb der ZIP-Schleife entfällt der `if (!receipt.file_url) continue;`-Check (bereits vorgefiltert), dient nur noch als Sicherheitsnetz.
 
-Damit verhält sich der Eintrag konsistent zur "Manuelle Ausgabe ohne Beleg"-Erfassung (`ManualExpenseDialog`), die genau diese Felder bereits so setzt.
-
-### 1. `src/pages/Review.tsx`
-- Im Action-Footer (um Zeile 1834–1881) neuen `Button variant="outline"` **"Keine Rechnung"** einfügen, Icon `FileX` (oder `Receipt`-mit-Strich), zwischen *Ablehnen* und *Überspringen*.
-- Handler `markAsNoReceipt()`: ruft eine kleine Variante von `saveReceipt('approved')` auf, die zusätzlich `is_no_receipt_entry: true` und `category: NO_RECEIPT_CATEGORY` mit in den Update-Payload nimmt, danach `goToNext()` wie bei `approved`.
-- Bestätigungs-Toast: "Als 'Keine Rechnung' markiert".
-
-### 2. `src/components/receipts/ReceiptDetailPanel.tsx`
-- Im Footer (Zeile 1889–1937) neuen `Button variant="outline"` **"Keine Rechnung"** in der rechten Button-Gruppe, vor *Ablehnen*.
-- Klick → `handleSaveClick('approved')` aufrufen, vorher Formular-State um `is_no_receipt_entry = true` und `category = NO_RECEIPT_CATEGORY` ergänzen (gleiches Pattern wie die bestehenden Save-Aufrufe).
-- Wenn `receipt.is_no_receipt_entry === true` bereits gesetzt ist, Button als *aktiv/disabled* anzeigen ("Bereits markiert").
-
-### 3. Keine weiteren Änderungen
-- Kein DB-Migration nötig (`is_no_receipt_entry`, `NO_RECEIPT_CATEGORY` existieren).
-- Keine Änderung an Filtern/Listen – die Konstante wird in `Expenses`, `Reports`, `Reconciliation` bereits berücksichtigt.
-- Keine Änderungen am AI-Lernen (Belege mit `is_no_receipt_entry` fließen nicht in Vendor-Learning ein – schon bestehend).
-
-## Dateien
-- `src/pages/Review.tsx`
-- `src/components/receipts/ReceiptDetailPanel.tsx`
+## Nicht betroffen
+- CSV/Excel/Steuer-Export (TaxExportDialog) → enthalten weiterhin alle Datensätze, da hier nur Metadaten exportiert werden, keine Dateien.
+- Keine DB- oder Hook-Änderungen.

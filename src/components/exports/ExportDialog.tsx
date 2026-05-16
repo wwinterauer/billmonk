@@ -84,6 +84,13 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
   const [currentItem, setCurrentItem] = useState(0);
   const [currentFileName, setCurrentFileName] = useState('');
 
+  // Nur Belege mit hinterlegtem Dokument exportieren
+  // (manuelle Ausgaben ohne Beleg, Schlagwort-Buchungen, "Keine Rechnung" überspringen)
+  const exportableReceipts = receipts.filter(
+    r => r.file_url && !r.is_no_receipt_entry
+  );
+  const skippedCount = receipts.length - exportableReceipts.length;
+
   // Load naming settings from database
   useEffect(() => {
     const loadSettings = async () => {
@@ -264,7 +271,7 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
 
   // Export as ZIP
   const handleExportZip = async () => {
-    if (receipts.length === 0) return;
+    if (exportableReceipts.length === 0) return;
 
     setIsExporting(true);
     setExportComplete(false);
@@ -278,15 +285,15 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
     let successCount = 0;
 
     try {
-      for (let i = 0; i < receipts.length; i++) {
+      for (let i = 0; i < exportableReceipts.length; i++) {
         if (abortRef.current) {
           toast({ title: 'Export abgebrochen' });
           break;
         }
 
-        const receipt = receipts[i];
+        const receipt = exportableReceipts[i];
         setCurrentItem(i + 1);
-        setProgress(Math.round(((i + 1) / receipts.length) * 100));
+        setProgress(Math.round(((i + 1) / exportableReceipts.length) * 100));
 
         if (!receipt.file_url) continue;
 
@@ -380,7 +387,7 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            {exportComplete ? 'Export abgeschlossen' : `${receipts.length} Belege exportieren`}
+            {exportComplete ? 'Export abgeschlossen' : `${exportableReceipts.length} Belege exportieren`}
           </DialogTitle>
           {!exportComplete && (
             <DialogDescription>
@@ -513,11 +520,14 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
                 </div>
               </div>
 
-              {receipts.some(r => !r.file_url) && (
+              {skippedCount > 0 && (
                 <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                   <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-yellow-700">
-                    Einige Belege haben keine Datei und werden übersprungen.
+                    {skippedCount === 1
+                      ? '1 Eintrag ohne Dokument wird übersprungen'
+                      : `${skippedCount} Einträge ohne Dokument werden übersprungen`}
+                    {' '}(z.B. manuelle Ausgaben, Schlagwort-Buchungen aus dem Kontoabgleich oder als „Keine Rechnung" markierte Einträge).
                   </p>
                 </div>
               )}
@@ -527,7 +537,7 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
               <Button variant="ghost" onClick={() => onOpenChange(false)}>
                 Abbrechen
               </Button>
-              <Button onClick={handleExportZip} disabled={receipts.length === 0}>
+              <Button onClick={handleExportZip} disabled={exportableReceipts.length === 0}>
                 ZIP erstellen & herunterladen
               </Button>
             </DialogFooter>
