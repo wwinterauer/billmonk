@@ -837,6 +837,25 @@ const Expenses = () => {
     return receipts.filter(r => r.is_duplicate === true && r.duplicate_of).length;
   }, [receipts]);
 
+  // Load split lines for ALL split-booking receipts so the search can match split-line content
+  const allSplitReceiptIds = useMemo(
+    () => receipts.filter(r => (r as any).is_split_booking).map(r => r.id),
+    [receipts]
+  );
+  const { data: allSplitLinesForSearch = [] } = useSplitLines(
+    splitBookingEnabled && allSplitReceiptIds.length > 0 && searchQuery.trim().length > 0,
+    allSplitReceiptIds
+  );
+  const splitSearchTextByReceiptId = useMemo(() => {
+    const map = new Map<string, string>();
+    allSplitLinesForSearch.forEach(line => {
+      const parts = [line.description, line.category, line.tax_type].filter(Boolean).join(' ').toLowerCase();
+      const prev = map.get(line.receipt_id);
+      map.set(line.receipt_id, prev ? `${prev} ${parts}` : parts);
+    });
+    return map;
+  }, [allSplitLinesForSearch]);
+
   // Filter and sort receipts
   const filteredReceipts = useMemo(() => {
     let result = [...receipts];
