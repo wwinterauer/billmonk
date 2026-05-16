@@ -113,6 +113,7 @@ export function VendorManagement() {
   interface MergePreview {
     display_name: string;
     legal_names: string[];
+    primary_legal_name: string | null;
     detected_names: string[];
     default_category_id: string | null;
     default_vat_rate: number | null;
@@ -120,6 +121,7 @@ export function VendorManagement() {
     total_amount: number;
   }
   const [mergePreview, setMergePreview] = useState<MergePreview | null>(null);
+  const [newLegalNameInput, setNewLegalNameInput] = useState('');
 
   // Import state
   const [isImporting, setIsImporting] = useState(false);
