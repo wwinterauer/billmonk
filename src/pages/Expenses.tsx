@@ -855,6 +855,13 @@ const Expenses = () => {
       result = result.filter(r => !r.invoice_number || r.invoice_number.trim() === '');
     }
 
+    // Split booking filter
+    if (splitFilter === 'split') {
+      result = result.filter(r => (r as any).is_split_booking === true);
+    } else if (splitFilter === 'no_split') {
+      result = result.filter(r => !(r as any).is_split_booking);
+    }
+
     // Tag filter
     if (tagFilter.length > 0) {
       if (tagFilter.includes('__none__')) {
