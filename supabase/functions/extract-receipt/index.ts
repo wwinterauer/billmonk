@@ -991,28 +991,101 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         const receiptUserId = receipt?.user_id || null;
 
         if (receiptUserId && extractedData.vendor) {
-          // Vendor matching
-          const { data: vendorMatch } = await supabase
-            .from('vendors')
-            .select('id, expenses_only_extraction, legal_names, default_category_id')
-            .eq('user_id', receiptUserId)
-            .or(`display_name.ilike.${extractedData.vendor}`)
-            .maybeSingle();
+          // Vendor matching: load all user vendors and match by normalized name
+          // (strip legal form + lowercase) with Levenshtein fallback. This lets
+          // "Sowana Handels GmbH" and "sowana" resolve to the same vendor.
+          const extractedNorm = normalizeVendorName(extractedData.vendor);
+          const extractedLower = (extractedData.vendor || "").toLowerCase().trim();
 
-          let finalVendorMatch = vendorMatch;
-          if (!finalVendorMatch) {
-            const { data: allVendors } = await supabase
-              .from('vendors')
-              .select('id, expenses_only_extraction, legal_names, default_category_id')
-              .eq('user_id', receiptUserId);
-            if (allVendors) {
+          const { data: allVendors } = await supabase
+            .from('vendors')
+            .select('id, display_name, expenses_only_extraction, legal_names, default_category_id')
+            .eq('user_id', receiptUserId);
+
+          let finalVendorMatch: any = null;
+          if (allVendors && allVendors.length > 0) {
+            // 1. Exact (case-insensitive) display_name match
+            finalVendorMatch = allVendors.find(v =>
+              (v.display_name || '').toLowerCase().trim() === extractedLower
+            ) || null;
+
+            // 2. Exact legal_names match
+            if (!finalVendorMatch) {
               finalVendorMatch = allVendors.find(v =>
-                (v.legal_names || []).some((ln: string) => ln.toLowerCase() === extractedData.vendor!.toLowerCase())
+                (v.legal_names || []).some((ln: string) => ln.toLowerCase().trim() === extractedLower)
               ) || null;
+            }
+
+            // 3. Normalized match (strip legal form) on display_name OR legal_names
+            if (!finalVendorMatch && extractedNorm) {
+              finalVendorMatch = allVendors.find(v => {
+                if (normalizeVendorName(v.display_name) === extractedNorm) return true;
+                return (v.legal_names || []).some((ln: string) => normalizeVendorName(ln) === extractedNorm);
+              }) || null;
+            }
+
+            // 4. Fuzzy fallback (similarity ≥ 0.88) on normalized names — guard short names
+            if (!finalVendorMatch && extractedNorm && extractedNorm.length >= 4) {
+              let bestScore = 0;
+              let bestVendor: any = null;
+              for (const v of allVendors) {
+                const candidates = [v.display_name, ...(v.legal_names || [])]
+                  .map(normalizeVendorName)
+                  .filter(n => n.length >= 4);
+                for (const cand of candidates) {
+                  const score = nameSimilarity(extractedNorm, cand);
+                  if (score > bestScore) { bestScore = score; bestVendor = v; }
+                }
+              }
+              if (bestScore >= 0.88) {
+                finalVendorMatch = bestVendor;
+                console.log(`[Vendor Match] Fuzzy matched "${extractedData.vendor}" → "${bestVendor.display_name}" (score ${bestScore.toFixed(2)})`);
+              }
             }
           }
 
           const vendorId = receipt?.vendor_id || finalVendorMatch?.id;
+
+          // Auto-learn legal_names: if AI extracted a name with legal form and
+          // the matched vendor doesn't yet know it, add it. Also upgrade
+          // display_name when current display_name lacks a legal form but the
+          // new one provides it.
+          if (finalVendorMatch && extractedData.vendor) {
+            const aiName = extractedData.vendor.trim();
+            const aiNameLower = aiName.toLowerCase();
+            const currentDisplay = (finalVendorMatch.display_name || '').trim();
+            const knownNames = new Set<string>([
+              currentDisplay.toLowerCase(),
+              ...(finalVendorMatch.legal_names || []).map((n: string) => n.toLowerCase()),
+            ]);
+
+            const updates: Record<string, any> = {};
+            if (hasLegalForm(aiName) && !knownNames.has(aiNameLower)) {
+              const newLegalNames = [...(finalVendorMatch.legal_names || []), aiName];
+              updates.legal_names = newLegalNames;
+            }
+            // Upgrade display_name when current is the bare brand and AI gave the full legal name
+            if (
+              hasLegalForm(aiName) &&
+              !hasLegalForm(currentDisplay) &&
+              normalizeVendorName(currentDisplay) === normalizeVendorName(aiName) &&
+              currentDisplay.toLowerCase() !== aiNameLower
+            ) {
+              updates.display_name = aiName;
+            }
+            if (Object.keys(updates).length > 0) {
+              const { error: vendorUpdateError } = await supabase
+                .from('vendors')
+                .update(updates)
+                .eq('id', finalVendorMatch.id);
+              if (vendorUpdateError) {
+                console.warn(`[Vendor Learning] Failed to update vendor ${finalVendorMatch.id}:`, vendorUpdateError);
+              } else {
+                console.log(`[Vendor Learning] Updated vendor ${finalVendorMatch.id}:`, updates);
+              }
+            }
+          }
+
 
           // Category & tax_type learning: vendor-scoped keyword > global keyword > vendor default > AI
           if (extractedData.description) {
