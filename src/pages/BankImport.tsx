@@ -351,7 +351,7 @@ export default function BankImport() {
           
           if (matchedKeyword) {
             // Create receipt entry without physical receipt
-            const { error: receiptError } = await supabase
+            const { data: insertedReceipt, error: receiptError } = await supabase
               .from('receipts')
               .insert({
                 user_id: user.id,
@@ -372,15 +372,17 @@ export default function BankImport() {
                 bank_transaction_reference: tx.description,
                 bank_transaction_id: insertedTx?.id,
                 notes: 'Automatisch erstellt aus Bankbuchung - Keine Rechnung vorhanden',
-              });
+              })
+              .select('id')
+              .single();
             
-            if (!receiptError) {
+            if (!receiptError && insertedReceipt) {
               noReceiptEntriesCreated++;
               
-              // Update transaction status to matched
+              // Link transaction <-> receipt and mark as matched
               await supabase
                 .from('bank_transactions')
-                .update({ status: 'matched' })
+                .update({ status: 'matched', receipt_id: insertedReceipt.id })
                 .eq('id', insertedTx.id);
             }
           }
