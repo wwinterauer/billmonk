@@ -1,35 +1,56 @@
 ## Ziel
 
-Im „Lieferant bearbeiten"-Dialog (`VendorManagement.tsx`) sollen die fünf Dropdowns
-- Standard-Kategorie
-- Standard-Tag
-- Standard MwSt-Satz
-- Standard-Buchungsart
-- Standard-Zahlungsart
+In der Ausgabenübersicht (`/expenses`) sollen Rechnungen mit Splitbuchung (`is_split_booking = true`) zwei neue Funktionen bekommen:
 
-eine **Suchfunktion** bekommen und es muss möglich sein, **„keine Auswahl"** zu wählen (Feld auf leer/null zurücksetzen).
+1. **Aufklappbare Tabellenzeilen**, die die einzelnen Buchungssätze (Splitlines) direkt in der Tabelle zeigen.
+2. **Ein Filter**, mit dem nur Rechnungen mit Splitbuchungen angezeigt werden können.
 
-## Lösung
+## Darstellungs-Konzept (Aufklappen)
 
-Die bestehende Komponente `src/components/ui/searchable-select.tsx` bietet bereits beides (`CommandInput`-Suche + `allowClear`). Die 5 shadcn-`<Select>`-Blöcke (Zeilen ~1325–1448) werden durch `<SearchableSelect>` ersetzt.
+- In der ersten Spalte (Checkbox-Spalte) bekommt jede Zeile eines Splitbuchungs-Belegs zusätzlich einen kleinen **Chevron-Button** (▶ / ▼) links neben oder anstelle eines kleinen Indikators. Nur sichtbar wenn `is_split_booking === true`.
+- Klick auf Chevron toggelt einen lokalen `expandedIds: Set<string>` State.
+- Beim Aufklappen wird **direkt unter** der Belegzeile eine zusätzliche `<TableRow>` mit einer einzigen `<TableCell colSpan={...}>` eingefügt. Innerhalb dieser Zelle wird eine **kompakte Sub-Tabelle** der Splitlines gerendert (leicht eingerückt, dezenter Hintergrund `bg-muted/30`, schmalerer Text).
+- Spalten der Sub-Tabelle:
+  - Beschreibung
+  - Kategorie
+  - Buchungsart (Tax Type)
+  - MwSt %
+  - Netto
+  - MwSt
+  - Brutto
+  - Privat-Badge (wenn `is_private`)
+- Daten kommen aus dem bereits vorhandenen Hook `useSplitLines` (siehe `src/hooks/useSplitLines.ts`). Wir laden die Splitlines für **alle aktuell sichtbaren Splitbuchungs-Belege auf der Seite** in einem Query (`receiptIds` = IDs der `paginatedReceipts` mit `is_split_booking`), damit das Aufklappen sofort funktioniert ohne Nachladen.
+- Falls für einen Beleg keine Splitlines gefunden werden, zeigt die Sub-Zeile einen dezenten Hinweis "Keine Buchungssätze gefunden".
 
-### Pro Dropdown
-- Optionen aus den jeweiligen Quellen (`categories`, `tags`, `vatRates`, lokalisierte Tax-Kategorien, hartkodierte Zahlungsarten) in `{ value, label }`-Form mappen.
-- `value`, `onChange` an den vorhandenen `formData`-Pfad anbinden. Beim Clear → leerer String (bestehende Logik wandelt das beim Save passend in `null`).
-- `allowClear` auf `true` mit `clearLabel="— Keine Vorgabe —"`.
-- `placeholder` / `searchPlaceholder` / `emptyText` deutsch.
+## Filter
 
-### Spezialfall „Standard-Buchungsart"
-- Hier existiert bereits ein `__none__`-Item. Wird durch `allowClear` ersetzt; Save-Logik (vermutlich Mapping `__none__` → null) entsprechend bereinigen, falls vorhanden.
+- Neuer Filter-State `splitFilter: 'all' | 'split' | 'no_split'` (Default `'all'`).
+- Neues Dropdown in der Filterleiste neben dem bestehenden „Rechnungsnr."-Filter mit Optionen:
+  - Alle Belege
+  - Nur mit Splitbuchung
+  - Nur ohne Splitbuchung
+- Anwendung in `filteredReceipts`-Memo (Standard-Filter-Pattern wie bestehende Filter).
+- Filter wird in den Reset-Effekt für `currentPage` aufgenommen.
+- Filter ist nur sichtbar/aktivierbar wenn `splitBookingEnabled` (Feature-Flag aus `usePlan`).
 
-### Spezialfall „MwSt-Satz"
-- Wert ist als String gespeichert. Mapping `{ value: rate.value, label: rate.label }` bleibt.
+## Technische Details
 
-## Nicht im Scope
-- Filter-Selects oben im Header (Alle Kategorien, Sortierung, weitere Filter) bleiben unverändert – das ist nicht der Edit-Bearbeiten-Bereich.
-- Andere Komponenten/Dialoge.
+**Datei:** `src/pages/Expenses.tsx`
 
-## Validierung
-- Edit-Dialog öffnen, in jedem Dropdown tippen → Liste filtert.
-- „— Keine Vorgabe —" wählen → Wert wird leer, Speichern persistiert null.
-- Bestehende Werte werden korrekt angezeigt.
+- Neuer State: `const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())`.
+- Neuer State: `const [splitFilter, setSplitFilter] = useState<'all'|'split'|'no_split'>('all')`.
+- IDs der sichtbaren Split-Belege per Memo:
+  ```ts
+  const visibleSplitReceiptIds = useMemo(
+    () => paginatedReceipts.filter(r => (r as any).is_split_booking).map(r => r.id),
+    [paginatedReceipts]
+  );
+  ```
+- `useSplitLines(splitBookingEnabled && visibleSplitReceiptIds.length > 0, visibleSplitReceiptIds)` zum Laden.
+- Im `paginatedReceipts.map`-Render-Block: nach der `<TableRow>` ggf. eine zweite `<TableRow>` mit Sub-Tabelle ausgeben, wenn `expandedIds.has(receipt.id)`. ColSpan = `1 (checkbox) + orderedVisibleColumns.length + 1 (actions)`.
+- Chevron-Toggle in der Checkbox-Zelle als kleines Icon links neben der Checkbox (nur wenn Splitbuchung). Verwendung `ChevronRight` / `ChevronDown` aus lucide-react.
+- Splitlines pro Beleg gruppieren via `useMemo` `Map<receiptId, SplitLine[]>`.
+- `filteredReceipts`-Memo um Split-Filter erweitern und `splitFilter` zur Dependency-Liste hinzufügen.
+- Page-Reset-Effekt um `splitFilter` ergänzen.
+
+**Keine Schemaänderungen, keine Backend-Änderungen.** Reine UI-Erweiterung auf vorhandenen Daten (`receipts.is_split_booking`, Tabelle `receipt_split_lines` via `useSplitLines`).

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { RecurringExpensesTab } from '@/components/expenses/RecurringExpensesTab';
 import { Repeat } from 'lucide-react';
@@ -126,6 +126,7 @@ import { checkForDuplicates, type DuplicateCheckResult } from '@/services/duplic
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSplitLines } from '@/hooks/useSplitLines';
 import { SplitSuggestionDialog } from '@/components/receipts/SplitSuggestionDialog';
 import { SourceBadge, NoReceiptBadge } from '@/components/receipts/SourceBadge';
 import { PageMeta } from '@/components/PageMeta';
@@ -313,8 +314,10 @@ const Expenses = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [taxTypeFilter, setTaxTypeFilter] = useState<string>('all');
   const [invoiceFilter, setInvoiceFilter] = useState<string>('all');
+  const [splitFilter, setSplitFilter] = useState<'all' | 'split' | 'no_split'>('all');
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   // Column visibility state
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(() => {
@@ -852,6 +855,13 @@ const Expenses = () => {
       result = result.filter(r => !r.invoice_number || r.invoice_number.trim() === '');
     }
 
+    // Split booking filter
+    if (splitFilter === 'split') {
+      result = result.filter(r => (r as any).is_split_booking === true);
+    } else if (splitFilter === 'no_split') {
+      result = result.filter(r => !(r as any).is_split_booking);
+    }
+
     // Tag filter
     if (tagFilter.length > 0) {
       if (tagFilter.includes('__none__')) {
@@ -930,7 +940,7 @@ const Expenses = () => {
     });
 
     return result;
-  }, [receipts, statusFilter, categoryFilter, taxTypeFilter, tagFilter, receiptTagsCache, searchQuery, sortField, sortDirection]);
+  }, [receipts, statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, splitFilter, tagFilter, receiptTagsCache, searchQuery, sortField, sortDirection]);
 
   // Pagination
   const totalPages = Math.ceil(filteredReceipts.length / ITEMS_PER_PAGE);
@@ -939,10 +949,38 @@ const Expenses = () => {
     currentPage * ITEMS_PER_PAGE
   );
 
+  // Load split lines for visible split-booking receipts on this page
+  const visibleSplitReceiptIds = useMemo(
+    () => paginatedReceipts.filter(r => (r as any).is_split_booking).map(r => r.id),
+    [paginatedReceipts]
+  );
+  const { data: visibleSplitLines = [] } = useSplitLines(
+    splitBookingEnabled && visibleSplitReceiptIds.length > 0,
+    visibleSplitReceiptIds
+  );
+  const splitLinesByReceiptId = useMemo(() => {
+    const map = new Map<string, typeof visibleSplitLines>();
+    visibleSplitLines.forEach(line => {
+      const arr = map.get(line.receipt_id) || [];
+      arr.push(line);
+      map.set(line.receipt_id, arr);
+    });
+    return map;
+  }, [visibleSplitLines]);
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, tagFilter, searchQuery]);
+  }, [statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, splitFilter, tagFilter, searchQuery]);
 
   // Save column visibility to localStorage
   useEffect(() => {
@@ -1979,6 +2017,20 @@ const Expenses = () => {
             </SelectContent>
           </Select>
 
+          {splitBookingEnabled && (
+            <Select value={splitFilter} onValueChange={(v) => setSplitFilter(v as any)}>
+              <SelectTrigger className="w-[180px]">
+                <Layers className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Splitbuchung" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle Belege</SelectItem>
+                <SelectItem value="split">Nur mit Splitbuchung</SelectItem>
+                <SelectItem value="no_split">Nur ohne Splitbuchung</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+
           {/* Tag Filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -2639,15 +2691,36 @@ const Expenses = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedReceipts.map((receipt) => (
+                      {paginatedReceipts.map((receipt) => {
+                        const isSplit = splitBookingEnabled && (receipt as any).is_split_booking === true;
+                        const isExpanded = expandedIds.has(receipt.id);
+                        const splitLines = splitLinesByReceiptId.get(receipt.id) || [];
+                        const totalCols = 1 + orderedVisibleColumns.length + 1;
+                        return (
+                        <Fragment key={receipt.id}>
                         <TableRow key={receipt.id}>
                           <TableCell style={{ width: 48, minWidth: 48, maxWidth: 48 }}>
-                            <Checkbox
-                              checked={selectedIds.has(receipt.id)}
-                              onCheckedChange={(checked) =>
-                                handleSelectOne(receipt.id, checked as boolean)
-                              }
-                            />
+                            <div className="flex items-center gap-1">
+                              {isSplit ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 -ml-1 text-muted-foreground hover:text-foreground"
+                                  onClick={() => toggleExpand(receipt.id)}
+                                  title={isExpanded ? 'Buchungssätze ausblenden' : 'Buchungssätze anzeigen'}
+                                >
+                                  {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                </Button>
+                              ) : (
+                                <span className="inline-block w-5" />
+                              )}
+                              <Checkbox
+                                checked={selectedIds.has(receipt.id)}
+                                onCheckedChange={(checked) =>
+                                  handleSelectOne(receipt.id, checked as boolean)
+                                }
+                              />
+                            </div>
                           </TableCell>
                           {orderedVisibleColumns.map(key => renderCell(receipt, key))}
                           <TableCell className="text-right px-2" style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}>
@@ -2736,7 +2809,63 @@ const Expenses = () => {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        {isSplit && isExpanded && (
+                          <TableRow key={receipt.id + '-split'} className="bg-muted/30 hover:bg-muted/30">
+                            <TableCell colSpan={totalCols} className="p-0">
+                              <div className="px-12 py-3">
+                                <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                                  <Layers className="h-3.5 w-3.5" />
+                                  Buchungssätze ({splitLines.length})
+                                </div>
+                                {splitLines.length === 0 ? (
+                                  <div className="text-xs text-muted-foreground italic py-2">
+                                    Keine Buchungssätze gefunden
+                                  </div>
+                                ) : (
+                                  <div className="rounded-md border bg-background overflow-hidden">
+                                    <table className="w-full text-xs">
+                                      <thead className="bg-muted/50">
+                                        <tr className="text-left text-muted-foreground">
+                                          <th className="px-3 py-2 font-medium">Beschreibung</th>
+                                          <th className="px-3 py-2 font-medium">Kategorie</th>
+                                          <th className="px-3 py-2 font-medium">Buchungsart</th>
+                                          <th className="px-3 py-2 font-medium text-right">MwSt %</th>
+                                          <th className="px-3 py-2 font-medium text-right">Netto</th>
+                                          <th className="px-3 py-2 font-medium text-right">MwSt</th>
+                                          <th className="px-3 py-2 font-medium text-right">Brutto</th>
+                                          <th className="px-3 py-2 font-medium">Privat</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {splitLines.map(line => (
+                                          <tr key={line.id} className="border-t">
+                                            <td className="px-3 py-2">{line.description || <span className="text-muted-foreground">—</span>}</td>
+                                            <td className="px-3 py-2">{line.category || <span className="text-muted-foreground">—</span>}</td>
+                                            <td className="px-3 py-2">{line.tax_type || <span className="text-muted-foreground">—</span>}</td>
+                                            <td className="px-3 py-2 text-right tabular-nums">{(line.vat_rate ?? 0).toFixed(2)}%</td>
+                                            <td className="px-3 py-2 text-right tabular-nums">{(line.amount_net ?? 0).toFixed(2)}</td>
+                                            <td className="px-3 py-2 text-right tabular-nums">{(line.vat_amount ?? 0).toFixed(2)}</td>
+                                            <td className="px-3 py-2 text-right tabular-nums font-medium">{(line.amount_gross ?? 0).toFixed(2)}</td>
+                                            <td className="px-3 py-2">
+                                              {line.is_private ? (
+                                                <Badge variant="outline" className="text-[10px] h-5">Privat</Badge>
+                                              ) : (
+                                                <span className="text-muted-foreground">—</span>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        </Fragment>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                   </SortableContext>
