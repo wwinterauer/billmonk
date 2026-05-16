@@ -291,6 +291,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         exact_applied: exactApplied,
+        high_confidence_applied: highConfidenceApplied,
         skonto_candidates: skontoCandidates,
         scanned_transactions: txs.length,
       }),
