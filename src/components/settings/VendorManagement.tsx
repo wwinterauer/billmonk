@@ -1505,7 +1505,7 @@ export function VendorManagement() {
                 className="text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                {formData.extraction_hint.length}/500 Zeichen — Diese Hinweise werden der KI bei jeder Analyse dieses Lieferanten mitgegeben (Kategorisierung, Tag-Auswahl, Beschreibungs-Anpassung, Betragserkennung).
+                {formData.extraction_hint.length}/500 Zeichen — Trage lieferantenspezifische Regeln ein (z.B. feste Kategorie, Tag-Logik, Beschreibungs-Präfixe, Rechnungsnummern-Muster). Die KI berücksichtigt sie bei jedem neuen Beleg.
               </p>
             </div>
 
