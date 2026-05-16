@@ -2863,7 +2863,7 @@ const Expenses = () => {
                             </TableCell>
                           </TableRow>
                         )}
-                        </>
+                        </Fragment>
                         );
                       })}
                     </TableBody>
