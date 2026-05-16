@@ -1328,7 +1328,7 @@ export function ExportFormatDialog({
                     <div className="space-y-0.5">
                       <Label htmlFor="expandSplitBookings">Splitbuchungen aufteilen</Label>
                       <p className="text-xs text-muted-foreground">
-                        Split-Belege erzeugen mehrere Zeilen
+                        Split-Belege erzeugen mehrere Zeilen — Betrag, Kategorie und USt. werden pro Zeile überschrieben
                       </p>
                     </div>
                     <Switch
