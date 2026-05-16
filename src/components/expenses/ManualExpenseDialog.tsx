@@ -32,6 +32,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories } from '@/hooks/useCategories';
 import { useVatRates } from '@/hooks/useVatRates';
+import { useTags } from '@/hooks/useTags';
 import { VendorAutocomplete } from '@/components/receipts/VendorAutocomplete';
 import { PAYMENT_METHODS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
