@@ -1923,6 +1923,15 @@ export function ReceiptDetailPanel({
                   </Button>
                   <div className="flex gap-2">
                     <Button
+                      variant="outline"
+                      onClick={markAsNoReceipt}
+                      disabled={saving || receipt.is_no_receipt_entry === true}
+                      title="Diesen Eintrag als 'Keine Rechnung' kennzeichnen (z. B. Kontoauszug, Werbung)"
+                    >
+                      <FileX className="h-4 w-4 mr-2" />
+                      {receipt.is_no_receipt_entry ? 'Keine Rechnung ✓' : 'Keine Rechnung'}
+                    </Button>
+                    <Button
                       variant="destructive"
                       onClick={() => handleSaveClick('rejected')}
                       disabled={saving}
