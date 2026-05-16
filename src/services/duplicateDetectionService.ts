@@ -109,8 +109,9 @@ export async function checkForDuplicates(
       }
     }
 
-    // 3. Amount + date + vendor match (90% - very likely)
-    // Strict rule: if new receipt has invoice_number, candidate must have same one or none
+    // 3. Amount + date + vendor match
+    // Strict rule: if both new and candidate have invoice_number, they must match.
+    // If new has no invoice_number but candidate does, we can't be sure → lower score.
     if (receiptData.amount_gross && receiptData.receipt_date && receiptData.vendor) {
       let amountQuery = supabase
         .from('receipts')
@@ -122,16 +123,42 @@ export async function checkForDuplicates(
       if (receiptData.invoice_number) {
         amountQuery = amountQuery.or(`invoice_number.eq.${receiptData.invoice_number},invoice_number.is.null`);
       }
-      const { data: amountMatch } = await amountQuery
+      const { data: candidates } = await amountQuery
         .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
-        .limit(1)
-        .maybeSingle();
+        .limit(5);
 
-      if (amountMatch) {
+      const list = candidates || [];
+      // Hard-exclude candidates with a different invoice_number (belt-and-suspenders)
+      const filtered = list.filter(c => {
+        if (receiptData.invoice_number && c.invoice_number && c.invoice_number !== receiptData.invoice_number) {
+          return false;
+        }
+        return true;
+      });
+
+      if (filtered.length > 0) {
+        // Prefer candidate with matching invoice_number, then with no invoice_number
+        const exactInv = filtered.find(c => receiptData.invoice_number && c.invoice_number === receiptData.invoice_number);
+        const nullInv = filtered.find(c => !c.invoice_number);
+        const best = exactInv || nullInv || filtered[0];
+
+        // If new receipt has no invoice_number but candidate does, this is weak evidence
+        // (recurring monthly invoices share amount+date+vendor but differ by invoice number)
+        const weakSignal = !receiptData.invoice_number && best.invoice_number;
+        if (weakSignal) {
+          return {
+            isDuplicate: true,
+            duplicateOf: best.id,
+            score: 65,
+            matchType: 'possible',
+            matchReasons: ['Gleicher Betrag', 'Gleiches Datum', 'Gleicher Lieferant', 'Rechnungsnummer noch nicht extrahiert']
+          };
+        }
+
         return {
           isDuplicate: true,
-          duplicateOf: amountMatch.id,
+          duplicateOf: best.id,
           score: 90,
           matchType: 'very_likely',
           matchReasons: ['Gleicher Betrag', 'Gleiches Datum', 'Gleicher Lieferant']
