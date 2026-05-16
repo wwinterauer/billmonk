@@ -142,8 +142,10 @@ export function ReceiptAssignmentModal({
   transaction,
   onAssign,
   onUploadNew,
+  onCreateAsExpense,
 }: ReceiptAssignmentModalProps) {
   const { user } = useAuth();
+  const [isCreatingExpense, setIsCreatingExpense] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
