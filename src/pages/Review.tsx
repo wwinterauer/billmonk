@@ -145,6 +145,8 @@ const Review = () => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
   const [vendorAutoApprove, setVendorAutoApprove] = useState(false);
   const [vendorAutoApproveMinConfidence, setVendorAutoApproveMinConfidence] = useState(0.8);
