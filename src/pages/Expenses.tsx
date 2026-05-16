@@ -980,7 +980,7 @@ const Expenses = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, splitFilter, tagFilter, searchQuery]);
+  }, [statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, tagFilter, searchQuery]);
 
   // Save column visibility to localStorage
   useEffect(() => {
