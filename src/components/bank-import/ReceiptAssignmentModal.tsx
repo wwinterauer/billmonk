@@ -253,23 +253,73 @@ export function ReceiptAssignmentModal({
     return others.slice(0, 5);
   }, [receipts, transaction, filterSimilarAmount, filterSimilarDate]);
 
+  // Fetch split lines for the currently selected receipt (only when needed)
+  const { data: splitLines } = useQuery({
+    queryKey: ['receipt-split-lines-for-matching', selectedReceipt],
+    queryFn: async (): Promise<SplitLine[]> => {
+      if (!selectedReceipt) return [];
+      const [linesRes, txRes] = await Promise.all([
+        supabase
+          .from('receipt_split_lines')
+          .select('id, description, amount_gross, sort_order')
+          .eq('receipt_id', selectedReceipt)
+          .order('sort_order', { ascending: true }),
+        supabase
+          .from('bank_transactions')
+          .select('id, receipt_split_line_id')
+          .eq('receipt_id', selectedReceipt)
+          .not('receipt_split_line_id', 'is', null),
+      ]);
+      if (linesRes.error) throw linesRes.error;
+      const matchedMap = new Map<string, string>();
+      for (const t of txRes.data ?? []) {
+        if (t.receipt_split_line_id) matchedMap.set(t.receipt_split_line_id, t.id);
+      }
+      return (linesRes.data ?? []).map((l: any) => ({
+        id: l.id,
+        description: l.description,
+        amount_gross: Number(l.amount_gross),
+        sort_order: l.sort_order ?? 0,
+        matched_tx_id: matchedMap.get(l.id) ?? null,
+      }));
+    },
+    enabled: !!selectedReceipt,
+  });
+
+  const hasSplitLines = !!splitLines && splitLines.length > 0;
+
+  // Auto-suggest the split line whose amount matches the bank tx (within 1 cent)
+  useEffect(() => {
+    if (!hasSplitLines || !transaction) {
+      setSelectedSplitLine(null);
+      return;
+    }
+    const txAmt = Math.abs(transaction.amount);
+    const exact = splitLines!.find(
+      (l) => !l.matched_tx_id && Math.abs(Number(l.amount_gross) - txAmt) < 0.02,
+    );
+    setSelectedSplitLine(exact?.id ?? null);
+  }, [hasSplitLines, splitLines, transaction]);
+
   if (!transaction) return null;
 
   const handleAssign = async () => {
-    if (selectedReceipt) {
-      setIsAssigning(true);
-      try {
-        await onAssign(transaction.id, selectedReceipt);
-      } finally {
-        setIsAssigning(false);
-        setSelectedReceipt(null);
-        setSearchQuery('');
-      }
+    if (!selectedReceipt) return;
+    if (hasSplitLines && !selectedSplitLine) return;
+    setIsAssigning(true);
+    try {
+      await onAssign(transaction.id, selectedReceipt, hasSplitLines ? selectedSplitLine : null);
+    } finally {
+      setIsAssigning(false);
+      setSelectedReceipt(null);
+      setSelectedSplitLine(null);
+      setSearchQuery('');
     }
   };
 
   const handleClose = () => {
     setSelectedReceipt(null);
+    setSelectedSplitLine(null);
     setSearchQuery('');
     onOpenChange(false);
   };
