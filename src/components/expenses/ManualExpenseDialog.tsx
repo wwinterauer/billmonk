@@ -277,6 +277,7 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
             </div>
 
             <div className="space-y-2">
+              <Label>Lieferant *</Label>
               <VendorAutocomplete
                 value={vendor}
                 vendorId={selectedVendorId}
@@ -286,7 +287,7 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
                 }}
                 onVendorSelect={handleVendorSelect}
                 disabled={saving}
-                label="Lieferant *"
+                hideLabel
                 placeholder="z.B. Bäckerei Müller"
               />
             </div>
