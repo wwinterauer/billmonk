@@ -282,13 +282,21 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
     try {
       const { data: receipt } = await supabase
         .from('receipts')
-        .select('line_items_raw')
+        .select('line_items_raw, category')
         .eq('id', receiptId)
         .single();
 
       const lineItems = (receipt as any)?.line_items_raw;
       if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
-        toast({ title: 'Keine KI-Positionen', description: 'Für diesen Beleg wurden keine Rechnungspositionen erkannt. Analysiere den Beleg erneut.', variant: 'destructive' });
+        if ((receipt as any)?.category === 'Keine Rechnung') {
+          toast({
+            title: 'Dokument wurde nicht als Beleg erkannt',
+            description: 'Erzwinge zuerst die KI-Extraktion über "KI-Analyse → Klassifizierung übersteuern", dann sind Split-Vorschläge möglich.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({ title: 'Keine KI-Positionen', description: 'Für diesen Beleg wurden keine Rechnungspositionen erkannt. Analysiere den Beleg erneut.', variant: 'destructive' });
+        }
         return;
       }
 

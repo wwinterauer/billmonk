@@ -138,7 +138,7 @@ export function ReanalyzeOptions({
 
   // AI Re-run handler - supports selective field reanalysis
   // Uses receiptId path to ensure vendor settings (expenses_only, keywords) are loaded
-  const reanalyzeFields = async (fieldsToUpdate: string[]) => {
+  const reanalyzeFields = async (fieldsToUpdate: string[], options?: { forceTreatAsReceipt?: boolean }) => {
     if (!fileUrl || isRerunning || !receiptId) return;
     if (fieldsToUpdate.length === 0) return;
 
@@ -147,10 +147,29 @@ export function ReanalyzeOptions({
     try {
       // Call edge function with receiptId so vendor settings are loaded
       const { data, error } = await supabase.functions.invoke('extract-receipt', {
-        body: { receiptId, forceExtract: true, skipMultiCheck: true }
+        body: {
+          receiptId,
+          forceExtract: true,
+          skipMultiCheck: true,
+          forceTreatAsReceipt: options?.forceTreatAsReceipt === true,
+        }
       });
 
       if (error) throw new Error(error.message || 'KI-Analyse fehlgeschlagen');
+
+      // Non-receipt classification: edge function returns success=true, is_receipt=false, no `data`
+      if (data?.success && data?.is_receipt === false) {
+        const docType = data.document_type || 'Sonstiges Dokument';
+        const reason = data.reason || '';
+        toast({
+          variant: 'default',
+          title: 'Dokument ist kein klassischer Beleg',
+          description: `Erkannt als „${docType}". ${reason} Nutze „KI-Analyse → Klassifizierung übersteuern", um die Extraktion trotzdem zu erzwingen.`,
+        });
+        onReanalyzeComplete?.();
+        return;
+      }
+
       if (!data?.success || !data?.data) {
         throw new Error(data?.error || 'KI-Erkennung hat keine Daten zurückgegeben');
       }
@@ -227,7 +246,7 @@ export function ReanalyzeOptions({
       onFieldsUpdated(updates);
 
       toast({
-        title: 'KI-Erkennung abgeschlossen',
+        title: options?.forceTreatAsReceipt ? 'KI-Extraktion erzwungen' : 'KI-Erkennung abgeschlossen',
         description: `Konfidenz: ${Math.round((normalized.confidence || 0) * 100)}% - ${changes.length} Feld(er) aktualisiert`,
       });
 
@@ -243,6 +262,11 @@ export function ReanalyzeOptions({
     } finally {
       setIsRerunning(false);
     }
+  };
+
+  // Force extraction even when the doc was classified as "not a receipt"
+  const forceExtractAsReceipt = () => {
+    reanalyzeFields(REANALYZABLE_FIELDS.map(f => f.id), { forceTreatAsReceipt: true });
   };
 
   // General reanalysis modes
@@ -430,6 +454,14 @@ export function ReanalyzeOptions({
             <div className="flex-1">
               <p>Komplett neu</p>
               <p className="text-xs text-orange-400">Überschreibt alle Felder</p>
+            </div>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onClick={forceExtractAsReceipt}>
+            <Sparkles className="w-4 h-4 mr-2 text-amber-500" />
+            <div className="flex-1">
+              <p>Klassifizierung übersteuern</p>
+              <p className="text-xs text-muted-foreground">Auch wenn kein typischer Beleg</p>
             </div>
           </DropdownMenuItem>
 
