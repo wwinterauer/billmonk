@@ -895,10 +895,20 @@ export default function Reconciliation() {
                               description: (
                                 <Tooltip delayDuration={300}>
                                   <TooltipTrigger asChild>
-                                    <span className="block truncate cursor-default">{truncateText(transaction.description)}</span>
+                                    <span className="flex items-center gap-2 min-w-0 cursor-default">
+                                      <span className="block truncate">{truncateText(transaction.description)}</span>
+                                      {recurringTxIds.has(transaction.id) && (
+                                        <Badge variant="outline" className="shrink-0 text-[10px] gap-1 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300">
+                                          wiederkehrend
+                                        </Badge>
+                                      )}
+                                    </span>
                                   </TooltipTrigger>
                                   <TooltipContent side="bottom" align="start" className="max-w-md whitespace-pre-wrap break-words">
                                     <p>{transaction.description || '–'}</p>
+                                    {recurringTxIds.has(transaction.id) && (
+                                      <p className="mt-1 text-xs text-blue-300">Teil einer erkannten wiederkehrenden Buchungsserie (Akonto).</p>
+                                    )}
                                   </TooltipContent>
                                 </Tooltip>
                               ),
