@@ -75,7 +75,7 @@ export function detectRecurringGroups(txs: RecurringTx[]): RecurringGroup[] {
   const groups: RecurringGroup[] = [];
 
   for (const [key, arr] of buckets) {
-    if (arr.length < 3) continue;
+    if (arr.length < 2) continue;
     const sorted = [...arr].sort((a, b) =>
       (a.transaction_date! < b.transaction_date! ? -1 : 1)
     );
@@ -85,13 +85,16 @@ export function detectRecurringGroups(txs: RecurringTx[]): RecurringGroup[] {
       intervals.push((dates[i] - dates[i - 1]) / (1000 * 60 * 60 * 24));
     }
     const spanDays = (dates[dates.length - 1] - dates[0]) / (1000 * 60 * 60 * 24);
-    if (spanDays < 60) continue;
+    if (spanDays < 25) continue;
     const avg = intervals.reduce((s, x) => s + x, 0) / intervals.length;
 
     let cadence: RecurringGroup['cadence'] = 'irregular';
     if (avg >= 22 && avg <= 38) cadence = 'monthly';
     else if (avg >= 80 && avg <= 100) cadence = 'quarterly';
     else continue; // require a recognizable cadence
+
+    const confidence: RecurringGroup['confidence'] =
+      sorted.length >= 3 || spanDays >= 60 ? 'high' : 'medium';
 
     const [token] = key.split('|');
     const amount = Math.abs(sorted[0].amount!);
@@ -103,6 +106,7 @@ export function detectRecurringGroups(txs: RecurringTx[]): RecurringGroup[] {
       amount,
       count: sorted.length,
       cadence,
+      confidence,
       avgIntervalDays: Math.round(avg),
       firstDate: sorted[0].transaction_date!,
       lastDate: sorted[sorted.length - 1].transaction_date!,
@@ -111,7 +115,11 @@ export function detectRecurringGroups(txs: RecurringTx[]): RecurringGroup[] {
     });
   }
 
-  // Sort by count desc, then amount desc
-  groups.sort((a, b) => b.count - a.count || b.amount - a.amount);
+  // Sort high-confidence first, then by count, then amount
+  groups.sort((a, b) =>
+    (a.confidence === b.confidence ? 0 : a.confidence === 'high' ? -1 : 1)
+    || b.count - a.count
+    || b.amount - a.amount
+  );
   return groups;
 }
