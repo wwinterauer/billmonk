@@ -387,7 +387,7 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            {exportComplete ? 'Export abgeschlossen' : `${receipts.length} Belege exportieren`}
+            {exportComplete ? 'Export abgeschlossen' : `${exportableReceipts.length} Belege exportieren`}
           </DialogTitle>
           {!exportComplete && (
             <DialogDescription>
