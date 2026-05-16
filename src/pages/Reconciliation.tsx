@@ -52,6 +52,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ReceiptAssignmentModal } from '@/components/bank-import/ReceiptAssignmentModal';
 import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
+import { SkontoReconcileDialog, type SkontoCandidate } from '@/components/reconciliation/SkontoReconcileDialog';
+import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -107,6 +109,77 @@ export default function Reconciliation() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
   const [showReceiptPanel, setShowReceiptPanel] = useState(false);
+
+  // Auto-reconcile (skonto) state
+  const [reconcileRunning, setReconcileRunning] = useState(false);
+  const [reconcileApplying, setReconcileApplying] = useState(false);
+  const [reconcileDialogOpen, setReconcileDialogOpen] = useState(false);
+  const [skontoCandidates, setSkontoCandidates] = useState<SkontoCandidate[]>([]);
+  const [reconcileSummary, setReconcileSummary] = useState<{ exact: number; scanned: number }>({ exact: 0, scanned: 0 });
+
+  const runAutoReconcile = async () => {
+    setReconcileRunning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('reconcile-with-skonto', {
+        body: { mode: 'preview' },
+      });
+      if (error) throw error;
+      const exact = data?.exact_applied ?? 0;
+      const scanned = data?.scanned_transactions ?? 0;
+      const candidates: SkontoCandidate[] = data?.skonto_candidates ?? [];
+      setSkontoCandidates(candidates);
+      setReconcileSummary({ exact, scanned });
+
+      // Always refresh after exact matches
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-unmatched-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-receipts-without-payment'] });
+      queryClient.invalidateQueries({ queryKey: ['missing-receipts-list'] });
+
+      if (candidates.length > 0) {
+        setReconcileDialogOpen(true);
+      } else {
+        toast({
+          title: 'Abgleich abgeschlossen',
+          description: exact > 0
+            ? `${exact} Buchung${exact === 1 ? '' : 'en'} exakt zugeordnet. Keine Skonto-Vorschläge.`
+            : 'Keine passenden Belege gefunden.',
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unbekannter Fehler';
+      toast({ title: 'Fehler beim Abgleich', description: msg, variant: 'destructive' });
+    } finally {
+      setReconcileRunning(false);
+    }
+  };
+
+  const applySkontoMatches = async (accepted: { transaction_id: string; receipt_id: string }[]) => {
+    setReconcileApplying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('reconcile-with-skonto', {
+        body: { mode: 'apply', accepted_pairs: accepted },
+      });
+      if (error) throw error;
+      const applied = data?.applied ?? 0;
+      toast({
+        title: 'Skonto-Zuordnungen übernommen',
+        description: `${applied} Buchung${applied === 1 ? '' : 'en'} verknüpft.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-unmatched-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-receipts-without-payment'] });
+      queryClient.invalidateQueries({ queryKey: ['missing-receipts-list'] });
+      setReconcileDialogOpen(false);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unbekannter Fehler';
+      toast({ title: 'Fehler beim Übernehmen', description: msg, variant: 'destructive' });
+    } finally {
+      setReconcileApplying(false);
+    }
+  };
 
   // Reset page when filters change
   useEffect(() => {
@@ -592,8 +665,8 @@ export default function Reconciliation() {
                 </CardContent>
               </Card>
 
-              {/* Warning Banner */}
-              {unmatchedCount !== undefined && unmatchedCount > 0 && statusFilter !== 'unmatched' && (
+              {/* Auto-Reconcile Banner */}
+              {unmatchedCount !== undefined && unmatchedCount > 0 && (
                 <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
@@ -603,11 +676,27 @@ export default function Reconciliation() {
                   </div>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button size="sm" variant="outline" disabled className="opacity-50">
-                        Automatisch matchen
+                      <Button
+                        size="sm"
+                        onClick={runAutoReconcile}
+                        disabled={reconcileRunning}
+                      >
+                        {reconcileRunning ? (
+                          <>
+                            <Clock className="mr-2 h-4 w-4 animate-spin" />
+                            Wird abgeglichen…
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Automatisch matchen
+                          </>
+                        )}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent><p>Kommt bald</p></TooltipContent>
+                    <TooltipContent>
+                      <p>Exakte Treffer werden direkt zugeordnet. Bei 1–5 % Abweichung mit Lieferant/Rechnungsnummer in der Beschreibung wird ein Skonto-Vorschlag zur Bestätigung angezeigt.</p>
+                    </TooltipContent>
                   </Tooltip>
                 </div>
               )}
@@ -947,6 +1036,16 @@ export default function Reconciliation() {
         onUpdate={() => {
           queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
         }}
+      />
+
+      <SkontoReconcileDialog
+        open={reconcileDialogOpen}
+        onOpenChange={setReconcileDialogOpen}
+        candidates={skontoCandidates}
+        exactApplied={reconcileSummary.exact}
+        scanned={reconcileSummary.scanned}
+        onApply={applySkontoMatches}
+        isApplying={reconcileApplying}
       />
       </FeatureGate>
     </DashboardLayout>
