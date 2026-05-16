@@ -974,7 +974,7 @@ const Expenses = () => {
     });
 
     return result;
-  }, [receipts, statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, tagFilter, receiptTagsCache, searchQuery, sortField, sortDirection]);
+  }, [receipts, statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, tagFilter, receiptTagsCache, searchQuery, sortField, sortDirection, splitSearchTextByReceiptId]);
 
   // Pagination
   const totalPages = Math.ceil(filteredReceipts.length / ITEMS_PER_PAGE);
