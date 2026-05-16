@@ -1599,22 +1599,6 @@ export function VendorManagement() {
                       ? 'Ohne Schlagwörter werden allgemein alle Kosten erfasst.'
                       : 'Die KI extrahiert nur Zeilen die diese Begriffe enthalten.'}
                   </p>
-
-                  {/* Extraction Hint Textarea */}
-                  <div className="space-y-1.5 pt-1">
-                    <Label className="text-sm">Extraktions-Hinweis für die KI (optional)</Label>
-                    <Textarea
-                      value={formData.extraction_hint}
-                      onChange={(e) => setFormData(prev => ({ ...prev, extraction_hint: e.target.value.slice(0, 500) }))}
-                      placeholder="z.B. Beträge in Klammern sind Kosten und sollen als positive Werte behandelt werden"
-                      rows={3}
-                      maxLength={500}
-                      className="text-sm"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {formData.extraction_hint.length}/500 Zeichen — Dieser Hinweis wird der KI bei jeder Analyse mitgegeben.
-                    </p>
-                  </div>
                 </div>
               )}
             </div>
