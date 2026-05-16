@@ -2560,293 +2560,54 @@ const Expenses = () => {
               ) : (
                 <>
                   <div className="overflow-x-auto">
-                  <Table>
+                  <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-12">
+                        <TableHead style={{ width: 48, minWidth: 48, maxWidth: 48 }}>
                           <Checkbox
                             checked={isAllSelected}
                             onCheckedChange={handleSelectAll}
                           />
                         </TableHead>
-                        {visibleColumns.has('date') && (
-                          <TableHead 
-                            className="cursor-pointer hover:text-foreground"
-                            onClick={() => handleSort('receipt_date')}
-                          >
-                            Datum {getSortIcon('receipt_date')}
-                          </TableHead>
-                        )}
-                        {visibleColumns.has('vendor') && (
-                          <TableHead 
-                            className="cursor-pointer hover:text-foreground"
-                            onClick={() => handleSort('vendor')}
-                          >
-                            Lieferant {getSortIcon('vendor')}
-                          </TableHead>
-                        )}
-                        {visibleColumns.has('invoice_number') && (
-                          <TableHead 
-                            className="cursor-pointer hover:text-foreground w-[120px]"
-                            onClick={() => handleSort('invoice_number')}
-                          >
-                            Rechnungsnr. {getSortIcon('invoice_number')}
-                          </TableHead>
-                        )}
-                        {visibleColumns.has('description') && (
-                          <TableHead>Beschreibung</TableHead>
-                        )}
-                        {visibleColumns.has('category') && (
-                          <TableHead>Kategorie</TableHead>
-                        )}
-                        {visibleColumns.has('tax_type') && (
-                          <TableHead>Buchungsart</TableHead>
-                        )}
-                        {visibleColumns.has('tags') && (
-                          <TableHead>Tags</TableHead>
-                        )}
-                        {visibleColumns.has('amount') && (
-                          <TableHead 
-                            className="text-right cursor-pointer hover:text-foreground"
-                            onClick={() => handleSort('amount_gross')}
-                          >
-                            Betrag {getSortIcon('amount_gross')}
-                          </TableHead>
-                        )}
-                        {visibleColumns.has('ai') && (
-                          <TableHead>KI</TableHead>
-                        )}
-                        {visibleColumns.has('status') && (
-                          <TableHead>Status</TableHead>
-                        )}
-                        <TableHead className="text-right">Aktionen</TableHead>
+                        <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleColumnDragEnd}>
+                          <SortableContext items={orderedVisibleColumns} strategy={horizontalListSortingStrategy}>
+                            {orderedVisibleColumns.map(key => {
+                              const cfg = COLUMN_CONFIG.find(c => c.key === key)!;
+                              const isSorted = cfg.sortField && sortField === cfg.sortField
+                                ? sortDirection
+                                : false as const;
+                              return (
+                                <EditableTableHead
+                                  key={key}
+                                  id={key}
+                                  label={cfg.label}
+                                  width={columnWidths[key]}
+                                  sortable={!!cfg.sortField}
+                                  isSorted={isSorted}
+                                  align={cfg.align}
+                                  onSort={cfg.sortField ? () => handleSort(cfg.sortField!) : undefined}
+                                  onResize={(w) => handleColumnResize(key, w)}
+                                />
+                              );
+                            })}
+                          </SortableContext>
+                        </DndContext>
+                        <TableHead className="text-right" style={{ width: 160, minWidth: 160 }}>Aktionen</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedReceipts.map((receipt) => (
                         <TableRow key={receipt.id}>
-                          <TableCell>
+                          <TableCell style={{ width: 48, minWidth: 48, maxWidth: 48 }}>
                             <Checkbox
                               checked={selectedIds.has(receipt.id)}
-                              onCheckedChange={(checked) => 
+                              onCheckedChange={(checked) =>
                                 handleSelectOne(receipt.id, checked as boolean)
                               }
                             />
                           </TableCell>
-                          {visibleColumns.has('date') && (
-                            <TableCell className="font-medium">
-                              {receipt.receipt_date 
-                                ? format(new Date(receipt.receipt_date), 'dd.MM.yyyy')
-                                : format(new Date(receipt.created_at), 'dd.MM.yyyy')
-                              }
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('vendor') && (
-                            <TableCell>
-                              {receipt.vendor_brand && receipt.vendor_brand !== receipt.vendor ? (
-                                <div>
-                                  <span className="font-medium">{receipt.vendor_brand}</span>
-                                  <span 
-                                    className="block text-xs text-muted-foreground truncate max-w-[180px]"
-                                    title={receipt.vendor || ''}
-                                  >
-                                    {receipt.vendor}
-                                  </span>
-                                </div>
-                              ) : (
-                                receipt.vendor || '—'
-                              )}
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('invoice_number') && (
-                            <TableCell className="w-[120px]">
-                              {receipt.invoice_number ? (
-                                receipt.invoice_number.length > 15 ? (
-                                  <span 
-                                    className="font-mono text-sm truncate block max-w-[100px]" 
-                                    title={receipt.invoice_number}
-                                  >
-                                    {receipt.invoice_number.slice(0, 12)}...
-                                  </span>
-                                ) : (
-                                  <span className="font-mono text-sm">{receipt.invoice_number}</span>
-                                )
-                              ) : (
-                                <span className="text-muted-foreground">–</span>
-                              )}
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('description') && (
-                            <TableCell className="max-w-[200px]">
-                              <span 
-                                className="truncate block" 
-                                title={receipt.description || undefined}
-                              >
-                                {truncateText(receipt.description)}
-                              </span>
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('category') && (
-                            <TableCell>
-                              {receipt.category ? (
-                                <Badge 
-                                  variant="outline"
-                                  style={{ 
-                                    borderColor: getCategoryColor(receipt.category) || undefined,
-                                    color: getCategoryColor(receipt.category) || undefined,
-                                  }}
-                                >
-                                  {receipt.category}
-                                </Badge>
-                              ) : '—'}
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('tax_type') && (
-                            <TableCell>
-                              {(receipt as any).tax_type ? (
-                                <Badge variant="outline" className="text-xs">
-                                  {(receipt as any).tax_type}
-                                </Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">Offen</span>
-                              )}
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('tags') && (
-                            <TableCell>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <button 
-                                    className="flex items-center gap-1 hover:opacity-80 cursor-pointer min-h-[24px]"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {receiptTagsCache[receipt.id]?.length > 0 ? (
-                                      <>
-                                        {receiptTagsCache[receipt.id].slice(0, 2).map(tag => (
-                                          <Badge
-                                            key={tag.id}
-                                            variant="secondary"
-                                            className="text-xs py-0.5 px-1.5 text-white"
-                                            style={{ backgroundColor: tag.color }}
-                                            title={tag.name}
-                                          >
-                                            {tag.name}
-                                          </Badge>
-                                        ))}
-                                        {receiptTagsCache[receipt.id].length > 2 && (
-                                          <Badge variant="outline" className="text-xs py-0.5 px-1.5">
-                                            +{receiptTagsCache[receipt.id].length - 2}
-                                          </Badge>
-                                        )}
-                                      </>
-                                    ) : (
-                                      <span className="text-xs text-muted-foreground">—</span>
-                                    )}
-                                  </button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-3" align="start">
-                                  <div className="space-y-2">
-                                    <p className="text-sm font-medium mb-2">Tags zuweisen</p>
-                                    <TagSelector
-                                      receiptId={receipt.id}
-                                      size="sm"
-                                      onChange={loadReceipts}
-                                    />
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('amount') && (
-                            <TableCell className="text-right font-medium">
-                              {formatCurrency(receipt.amount_gross)}
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('ai') && (
-                            <TableCell>
-                              {receipt.ai_confidence !== null && receipt.ai_confidence !== undefined ? (
-                                <Badge 
-                                  variant={
-                                    receipt.ai_confidence >= 0.8 ? 'default' :
-                                    receipt.ai_confidence >= 0.5 ? 'secondary' : 'destructive'
-                                  }
-                                  className="text-xs"
-                                >
-                                  <Sparkles className="h-3 w-3 mr-1" />
-                                  {Math.round(receipt.ai_confidence * 100)}%
-                                </Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
-                          )}
-                          {visibleColumns.has('status') && (
-                            <TableCell>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <Badge 
-                                  variant="outline" 
-                                  className={STATUS_CONFIG[receipt.status]?.color || ''}
-                                >
-                                  {receipt.status === 'split' && <Scissors className="w-3 h-3 mr-1" />}
-                                  {receipt.status === 'needs_splitting' && <Scissors className="w-3 h-3 mr-1" />}
-                                  {STATUS_CONFIG[receipt.status]?.label || receipt.status}
-                                </Badge>
-                                {/* Auto-approved badge */}
-                                {(receipt as any).auto_approved && (receipt.status === 'approved' || receipt.status === 'split') && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="bg-success/10 text-success border-success/30 text-xs"
-                                  >
-                                    <Zap className="w-3 h-3 mr-1" />
-                                    Automatisch freigegeben
-                                  </Badge>
-                                )}
-                                {/* Split-from indicator for child receipts */}
-                                {receipt.split_from_receipt_id && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
-                                  >
-                                    <Layers className="w-3 h-3 mr-1" />
-                                    Teil
-                                    {receipt.original_pages && receipt.original_pages.length > 0 && (
-                                      <span className="ml-1 opacity-75">
-                                        (S. {receipt.original_pages.join(', ')})
-                                      </span>
-                                    )}
-                                  </Badge>
-                                )}
-                                {receipt.is_duplicate && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="bg-warning/10 text-warning border-warning/30 cursor-pointer text-xs"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (receipt.duplicate_of) {
-                                        openDuplicateComparison(receipt.id, receipt.duplicate_of);
-                                      }
-                                    }}
-                                  >
-                                    <Copy className="w-3 h-3 mr-1" />
-                                    {receipt.duplicate_score || 0}%
-                                  </Badge>
-                                )}
-                                {/* Split Booking icon */}
-                                {splitBookingEnabled && (receipt as any).is_split_booking && (
-                                  <Layers className="w-3.5 h-3.5 text-violet-600" />
-                                )}
-                                {/* Source Badge for email imports */}
-                                {receipt.source?.startsWith('email_') && (
-                                  <SourceBadge receipt={receipt} compact />
-                                )}
-                                {/* No Receipt Badge */}
-                                {receipt.is_no_receipt_entry && (
-                                  <NoReceiptBadge compact />
-                                )}
-                              </div>
-                            </TableCell>
-                          )}
-                          <TableCell className="text-right">
+                          {orderedVisibleColumns.map(key => renderCell(receipt, key))}
+                          <TableCell className="text-right" style={{ width: 160, minWidth: 160 }}>
                             <div className="flex items-center justify-end gap-1">
                               {/* Duplicate comparison button */}
                               {receipt.is_duplicate && receipt.duplicate_of && (
@@ -2871,7 +2632,7 @@ const Expenses = () => {
                                       Kein Duplikat
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem 
+                                    <DropdownMenuItem
                                       className="text-destructive"
                                       onClick={() => handleDeleteClick(receipt.id)}
                                     >
@@ -2881,7 +2642,6 @@ const Expenses = () => {
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               )}
-                              {/* Split button for needs_splitting status */}
                               {receipt.status === 'needs_splitting' && (
                                 <Button
                                   variant="ghost"
@@ -2893,7 +2653,6 @@ const Expenses = () => {
                                   <Scissors className="h-4 w-4" />
                                 </Button>
                               )}
-                              {/* "Doch ein Beleg" button for not_a_receipt status */}
                               {receipt.status === 'not_a_receipt' && (
                                 <Button
                                   variant="ghost"
