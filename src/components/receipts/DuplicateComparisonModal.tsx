@@ -372,8 +372,10 @@ export function DuplicateComparisonModal({
   onOpenChange, 
   duplicateId, 
   originalId,
-  onRefresh 
+  onRefresh,
+  onViewReceipt
 }: DuplicateComparisonModalProps) {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [duplicate, setDuplicate] = useState<ReceiptData | null>(null);
