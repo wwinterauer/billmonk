@@ -361,7 +361,7 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
               <Label>Kategorie</Label>
               <SearchableSelect
                 value={category}
-                onValueChange={setCategory}
+                onChange={setCategory}
                 options={userCategories.map((c) => ({ value: c.name, label: c.name }))}
                 placeholder="Kategorie wählen…"
                 disabled={saving}
@@ -371,7 +371,7 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
               <Label>Buchungsart (Steuer)</Label>
               <SearchableSelect
                 value={taxType}
-                onValueChange={setTaxType}
+                onChange={setTaxType}
                 options={taxCategories.map((c) => ({ value: c.name, label: c.name }))}
                 placeholder="Buchungsart wählen…"
                 disabled={saving}
