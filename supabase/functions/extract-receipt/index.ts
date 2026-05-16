@@ -956,7 +956,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
       }
 
       // ── Non-receipt document handling ─────────────────────────────
-      if (extractedData.is_receipt === false) {
+      if (extractedData.is_receipt === false && !forceTreatAsReceipt) {
         console.log("Document is NOT a receipt:", { document_type: extractedData.document_type, reason: extractedData.reason });
 
         if (receiptId) {
@@ -980,6 +980,12 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           JSON.stringify({ success: true, is_receipt: false, saved_as_supplementary: true, document_type: extractedData.document_type, reason: extractedData.reason, receiptId }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
+      }
+
+      if (extractedData.is_receipt === false && forceTreatAsReceipt) {
+        console.log("Override: treating non-receipt as receipt:", { document_type: extractedData.document_type });
+        // Force-through: continue normal receipt flow with whatever fields we got.
+        extractedData.is_receipt = true;
       }
 
       // ── Receipt data: learning & DB update ───────────────────────
