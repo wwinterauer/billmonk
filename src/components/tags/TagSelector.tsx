@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import type { Tag } from '@/types/tags';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 interface TagSelectorProps {
   receiptId?: string;              // Einzelner Beleg
