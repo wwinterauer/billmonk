@@ -545,10 +545,24 @@ export default function Reconciliation() {
 
   const handleUnmatch = async (transactionId: string, receiptId: string | null) => {
     try {
+      // Only unlink the receipt's bank_transaction_id if it was actually pointing at this tx
+      // (split-line matches don't set receipts.bank_transaction_id at all).
       if (receiptId) {
-        await supabase.from('receipts').update({ bank_transaction_id: null }).eq('id', receiptId);
+        await supabase
+          .from('receipts')
+          .update({ bank_transaction_id: null })
+          .eq('id', receiptId)
+          .eq('bank_transaction_id', transactionId);
       }
-      await updateStatusMutation.mutateAsync({ transactionId, status: 'unmatched' });
+      await supabase
+        .from('bank_transactions')
+        .update({ status: 'unmatched', receipt_id: null, receipt_split_line_id: null })
+        .eq('id', transactionId);
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-unmatched-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['kpi-receipts-without-payment'] });
+      queryClient.invalidateQueries({ queryKey: ['missing-receipts-list'] });
       toast({ title: 'Zuordnung aufgehoben', description: 'Die Verknüpfung wurde entfernt.' });
     } catch (error) {
       toast({ title: 'Fehler', description: 'Die Zuordnung konnte nicht aufgehoben werden.', variant: 'destructive' });
