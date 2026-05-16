@@ -398,10 +398,19 @@ export function useVendors() {
         }
       }
 
+      // Helper: exclude duplicates and multi-invoice splitting receipts
+      const isEligible = (r: { is_duplicate: boolean | null; status?: string | null; split_suggestion?: any }) => {
+        if (r.is_duplicate) return false;
+        if (r.status === 'needs_splitting' || r.status === 'duplicate') return false;
+        const ss = r.split_suggestion;
+        if (ss && typeof ss === 'object' && (ss as any).contains_multiple_invoices === true) return false;
+        return true;
+      };
+
       // 1) Fetch review receipts already linked by vendor_id
       const { data: linkedReceipts, error: linkedError } = await supabase
         .from('receipts')
-        .select('id, ai_confidence, is_duplicate')
+        .select('id, ai_confidence, is_duplicate, status, split_suggestion')
         .eq('vendor_id', id)
         .eq('status', 'review')
         .gte('ai_confidence', minConfidence);
@@ -411,7 +420,7 @@ export function useVendors() {
       }
 
       // 2) Fetch unlinked review receipts that match by vendor name/brand
-      let unmatchedReceipts: { id: string; ai_confidence: number | null; is_duplicate: boolean | null; vendor: string | null; vendor_brand: string | null }[] = [];
+      let unmatchedReceipts: { id: string; ai_confidence: number | null; is_duplicate: boolean | null; status: string | null; split_suggestion: any; vendor: string | null; vendor_brand: string | null }[] = [];
       if (nameVariants.size > 0) {
         // Build OR filter for vendor and vendor_brand columns
         const nameArray = Array.from(nameVariants);
@@ -421,7 +430,7 @@ export function useVendors() {
 
         const { data: unlinkedData, error: unlinkedError } = await supabase
           .from('receipts')
-          .select('id, ai_confidence, is_duplicate, vendor, vendor_brand')
+          .select('id, ai_confidence, is_duplicate, status, split_suggestion, vendor, vendor_brand')
           .is('vendor_id', null)
           .eq('status', 'review')
           .gte('ai_confidence', minConfidence)
@@ -434,17 +443,17 @@ export function useVendors() {
         }
       }
 
-      // Combine eligible IDs (exclude duplicates)
+      // Combine eligible IDs (exclude duplicates and splitting receipts)
       const eligibleIds: string[] = [];
       if (linkedReceipts) {
         for (const r of linkedReceipts) {
-          if (!r.is_duplicate) eligibleIds.push(r.id);
+          if (isEligible(r)) eligibleIds.push(r.id);
         }
       }
       // Unlinked receipts: also link them to this vendor
       const unlinkIds: string[] = [];
       for (const r of unmatchedReceipts) {
-        if (!r.is_duplicate) {
+        if (isEligible(r)) {
           eligibleIds.push(r.id);
           unlinkIds.push(r.id);
         }

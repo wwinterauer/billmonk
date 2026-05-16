@@ -256,7 +256,7 @@ export function useReceiptProcessing(
         if (vendorData?.auto_approve) {
           const confidence = updateData.ai_confidence ?? 0;
           const minConfidence = vendorData.auto_approve_min_confidence ?? 0.8;
-          const isDuplicate = updateData.is_duplicate === true;
+          const isDuplicate = updateData.is_duplicate === true || updateData.status === 'duplicate';
           const needsSplitting = updateData.status === 'needs_splitting' || 
             (updateData.split_suggestion && typeof updateData.split_suggestion === 'object' && 
              (updateData.split_suggestion as any)?.contains_multiple_invoices === true);
