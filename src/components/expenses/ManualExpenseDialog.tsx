@@ -436,14 +436,22 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
                         )
                       }
                       className={cn(
-                        'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
-                        isSelected
-                          ? 'border-transparent text-white'
-                          : 'bg-background border-border text-foreground hover:bg-muted',
+                        'inline-flex items-center rounded-full text-xs font-medium transition-all duration-150',
+                        'cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50',
+                        isSelected && 'text-white',
+                        !isSelected && 'border bg-transparent hover:bg-opacity-10',
                       )}
-                      style={isSelected ? { backgroundColor: tag.color } : undefined}
+                      style={isSelected
+                        ? { backgroundColor: tag.color, borderColor: 'transparent' }
+                        : { backgroundColor: 'transparent', borderColor: tag.color, color: tag.color }
+                      }
                     >
-                      {tag.name}
+                      {isSelected && (
+                        <svg className="mr-1 h-3 w-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      <span>{tag.name}</span>
                     </button>
                   );
                 })}
