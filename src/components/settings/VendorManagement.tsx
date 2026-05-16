@@ -501,12 +501,20 @@ export function VendorManagement() {
 
     setIsMerging(true);
     try {
+      // Order legal_names so the chosen primary comes first
+      const orderedLegalNames = mergePreview.primary_legal_name
+        ? [
+            mergePreview.primary_legal_name,
+            ...mergePreview.legal_names.filter((n) => n !== mergePreview.primary_legal_name),
+          ]
+        : mergePreview.legal_names;
+
       // 1. Update target vendor
       await supabase
         .from('vendors')
         .update({
           display_name: mergePreview.display_name,
-          legal_names: mergePreview.legal_names,
+          legal_names: orderedLegalNames,
           detected_names: mergePreview.detected_names,
           default_category_id: mergePreview.default_category_id,
           default_vat_rate: mergePreview.default_vat_rate,
