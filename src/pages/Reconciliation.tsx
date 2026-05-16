@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { FeatureGate } from '@/components/FeatureGate';
 import { motion } from 'framer-motion';
 import { 
