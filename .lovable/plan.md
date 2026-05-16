@@ -1,43 +1,75 @@
-## Befund
+## Ziel
 
-Die drei Diemut-Winterauer-Buchungen (3× 467,64 €) **sind** in der Datenbank bereits korrekt der jeweiligen Splitzeile zugeordnet (`bank_transactions.status='matched'`, `receipt_id` + `receipt_split_line_id` gesetzt). Die Auto-Reconcile-Logik funktioniert also.
+Im "Beleg zuordnen"-Dialog (auf der Reconciliation-Seite) eine dritte Option ergänzen: **"Als Ausgabe erfassen"**. Damit kann eine Bankbuchung direkt in eine vollwertige Ausgabe umgewandelt und im gewohnten Detail-Fenster (wie aus dem Review) komplett befüllt werden – inkl. Lieferant, Rechnungsnummer, Kategorien, Steuersatz, Split-Buchung usw.
 
-Das Problem ist die **Anzeige**:
+## UX-Flow
 
-1. In Spalte „Zugeordneter Beleg" wird nur der Eltern-Beleg angezeigt: `Winterauer Wilfried u. Julia (1.175,66 €)`. Da der Betrag (1.175,66) nicht zum Bank-Betrag (467,64) passt, wirkt das wie eine falsche Zuordnung – obwohl die Zeile korrekt zugewiesen ist.
-2. Im KPI „Belege ohne Zahlung" und in der Liste werden Splitbelege immer als „unbezahlt" gezählt, weil dort nur `receipts.bank_transaction_id IS NULL` geprüft wird – Splitbelege setzen dieses Feld bewusst nicht.
-3. `ReceiptAssignmentModal` lädt die Splitzeile beim Trennen / Neu-Zuordnen nicht zurück (Schritt 2 startet leer).
+1. User klickt in der Reconciliation-Tabelle auf "Beleg zuordnen" einer unmatched Buchung.
+2. Im Modal-Footer erscheinen **drei** Aktionen statt zwei:
+   - Bestehenden Beleg auswählen (Standardliste, wie heute)
+   - **Als Ausgabe erfassen** (neu)
+   - Neuen Beleg hochladen (wie heute)
+3. Klick auf "Als Ausgabe erfassen":
+   - Erzeugt sofort einen neuen `receipts`-Eintrag mit den Daten der Buchung (siehe unten).
+   - Verknüpft Buchung ↔ Beleg (`bank_transactions.receipt_id`, `bank_transactions.status='matched'`).
+   - Schließt das Zuordnungs-Modal und öffnet direkt das **ReceiptDetailPanel** für den neuen Beleg – die gleiche Vollmaske wie im Review-Fenster.
+4. User vervollständigt Lieferant, Rechnungsnummer, Kategorie, Steuer, ggf. Split-Buchung und speichert. Status wird beim Speichern wie üblich auf `approved` gesetzt.
 
-## Änderungen (nur Frontend)
+## Vorbelegung der neuen Ausgabe
 
-### A) `Reconciliation.tsx` – Spalte „Zugeordneter Beleg"
-- Query um `receipt_split_line_id` und Join `receipt_split_lines:receipt_split_line_id ( id, description, amount_gross )` erweitern.
-- Anzeige:
-  - Whole-Match (keine Zeile): wie heute.
-  - Split-Match: `Vendor — Linienbeschreibung (Linienbetrag)`, z. B. `Winterauer Wilfried u. Julia — WINTERAUER, Diemuth (467,64 €)`.
-- `handleUnmatch` zusätzlich `receipt_split_line_id: null` setzen (steht schon in Z. 559, prüfen dass es überall greift).
+| Feld | Wert aus Bankbuchung |
+|---|---|
+| `user_id` | aktueller User |
+| `receipt_date` | `bank_transactions.transaction_date` |
+| `amount_gross` | `Math.abs(bank_transactions.amount)` |
+| `vendor` | aus `description` extrahiert (heuristisch: "Empfänger: X" / "Auftraggeber: X" / sonst erster sinnvoller Token) |
+| `currency` | `EUR` (Default) |
+| `payment_method` | `bank_transfer` |
+| `status` | `review` (User muss vervollständigen) |
+| `source` | `bank_import` (bestehender erlaubter Wert) |
+| `is_no_receipt_entry` | `true` (kein PDF/Bild) |
+| `bank_transaction_reference` | `bank_transactions.description` (gekürzt) |
+| `file_url` / `file_path` | `null` |
 
-### B) KPI „Belege ohne Zahlung" + Tab „Fehlende Belege" – split-aware
-- Neue Query lädt alle Belege mit `is_split_booking=true` plus deren Splitzeilen plus zugehörige `bank_transactions.receipt_split_line_id`.
-- Ein Splitbeleg gilt als **bezahlt**, wenn jede Splitzeile in `bank_transactions` mit `status='matched'` referenziert ist. Sonst **teilweise bezahlt** – zählt mit (Anzahl offener Zeilen, Summe offener Zeilenbeträge) in das KPI.
-- Whole-Belege: weiterhin nur `bank_transaction_id IS NULL` zählen.
-- KPI-Label bleibt; Zahl und Gesamtsumme spiegeln die neue Logik wider.
+Optional: Wenn die Buchung ein `bank_import_keywords`-Treffer ist, werden `category`, `tax_rate` und `description` aus der Vorlage vorbelegt (gleiche Logik wie beim Bank-Import "Ohne Rechnung").
 
-### C) `ReceiptAssignmentModal.tsx` – Re-Assign / Vorauswahl
-- Beim Öffnen für eine bereits gematchte Transaktion: aktuelle `receipt_split_line_id` als Default in Schritt 2 vorauswählen.
-- Bereits durch **andere** Bank-Tx belegte Zeilen bleiben deaktiviert (bestehende Logik).
+## Technische Umsetzung
 
-### D) `useSplitLines` ist bereits vorhanden – wiederverwenden
-- Für KPI-Aggregation und Anzeige derselbe Hook bzw. eine kleine Helferfunktion `isSplitReceiptFullyPaid(receipt, lines, matchedLineIds)`.
+### 1. `ReceiptAssignmentModal.tsx`
+- Neue Prop `onCreateAsExpense: (transactionId: string) => void`.
+- Im Footer (sowohl Leer-Zustand als auch normaler Zustand) Button **"Als Ausgabe erfassen"** mit Icon `Plus` einfügen, zwischen "Hochladen" und "Zuordnen".
+- Kurzer Hilfetext: *"Ohne Original-Beleg direkt erfassen"*.
 
-## Out of Scope
-- Keine Änderung an `auto-reconcile` / `reconcile-with-skonto` – Matching funktioniert.
-- Kein Kombi-Matching (N Banktx → 1 Ganz-Beleg).
-- Keine DB-Migration nötig.
+### 2. `src/pages/Reconciliation.tsx`
+- Neue Handler-Funktion `handleCreateAsExpense(transactionId)`:
+  1. Bankbuchung aus State holen.
+  2. `vendor` aus Description parsen (kleine Helper-Funktion `extractVendorFromDescription`, kann später wiederverwendet werden).
+  3. Optional: Keyword-Match gegen `bank_import_keywords` → Defaults übernehmen.
+  4. `INSERT` in `receipts` mit obigen Defaults; `select().single()` liefert neue `id`.
+  5. `UPDATE bank_transactions SET receipt_id = neu.id, status = 'matched' WHERE id = transactionId`.
+  6. `queryClient.invalidateQueries(['bank-transactions'])` + Toast.
+  7. `setShowAssignModal(false)`; `setSelectedReceiptId(neu.id)`; `setShowReceiptPanel(true)`.
+- Prop `onCreateAsExpense={handleCreateAsExpense}` an das Modal weiterreichen.
 
-## Dateien
-- `src/pages/Reconciliation.tsx` (Query erweitern, KPI-Query split-aware, Spalten-Anzeige).
-- `src/components/bank-import/ReceiptAssignmentModal.tsx` (Vorauswahl bestehender Splitzeile).
-- ggf. kleine Helferfunktion in `src/hooks/useSplitLines.ts`.
+### 3. `ReceiptDetailPanel.tsx`
+- Keine strukturellen Änderungen nötig – das Panel akzeptiert bereits beliebige Receipt-IDs und kann Belege ohne Datei anzeigen (PDF-Viewer wird leer/ausgeblendet).
+- Falls noch nicht vorhanden: kleiner Hinweis-Badge "Ohne Original-Beleg" wenn `is_no_receipt_entry === true` (optional, kosmetisch).
 
-Soll ich das so umsetzen?
+### 4. Keine Migration nötig
+- Spalten `source='bank_import'`, `is_no_receipt_entry`, `bank_transaction_reference`, `bank_transactions.receipt_id` existieren bereits.
+- Status `review` ist im bestehenden Check-Constraint.
+
+### 5. Edge-Cases
+- Wenn Buchung bereits gematcht ist → Button "Als Ausgabe erfassen" wird ausgeblendet (Modal wird heute eh nur für unmatched geöffnet).
+- Negative Beträge (Ausgaben) → `Math.abs`; positive Beträge (Einnahmen) → später separater Flow, hier vorerst gleich behandeln, aber Hinweis "Achtung: Einnahme" anzeigen wenn `amount > 0`.
+- Fehler beim Insert → Toast + Modal bleibt offen.
+
+## Was sich **nicht** ändert
+- Auto-Reconcile-Logik, Split-Line-Matching, Bank-Import-Workflow, Review-Seite – alles unverändert.
+- Keine neuen Tabellen, keine RLS-Änderungen.
+
+## Dateien (geschätzt)
+- `src/components/bank-import/ReceiptAssignmentModal.tsx` (neuer Button + Prop)
+- `src/pages/Reconciliation.tsx` (Handler + State-Übergabe)
+- `src/components/receipts/ReceiptDetailPanel.tsx` (optionaler Badge)
+- ggf. `src/lib/bank-description-parser.ts` (kleine Helper für Vendor-Extraktion, falls noch nicht existiert)
