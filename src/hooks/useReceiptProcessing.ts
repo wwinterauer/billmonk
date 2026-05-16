@@ -216,7 +216,7 @@ export function useReceiptProcessing(
       try {
         const { data: currentReceipt } = await supabase
           .from('receipts')
-          .select('file_hash')
+          .select('file_hash, is_duplicate')
           .eq('id', receiptId)
           .maybeSingle();
 
@@ -239,6 +239,12 @@ export function useReceiptProcessing(
           (updateData as any).duplicate_checked_at = new Date().toISOString();
           updateData.status = 'duplicate';
         } else {
+          // Clear stale duplicate marking if a previous (less precise) check had
+          // flagged it — now that we have fresh AI-extracted data (incl. invoice#),
+          // a clean re-check should win.
+          updateData.is_duplicate = false;
+          (updateData as any).duplicate_of = null;
+          (updateData as any).duplicate_score = null;
           (updateData as any).duplicate_checked_at = new Date().toISOString();
         }
       } catch (dupErr) {
