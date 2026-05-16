@@ -570,6 +570,7 @@ serve(async (req) => {
 
       if (userCategories && userCategories.length > 0) {
         const catNames = userCategories.map(c => c.name).filter(n => n !== 'Keine Rechnung');
+        userCategoryNames = catNames;
         if (catNames.length > 0) {
           categoryList = catNames.join(', ');
 
