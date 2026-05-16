@@ -940,7 +940,7 @@ const Expenses = () => {
     });
 
     return result;
-  }, [receipts, statusFilter, categoryFilter, taxTypeFilter, tagFilter, receiptTagsCache, searchQuery, sortField, sortDirection]);
+  }, [receipts, statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, splitFilter, tagFilter, receiptTagsCache, searchQuery, sortField, sortDirection]);
 
   // Pagination
   const totalPages = Math.ceil(filteredReceipts.length / ITEMS_PER_PAGE);
@@ -949,10 +949,38 @@ const Expenses = () => {
     currentPage * ITEMS_PER_PAGE
   );
 
+  // Load split lines for visible split-booking receipts on this page
+  const visibleSplitReceiptIds = useMemo(
+    () => paginatedReceipts.filter(r => (r as any).is_split_booking).map(r => r.id),
+    [paginatedReceipts]
+  );
+  const { data: visibleSplitLines = [] } = useSplitLines(
+    splitBookingEnabled && visibleSplitReceiptIds.length > 0,
+    visibleSplitReceiptIds
+  );
+  const splitLinesByReceiptId = useMemo(() => {
+    const map = new Map<string, typeof visibleSplitLines>();
+    visibleSplitLines.forEach(line => {
+      const arr = map.get(line.receipt_id) || [];
+      arr.push(line);
+      map.set(line.receipt_id, arr);
+    });
+    return map;
+  }, [visibleSplitLines]);
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, tagFilter, searchQuery]);
+  }, [statusFilter, categoryFilter, taxTypeFilter, invoiceFilter, splitFilter, tagFilter, searchQuery]);
 
   // Save column visibility to localStorage
   useEffect(() => {
