@@ -817,7 +817,7 @@ const Expenses = () => {
 
   // Duplicate count
   const duplicateCount = useMemo(() => {
-    return receipts.filter(r => r.is_duplicate === true).length;
+    return receipts.filter(r => r.is_duplicate === true && r.duplicate_of).length;
   }, [receipts]);
 
   // Filter and sort receipts
@@ -826,7 +826,7 @@ const Expenses = () => {
 
     // Status filter - special handling for 'duplicate'
     if (statusFilter === 'duplicate') {
-      result = result.filter(r => r.is_duplicate === true);
+      result = result.filter(r => r.is_duplicate === true && r.duplicate_of);
     } else if (statusFilter !== 'all') {
       result = result.filter(r => r.status === statusFilter);
     }
