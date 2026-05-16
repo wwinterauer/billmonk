@@ -1058,6 +1058,21 @@ const Review = () => {
                         }}
                       />
                     )}
+                    {currentReceipt && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCheckDuplicate}
+                        disabled={checkingDuplicate || imageLoading}
+                      >
+                        {checkingDuplicate ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Copy className="h-4 w-4 mr-2" />
+                        )}
+                        Duplikat prüfen
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>
