@@ -70,6 +70,7 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
   const [paymentMethod, setPaymentMethod] = useState('Bar');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [notes, setNotes] = useState('');
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
   // Sync default VAT once loaded
   useEffect(() => {
