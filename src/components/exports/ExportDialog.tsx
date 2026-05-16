@@ -520,11 +520,14 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
                 </div>
               </div>
 
-              {receipts.some(r => !r.file_url) && (
+              {skippedCount > 0 && (
                 <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                   <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-yellow-700">
-                    Einige Belege haben keine Datei und werden übersprungen.
+                    {skippedCount === 1
+                      ? '1 Eintrag ohne Dokument wird übersprungen'
+                      : `${skippedCount} Einträge ohne Dokument werden übersprungen`}
+                    {' '}(z.B. manuelle Ausgaben, Schlagwort-Buchungen aus dem Kontoabgleich oder als „Keine Rechnung" markierte Einträge).
                   </p>
                 </div>
               )}
@@ -534,7 +537,7 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
               <Button variant="ghost" onClick={() => onOpenChange(false)}>
                 Abbrechen
               </Button>
-              <Button onClick={handleExportZip} disabled={receipts.length === 0}>
+              <Button onClick={handleExportZip} disabled={exportableReceipts.length === 0}>
                 ZIP erstellen & herunterladen
               </Button>
             </DialogFooter>
