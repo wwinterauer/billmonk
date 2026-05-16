@@ -7,7 +7,8 @@ import {
   Building2, 
   Loader2,
   ImageIcon,
-  Percent
+  Percent,
+  Plus,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { de } from 'date-fns/locale';
