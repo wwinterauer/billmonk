@@ -506,13 +506,37 @@ export function ReceiptAssignmentModal({
                   <p className="font-medium text-foreground">Keine passenden Belege gefunden</p>
                   <p className="text-sm text-muted-foreground mt-1 mb-4">
                     {filterSimilarAmount || filterSimilarDate 
-                      ? 'Versuche die Filter anzupassen oder lade einen neuen Beleg hoch'
-                      : 'Lade einen neuen Beleg hoch, um ihn zuzuordnen'}
+                      ? 'Versuche die Filter anzupassen, lade einen Beleg hoch oder erfasse die Buchung direkt als Ausgabe'
+                      : 'Lade einen neuen Beleg hoch oder erfasse die Buchung direkt als Ausgabe'}
                   </p>
-                  <Button variant="outline" onClick={onUploadNew}>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Neuen Beleg hochladen
-                  </Button>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <Button variant="outline" onClick={onUploadNew}>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Neuen Beleg hochladen
+                    </Button>
+                    {onCreateAsExpense && transaction && (
+                      <Button
+                        variant="outline"
+                        disabled={isCreatingExpense}
+                        onClick={async () => {
+                          if (!transaction) return;
+                          setIsCreatingExpense(true);
+                          try {
+                            await onCreateAsExpense(transaction.id);
+                          } finally {
+                            setIsCreatingExpense(false);
+                          }
+                        }}
+                      >
+                        {isCreatingExpense ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Plus className="mr-2 h-4 w-4" />
+                        )}
+                        Als Ausgabe erfassen
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <RadioGroup value={selectedReceipt || ''} onValueChange={setSelectedReceipt}>
