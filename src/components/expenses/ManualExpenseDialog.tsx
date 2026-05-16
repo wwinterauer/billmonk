@@ -169,7 +169,7 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
           ? vatRate === 'mixed' ? null : 0
           : parseFloat(vatRate);
 
-      const { error } = await supabase.from('receipts').insert({
+      const { data: inserted, error } = await supabase.from('receipts').insert({
         user_id: user.id,
         file_url: null,
         file_name: null,
@@ -193,9 +193,19 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
         notes: notes.trim() || null,
         ai_confidence: null,
         auto_approved: false,
-      });
+      }).select('id').single();
 
       if (error) throw error;
+
+      // Tags zuweisen
+      if (inserted?.id && selectedTagIds.length > 0) {
+        const tagRows = selectedTagIds.map((tagId) => ({
+          receipt_id: inserted.id,
+          tag_id: tagId,
+        }));
+        const { error: tagErr } = await supabase.from('receipt_tags').insert(tagRows);
+        if (tagErr) console.error('Tag-Zuweisung fehlgeschlagen:', tagErr);
+      }
 
       toast({ title: 'Ausgabe erfasst', description: `${vendor} – ${gross.toFixed(2)} ${currency}` });
       onCreated();
