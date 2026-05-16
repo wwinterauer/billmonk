@@ -457,6 +457,14 @@ export function ReanalyzeOptions({
             </div>
           </DropdownMenuItem>
 
+          <DropdownMenuItem onClick={forceExtractAsReceipt}>
+            <Sparkles className="w-4 h-4 mr-2 text-amber-500" />
+            <div className="flex-1">
+              <p>Klassifizierung übersteuern</p>
+              <p className="text-xs text-muted-foreground">Auch wenn kein typischer Beleg</p>
+            </div>
+          </DropdownMenuItem>
+
           <DropdownMenuSeparator />
 
           {/* OPTION 2: Field-wise Analysis */}
