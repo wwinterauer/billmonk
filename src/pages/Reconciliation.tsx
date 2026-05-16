@@ -1490,6 +1490,7 @@ export default function Reconciliation() {
           setShowAssignModal(false);
           navigate('/upload');
         }}
+        onCreateAsExpense={handleCreateAsExpense}
       />
 
       {/* Receipt Detail Panel */}
