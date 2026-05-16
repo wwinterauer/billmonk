@@ -1976,6 +1976,23 @@ const Expenses = () => {
                   Duplikate {duplicateCount > 0 && `(${duplicateCount})`}
                 </div>
               </SelectItem>
+              {splitBookingEnabled && (
+                <>
+                  <SelectSeparator />
+                  <SelectItem value="__split__">
+                    <div className="flex items-center">
+                      <Layers className="w-4 h-4 mr-2 text-chart-4" />
+                      Mit Splitbuchung
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="__no_split__">
+                    <div className="flex items-center">
+                      <Layers className="w-4 h-4 mr-2 text-muted-foreground" />
+                      Ohne Splitbuchung
+                    </div>
+                  </SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
 
