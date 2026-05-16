@@ -184,7 +184,40 @@ export default function Reconciliation() {
     }
   };
 
-  // Reset page when filters change
+  // ===== Editable column configs =====
+  type TxCol = 'date' | 'description' | 'amount' | 'source' | 'status' | 'matched' | 'actions';
+  const txColumns: ColumnDef<TxCol>[] = useMemo(() => [
+    { key: 'date', label: 'Datum', defaultWidth: 120, sortable: true },
+    { key: 'description', label: 'Beschreibung', defaultWidth: 360 },
+    { key: 'amount', label: 'Betrag', defaultWidth: 130, sortable: true, align: 'right' },
+    { key: 'source', label: 'Quelle', defaultWidth: 110 },
+    { key: 'status', label: 'Status', defaultWidth: 110 },
+    { key: 'matched', label: 'Zugeordneter Beleg', defaultWidth: 240 },
+    { key: 'actions', label: 'Aktionen', defaultWidth: 220, align: 'right' },
+  ], []);
+  const txCols = useEditableColumns<TxCol>('reconcile-tx', txColumns);
+
+  type InvCol = 'number' | 'customer' | 'amount' | 'due' | 'status' | 'actions';
+  const invColumns: ColumnDef<InvCol>[] = useMemo(() => [
+    { key: 'number', label: 'Rechnungsnr.', defaultWidth: 140 },
+    { key: 'customer', label: 'Kunde', defaultWidth: 240 },
+    { key: 'amount', label: 'Betrag', defaultWidth: 130, align: 'right' },
+    { key: 'due', label: 'Fälligkeitsdatum', defaultWidth: 200 },
+    { key: 'status', label: 'Status', defaultWidth: 130 },
+    { key: 'actions', label: 'Aktionen', defaultWidth: 140, align: 'right' },
+  ], []);
+  const invCols = useEditableColumns<InvCol>('reconcile-inv', invColumns);
+
+  type MissCol = 'date' | 'description' | 'amount' | 'source' | 'actions';
+  const missColumns: ColumnDef<MissCol>[] = useMemo(() => [
+    { key: 'date', label: 'Datum', defaultWidth: 120 },
+    { key: 'description', label: 'Beschreibung', defaultWidth: 420 },
+    { key: 'amount', label: 'Betrag', defaultWidth: 130, align: 'right' },
+    { key: 'source', label: 'Quelle', defaultWidth: 110 },
+    { key: 'actions', label: 'Aktionen', defaultWidth: 160, align: 'right' },
+  ], []);
+  const missCols = useEditableColumns<MissCol>('reconcile-miss', missColumns);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [statusFilter, searchQuery, dateFrom, dateTo]);
