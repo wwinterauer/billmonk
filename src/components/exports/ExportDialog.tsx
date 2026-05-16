@@ -271,7 +271,7 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
 
   // Export as ZIP
   const handleExportZip = async () => {
-    if (receipts.length === 0) return;
+    if (exportableReceipts.length === 0) return;
 
     setIsExporting(true);
     setExportComplete(false);
@@ -285,15 +285,15 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
     let successCount = 0;
 
     try {
-      for (let i = 0; i < receipts.length; i++) {
+      for (let i = 0; i < exportableReceipts.length; i++) {
         if (abortRef.current) {
           toast({ title: 'Export abgebrochen' });
           break;
         }
 
-        const receipt = receipts[i];
+        const receipt = exportableReceipts[i];
         setCurrentItem(i + 1);
-        setProgress(Math.round(((i + 1) / receipts.length) * 100));
+        setProgress(Math.round(((i + 1) / exportableReceipts.length) * 100));
 
         if (!receipt.file_url) continue;
 
