@@ -813,7 +813,14 @@ export default function Reconciliation() {
                                 </span>
                               ),
                               description: (
-                                <span title={transaction.description || ''} className="block truncate">{truncateText(transaction.description)}</span>
+                                <Tooltip delayDuration={300}>
+                                  <TooltipTrigger asChild>
+                                    <span className="block truncate cursor-default">{truncateText(transaction.description)}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" align="start" className="max-w-md whitespace-pre-wrap break-words">
+                                    <p>{transaction.description || '–'}</p>
+                                  </TooltipContent>
+                                </Tooltip>
                               ),
                               amount: (
                                 <span className={cn('font-mono whitespace-nowrap', transaction.amount && transaction.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400')}>
@@ -1071,7 +1078,16 @@ export default function Reconciliation() {
                         {missingReceiptsList.map((tx: any) => {
                           const cells: Record<MissCol, React.ReactNode> = {
                             date: <span className="font-medium whitespace-nowrap">{tx.transaction_date ? format(new Date(tx.transaction_date), 'dd.MM.yyyy', { locale: de }) : '–'}</span>,
-                            description: <span title={tx.description || ''} className="block truncate">{truncateText(tx.description)}</span>,
+                            description: (
+                              <Tooltip delayDuration={300}>
+                                <TooltipTrigger asChild>
+                                  <span className="block truncate cursor-default">{truncateText(tx.description)}</span>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" align="start" className="max-w-md whitespace-pre-wrap break-words">
+                                  <p>{tx.description || '–'}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            ),
                             amount: <span className="font-mono text-red-600 dark:text-red-400">{formatAmount(tx.amount)}</span>,
                             source: (
                               <Badge variant="secondary" className="text-xs">
