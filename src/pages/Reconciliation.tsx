@@ -1044,54 +1044,80 @@ export default function Reconciliation() {
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
-                    <Table>
+                    <missCols.DndContext sensors={missCols.sensors} collisionDetection={missCols.closestCenter} onDragEnd={missCols.handleDragEnd}>
+                    <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Datum</TableHead>
-                          <TableHead>Beschreibung</TableHead>
-                          <TableHead className="text-right">Betrag</TableHead>
-                          <TableHead>Quelle</TableHead>
-                          <TableHead className="text-right">Aktionen</TableHead>
+                          <SortableContext items={missCols.order} strategy={horizontalListSortingStrategy}>
+                            {missCols.order.map((key) => {
+                              const def = missCols.defByKey[key];
+                              return (
+                                <EditableTableHead
+                                  key={key}
+                                  id={key}
+                                  label={def.label}
+                                  width={missCols.widths[key]}
+                                  sortable={false}
+                                  isSorted={false}
+                                  align={def.align}
+                                  onResize={(w) => missCols.setWidth(key, w)}
+                                />
+                              );
+                            })}
+                          </SortableContext>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {missingReceiptsList.map((tx: any) => (
-                          <TableRow key={tx.id}>
-                            <TableCell className="font-medium whitespace-nowrap">
-                              {tx.transaction_date ? format(new Date(tx.transaction_date), 'dd.MM.yyyy', { locale: de }) : '–'}
-                            </TableCell>
-                            <TableCell>
-                              <span title={tx.description || ''}>{truncateText(tx.description)}</span>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-red-600 dark:text-red-400">
-                              {formatAmount(tx.amount)}
-                            </TableCell>
-                            <TableCell>
+                        {missingReceiptsList.map((tx: any) => {
+                          const cells: Record<MissCol, React.ReactNode> = {
+                            date: <span className="font-medium whitespace-nowrap">{tx.transaction_date ? format(new Date(tx.transaction_date), 'dd.MM.yyyy', { locale: de }) : '–'}</span>,
+                            description: <span title={tx.description || ''} className="block truncate">{truncateText(tx.description)}</span>,
+                            amount: <span className="font-mono text-red-600 dark:text-red-400">{formatAmount(tx.amount)}</span>,
+                            source: (
                               <Badge variant="secondary" className="text-xs">
                                 {tx.source === 'live' ? 'Live-Bank' : 'CSV-Import'}
                               </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleAssignClick({
-                                  id: tx.id,
-                                  transaction_date: tx.transaction_date,
-                                  description: tx.description,
-                                  amount: tx.amount,
-                                  status: 'unmatched',
-                                  receipt_id: null,
-                                })}
-                              >
-                                <FileText className="mr-1 h-3 w-3" />
-                                Beleg zuordnen
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                            ),
+                            actions: (
+                              <div className="flex justify-end">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleAssignClick({
+                                    id: tx.id,
+                                    transaction_date: tx.transaction_date,
+                                    description: tx.description,
+                                    amount: tx.amount,
+                                    status: 'unmatched',
+                                    receipt_id: null,
+                                  })}
+                                >
+                                  <FileText className="mr-1 h-3 w-3" />
+                                  Beleg zuordnen
+                                </Button>
+                              </div>
+                            ),
+                          };
+                          return (
+                            <TableRow key={tx.id}>
+                              {missCols.order.map((key) => {
+                                const def = missCols.defByKey[key];
+                                return (
+                                  <TableCell
+                                    key={key}
+                                    style={{ width: missCols.widths[key], minWidth: missCols.widths[key], maxWidth: missCols.widths[key] }}
+                                    className={cn('overflow-hidden', def.align === 'right' && 'text-right')}
+                                  >
+                                    {cells[key]}
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
+                    </missCols.DndContext>
                     </div>
                   )}
                 </CardContent>
