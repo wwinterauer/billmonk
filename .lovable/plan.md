@@ -1,23 +1,30 @@
-## Ziel
-Beim Beleg-ZIP-Export sollen Einträge ohne hinterlegtes Dokument (manuelle Ausgaben ohne Beleg, Schlagwort-Buchungen aus dem Kontoabgleich, "Keine Rechnung"-Markierungen) korrekt herausgefiltert werden – inkl. richtiger Zählung und klarer Hinweismeldung.
+## Problem
 
-## Änderungen
+Beim manuellen Speichern einer Ausgabe sendet `ManualExpenseDialog` `source: 'manual'`. Die DB-Constraint `receipts_source_check` lässt aber nur diese Werte zu:
 
-**`src/components/exports/ExportDialog.tsx`**
+`upload, email_webhook, email_imap, cloud, api, camera, share, split, bank_import`
 
-1. Am Anfang der Komponente abgeleitete Liste bilden:
-   ```ts
-   const exportableReceipts = receipts.filter(
-     r => r.file_url && !r.is_no_receipt_entry
-   );
-   const skippedCount = receipts.length - exportableReceipts.length;
-   ```
-2. Überall wo bisher `receipts` für ZIP-Export, Fortschritt, Header-Zähler (`${receipts.length} Belege exportieren`) und `generateFileName` verwendet wird → `exportableReceipts` benutzen.
-3. Hinweisbox (Zeile 516) ersetzen: Wenn `skippedCount > 0`, Text auf
-   "{skippedCount} Eintrag/Einträge ohne Dokument werden übersprungen (z.B. manuelle Ausgaben oder Schlagwort-Buchungen aus dem Kontoabgleich)."
-4. Export-Button deaktivieren wenn `exportableReceipts.length === 0`.
-5. Innerhalb der ZIP-Schleife entfällt der `if (!receipt.file_url) continue;`-Check (bereits vorgefiltert), dient nur noch als Sicherheitsnetz.
+→ Postgres lehnt das INSERT mit Check-Constraint-Verletzung ab. Im Frontend kommt nur „Unbekannter Fehler" an.
 
-## Nicht betroffen
-- CSV/Excel/Steuer-Export (TaxExportDialog) → enthalten weiterhin alle Datensätze, da hier nur Metadaten exportiert werden, keine Dateien.
-- Keine DB- oder Hook-Änderungen.
+## Fix
+
+**Migration** auf der `receipts`-Tabelle: Constraint droppen und neu anlegen, mit `'manual'` zusätzlich erlaubt.
+
+```sql
+ALTER TABLE public.receipts DROP CONSTRAINT receipts_source_check;
+ALTER TABLE public.receipts ADD CONSTRAINT receipts_source_check
+  CHECK (source = ANY (ARRAY[
+    'upload','email_webhook','email_imap','cloud','api',
+    'camera','share','split','bank_import','manual'
+  ]));
+```
+
+## Zusätzlich (optional, klein)
+
+In `handleSave` von `ManualExpenseDialog.tsx` die Fehlermeldung robuster machen, damit künftige DB-Fehler im Toast sichtbar werden (Supabase-Fehler haben `message`/`details`/`hint`, nicht zwingend `Error`-Instanz):
+
+```ts
+const msg = (err as any)?.message || (err as any)?.details || (err as any)?.hint || 'Unbekannter Fehler';
+```
+
+Keine weiteren Codeänderungen nötig.
