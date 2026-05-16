@@ -490,6 +490,10 @@ export function ExportFormatDialog({
       case 'split_vat_rate': return (receipt as any)._split_vat_rate ?? '';
       case 'split_vat_amount': return (receipt as any)._split_vat_amount ?? '';
       case 'split_is_private': return (receipt as any)._split_is_private ? 'Ja' : '';
+      case 'tags': {
+        const tags = (receipt as any).tags as Array<{ name: string }> | undefined;
+        return tags && tags.length > 0 ? tags.map(t => t.name).join('; ') : '';
+      }
       default: return (receipt as unknown as Record<string, unknown>)[field];
     }
   };
