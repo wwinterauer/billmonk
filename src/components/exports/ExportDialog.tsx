@@ -77,6 +77,7 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
   const [groupByYear, setGroupByYear] = useState(false);
   const [groupByMonth, setGroupByMonth] = useState(true);
   const [groupByCategory, setGroupByCategory] = useState(false);
+  const [excludeNoReceipt, setExcludeNoReceipt] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportComplete, setExportComplete] = useState(false);
   const [exportedCount, setExportedCount] = useState(0);
@@ -84,11 +85,13 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
   const [currentItem, setCurrentItem] = useState(0);
   const [currentFileName, setCurrentFileName] = useState('');
 
-  // Nur Belege mit hinterlegtem Dokument exportieren
-  // (manuelle Ausgaben ohne Beleg, Schlagwort-Buchungen, "Keine Rechnung" überspringen)
-  const exportableReceipts = receipts.filter(
-    r => r.file_url && !r.is_no_receipt_entry
-  );
+  // Nur Belege mit hinterlegtem Dokument exportieren.
+  // Wenn excludeNoReceipt aktiv ist, werden zusätzlich "Keine Rechnung"-Einträge ausgeschlossen.
+  const exportableReceipts = receipts.filter(r => {
+    if (!r.file_url) return false;
+    if (excludeNoReceipt && (r.is_no_receipt_entry || r.category === 'Keine Rechnung')) return false;
+    return true;
+  });
   const skippedCount = receipts.length - exportableReceipts.length;
 
   // Load naming settings from database
@@ -518,6 +521,17 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
                     </label>
                   </div>
                 </div>
+              </div>
+
+              <div className="flex items-center space-x-3 pt-2 border-t">
+                <Checkbox
+                  id="excludeNoReceipt"
+                  checked={excludeNoReceipt}
+                  onCheckedChange={(v) => setExcludeNoReceipt(v as boolean)}
+                />
+                <label htmlFor="excludeNoReceipt" className="text-sm cursor-pointer">
+                  „Keine Rechnung"-Einträge ausschließen
+                </label>
               </div>
 
               {skippedCount > 0 && (
