@@ -54,6 +54,9 @@ import { ReceiptAssignmentModal } from '@/components/bank-import/ReceiptAssignme
 import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
 import { SkontoReconcileDialog, type SkontoCandidate } from '@/components/reconciliation/SkontoReconcileDialog';
 import { Sparkles } from 'lucide-react';
+import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { EditableTableHead } from '@/components/expenses/EditableTableHead';
+import { useEditableColumns, type ColumnDef } from '@/hooks/useEditableColumns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
