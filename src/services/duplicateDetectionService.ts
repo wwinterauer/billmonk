@@ -192,7 +192,7 @@ export async function checkForDuplicates(
     }
 
     // 6. Amount + date only (60% - possible)
-    // Strict rule: if new receipt has invoice_number, candidate must have same one or none
+    // Hard-exclude candidates with a different invoice_number.
     if (receiptData.amount_gross && receiptData.receipt_date) {
       let adQuery = supabase
         .from('receipts')
@@ -203,19 +203,30 @@ export async function checkForDuplicates(
       if (receiptData.invoice_number) {
         adQuery = adQuery.or(`invoice_number.eq.${receiptData.invoice_number},invoice_number.is.null`);
       }
-      const { data: amountDateMatch } = await adQuery
+      const { data: candidates } = await adQuery
         .in('status', activeStatuses)
         .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
-        .limit(1)
-        .maybeSingle();
+        .limit(5);
 
-      if (amountDateMatch) {
+      const filtered = (candidates || []).filter(c => {
+        if (receiptData.invoice_number && c.invoice_number && c.invoice_number !== receiptData.invoice_number) {
+          return false;
+        }
+        return true;
+      });
+
+      if (filtered.length > 0) {
+        const best = filtered.find(c => !c.invoice_number) || filtered[0];
+        // Weak signal if new has no invoice but candidate does — lower score further
+        const weakSignal = !receiptData.invoice_number && best.invoice_number;
         return {
           isDuplicate: true,
-          duplicateOf: amountDateMatch.id,
-          score: 60,
+          duplicateOf: best.id,
+          score: weakSignal ? 45 : 60,
           matchType: 'possible',
-          matchReasons: ['Gleicher Betrag', 'Gleiches Datum']
+          matchReasons: weakSignal
+            ? ['Gleicher Betrag', 'Gleiches Datum', 'Rechnungsnummer noch nicht extrahiert']
+            : ['Gleicher Betrag', 'Gleiches Datum']
         };
       }
     }
