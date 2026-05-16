@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
@@ -1323,29 +1324,16 @@ export function VendorManagement() {
             {/* Standard-Kategorie */}
             <div className="space-y-2">
               <Label htmlFor="default_category">Standard-Kategorie</Label>
-              <Select
-                value={formData.default_category_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, default_category_id: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Keine (manuell wählen)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {userCategories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      <span className="flex items-center">
-                        {category.color && (
-                          <span
-                            className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
-                            style={{ backgroundColor: category.color }}
-                          />
-                        )}
-                        {category.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={formData.default_category_id || ''}
+                onChange={(value) => setFormData(prev => ({ ...prev, default_category_id: value }))}
+                options={userCategories.map((c) => ({ value: c.id, label: c.name }))}
+                placeholder="Keine (manuell wählen)"
+                searchPlaceholder="Kategorie suchen..."
+                emptyText="Keine Kategorie gefunden."
+                allowClear
+                clearLabel="— Keine Vorgabe —"
+              />
               <p className="text-xs text-muted-foreground">
                 Wird automatisch bei neuen Belegen gesetzt
               </p>
@@ -1354,27 +1342,16 @@ export function VendorManagement() {
             {/* Standard-Tag */}
             <div className="space-y-2">
               <Label htmlFor="default_tag">Standard-Tag</Label>
-              <Select
-                value={formData.default_tag_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, default_tag_id: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Kein Standard-Tag" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeTags.map((tag) => (
-                    <SelectItem key={tag.id} value={tag.id}>
-                      <span className="flex items-center">
-                        <span
-                          className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
-                          style={{ backgroundColor: tag.color }}
-                        />
-                        {tag.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={formData.default_tag_id || ''}
+                onChange={(value) => setFormData(prev => ({ ...prev, default_tag_id: value }))}
+                options={activeTags.map((t) => ({ value: t.id, label: t.name }))}
+                placeholder="Kein Standard-Tag"
+                searchPlaceholder="Tag suchen..."
+                emptyText="Kein Tag gefunden."
+                allowClear
+                clearLabel="— Keine Vorgabe —"
+              />
               <p className="text-xs text-muted-foreground">
                 Tag wird automatisch bei Lieferantenauswahl zugewiesen
               </p>
@@ -1383,42 +1360,31 @@ export function VendorManagement() {
             {/* Standard MwSt-Satz */}
             <div className="space-y-2">
               <Label htmlFor="default_vat_rate">Standard MwSt-Satz</Label>
-              <Select
-                value={formData.default_vat_rate}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, default_vat_rate: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Keine Vorgabe" />
-                </SelectTrigger>
-                <SelectContent>
-                  {VAT_RATES.map((rate) => (
-                    <SelectItem key={rate.value} value={rate.value}>
-                      {rate.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={formData.default_vat_rate || ''}
+                onChange={(value) => setFormData(prev => ({ ...prev, default_vat_rate: value }))}
+                options={VAT_RATES.map((r) => ({ value: r.value, label: r.label }))}
+                placeholder="Keine Vorgabe"
+                searchPlaceholder="MwSt-Satz suchen..."
+                emptyText="Kein Satz gefunden."
+                allowClear
+                clearLabel="— Keine Vorgabe —"
+              />
             </div>
 
             {/* Standard-Buchungsart (tax_type) */}
             <div className="space-y-2">
               <Label htmlFor="default_tax_type">Standard-Buchungsart</Label>
-              <Select
-                value={formData.default_tax_type || '__none__'}
-                onValueChange={(value) =>
-                  setFormData(prev => ({ ...prev, default_tax_type: value === '__none__' ? '' : value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Keine Vorgabe" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Keine Vorgabe</SelectItem>
-                  {taxCategories.map((c) => (
-                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={formData.default_tax_type || ''}
+                onChange={(value) => setFormData(prev => ({ ...prev, default_tax_type: value }))}
+                options={taxCategories.map((c) => ({ value: c.name, label: c.name }))}
+                placeholder="Keine Vorgabe"
+                searchPlaceholder="Buchungsart suchen..."
+                emptyText="Keine Buchungsart gefunden."
+                allowClear
+                clearLabel="— Keine Vorgabe —"
+              />
               <p className="text-xs text-muted-foreground">
                 Steuer-Buchungsart wird bei neuen Belegen dieses Lieferanten automatisch vorausgewählt (sofern AI keine erkennt).
               </p>
@@ -1427,25 +1393,26 @@ export function VendorManagement() {
             {/* Standard-Zahlungsart */}
             <div className="space-y-2">
               <Label htmlFor="default_payment_method">Standard-Zahlungsart</Label>
-              <Select
-                value={formData.default_payment_method}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, default_payment_method: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Keine Vorgabe" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Überweisung">Überweisung</SelectItem>
-                  <SelectItem value="Kreditkarte">Kreditkarte</SelectItem>
-                  <SelectItem value="Debitkarte">Karte Debitzahlung</SelectItem>
-                  <SelectItem value="Bar">Barzahlung</SelectItem>
-                  <SelectItem value="PayPal">PayPal</SelectItem>
-                  <SelectItem value="Apple Pay">Apple Pay</SelectItem>
-                  <SelectItem value="Google Pay">Google Pay</SelectItem>
-                  <SelectItem value="Lastschrift">Lastschrift</SelectItem>
-                  <SelectItem value="Sonstige">Sonstige</SelectItem>
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={formData.default_payment_method || ''}
+                onChange={(value) => setFormData(prev => ({ ...prev, default_payment_method: value }))}
+                options={[
+                  { value: 'Überweisung', label: 'Überweisung' },
+                  { value: 'Kreditkarte', label: 'Kreditkarte' },
+                  { value: 'Debitkarte', label: 'Karte Debitzahlung' },
+                  { value: 'Bar', label: 'Barzahlung' },
+                  { value: 'PayPal', label: 'PayPal' },
+                  { value: 'Apple Pay', label: 'Apple Pay' },
+                  { value: 'Google Pay', label: 'Google Pay' },
+                  { value: 'Lastschrift', label: 'Lastschrift' },
+                  { value: 'Sonstige', label: 'Sonstige' },
+                ]}
+                placeholder="Keine Vorgabe"
+                searchPlaceholder="Zahlungsart suchen..."
+                emptyText="Keine Zahlungsart gefunden."
+                allowClear
+                clearLabel="— Keine Vorgabe —"
+              />
               <p className="text-xs text-muted-foreground">
                 Zahlungsart wird automatisch bei Lieferantenauswahl zugewiesen
               </p>
