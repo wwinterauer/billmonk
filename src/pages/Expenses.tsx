@@ -377,12 +377,12 @@ const Expenses = () => {
 
   // Actions column width (resizable)
   const [actionsColWidth, setActionsColWidth] = useState<number>(() => {
-    const saved = localStorage.getItem('expenses-actions-col-width');
+    const saved = localStorage.getItem('expenses-actions-col-width-v2');
     const n = saved ? parseInt(saved, 10) : NaN;
-    return Number.isFinite(n) ? Math.max(60, Math.min(400, n)) : 120;
+    return Number.isFinite(n) ? Math.max(60, Math.min(400, n)) : 96;
   });
   useEffect(() => {
-    localStorage.setItem('expenses-actions-col-width', String(actionsColWidth));
+    localStorage.setItem('expenses-actions-col-width-v2', String(actionsColWidth));
   }, [actionsColWidth]);
   const handleActionsResizeDown = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -2628,7 +2628,7 @@ const Expenses = () => {
                           </SortableContext>
                         </DndContext>
                         <TableHead
-                          className="text-right relative group"
+                          className="text-right relative group px-2"
                           style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}
                         >
                           <div
@@ -2652,8 +2652,8 @@ const Expenses = () => {
                             />
                           </TableCell>
                           {orderedVisibleColumns.map(key => renderCell(receipt, key))}
-                          <TableCell className="text-right" style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}>
-                            <div className="flex items-center justify-end gap-1">
+                          <TableCell className="text-right px-2" style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}>
+                            <div className="flex items-center justify-end gap-0.5 flex-wrap">
                               {/* Duplicate comparison button */}
                               {receipt.is_duplicate && receipt.duplicate_of && (
                                 <DropdownMenu>
