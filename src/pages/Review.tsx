@@ -24,6 +24,7 @@ import {
   Zap,
   Copy,
   GitCompare,
+  FileX,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -91,7 +92,7 @@ import { useVendors } from '@/hooks/useVendors';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
 import { VendorAutocomplete } from '@/components/receipts/VendorAutocomplete';
 import { VendorBrandAutocomplete } from '@/components/receipts/VendorBrandAutocomplete';
-import { PAYMENT_METHODS } from '@/lib/constants';
+import { PAYMENT_METHODS, NO_RECEIPT_CATEGORY } from '@/lib/constants';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PageMeta } from '@/components/PageMeta';
 import { DuplicateComparisonModal } from '@/components/receipts/DuplicateComparisonModal';
