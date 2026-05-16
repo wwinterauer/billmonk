@@ -377,10 +377,13 @@ const Expenses = () => {
 
   // Actions column width (resizable)
   const [actionsColWidth, setActionsColWidth] = useState<number>(() => {
-    const saved = localStorage.getItem('expenses-actions-col-width');
+    const saved = localStorage.getItem('expenses-actions-col-width-v2');
     const n = saved ? parseInt(saved, 10) : NaN;
-    return Number.isFinite(n) ? Math.max(60, Math.min(400, n)) : 120;
+    return Number.isFinite(n) ? Math.max(60, Math.min(400, n)) : 96;
   });
+  useEffect(() => {
+    localStorage.setItem('expenses-actions-col-width-v2', String(actionsColWidth));
+  }, [actionsColWidth]);
   useEffect(() => {
     localStorage.setItem('expenses-actions-col-width', String(actionsColWidth));
   }, [actionsColWidth]);
