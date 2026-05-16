@@ -968,7 +968,11 @@ export function ExportFormatDialog({
 
   // ZIP Export with folder support
   const exportToZIP = async () => {
-    if (receipts.length === 0) return;
+    const zipReceipts = excludeNoReceipt
+      ? receipts.filter(r => r.category !== 'Keine Rechnung')
+      : receipts;
+
+    if (zipReceipts.length === 0) return;
 
     setIsExporting(true);
     setExportComplete(false);
@@ -982,15 +986,15 @@ export function ExportFormatDialog({
     let successCount = 0;
 
     try {
-      for (let i = 0; i < receipts.length; i++) {
+      for (let i = 0; i < zipReceipts.length; i++) {
         if (abortRef.current) {
           toast({ title: 'Export abgebrochen' });
           break;
         }
 
-        const receipt = receipts[i];
+        const receipt = zipReceipts[i];
         setCurrentItem(i + 1);
-        setProgress(Math.round(((i + 1) / receipts.length) * 100));
+        setProgress(Math.round(((i + 1) / zipReceipts.length) * 100));
 
         if (!receipt.file_url) continue;
 
