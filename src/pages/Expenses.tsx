@@ -314,7 +314,7 @@ const Expenses = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [taxTypeFilter, setTaxTypeFilter] = useState<string>('all');
   const [invoiceFilter, setInvoiceFilter] = useState<string>('all');
-  const [splitFilter, setSplitFilter] = useState<'all' | 'split' | 'no_split'>('all');
+  
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
