@@ -1958,6 +1958,18 @@ const Review = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Duplicate Comparison Modal */}
+        <DuplicateComparisonModal
+          open={duplicateModalOpen}
+          onOpenChange={setDuplicateModalOpen}
+          duplicateId={currentReceipt?.id ?? null}
+          originalId={currentReceipt?.duplicate_of ?? null}
+          onRefresh={() => {
+            queryClient.invalidateQueries({ queryKey: ['receipts'] });
+            loadReceipts();
+          }}
+        />
       </div>
     </DashboardLayout>
   );
