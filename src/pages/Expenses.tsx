@@ -2057,6 +2057,14 @@ const Expenses = () => {
                   <span>{col.label}</span>
                 </DropdownMenuItem>
               ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={(e) => { e.preventDefault(); resetColumnLayout(); }}
+                className="flex items-center gap-2 text-muted-foreground"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Layout zurücksetzen</span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
