@@ -2627,7 +2627,17 @@ const Expenses = () => {
                             })}
                           </SortableContext>
                         </DndContext>
-                        <TableHead className="text-right" style={{ width: 160, minWidth: 160 }}>Aktionen</TableHead>
+                        <TableHead
+                          className="text-right relative group"
+                          style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}
+                        >
+                          <div
+                            onPointerDown={handleActionsResizeDown}
+                            className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary/40"
+                            title="Spaltenbreite anpassen"
+                          />
+                          Aktionen
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
