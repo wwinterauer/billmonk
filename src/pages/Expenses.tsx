@@ -855,10 +855,10 @@ const Expenses = () => {
       result = result.filter(r => !r.invoice_number || r.invoice_number.trim() === '');
     }
 
-    // Split booking filter
-    if (splitFilter === 'split') {
+    // Split booking filter (via status dropdown)
+    if (statusFilter === '__split__') {
       result = result.filter(r => (r as any).is_split_booking === true);
-    } else if (splitFilter === 'no_split') {
+    } else if (statusFilter === '__no_split__') {
       result = result.filter(r => !(r as any).is_split_booking);
     }
 
