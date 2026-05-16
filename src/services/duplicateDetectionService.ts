@@ -247,15 +247,39 @@ export async function markAsDuplicate(
   score: number
 ): Promise<boolean> {
   try {
+    if (receiptId === duplicateOfId) return false;
+
+    // Load both receipts to (a) prevent circular references and (b) ensure the
+    // older one is treated as the "original".
+    const { data: rows } = await supabase
+      .from('receipts')
+      .select('id, created_at, duplicate_of')
+      .in('id', [receiptId, duplicateOfId]);
+
+    const me = rows?.find(r => r.id === receiptId);
+    const other = rows?.find(r => r.id === duplicateOfId);
+    if (!me || !other) return false;
+
+    // Circular guard: if candidate already points back to us, abort.
+    if (other.duplicate_of === receiptId) {
+      console.warn('markAsDuplicate: circular duplicate reference avoided', { receiptId, duplicateOfId });
+      return false;
+    }
+
+    // Always mark the newer one as duplicate of the older one.
+    const meIsOlder = new Date(me.created_at).getTime() <= new Date(other.created_at).getTime();
+    const duplicateId = meIsOlder ? duplicateOfId : receiptId;
+    const originalId = meIsOlder ? receiptId : duplicateOfId;
+
     const { error } = await supabase
       .from('receipts')
       .update({
         is_duplicate: true,
-        duplicate_of: duplicateOfId,
+        duplicate_of: originalId,
         duplicate_score: score,
         duplicate_checked_at: new Date().toISOString()
       })
-      .eq('id', receiptId);
+      .eq('id', duplicateId);
 
     return !error;
   } catch (error) {
