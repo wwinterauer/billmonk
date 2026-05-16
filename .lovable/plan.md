@@ -1,29 +1,31 @@
-## Problem
+## Ziel
 
-Im `DuplicateComparisonModal` ruft der **Details**-Button `handleViewDetails` auf, das per `window.location.href = '/expenses?receipt=...'` auf die Ausgaben-Seite springt. Diese Seite liest den `?receipt=`-Parameter aktuell nicht aus, daher landet der User in der Übersicht statt im Beleg-Detail.
+Beleg im Review-Flow und im `ReceiptDetailPanel` als **"Keine Rechnung"** markieren können – ohne Umweg über Löschen oder eine Kategorie. Der Beleg wird dabei als "kein Rechnungsbeleg" gekennzeichnet, aus dem Review-Workflow entfernt, bleibt aber als Eintrag (z. B. für Bank-Abgleich) erhalten.
 
 ## Lösung
 
-Zwei kleine Änderungen, die zusammen sicherstellen, dass "Details" immer im richtigen Beleg-Detail-Panel landet – auch wenn der Vergleich aus dem Review geöffnet wurde.
+Neuer Button **"Keine Rechnung"** in beiden Action-Footern (zwischen *Ablehnen* und *Überspringen* bzw. *Überprüfen*). Klick setzt:
+- `is_no_receipt_entry = true`
+- `status = 'approved'` (raus aus Review/Pending)
+- `category = 'Keine Rechnung'` (Konstante `NO_RECEIPT_CATEGORY` aus `src/lib/constants.ts`)
 
-### 1. `DuplicateComparisonModal.tsx`
-- Neue optionale Prop: `onViewReceipt?: (receiptId: string) => void`.
-- `handleViewDetails(receiptId)`:
-  - Schließt das Modal (`onOpenChange(false)`).
-  - Wenn `onViewReceipt` vorhanden → ruft es mit der ID auf (kein Page-Reload, gleiche Seite).
-  - Sonst Fallback: `navigate('/expenses?receipt=…')` via `useNavigate` (statt `window.location.href`, das einen vollen Reload auslöst).
+Damit verhält sich der Eintrag konsistent zur "Manuelle Ausgabe ohne Beleg"-Erfassung (`ManualExpenseDialog`), die genau diese Felder bereits so setzt.
 
-### 2. `src/pages/Expenses.tsx`
-- Prop `onViewReceipt={(id) => { setDuplicateComparisonOpen(false); openReceiptDetail(id); }}` an das Modal weiterreichen → öffnet direkt das vorhandene `ReceiptDetailPanel`.
-- Beim Mount/URL-Change `?receipt=<uuid>` auslesen (`useSearchParams`) und bei vorhandenem Param `openReceiptDetail(id)` aufrufen + Param wieder aus der URL entfernen. Das deckt den Fall ab, wenn die Navigation aus Review (anderer Seite) kommt.
+### 1. `src/pages/Review.tsx`
+- Im Action-Footer (um Zeile 1834–1881) neuen `Button variant="outline"` **"Keine Rechnung"** einfügen, Icon `FileX` (oder `Receipt`-mit-Strich), zwischen *Ablehnen* und *Überspringen*.
+- Handler `markAsNoReceipt()`: ruft eine kleine Variante von `saveReceipt('approved')` auf, die zusätzlich `is_no_receipt_entry: true` und `category: NO_RECEIPT_CATEGORY` mit in den Update-Payload nimmt, danach `goToNext()` wie bei `approved`.
+- Bestätigungs-Toast: "Als 'Keine Rechnung' markiert".
 
-### 3. `src/pages/Review.tsx`
-- Prop `onViewReceipt` **nicht** setzen → es greift der Navigations-Fallback nach `/expenses?receipt=…`, wo Punkt 2 das Detail-Panel automatisch öffnet.
+### 2. `src/components/receipts/ReceiptDetailPanel.tsx`
+- Im Footer (Zeile 1889–1937) neuen `Button variant="outline"` **"Keine Rechnung"** in der rechten Button-Gruppe, vor *Ablehnen*.
+- Klick → `handleSaveClick('approved')` aufrufen, vorher Formular-State um `is_no_receipt_entry = true` und `category = NO_RECEIPT_CATEGORY` ergänzen (gleiches Pattern wie die bestehenden Save-Aufrufe).
+- Wenn `receipt.is_no_receipt_entry === true` bereits gesetzt ist, Button als *aktiv/disabled* anzeigen ("Bereits markiert").
 
-## Was sich **nicht** ändert
-- Vergleichs-Logik, Lösch-Logik (`handleDelete`, Promotion eines Duplikats zum Original) bleibt unverändert.
-- Keine Migration, keine RLS-Änderung.
+### 3. Keine weiteren Änderungen
+- Kein DB-Migration nötig (`is_no_receipt_entry`, `NO_RECEIPT_CATEGORY` existieren).
+- Keine Änderung an Filtern/Listen – die Konstante wird in `Expenses`, `Reports`, `Reconciliation` bereits berücksichtigt.
+- Keine Änderungen am AI-Lernen (Belege mit `is_no_receipt_entry` fließen nicht in Vendor-Learning ein – schon bestehend).
 
 ## Dateien
-- `src/components/receipts/DuplicateComparisonModal.tsx`
-- `src/pages/Expenses.tsx`
+- `src/pages/Review.tsx`
+- `src/components/receipts/ReceiptDetailPanel.tsx`
