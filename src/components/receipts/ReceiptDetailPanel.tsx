@@ -738,6 +738,9 @@ export function ReceiptDetailPanel({
     } finally {
       setSaving(false);
     }
+  };
+
+  // Execute save after dialog confirmation
   const executeSaveWithLearning = () => {
     const pendingStatus = (window as unknown as { pendingSaveStatus?: 'approved' | 'rejected' | 'review' | 'completed' }).pendingSaveStatus;
     setShowSaveDialog(false);
