@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { PAYMENT_METHODS } from '@/lib/constants';
-import { Repeat } from 'lucide-react';
+import { PAYMENT_METHODS, NO_RECEIPT_CATEGORY } from '@/lib/constants';
+import { Repeat, FileX } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
