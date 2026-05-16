@@ -543,6 +543,59 @@ export function ReceiptAssignmentModal({
           </ScrollArea>
         </div>
 
+        {/* Split line picker (step 2) */}
+        {hasSplitLines && (
+          <div className="px-6 pt-4 pb-2 border-t bg-muted/30">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              Splitzeile auswählen
+            </p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Dieser Beleg ist in {splitLines!.length} Zeilen aufgeteilt. Wähle die Zeile, die zu dieser Bankbuchung gehört.
+            </p>
+            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              {splitLines!.map((line) => {
+                const txAmt = Math.abs(transaction.amount);
+                const amountMatches = Math.abs(Number(line.amount_gross) - txAmt) < 0.02;
+                const taken = !!line.matched_tx_id;
+                return (
+                  <button
+                    key={line.id}
+                    type="button"
+                    disabled={taken}
+                    onClick={() => setSelectedSplitLine(line.id)}
+                    className={cn(
+                      'w-full flex items-center justify-between gap-3 p-2.5 rounded-md border text-sm transition-all text-left',
+                      selectedSplitLine === line.id
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                        : 'border-border hover:border-primary/50 hover:bg-muted/30',
+                      taken && 'opacity-50 cursor-not-allowed',
+                    )}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">
+                        {line.description || `Zeile ${line.sort_order + 1}`}
+                      </p>
+                      {taken && (
+                        <p className="text-xs text-muted-foreground">Bereits zugeordnet</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {amountMatches && !taken && (
+                        <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0">
+                          Betrag passt
+                        </Badge>
+                      )}
+                      <span className="font-semibold tabular-nums">
+                        {formatAmount(Number(line.amount_gross))}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <DialogFooter className="px-6 py-4 border-t bg-muted/30">
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button variant="ghost" onClick={handleClose} className="sm:order-1">
@@ -552,9 +605,9 @@ export function ReceiptAssignmentModal({
               <Upload className="mr-2 h-4 w-4" />
               Neuen Beleg hochladen
             </Button>
-            <Button 
-              onClick={handleAssign} 
-              disabled={!selectedReceipt || isAssigning}
+            <Button
+              onClick={handleAssign}
+              disabled={!selectedReceipt || isAssigning || (hasSplitLines && !selectedSplitLine)}
               className="sm:order-3"
             >
               {isAssigning ? (
