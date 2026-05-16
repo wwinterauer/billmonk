@@ -802,6 +802,21 @@ export default function Reconciliation() {
                 </div>
               )}
 
+              {/* Recurring (Akonto) suggestions */}
+              <RecurringSuggestionsPanel
+                groups={recurringGroups}
+                dismissedKeys={dismissedRecurring}
+                onDismiss={(key) =>
+                  setDismissedRecurring(prev => {
+                    const next = new Set(prev);
+                    next.add(key);
+                    return next;
+                  })
+                }
+                onIgnoreAll={handleBulkIgnoreRecurring}
+                isBusy={bulkIgnoreBusy}
+              />
+
               {/* Transactions Table */}
               <Card>
                 <CardContent className="p-0">
