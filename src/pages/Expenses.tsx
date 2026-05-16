@@ -108,6 +108,20 @@ import { cn } from '@/lib/utils';
 import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
 import { Folder } from 'lucide-react';
 import { Copy, Scissors, Layers, Zap } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { EditableTableHead } from '@/components/expenses/EditableTableHead';
 import { checkForDuplicates, type DuplicateCheckResult } from '@/services/duplicateDetectionService';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
