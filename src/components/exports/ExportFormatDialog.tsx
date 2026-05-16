@@ -560,8 +560,8 @@ export function ExportFormatDialog({
     const columns = visibleColumns;
     let sortedReceipts = [...receipts];
 
-    // Filter out "Keine Rechnung" if option is enabled (not for ZIP)
-    if (excludeNoReceipt && exportFormat !== 'zip') {
+    // Filter out "Keine Rechnung" if option is enabled
+    if (excludeNoReceipt) {
       sortedReceipts = sortedReceipts.filter(r => r.category !== 'Keine Rechnung');
     }
 
@@ -896,13 +896,16 @@ export function ExportFormatDialog({
   const generateZIPBlob = async (): Promise<Blob> => {
     const zip = new JSZip();
     const usedNames = new Map<string, number>();
+    const zipReceipts = excludeNoReceipt
+      ? receipts.filter(r => r.category !== 'Keine Rechnung')
+      : receipts;
 
-    for (let i = 0; i < receipts.length; i++) {
+    for (let i = 0; i < zipReceipts.length; i++) {
       if (abortRef.current) break;
 
-      const receipt = receipts[i];
+      const receipt = zipReceipts[i];
       setCurrentItem(i + 1);
-      setProgress(Math.round(((i + 1) / receipts.length) * 100));
+      setProgress(Math.round(((i + 1) / zipReceipts.length) * 100));
 
       if (!receipt.file_url) continue;
 
@@ -965,7 +968,11 @@ export function ExportFormatDialog({
 
   // ZIP Export with folder support
   const exportToZIP = async () => {
-    if (receipts.length === 0) return;
+    const zipReceipts = excludeNoReceipt
+      ? receipts.filter(r => r.category !== 'Keine Rechnung')
+      : receipts;
+
+    if (zipReceipts.length === 0) return;
 
     setIsExporting(true);
     setExportComplete(false);
@@ -979,15 +986,15 @@ export function ExportFormatDialog({
     let successCount = 0;
 
     try {
-      for (let i = 0; i < receipts.length; i++) {
+      for (let i = 0; i < zipReceipts.length; i++) {
         if (abortRef.current) {
           toast({ title: 'Export abgebrochen' });
           break;
         }
 
-        const receipt = receipts[i];
+        const receipt = zipReceipts[i];
         setCurrentItem(i + 1);
-        setProgress(Math.round(((i + 1) / receipts.length) * 100));
+        setProgress(Math.round(((i + 1) / zipReceipts.length) * 100));
 
         if (!receipt.file_url) continue;
 
@@ -1339,17 +1346,15 @@ export function ExportFormatDialog({
                   </>
                 )}
 
-                {/* Exclude "Keine Rechnung" option (not for ZIP) */}
-                {exportFormat !== 'zip' && (
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="excludeNoReceipt">„Keine Rechnung" ausschließen</Label>
-                    <Switch
-                      id="excludeNoReceipt"
-                      checked={excludeNoReceipt}
-                      onCheckedChange={setExcludeNoReceipt}
-                    />
-                  </div>
-                )}
+                {/* Exclude "Keine Rechnung" option */}
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="excludeNoReceipt">„Keine Rechnung" ausschließen</Label>
+                  <Switch
+                    id="excludeNoReceipt"
+                    checked={excludeNoReceipt}
+                    onCheckedChange={setExcludeNoReceipt}
+                  />
+                </div>
 
                 {/* Split bookings option (only when feature enabled, not for ZIP) */}
                 {splitBookingEnabled && exportFormat !== 'zip' && (
