@@ -523,6 +523,17 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
                 </div>
               </div>
 
+              <div className="flex items-center space-x-3 pt-2 border-t">
+                <Checkbox
+                  id="excludeNoReceipt"
+                  checked={excludeNoReceipt}
+                  onCheckedChange={(v) => setExcludeNoReceipt(v as boolean)}
+                />
+                <label htmlFor="excludeNoReceipt" className="text-sm cursor-pointer">
+                  „Keine Rechnung"-Einträge ausschließen
+                </label>
+              </div>
+
               {skippedCount > 0 && (
                 <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                   <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
