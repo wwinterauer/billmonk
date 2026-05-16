@@ -77,11 +77,18 @@ interface BankTransaction {
   amount: number | null;
   status: string | null;
   receipt_id: string | null;
+  receipt_split_line_id?: string | null;
   is_expense?: boolean | null;
   source?: string;
   receipt?: {
     id: string;
     vendor: string | null;
+    amount_gross: number | null;
+    is_split_booking?: boolean | null;
+  } | null;
+  split_line?: {
+    id: string;
+    description: string | null;
     amount_gross: number | null;
   } | null;
 }
@@ -244,20 +251,76 @@ export default function Reconciliation() {
     enabled: !!user?.id,
   });
 
-  // Receipts without payment (approved/completed, no bank_transaction_id)
+  // Receipts without payment (approved/completed). Split-aware:
+  //  - Whole receipts: unpaid iff bank_transaction_id IS NULL
+  //  - Split receipts: unpaid iff at least one split line has no matched bank tx;
+  //    open amount = sum of unmatched line amounts.
   const { data: receiptsWithoutPaymentData } = useQuery({
     queryKey: ['kpi-receipts-without-payment'],
     queryFn: async () => {
       if (!user?.id) return { count: 0, total: 0 };
-      const { data, error } = await supabase
+      const { data: receipts, error } = await supabase
         .from('receipts')
-        .select('amount_gross')
+        .select('id, amount_gross, bank_transaction_id, is_split_booking')
         .eq('user_id', user.id)
-        .in('status', ['approved', 'completed'])
-        .is('bank_transaction_id', null);
+        .in('status', ['approved', 'completed']);
       if (error) throw error;
-      const total = (data || []).reduce((sum, r) => sum + (r.amount_gross || 0), 0);
-      return { count: data?.length || 0, total };
+
+      const splitReceiptIds = (receipts || [])
+        .filter(r => r.is_split_booking)
+        .map(r => r.id);
+
+      let splitLinesByReceipt = new Map<string, Array<{ id: string; amount_gross: number }>>();
+      let matchedLineIds = new Set<string>();
+      if (splitReceiptIds.length > 0) {
+        const [linesRes, matchedRes] = await Promise.all([
+          supabase
+            .from('receipt_split_lines')
+            .select('id, receipt_id, amount_gross')
+            .in('receipt_id', splitReceiptIds),
+          supabase
+            .from('bank_transactions')
+            .select('receipt_split_line_id')
+            .eq('user_id', user.id)
+            .in('receipt_id', splitReceiptIds)
+            .not('receipt_split_line_id', 'is', null),
+        ]);
+        for (const l of linesRes.data || []) {
+          const arr = splitLinesByReceipt.get(l.receipt_id) || [];
+          arr.push({ id: l.id, amount_gross: Number(l.amount_gross) || 0 });
+          splitLinesByReceipt.set(l.receipt_id, arr);
+        }
+        for (const m of matchedRes.data || []) {
+          if (m.receipt_split_line_id) matchedLineIds.add(m.receipt_split_line_id);
+        }
+      }
+
+      let count = 0;
+      let total = 0;
+      for (const r of receipts || []) {
+        if (r.is_split_booking) {
+          const lines = splitLinesByReceipt.get(r.id) || [];
+          if (lines.length === 0) {
+            // No lines defined yet → fall back to whole-receipt rule
+            if (!r.bank_transaction_id) {
+              count += 1;
+              total += r.amount_gross || 0;
+            }
+            continue;
+          }
+          const openLines = lines.filter(l => !matchedLineIds.has(l.id));
+          if (openLines.length > 0) {
+            count += 1;
+            total += openLines.reduce((s, l) => s + l.amount_gross, 0);
+          }
+        } else {
+          if (!r.bank_transaction_id) {
+            count += 1;
+            total += r.amount_gross || 0;
+          }
+        }
+      }
+      return { count, total };
     },
     enabled: !!user?.id,
   });
@@ -331,10 +394,17 @@ export default function Reconciliation() {
           amount,
           status,
           receipt_id,
+          receipt_split_line_id,
           source,
           receipts:receipt_id (
             id,
             vendor,
+            amount_gross,
+            is_split_booking
+          ),
+          split_line:receipt_split_line_id (
+            id,
+            description,
             amount_gross
           )
         `, { count: 'exact' })
@@ -364,6 +434,7 @@ export default function Reconciliation() {
       const transactions = (data || []).map((t: any) => ({
         ...t,
         receipt: t.receipts,
+        split_line: t.split_line,
       }));
 
       return { transactions, total: count || 0 };
@@ -951,8 +1022,27 @@ export default function Reconciliation() {
                               matched: transaction.status === 'matched' && transaction.receipt ? (
                                 <div className="flex items-center gap-2 text-sm min-w-0">
                                   <LinkIcon className="h-3 w-3 text-muted-foreground shrink-0" />
-                                  <span className="truncate">{transaction.receipt.vendor || 'Beleg'}</span>
-                                  <span className="text-muted-foreground shrink-0">({formatAmount(transaction.receipt.amount_gross)})</span>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="truncate">
+                                      {transaction.receipt.vendor || 'Beleg'}
+                                      {transaction.split_line && (
+                                        <span className="text-muted-foreground"> — {transaction.split_line.description || 'Splitzeile'}</span>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {transaction.split_line ? (
+                                        <>
+                                          {formatAmount(transaction.split_line.amount_gross)}
+                                          <span className="ml-1 opacity-70">/ Beleg {formatAmount(transaction.receipt.amount_gross)}</span>
+                                        </>
+                                      ) : (
+                                        formatAmount(transaction.receipt.amount_gross)
+                                      )}
+                                    </div>
+                                  </div>
+                                  {transaction.split_line && (
+                                    <Badge variant="outline" className="shrink-0 text-[10px]">Splitzeile</Badge>
+                                  )}
                                 </div>
                               ) : (
                                 <span className="text-muted-foreground">–</span>

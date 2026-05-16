@@ -1,58 +1,43 @@
-# Bankabgleich mit Splitbuchungen
+## Befund
 
-Aktuell wird 1 Bankbuchung ↔ 1 ganzer Beleg gematcht. Splitbelege (z.B. Lohnabrechnung mit Splitzeilen für Diemut, Ivana, ÖGK …) können nicht zugeordnet werden, weil die Bank N getrennte Überweisungen zeigt, deren Beträge jeweils nur einer **Zeile** entsprechen.
+Die drei Diemut-Winterauer-Buchungen (3× 467,64 €) **sind** in der Datenbank bereits korrekt der jeweiligen Splitzeile zugeordnet (`bank_transactions.status='matched'`, `receipt_id` + `receipt_split_line_id` gesetzt). Die Auto-Reconcile-Logik funktioniert also.
 
-## Ziel
-Eine Bankbuchung kann an eine **einzelne Splitzeile** eines Belegs gebunden werden. Mehrere Bankbuchungen können zum selben Belegelternteil gehören, jeweils zu unterschiedlichen Zeilen.
+Das Problem ist die **Anzeige**:
 
-## DB-Änderung
-- `bank_transactions.receipt_split_line_id uuid` (FK → `receipt_split_lines.id`, `ON DELETE SET NULL`).
-- Bestehende Spalte `bank_transactions.receipt_id` bleibt = Eltern-Beleg.
-- `receipts.bank_transaction_id` bleibt für „klassische" 1:1-Belege. Bei Splitbelegen wird sie nicht mehr verwendet – die Wahrheit liegt auf der Bank-Tx-Seite (`receipt_id` + `receipt_split_line_id`).
-- Index auf `(receipt_split_line_id)` für schnellen Lookup.
+1. In Spalte „Zugeordneter Beleg" wird nur der Eltern-Beleg angezeigt: `Winterauer Wilfried u. Julia (1.175,66 €)`. Da der Betrag (1.175,66) nicht zum Bank-Betrag (467,64) passt, wirkt das wie eine falsche Zuordnung – obwohl die Zeile korrekt zugewiesen ist.
+2. Im KPI „Belege ohne Zahlung" und in der Liste werden Splitbelege immer als „unbezahlt" gezählt, weil dort nur `receipts.bank_transaction_id IS NULL` geprüft wird – Splitbelege setzen dieses Feld bewusst nicht.
+3. `ReceiptAssignmentModal` lädt die Splitzeile beim Trennen / Neu-Zuordnen nicht zurück (Schritt 2 startet leer).
 
-## Helper
-- View / DB-Funktion `unpaid_match_candidates(user_id)` ist optional – einfacher: in den Edge Functions die Splitzeilen pro Beleg im Kandidatenpool als virtuelle Einträge auflisten:
-  ```text
-  candidate = {
-    id: split_line.id || receipt.id,
-    type: 'split' | 'whole',
-    receipt_id, split_line_id,
-    amount: split_line.amount_gross || receipt.amount_gross,
-    receipt_date: receipt.receipt_date,
-    vendor: receipt.vendor,
-    invoice_number: receipt.invoice_number,
-    description: split_line.description || receipt.description
-  }
-  ```
-- Belegung-Regel: Ein Beleg ohne Splitzeilen verhält sich wie heute. Bei einem Beleg mit Splitzeilen wird **nicht** der Ganz-Beleg in den Pool gegeben, sondern N Splitzeilen. Eine Zeile gilt als verbraucht, wenn schon eine `bank_transactions` Zeile mit dieser `receipt_split_line_id` existiert.
+## Änderungen (nur Frontend)
 
-## Edge Functions
-`auto-reconcile` und `reconcile-with-skonto`:
-1. Beim Kandidatenpool-Aufbau zusätzlich `receipt_split_lines` für die geladenen Belege joinen.
-2. Pool aus „Ganz-Belegen ohne Splits" + „Splitzeilen von Splitbelegen" zusammensetzen.
-3. Vorhandene 3-Stage-Logik (High-Confidence / Exact / Skonto) bleibt unverändert, arbeitet aber auf dem erweiterten Pool.
-4. Beim Anwenden des Matches:
-   - `bank_transactions`: `status='matched'`, `receipt_id=parent`, `receipt_split_line_id=line` (oder NULL bei Ganz-Beleg).
-   - `receipts.bank_transaction_id`: nur setzen, wenn Ganz-Beleg-Match (kein Split). Sonst NULL lassen.
-5. Splitzeilen-Vendor-Token: Zeile-Description wird der Eltern-Beleg-Beschreibung vorangestellt für Text-Matching (z.B. „Diemut Winterauer Gehalt 03/2026").
+### A) `Reconciliation.tsx` – Spalte „Zugeordneter Beleg"
+- Query um `receipt_split_line_id` und Join `receipt_split_lines:receipt_split_line_id ( id, description, amount_gross )` erweitern.
+- Anzeige:
+  - Whole-Match (keine Zeile): wie heute.
+  - Split-Match: `Vendor — Linienbeschreibung (Linienbetrag)`, z. B. `Winterauer Wilfried u. Julia — WINTERAUER, Diemuth (467,64 €)`.
+- `handleUnmatch` zusätzlich `receipt_split_line_id: null` setzen (steht schon in Z. 559, prüfen dass es überall greift).
 
-## UI – `Reconciliation.tsx`
-- Spalte „Zugeordneter Beleg" zeigt bei Split-Match zusätzlich die Zeile, z.B. `Lohnabrechnung 03 — Diemut Winterauer (1 234,00 €)`.
-- Manuelle Zuordnung über `ReceiptAssignmentModal`: wenn der gewählte Beleg Splitzeilen hat, wird ein zweiter Schritt eingeblendet → Auswahl der Zeile, deren Betrag zur Bankbuchung passt. Zeilen, die bereits einer anderen Bank-Tx zugeordnet sind, werden ausgegraut.
-- „Receipts ohne Zahlung" KPI / Liste: ein Splitbeleg gilt als bezahlt, wenn **alle** Splitzeilen zugeordnet sind; sonst als teilweise bezahlt (kleines „n/N bezahlt"-Badge).
+### B) KPI „Belege ohne Zahlung" + Tab „Fehlende Belege" – split-aware
+- Neue Query lädt alle Belege mit `is_split_booking=true` plus deren Splitzeilen plus zugehörige `bank_transactions.receipt_split_line_id`.
+- Ein Splitbeleg gilt als **bezahlt**, wenn jede Splitzeile in `bank_transactions` mit `status='matched'` referenziert ist. Sonst **teilweise bezahlt** – zählt mit (Anzahl offener Zeilen, Summe offener Zeilenbeträge) in das KPI.
+- Whole-Belege: weiterhin nur `bank_transaction_id IS NULL` zählen.
+- KPI-Label bleibt; Zahl und Gesamtsumme spiegeln die neue Logik wider.
 
-## Hilfsbereich – `useReceipt`-Hook
-- Beim Lesen eines Belegs zusätzlich die `bank_transactions`-Einträge mit `receipt_id=<id>` laden, um „teilweise bezahlt" sauber anzeigen zu können (außerhalb des Reconciliation-Screens nur Hinweis, keine Kernlogik dieser Änderung).
+### C) `ReceiptAssignmentModal.tsx` – Re-Assign / Vorauswahl
+- Beim Öffnen für eine bereits gematchte Transaktion: aktuelle `receipt_split_line_id` als Default in Schritt 2 vorauswählen.
+- Bereits durch **andere** Bank-Tx belegte Zeilen bleiben deaktiviert (bestehende Logik).
+
+### D) `useSplitLines` ist bereits vorhanden – wiederverwenden
+- Für KPI-Aggregation und Anzeige derselbe Hook bzw. eine kleine Helferfunktion `isSplitReceiptFullyPaid(receipt, lines, matchedLineIds)`.
 
 ## Out of Scope
-- Auto-Erkennung, dass die Summe von N Bankbuchungen exakt einem Ganz-Beleg ohne Splitzeilen entspricht (Kombi-Matching) – das wäre ein eigenes Feature.
+- Keine Änderung an `auto-reconcile` / `reconcile-with-skonto` – Matching funktioniert.
+- Kein Kombi-Matching (N Banktx → 1 Ganz-Beleg).
+- Keine DB-Migration nötig.
 
 ## Dateien
-- **Migration** (neu): Spalte + Index.
-- `supabase/functions/auto-reconcile/index.ts`, `supabase/functions/reconcile-with-skonto/index.ts` – Pool erweitern, Match-Apply anpassen.
-- `src/components/bank-import/ReceiptAssignmentModal.tsx` – Zeilenauswahl.
-- `src/pages/Reconciliation.tsx` – Spalten-Anzeige.
-- Optional `src/hooks/useReceipt*` – teilweise-bezahlt-Status.
+- `src/pages/Reconciliation.tsx` (Query erweitern, KPI-Query split-aware, Spalten-Anzeige).
+- `src/components/bank-import/ReceiptAssignmentModal.tsx` (Vorauswahl bestehender Splitzeile).
+- ggf. kleine Helferfunktion in `src/hooks/useSplitLines.ts`.
 
-Soll ich es so umsetzen?
+Soll ich das so umsetzen?
