@@ -813,7 +813,14 @@ export default function Reconciliation() {
                                 </span>
                               ),
                               description: (
-                                <span title={transaction.description || ''} className="block truncate">{truncateText(transaction.description)}</span>
+                                <Tooltip delayDuration={300}>
+                                  <TooltipTrigger asChild>
+                                    <span className="block truncate cursor-default">{truncateText(transaction.description)}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" align="start" className="max-w-md whitespace-pre-wrap break-words">
+                                    <p>{transaction.description || '–'}</p>
+                                  </TooltipContent>
+                                </Tooltip>
                               ),
                               amount: (
                                 <span className={cn('font-mono whitespace-nowrap', transaction.amount && transaction.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400')}>
