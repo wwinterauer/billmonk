@@ -116,23 +116,45 @@ import { SplitSuggestionDialog } from '@/components/receipts/SplitSuggestionDial
 import { SourceBadge, NoReceiptBadge } from '@/components/receipts/SourceBadge';
 import { PageMeta } from '@/components/PageMeta';
 
-type SortField = 'receipt_date' | 'vendor' | 'invoice_number' | 'amount_gross';
+type SortField =
+  | 'receipt_date'
+  | 'vendor'
+  | 'invoice_number'
+  | 'description'
+  | 'category'
+  | 'tax_type'
+  | 'amount_gross'
+  | 'ai_confidence'
+  | 'status';
 type SortDirection = 'asc' | 'desc';
 
 type ColumnKey = 'date' | 'vendor' | 'invoice_number' | 'description' | 'category' | 'tax_type' | 'tags' | 'amount' | 'ai' | 'status';
 
-const COLUMN_CONFIG: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
-  { key: 'date', label: 'Datum', defaultVisible: true },
-  { key: 'vendor', label: 'Lieferant', defaultVisible: true },
-  { key: 'invoice_number', label: 'Rechnungsnr.', defaultVisible: true },
-  { key: 'description', label: 'Beschreibung', defaultVisible: true },
-  { key: 'category', label: 'Kategorie', defaultVisible: true },
-  { key: 'tax_type', label: 'Buchungsart', defaultVisible: true },
-  { key: 'tags', label: 'Tags', defaultVisible: true },
-  { key: 'amount', label: 'Betrag', defaultVisible: true },
-  { key: 'ai', label: 'KI', defaultVisible: true },
-  { key: 'status', label: 'Status', defaultVisible: true },
+const COLUMN_CONFIG: {
+  key: ColumnKey;
+  label: string;
+  defaultVisible: boolean;
+  defaultWidth: number;
+  sortField?: SortField;
+  align?: 'left' | 'right';
+}[] = [
+  { key: 'date', label: 'Datum', defaultVisible: true, defaultWidth: 110, sortField: 'receipt_date' },
+  { key: 'vendor', label: 'Lieferant', defaultVisible: true, defaultWidth: 200, sortField: 'vendor' },
+  { key: 'invoice_number', label: 'Rechnungsnr.', defaultVisible: true, defaultWidth: 140, sortField: 'invoice_number' },
+  { key: 'description', label: 'Beschreibung', defaultVisible: true, defaultWidth: 220, sortField: 'description' },
+  { key: 'category', label: 'Kategorie', defaultVisible: true, defaultWidth: 150, sortField: 'category' },
+  { key: 'tax_type', label: 'Buchungsart', defaultVisible: true, defaultWidth: 150, sortField: 'tax_type' },
+  { key: 'tags', label: 'Tags', defaultVisible: true, defaultWidth: 160 },
+  { key: 'amount', label: 'Betrag', defaultVisible: true, defaultWidth: 120, sortField: 'amount_gross', align: 'right' },
+  { key: 'ai', label: 'KI', defaultVisible: true, defaultWidth: 90, sortField: 'ai_confidence' },
+  { key: 'status', label: 'Status', defaultVisible: true, defaultWidth: 200, sortField: 'status' },
 ];
+
+const DEFAULT_COLUMN_ORDER: ColumnKey[] = COLUMN_CONFIG.map(c => c.key);
+const DEFAULT_COLUMN_WIDTHS: Record<ColumnKey, number> = COLUMN_CONFIG.reduce(
+  (acc, c) => { acc[c.key] = c.defaultWidth; return acc; },
+  {} as Record<ColumnKey, number>,
+);
 
 const INVOICE_FILTER_OPTIONS = [
   { value: 'all', label: 'Alle' },
