@@ -217,10 +217,12 @@ export function ManualExpenseDialog({ open, onOpenChange, onCreated }: ManualExp
         resetForm();
       }
     } catch (err) {
+      const e = err as any;
+      const description = e?.message || e?.details || e?.hint || 'Unbekannter Fehler';
       toast({
         variant: 'destructive',
         title: 'Fehler beim Speichern',
-        description: err instanceof Error ? err.message : 'Unbekannter Fehler',
+        description,
       });
     } finally {
       setSaving(false);
