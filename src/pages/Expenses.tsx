@@ -2017,6 +2017,20 @@ const Expenses = () => {
             </SelectContent>
           </Select>
 
+          {splitBookingEnabled && (
+            <Select value={splitFilter} onValueChange={(v) => setSplitFilter(v as any)}>
+              <SelectTrigger className="w-[180px]">
+                <Layers className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Splitbuchung" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle Belege</SelectItem>
+                <SelectItem value="split">Nur mit Splitbuchung</SelectItem>
+                <SelectItem value="no_split">Nur ohne Splitbuchung</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+
           {/* Tag Filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
