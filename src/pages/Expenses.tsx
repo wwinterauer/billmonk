@@ -2697,7 +2697,7 @@ const Expenses = () => {
                         const splitLines = splitLinesByReceiptId.get(receipt.id) || [];
                         const totalCols = 1 + orderedVisibleColumns.length + 1;
                         return (
-                        <>
+                        <Fragment key={receipt.id}>
                         <TableRow key={receipt.id}>
                           <TableCell style={{ width: 48, minWidth: 48, maxWidth: 48 }}>
                             <div className="flex items-center gap-1">
