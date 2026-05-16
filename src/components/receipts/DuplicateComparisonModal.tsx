@@ -68,6 +68,7 @@ interface DuplicateComparisonModalProps {
   duplicateId: string | null;
   originalId: string | null;
   onRefresh?: () => void;
+  onViewReceipt?: (receiptId: string) => void;
 }
 
 interface ComparisonRowProps {
