@@ -633,6 +633,30 @@ export function ReceiptAssignmentModal({
               <Upload className="mr-2 h-4 w-4" />
               Neuen Beleg hochladen
             </Button>
+            {onCreateAsExpense && transaction && (
+              <Button
+                variant="outline"
+                disabled={isCreatingExpense}
+                className="sm:order-2"
+                onClick={async () => {
+                  if (!transaction) return;
+                  setIsCreatingExpense(true);
+                  try {
+                    await onCreateAsExpense(transaction.id);
+                  } finally {
+                    setIsCreatingExpense(false);
+                  }
+                }}
+                title="Buchung ohne Original-Beleg direkt als Ausgabe erfassen"
+              >
+                {isCreatingExpense ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="mr-2 h-4 w-4" />
+                )}
+                Als Ausgabe erfassen
+              </Button>
+            )}
             <Button
               onClick={handleAssign}
               disabled={!selectedReceipt || isAssigning || (hasSplitLines && !selectedSplitLine)}
