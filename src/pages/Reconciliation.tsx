@@ -63,6 +63,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePlan } from '@/hooks/usePlan';
 import { PageMeta } from '@/components/PageMeta';
+import { detectRecurringGroups, type RecurringGroup } from '@/lib/recurring-detection';
+import { RecurringSuggestionsPanel } from '@/components/reconciliation/RecurringSuggestionsPanel';
 
 type StatusFilter = 'all' | 'unmatched' | 'matched' | 'ignored';
 type SortField = 'transaction_date' | 'amount';
