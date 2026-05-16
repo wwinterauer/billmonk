@@ -84,6 +84,13 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
   const [currentItem, setCurrentItem] = useState(0);
   const [currentFileName, setCurrentFileName] = useState('');
 
+  // Nur Belege mit hinterlegtem Dokument exportieren
+  // (manuelle Ausgaben ohne Beleg, Schlagwort-Buchungen, "Keine Rechnung" überspringen)
+  const exportableReceipts = receipts.filter(
+    r => r.file_url && !r.is_no_receipt_entry
+  );
+  const skippedCount = receipts.length - exportableReceipts.length;
+
   // Load naming settings from database
   useEffect(() => {
     const loadSettings = async () => {
