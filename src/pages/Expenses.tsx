@@ -62,7 +62,6 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
