@@ -2721,6 +2721,7 @@ const Expenses = () => {
               ) : (
                 <>
                   <div className="overflow-x-auto">
+                  <TooltipProvider>
                   <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleColumnDragEnd}>
                   <SortableContext items={orderedVisibleColumns} strategy={horizontalListSortingStrategy}>
                   <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
