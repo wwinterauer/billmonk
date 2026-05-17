@@ -1675,9 +1675,16 @@ const Expenses = () => {
         return (
           <TableCell key={key} style={cellStyle}>
             {receipt.invoice_number ? (
-              <span className="font-mono text-sm block truncate" title={receipt.invoice_number}>
-                {receipt.invoice_number}
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="font-mono text-sm block truncate cursor-default">
+                    {receipt.invoice_number}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{receipt.invoice_number}</p>
+                </TooltipContent>
+              </Tooltip>
             ) : (
               <span className="text-muted-foreground">–</span>
             )}
@@ -1686,9 +1693,20 @@ const Expenses = () => {
       case 'description':
         return (
           <TableCell key={key} style={cellStyle}>
-            <span className="truncate block" title={receipt.description || undefined}>
-              {truncateText(receipt.description)}
-            </span>
+            {receipt.description ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="truncate block cursor-default">
+                    {truncateText(receipt.description)}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-md whitespace-pre-wrap">{receipt.description}</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <span className="text-muted-foreground">–</span>
+            )}
           </TableCell>
         );
       case 'category':
