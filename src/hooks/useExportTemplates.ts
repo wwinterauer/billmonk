@@ -299,7 +299,8 @@ export function useExportTemplates() {
           include_totals: template.include_totals,
           date_format: template.date_format,
           number_format: template.number_format,
-        })
+          group_order: (template.group_order || {}) as unknown as Json,
+        } as any)
         .select()
         .single();
 
