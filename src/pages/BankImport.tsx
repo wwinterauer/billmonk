@@ -384,6 +384,19 @@ export default function BankImport() {
                 .from('bank_transactions')
                 .update({ status: 'matched', receipt_id: insertedReceipt.id })
                 .eq('id', insertedTx.id);
+
+              // Assign default tags from keyword
+              const defaultTagIds: string[] = Array.isArray(matchedKeyword.default_tag_ids)
+                ? matchedKeyword.default_tag_ids.filter(Boolean)
+                : [];
+              if (defaultTagIds.length > 0) {
+                await supabase
+                  .from('receipt_tags')
+                  .upsert(
+                    defaultTagIds.map((tag_id) => ({ receipt_id: insertedReceipt.id, tag_id })),
+                    { onConflict: 'receipt_id,tag_id', ignoreDuplicates: true }
+                  );
+              }
             }
           }
         }
