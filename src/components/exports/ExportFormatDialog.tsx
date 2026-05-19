@@ -52,6 +52,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { 
   useExportTemplates, 
   DEFAULT_COLUMNS,
+  sortGroupKeys,
 } from '@/hooks/useExportTemplates';
 
 export type ExportFormat = 'csv' | 'excel' | 'pdf' | 'zip';
