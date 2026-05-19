@@ -103,7 +103,14 @@ import {
   type ExportColumn,
 } from '@/hooks/useExportTemplates';
 import { useExportPreview, type PreviewRow } from '@/hooks/useExportPreview';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+
+const GROUP_MONTHS = [
+  'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+  'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+];
 
 interface ExportTemplateEditorProps {
   open: boolean;
