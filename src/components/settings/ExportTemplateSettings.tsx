@@ -954,17 +954,65 @@ export function ExportTemplateSettings() {
                     />
                   </div>
 
-                  <div className="p-3 bg-muted rounded-lg">
-                    <p className="text-sm font-medium mb-2">Vorschau der Gruppen:</p>
-                    <div className="space-y-1 text-sm text-muted-foreground">
-                      {getGroupPreview(editingTemplate.group_by).map((group, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <ChevronRight className="h-3 w-3" />
-                          {group}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Reihenfolge der Gruppen</Label>
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={sortGroupOrderAlpha}
+                          disabled={loadingGroupValues || groupValues.length === 0}
+                        >
+                          A–Z
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={resetGroupOrder}
+                          disabled={!editingTemplate.group_order?.[editingTemplate.group_by]}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                          Zurücksetzen
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Per Drag &amp; Drop sortieren – diese Reihenfolge wird im Export verwendet.
+                    </p>
+                    <div className="p-2 bg-muted/50 rounded-lg max-h-64 overflow-y-auto">
+                      {loadingGroupValues ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground p-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Lade Gruppen…
                         </div>
-                      ))}
+                      ) : orderedGroupValues.length === 0 ? (
+                        <p className="text-sm text-muted-foreground p-2">
+                          Keine Werte gefunden.
+                        </p>
+                      ) : (
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={handleGroupDragEnd}
+                        >
+                          <SortableContext
+                            items={orderedGroupValues}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <div className="space-y-1.5">
+                              {orderedGroupValues.map((val) => (
+                                <SortableGroupValue key={val} id={val} label={val} />
+                              ))}
+                            </div>
+                          </SortableContext>
+                        </DndContext>
+                      )}
                     </div>
                   </div>
+
                 </>
               )}
             </CardContent>
