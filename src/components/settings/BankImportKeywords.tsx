@@ -64,6 +64,7 @@ interface BankKeyword {
   vendor_id: string | null;
   is_active: boolean;
   is_ignore: boolean;
+  default_tag_ids: string[] | null;
 }
 
 const CATEGORIES = [
