@@ -998,6 +998,7 @@ export function VendorManagement() {
                           onCheckedChange={toggleSelectAll}
                         />
                       </TableHead>
+                      <TableHead className="w-[100px]">Nr.</TableHead>
                       <TableHead>Markenname</TableHead>
                       <TableHead>Rechtlicher Name</TableHead>
                       <TableHead>Erkannte Varianten</TableHead>
