@@ -22,6 +22,7 @@ export interface ExportPreviewConfig {
   sortDirection: 'asc' | 'desc';
   groupBy: string | null;
   groupSubtotals: boolean;
+  groupOrder?: Record<string, string[]>;
   includeHeader: boolean;
   includeTotals: boolean;
   dateFormat: string;
