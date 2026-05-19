@@ -179,13 +179,15 @@ export function useExportPreview() {
     receipts: Record<string, unknown>[],
     config: ExportPreviewConfig
   ): PreviewRow[] => {
-    const { columns, groupBy, groupSubtotals, dateFormat, numberFormat } = config;
+    const { columns, groupBy, groupSubtotals, groupOrder, dateFormat, numberFormat } = config;
     const result: PreviewRow[] = [];
 
     if (groupBy) {
       const groups = groupReceipts(receipts, groupBy);
+      const orderedKeys = sortGroupKeys(Object.keys(groups), groupBy, groupOrder);
 
-      for (const [groupName, items] of Object.entries(groups)) {
+      for (const groupName of orderedKeys) {
+        const items = groups[groupName];
         // Group header
         result.push({ isGroupHeader: true, groupName });
 
