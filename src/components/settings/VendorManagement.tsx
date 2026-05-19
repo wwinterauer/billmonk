@@ -1233,6 +1233,21 @@ export function VendorManagement() {
               </p>
             </div>
 
+            {/* Lieferantennummer */}
+            <div className="space-y-2">
+              <Label htmlFor="vendor_number">Lieferantennummer</Label>
+              <Input
+                id="vendor_number"
+                value={formData.vendor_number}
+                onChange={(e) => setFormData(prev => ({ ...prev, vendor_number: e.target.value }))}
+                placeholder="z.B. L-001, 70001"
+                maxLength={50}
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional – frei vergebbare Nummer (muss pro Konto eindeutig sein)
+              </p>
+            </div>
+
             {/* Rechtliche Firmennamen */}
             <div className="space-y-2">
               <Label>Rechtliche Firmennamen</Label>
