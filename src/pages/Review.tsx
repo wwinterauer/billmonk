@@ -126,7 +126,7 @@ const Review = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { getReceipts, updateReceipt, getReceiptFileUrl, deleteReceipt } = useReceipts();
-  const { userCategories, taxCategories, addCategory } = useCategories();
+  const { userCategories, taxCategories } = useCategories();
   const { trackCorrections, trackSuccessfulPrediction } = useCorrectionTracking();
   const { splitBookingEnabled } = usePlan();
   const { vatRateGroups, defaultVatRate } = useVatRates();
@@ -1591,18 +1591,8 @@ const Review = () => {
                           onChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
                           options={userCategories.map(cat => ({ value: cat.name, label: cat.name }))}
                           placeholder="Nicht zugeordnet"
-                          searchPlaceholder="Kategorie suchen oder anlegen..."
+                          searchPlaceholder="Kategorie suchen..."
                           allowClear
-                          onCreate={async (name) => {
-                            try {
-                              const cat = await addCategory(name);
-                              setFormData(prev => ({ ...prev, category: cat.name }));
-                              toast({ title: 'Kategorie angelegt', description: cat.name });
-                            } catch (e) {
-                              toast({ variant: 'destructive', title: 'Fehler', description: e instanceof Error ? e.message : 'Konnte Kategorie nicht anlegen' });
-                            }
-                          }}
-                          createLabel={(q) => `„${q}" als neue Kategorie anlegen`}
                         />
                       </div>
 
