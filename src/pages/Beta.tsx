@@ -398,17 +398,15 @@ function BetaCodeEntry() {
         .update({ used_count: data.used_count + 1 })
         .eq('id', data.id);
 
-      // If user is logged in, set beta_expires_at on profile
+      // If user is logged in, mark as beta user for 180 days server-side
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const updateData: Record<string, any> = {
           is_beta_user: true,
           plan: 'business',
           subscription_status: 'active',
+          beta_expires_at: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
         };
-        if ((data as any).expires_at) {
-          updateData.beta_expires_at = (data as any).expires_at;
-        }
         await supabase.from('profiles').update(updateData).eq('id', user.id);
       }
 
