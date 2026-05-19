@@ -264,6 +264,7 @@ export function VendorManagement() {
       if (editingVendor) {
         const result = await updateVendor(editingVendor.id, {
           display_name: formData.display_name.trim(),
+          vendor_number: formData.vendor_number.trim() || null,
           legal_names: effectiveLegalNames.filter(n => n.trim()),
           detected_names: formData.detected_names,
           default_category_id: formData.default_category_id || null,
