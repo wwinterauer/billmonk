@@ -248,6 +248,7 @@ export function useExportTemplates() {
         columns: (t.columns as unknown as ExportColumn[]) || DEFAULT_COLUMNS,
         sort_direction: (t.sort_direction as 'asc' | 'desc') || 'asc',
         template_type: ((t as any).template_type as 'receipts' | 'invoices') || 'receipts',
+        group_order: ((t as any).group_order as Record<string, string[]>) || {},
       })) as ExportTemplate[];
 
       setTemplates(parsed);
