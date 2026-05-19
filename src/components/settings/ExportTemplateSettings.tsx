@@ -104,7 +104,43 @@ import {
   type ExportColumn,
 } from '@/hooks/useExportTemplates';
 import { useExportPreview } from '@/hooks/useExportPreview';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+
+const GROUP_MONTHS = [
+  'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+  'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+];
+
+// Sortable group value pill (drag-and-drop for group ordering)
+function SortableGroupValue({ id, label }: { id: string; label: string }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'flex items-center gap-2 p-2 rounded-md border bg-background',
+        isDragging && 'opacity-50 shadow-lg z-50',
+      )}
+    >
+      <button
+        className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded touch-none"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+      </button>
+      <span className="text-sm truncate flex-1">{label}</span>
+    </div>
+  );
+}
 
 // Sortable Column Component
 interface SortableColumnProps {
