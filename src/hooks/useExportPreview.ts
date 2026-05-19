@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import type { ExportColumn } from './useExportTemplates';
+import { sortGroupKeys, type ExportColumn } from './useExportTemplates';
 
 // German month names
 const MONTHS = [
