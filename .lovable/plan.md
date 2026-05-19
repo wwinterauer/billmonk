@@ -1,76 +1,28 @@
 ## Ziel
-Lieferantenverwaltung erweitern um:
-1. **Lieferantennummer** (frei vergebbar, optional eindeutig pro User)
-2. **Excel-Import** einer Lieferantenliste (für Neukunden / Migration aus Altsystem)
 
----
+Wenn eine Split-Buchungszeile als **Privat** markiert ist, soll die exportierte Zeile (Excel/CSV) zusätzlich den Tag **„Privat"** in der Spalte `tags` erhalten — ohne dass dieser Tag dauerhaft in der Datenbank am Beleg gespeichert wird (rein virtuell beim Export).
 
-## 1. Datenmodell
+## Umfang
 
-Neue Spalte in `vendors`:
-- `vendor_number text` (nullable)
-- Unique-Index pro User: `UNIQUE (user_id, vendor_number) WHERE vendor_number IS NOT NULL`
+Nur Export-Ausgabe. Keine Änderung am Datenmodell, an `receipt_tags` oder am Split-Editor.
 
-Migration via Supabase-Tool.
+## Änderungen
 
----
+### `src/components/exports/ExportFormatDialog.tsx`
 
-## 2. Lieferantennummer in der UI (`VendorManagement.tsx`)
+In der Stelle, wo Belege mit `is_split_booking` in einzelne Zeilen expandiert werden (~Zeile 622–643):
 
-- **Vendor-Dialog (Anlegen/Bearbeiten):** Neues Feld "Lieferantennummer" (Input, optional). Validierung: max. 50 Zeichen, Trim, Duplikat-Check beim Speichern (Toast bei Konflikt).
-- **Vendor-Tabelle:** Neue Spalte "Nr." (sortierbar, links neben Anzeigename). Bei leerem Wert „–".
-- **Suchfeld:** Suche zusätzlich nach `vendor_number`.
-- Automatische Vergabe wird **nicht** eingebaut (rein manuell, freie Vergabe).
+- Beim Erzeugen der expanded-Zeile prüfen, ob `line.is_private === true`.
+- Falls ja, die bestehenden `tags` der Zeile kopieren und einen virtuellen Eintrag `{ id: '__virtual_private__', name: 'Privat', color: '#…' }` anhängen — nur falls noch nicht enthalten (Duplikat-Check per Name, case-insensitive).
+- Die Spalte `tags` wird bereits über `tags.map(t => t.name).join('; ')` ausgegeben (Zeile 494–497), sodass „Privat" automatisch in der Tag-Zelle erscheint.
 
-`useVendors.ts`: Typ + Insert/Update um `vendor_number` erweitern.
+### Optional: Gruppierung nach Tag
 
----
+Wenn der Benutzer im Template nach `tags` gruppiert, landen Privat-Splits damit automatisch in der Gruppe „Privat" — gewünschter Nebeneffekt, keine Extra-Logik nötig.
 
-## 3. Excel-Import
+## Nicht betroffen
 
-Neuer Button "Excel importieren" oben in der Vendor-Verwaltung neben dem bestehenden „Neuer Lieferant"-Button.
-
-### Flow
-1. **Vorlage herunterladen** (Button im Dialog): generiert `.xlsx` mit Spaltenköpfen + 2 Beispielzeilen via `xlsx` (bereits installiert).
-2. **Datei wählen** (`.xlsx`/`.xls`/`.csv`), wird clientseitig mit `xlsx` geparst.
-3. **Vorschau-Tabelle** mit Mapping & pro Zeile Status:
-   - `Neu` – wird angelegt
-   - `Update` – existiert (Match per Lieferantennummer ODER Anzeigename, case-insensitive) → optional aktualisieren (Checkbox „Bestehende überschreiben")
-   - `Fehler` – Validierung fehlgeschlagen (z. B. fehlender Name, doppelte Nummer in Datei)
-4. **Importieren**-Button: führt `upsert` in Batches (50 pro Request) aus, zeigt Fortschritt + Ergebnis-Toast.
-
-### Unterstützte Spalten (Header-Erkennung tolerant, DE/EN)
-| Header (Beispiele) | Feld |
-|---|---|
-| Lieferantennummer, Nr., Nummer, Number | `vendor_number` |
-| Anzeigename, Name, Display Name | `display_name` (Pflicht) |
-| Rechtsname, Legal Names (kommagetrennt) | `legal_names[]` |
-| Website, URL | `website` |
-| Notizen, Notes | `notes` |
-| Kategorie | Match auf `categories.name` → `default_category_id` |
-| MwSt-Satz, VAT | `default_vat_rate` (Zahl 0–100) |
-| Steuerart, Tax Type | `default_tax_type` |
-| Extraktions-Stichwörter (kommagetrennt) | `extraction_keywords[]` |
-
-Unbekannte Spalten werden ignoriert (Hinweis in Vorschau).
-
-### Validierung
-- `display_name` Pflicht, ≤ 200 Zeichen
-- `vendor_number` ≤ 50 Zeichen, in der Datei eindeutig
-- `default_vat_rate` numerisch, 0–100
-- Kategorie-Name muss existieren, sonst leer (mit Warnung)
-
----
-
-## 4. Geänderte/neue Dateien
-- **Migration:** Spalte `vendor_number` + Unique-Index
-- `src/hooks/useVendors.ts` – Typ + CRUD
-- `src/components/settings/VendorManagement.tsx` – neues Feld in Dialog + Tabellenspalte + Suche
-- `src/components/settings/VendorImportDialog.tsx` (neu) – Excel-Parser, Vorschau, Upsert
-- (optional) `src/lib/vendorImport.ts` (neu) – Header-Mapping & Validierungs-Helpers
-
-## Nicht enthalten
-- Keine automatische fortlaufende Nummerierung
-- Kein Re-Import-Verlauf / Undo
-- Keine Änderung an Belegen oder Vendor-Matching-Logik
-- Kein Export (besteht bei Bedarf separat)
+- `useExportPreview.ts` (expandiert keine Splits)
+- `TaxExportDialog.tsx` (nutzt `is_private` bereits explizit für Steuer-Logik)
+- Split-Editor & DB-Schema bleiben unverändert
+- Bestehende echte „Privat"-Tags am Beleg werden nicht doppelt angefügt
