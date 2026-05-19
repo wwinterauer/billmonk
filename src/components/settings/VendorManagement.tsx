@@ -160,6 +160,7 @@ export function VendorManagement() {
   const resetForm = () => {
     setFormData({
       display_name: '',
+      vendor_number: '',
       legal_names: [],
       detected_names: [],
       default_category_id: '',
