@@ -1,0 +1,1 @@
+ALTER TABLE public.bank_import_keywords ADD COLUMN IF NOT EXISTS default_tag_ids uuid[] NOT NULL DEFAULT '{}'::uuid[];
