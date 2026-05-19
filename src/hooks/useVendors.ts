@@ -142,6 +142,7 @@ export function useVendors() {
       defaultPaymentMethod?: string;
       notes?: string;
       website?: string;
+      vendorNumber?: string;
     }
   ): Promise<Vendor> => {
     if (!user) throw new Error('Nicht angemeldet');
@@ -164,21 +165,25 @@ export function useVendors() {
       .insert({
         user_id: user.id,
         display_name: displayName,
+        vendor_number: options?.vendorNumber?.trim() || null,
         legal_names: options?.legalName ? [options.legalName] : [],
         detected_names: options?.detectedNames || [],
         default_category_id: options?.defaultCategoryId || null,
         default_tag_id: options?.defaultTagId || null,
-        default_vat_rate: options?.defaultVatRate || null,
+        default_vat_rate: options?.defaultVatRate ?? null,
         default_tax_type: options?.defaultTaxType || null,
         field_defaults: Object.keys(fieldDefaults).length > 0 ? fieldDefaults : {},
         notes: options?.notes || null,
         website: options?.website || null,
-      })
+      } as never)
       .select()
       .single();
 
     if (error) {
       if (error.code === '23505') {
+        if (error.message?.toLowerCase().includes('vendor_number')) {
+          throw new Error('Diese Lieferantennummer ist bereits vergeben');
+        }
         throw new Error('Ein Lieferant mit diesem Namen existiert bereits');
       }
       throw new Error(error.message);
