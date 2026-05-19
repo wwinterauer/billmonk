@@ -308,6 +308,7 @@ export function VendorManagement() {
           defaultPaymentMethod: formData.default_payment_method || undefined,
           website: formData.website.trim() || undefined,
           notes: formData.notes.trim() || undefined,
+          vendorNumber: formData.vendor_number.trim() || undefined,
         });
         toast.success('Lieferant hinzugefügt');
       }
