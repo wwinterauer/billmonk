@@ -814,6 +814,10 @@ export function VendorManagement() {
             )}
             Aus Belegen importieren
           </Button>
+          <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Excel importieren
+          </Button>
           <Button onClick={() => setIsAddDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Neuer Lieferant
