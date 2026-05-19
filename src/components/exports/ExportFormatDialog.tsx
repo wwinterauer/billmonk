@@ -52,6 +52,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { 
   useExportTemplates, 
   DEFAULT_COLUMNS,
+  sortGroupKeys,
 } from '@/hooks/useExportTemplates';
 
 export type ExportFormat = 'csv' | 'excel' | 'pdf' | 'zip';
@@ -662,13 +663,22 @@ export function ExportFormatDialog({
     // Apply grouping
     let groupedData: Map<string, Receipt[]> | null = null;
     if (selectedTemplate?.group_by) {
-      groupedData = new Map();
+      const unordered = new Map<string, Receipt[]>();
       for (const receipt of sortedReceipts) {
         const groupKey = getGroupKey(receipt, selectedTemplate.group_by);
-        if (!groupedData.has(groupKey)) {
-          groupedData.set(groupKey, []);
+        if (!unordered.has(groupKey)) {
+          unordered.set(groupKey, []);
         }
-        groupedData.get(groupKey)!.push(receipt);
+        unordered.get(groupKey)!.push(receipt);
+      }
+      const orderedKeys = sortGroupKeys(
+        Array.from(unordered.keys()),
+        selectedTemplate.group_by,
+        selectedTemplate.group_order,
+      );
+      groupedData = new Map();
+      for (const key of orderedKeys) {
+        groupedData.set(key, unordered.get(key)!);
       }
     }
 

@@ -1667,6 +1667,7 @@ export type Database = {
           date_format: string | null
           description: string | null
           group_by: string | null
+          group_order: Json
           group_subtotals: boolean | null
           id: string
           include_header: boolean | null
@@ -1686,6 +1687,7 @@ export type Database = {
           date_format?: string | null
           description?: string | null
           group_by?: string | null
+          group_order?: Json
           group_subtotals?: boolean | null
           id?: string
           include_header?: boolean | null
@@ -1705,6 +1707,7 @@ export type Database = {
           date_format?: string | null
           description?: string | null
           group_by?: string | null
+          group_order?: Json
           group_subtotals?: boolean | null
           id?: string
           include_header?: boolean | null

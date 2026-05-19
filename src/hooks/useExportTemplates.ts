@@ -29,6 +29,7 @@ export interface ExportTemplate {
   sort_direction: 'asc' | 'desc';
   group_by: string | null;
   group_subtotals: boolean;
+  group_order?: Record<string, string[]>;
   include_header: boolean;
   include_totals: boolean;
   date_format: string;
@@ -37,6 +38,21 @@ export interface ExportTemplate {
   created_at: string;
   updated_at: string;
 }
+
+// Sort group keys according to a saved order. Unknown keys are appended alphabetically (de).
+export const sortGroupKeys = (
+  keys: string[],
+  groupBy: string | null,
+  groupOrder: Record<string, string[]> | null | undefined,
+): string[] => {
+  if (!groupBy) return keys;
+  const saved = (groupOrder && groupOrder[groupBy]) || [];
+  const inSaved = saved.filter(k => keys.includes(k));
+  const rest = keys
+    .filter(k => !inSaved.includes(k))
+    .sort((a, b) => a.localeCompare(b, 'de'));
+  return [...inSaved, ...rest];
+};
 
 // Default columns for new templates
 export const DEFAULT_COLUMNS: ExportColumn[] = [
@@ -232,6 +248,7 @@ export function useExportTemplates() {
         columns: (t.columns as unknown as ExportColumn[]) || DEFAULT_COLUMNS,
         sort_direction: (t.sort_direction as 'asc' | 'desc') || 'asc',
         template_type: ((t as any).template_type as 'receipts' | 'invoices') || 'receipts',
+        group_order: ((t as any).group_order as Record<string, string[]>) || {},
       })) as ExportTemplate[];
 
       setTemplates(parsed);
@@ -282,7 +299,8 @@ export function useExportTemplates() {
           include_totals: template.include_totals,
           date_format: template.date_format,
           number_format: template.number_format,
-        })
+          group_order: (template.group_order || {}) as unknown as Json,
+        } as any)
         .select()
         .single();
 
@@ -328,6 +346,9 @@ export function useExportTemplates() {
       const updateData: Record<string, unknown> = { ...updates };
       if (updates.columns) {
         updateData.columns = updates.columns as unknown as Json;
+      }
+      if (updates.group_order) {
+        updateData.group_order = updates.group_order as unknown as Json;
       }
 
       const { error } = await supabase
@@ -396,6 +417,7 @@ export function useExportTemplates() {
     sort_direction: 'desc',
     group_by: null,
     group_subtotals: true,
+    group_order: {},
     include_header: true,
     include_totals: true,
     date_format: 'DD.MM.YYYY',

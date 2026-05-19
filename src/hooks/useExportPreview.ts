@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import type { ExportColumn } from './useExportTemplates';
+import { sortGroupKeys, type ExportColumn } from './useExportTemplates';
 
 // German month names
 const MONTHS = [
@@ -22,6 +22,7 @@ export interface ExportPreviewConfig {
   sortDirection: 'asc' | 'desc';
   groupBy: string | null;
   groupSubtotals: boolean;
+  groupOrder?: Record<string, string[]>;
   includeHeader: boolean;
   includeTotals: boolean;
   dateFormat: string;
@@ -178,13 +179,15 @@ export function useExportPreview() {
     receipts: Record<string, unknown>[],
     config: ExportPreviewConfig
   ): PreviewRow[] => {
-    const { columns, groupBy, groupSubtotals, dateFormat, numberFormat } = config;
+    const { columns, groupBy, groupSubtotals, groupOrder, dateFormat, numberFormat } = config;
     const result: PreviewRow[] = [];
 
     if (groupBy) {
       const groups = groupReceipts(receipts, groupBy);
+      const orderedKeys = sortGroupKeys(Object.keys(groups), groupBy, groupOrder);
 
-      for (const [groupName, items] of Object.entries(groups)) {
+      for (const groupName of orderedKeys) {
+        const items = groups[groupName];
         // Group header
         result.push({ isGroupHeader: true, groupName });
 
