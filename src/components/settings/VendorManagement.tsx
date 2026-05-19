@@ -1019,6 +1019,9 @@ export function VendorManagement() {
                               onCheckedChange={() => toggleSelect(vendor.id)}
                             />
                           </TableCell>
+                          <TableCell className="text-muted-foreground font-mono text-xs">
+                            {vendor.vendor_number || '–'}
+                          </TableCell>
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
                               {vendor.display_name}
