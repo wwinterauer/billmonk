@@ -620,6 +620,10 @@ export function ExportFormatDialog({
             const lines = linesByReceipt.get(receipt.id);
             if ((receipt as any).is_split_booking && lines && lines.length > 0) {
               lines.forEach((line, idx) => {
+                const baseTags = ((receipt as any).tags || []) as Array<{ id: string; name: string; color: string }>;
+                const lineTags = line.is_private && !baseTags.some(t => t.name?.toLowerCase() === 'privat')
+                  ? [...baseTags, { id: '__virtual_private__', name: 'Privat', color: '#94a3b8' }]
+                  : baseTags;
                 expanded.push({
                   ...receipt,
                   // Override standard fields with split line values so Excel rows are usable standalone
@@ -630,6 +634,7 @@ export function ExportFormatDialog({
                   category: line.category ?? receipt.category,
                   description: line.description ?? receipt.description,
                   tax_type: line.tax_type ?? receipt.tax_type,
+                  tags: lineTags,
                   _split_position: idx + 1,
                   _split_description: line.description,
                   _split_category: line.category,
