@@ -340,28 +340,27 @@ export function ExportTemplateEditor({
           };
           const field = fieldMap[currentGroupBy];
           if (field) {
-            const { data } = await supabase
-              .from('receipts')
-              .select(field)
-              .eq('user_id', user.id)
-              .limit(5000);
-            const set = new Set<string>();
-            (data || []).forEach((r: any) => {
-              const v = r[field];
-              if (v === null || v === undefined || v === '') return;
-              set.add(currentGroupBy === 'vat_rate' ? `${v}%` : String(v));
-            });
-            values = Array.from(set);
-
-            // Bei Gruppierung nach Kategorie: nur die vom User selbst angelegten
-            // Kategorien anzeigen (keine freitext-Werte aus KI-Extraktion).
             if (currentGroupBy === 'category') {
+              // Alle vom User angelegten Kategorien anzeigen (auch ungenutzte),
+              // statt nur Werte aus vorhandenen Belegen.
               const { data: userCats } = await supabase
                 .from('categories')
                 .select('name')
                 .eq('user_id', user.id);
-              const allowed = new Set((userCats || []).map(c => c.name));
-              values = values.filter(v => allowed.has(v));
+              values = (userCats || []).map(c => c.name).filter(Boolean);
+            } else {
+              const { data } = await supabase
+                .from('receipts')
+                .select(field)
+                .eq('user_id', user.id)
+                .limit(5000);
+              const set = new Set<string>();
+              (data || []).forEach((r: any) => {
+                const v = r[field];
+                if (v === null || v === undefined || v === '') return;
+                set.add(currentGroupBy === 'vat_rate' ? `${v}%` : String(v));
+              });
+              values = Array.from(set);
             }
           }
         }
