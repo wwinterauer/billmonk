@@ -352,6 +352,17 @@ export function ExportTemplateEditor({
               set.add(currentGroupBy === 'vat_rate' ? `${v}%` : String(v));
             });
             values = Array.from(set);
+
+            // Bei Gruppierung nach Kategorie: nur die vom User selbst angelegten
+            // Kategorien anzeigen (keine freitext-Werte aus KI-Extraktion).
+            if (currentGroupBy === 'category') {
+              const { data: userCats } = await supabase
+                .from('categories')
+                .select('name')
+                .eq('user_id', user.id);
+              const allowed = new Set((userCats || []).map(c => c.name));
+              values = values.filter(v => allowed.has(v));
+            }
           }
         }
         if (!cancelled) {
