@@ -39,6 +39,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useCategories } from '@/hooks/useCategories';
+import { useTags } from '@/hooks/useTags';
 import { VendorAutocomplete } from '@/components/receipts/VendorAutocomplete';
 import {
   Plus,
@@ -50,6 +51,7 @@ import {
   Info,
   Sparkles,
   Ban,
+  X,
 } from 'lucide-react';
 
 interface BankKeyword {
