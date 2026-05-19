@@ -262,6 +262,10 @@ export function ExportTemplateEditor({
   const [showPreview, setShowPreview] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
 
+  // Distinct group values for current group_by (loaded from user's receipts)
+  const [groupValues, setGroupValues] = useState<string[]>([]);
+  const [loadingGroupValues, setLoadingGroupValues] = useState(false);
+
   // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
