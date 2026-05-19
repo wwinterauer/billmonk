@@ -690,6 +690,19 @@ export default function Reconciliation() {
 
       if (insertErr) throw insertErr;
 
+      // Assign default tags from keyword
+      const defaultTagIds: string[] = Array.isArray(matchedKeyword?.default_tag_ids)
+        ? (matchedKeyword!.default_tag_ids as any[]).filter(Boolean)
+        : [];
+      if (defaultTagIds.length > 0) {
+        await supabase
+          .from('receipt_tags')
+          .upsert(
+            defaultTagIds.map((tag_id) => ({ receipt_id: newReceipt.id, tag_id })),
+            { onConflict: 'receipt_id,tag_id', ignoreDuplicates: true }
+          );
+      }
+
       const { error: txErr } = await supabase
         .from('bank_transactions')
         .update({
