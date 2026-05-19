@@ -348,6 +348,7 @@ export function BankImportKeywords() {
                   <TableHead>Lieferant</TableHead>
                   <TableHead>Steuerart</TableHead>
                   <TableHead>Beschreibung</TableHead>
+                  <TableHead>Tags</TableHead>
                   <TableHead className="text-right">MwSt</TableHead>
                   <TableHead className="text-center">Aktiv</TableHead>
                   <TableHead className="w-[100px]">Aktionen</TableHead>
