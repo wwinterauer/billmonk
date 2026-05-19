@@ -7,7 +7,19 @@ function hasBetaAccess(): boolean {
   return document.cookie.split(';').some(c => c.trim().startsWith('beta_access=true'));
 }
 
+function grantLocalAccess() {
+  localStorage.setItem('beta_access', 'true');
+  const expires = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `beta_access=true; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+function revokeLocalAccess() {
+  localStorage.removeItem('beta_access');
+  document.cookie = 'beta_access=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+}
+
 const EXEMPT_ROUTES = ['/beta', '/datenschutz', '/unsubscribe', '/share-receive', '/login', '/register', '/reset-password', '/forgot-password'];
+const PAID_PLANS = ['starter', 'pro', 'business'];
 
 interface BetaGateProps {
   children: React.ReactNode;
@@ -18,9 +30,8 @@ export function BetaGate({ children }: BetaGateProps) {
   const [checked, setChecked] = useState(false);
   const [hasAccess, setHasAccess] = useState(hasBetaAccess());
 
-  // Check beta_expires_at for logged-in users
   useEffect(() => {
-    const checkExpiry = async () => {
+    const check = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
@@ -28,26 +39,34 @@ export function BetaGate({ children }: BetaGateProps) {
           return;
         }
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('beta_expires_at, is_beta_user')
-          .eq('id', user.id)
-          .maybeSingle();
+        const [profileRes, roleRes] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('plan, beta_expires_at, is_beta_user')
+            .eq('id', user.id)
+            .maybeSingle(),
+          supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .eq('role', 'admin')
+            .maybeSingle(),
+        ]);
 
+        const profile = profileRes.data as any;
+        const isAdmin = !!roleRes.data;
+        const plan = profile?.plan as string | undefined;
+        const isPaid = plan ? PAID_PLANS.includes(plan) : false;
         const expired = profile?.beta_expires_at && new Date(profile.beta_expires_at) < new Date();
+        const isBeta = !!profile?.is_beta_user && !expired;
 
-        if (profile?.is_beta_user && !expired) {
-          // Auto-grant local beta access for known beta users (e.g. new device after login)
+        if (isAdmin || isPaid || isBeta) {
           if (!hasBetaAccess()) {
-            localStorage.setItem('beta_access', 'true');
-            const expires = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toUTCString();
-            document.cookie = `beta_access=true; expires=${expires}; path=/; SameSite=Lax`;
+            grantLocalAccess();
             setHasAccess(true);
           }
         } else if (expired && hasBetaAccess()) {
-          // Beta expired — revoke access
-          localStorage.removeItem('beta_access');
-          document.cookie = 'beta_access=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+          revokeLocalAccess();
           setHasAccess(false);
         }
       } catch {
@@ -56,16 +75,16 @@ export function BetaGate({ children }: BetaGateProps) {
       setChecked(true);
     };
 
-    checkExpiry();
+    check();
   }, [location.pathname]);
 
   if (EXEMPT_ROUTES.some(r => location.pathname.startsWith(r))) {
     return <>{children}</>;
   }
 
-  // Wait for expiry check on first render
-  if (!checked && hasBetaAccess()) {
-    return null; // brief loading
+  // Wait for check before redirecting on first render
+  if (!checked) {
+    return null;
   }
 
   if (!hasAccess) {
