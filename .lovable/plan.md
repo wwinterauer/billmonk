@@ -1,39 +1,76 @@
 ## Ziel
-Beim Excel-Export soll die Reihenfolge der Gruppen (z. B. Kategorien, Lieferanten, Tags, Zahlungsart, Buchungsart, MwSt-Satz, Monat/Quartal/Jahr) frei per Drag & Drop festlegbar sein — analog zur Spaltenreihenfolge.
+Lieferantenverwaltung erweitern um:
+1. **Lieferantennummer** (frei vergebbar, optional eindeutig pro User)
+2. **Excel-Import** einer Lieferantenliste (für Neukunden / Migration aus Altsystem)
 
-## Umsetzung
+---
 
-### 1. Datenmodell
-- Neue Spalte `group_order jsonb` in `export_templates` (Default `'{}'`).
-- Struktur: `{ "<group_by>": ["Wert1", "Wert2", ...] }` — pro Gruppierungsfeld eine eigene Reihenfolge.
-- Migration via Supabase-Tool.
-- Typ `ExportTemplate` um `group_order: Record<string, string[]>` erweitern.
+## 1. Datenmodell
 
-### 2. Editor-UI (`ExportTemplateEditor.tsx`)
-Im Bereich "Gruppierung" (nur sichtbar wenn `group_by` gesetzt):
-- Distinct-Gruppenwerte aus den vorhandenen Belegen/Rechnungen des Users laden (per Query, abhängig vom gewählten `group_by` und `template_type`).
-- Für Datums-Gruppen (month/quarter/year): chronologisch vorbelegen.
-- Werte als sortierbare Liste mit `@dnd-kit` rendern (gleiches Pattern wie Spalten-Drag-Drop, bereits im Editor vorhanden).
-- Drag & Drop aktualisiert `editingTemplate.group_order[group_by]`.
-- Neue/unbekannte Werte (die noch nicht in der gespeicherten Reihenfolge stehen) werden alphabetisch ans Ende angehängt.
-- Button "Alphabetisch sortieren" / "Zurücksetzen".
+Neue Spalte in `vendors`:
+- `vendor_number text` (nullable)
+- Unique-Index pro User: `UNIQUE (user_id, vendor_number) WHERE vendor_number IS NOT NULL`
 
-### 3. Export-Anwendung
-In `ExportFormatDialog.tsx` (CSV/Excel/PDF-Branches, Zeilen ~700, ~760, ~835) und `useExportPreview.ts`:
-- Nach Gruppierung in `Map`/`Record` die Keys gemäß `template.group_order[group_by]` sortieren.
-- Nicht gelistete Keys (neue Werte) alphabetisch dahinter.
-- Bei Datumsgruppen ohne explizite Order: chronologisch.
+Migration via Supabase-Tool.
 
-### 4. Verhalten beim Wechsel von `group_by`
-- `group_order` bleibt erhalten (pro Feld separat gespeichert), wird beim erneuten Wählen wieder verwendet.
+---
 
-## Geänderte/neue Dateien
-- Migration: neue Spalte `group_order`
-- `src/hooks/useExportTemplates.ts` — Typ + Default + Persistenz
-- `src/components/exports/ExportTemplateEditor.tsx` — neue Drag-Liste, Distinct-Loader
-- `src/components/exports/ExportFormatDialog.tsx` — Sortierung der Gruppen vor Ausgabe
-- `src/hooks/useExportPreview.ts` — gleiche Sortierung für Vorschau
+## 2. Lieferantennummer in der UI (`VendorManagement.tsx`)
+
+- **Vendor-Dialog (Anlegen/Bearbeiten):** Neues Feld "Lieferantennummer" (Input, optional). Validierung: max. 50 Zeichen, Trim, Duplikat-Check beim Speichern (Toast bei Konflikt).
+- **Vendor-Tabelle:** Neue Spalte "Nr." (sortierbar, links neben Anzeigename). Bei leerem Wert „–".
+- **Suchfeld:** Suche zusätzlich nach `vendor_number`.
+- Automatische Vergabe wird **nicht** eingebaut (rein manuell, freie Vergabe).
+
+`useVendors.ts`: Typ + Insert/Update um `vendor_number` erweitern.
+
+---
+
+## 3. Excel-Import
+
+Neuer Button "Excel importieren" oben in der Vendor-Verwaltung neben dem bestehenden „Neuer Lieferant"-Button.
+
+### Flow
+1. **Vorlage herunterladen** (Button im Dialog): generiert `.xlsx` mit Spaltenköpfen + 2 Beispielzeilen via `xlsx` (bereits installiert).
+2. **Datei wählen** (`.xlsx`/`.xls`/`.csv`), wird clientseitig mit `xlsx` geparst.
+3. **Vorschau-Tabelle** mit Mapping & pro Zeile Status:
+   - `Neu` – wird angelegt
+   - `Update` – existiert (Match per Lieferantennummer ODER Anzeigename, case-insensitive) → optional aktualisieren (Checkbox „Bestehende überschreiben")
+   - `Fehler` – Validierung fehlgeschlagen (z. B. fehlender Name, doppelte Nummer in Datei)
+4. **Importieren**-Button: führt `upsert` in Batches (50 pro Request) aus, zeigt Fortschritt + Ergebnis-Toast.
+
+### Unterstützte Spalten (Header-Erkennung tolerant, DE/EN)
+| Header (Beispiele) | Feld |
+|---|---|
+| Lieferantennummer, Nr., Nummer, Number | `vendor_number` |
+| Anzeigename, Name, Display Name | `display_name` (Pflicht) |
+| Rechtsname, Legal Names (kommagetrennt) | `legal_names[]` |
+| Website, URL | `website` |
+| Notizen, Notes | `notes` |
+| Kategorie | Match auf `categories.name` → `default_category_id` |
+| MwSt-Satz, VAT | `default_vat_rate` (Zahl 0–100) |
+| Steuerart, Tax Type | `default_tax_type` |
+| Extraktions-Stichwörter (kommagetrennt) | `extraction_keywords[]` |
+
+Unbekannte Spalten werden ignoriert (Hinweis in Vorschau).
+
+### Validierung
+- `display_name` Pflicht, ≤ 200 Zeichen
+- `vendor_number` ≤ 50 Zeichen, in der Datei eindeutig
+- `default_vat_rate` numerisch, 0–100
+- Kategorie-Name muss existieren, sonst leer (mit Warnung)
+
+---
+
+## 4. Geänderte/neue Dateien
+- **Migration:** Spalte `vendor_number` + Unique-Index
+- `src/hooks/useVendors.ts` – Typ + CRUD
+- `src/components/settings/VendorManagement.tsx` – neues Feld in Dialog + Tabellenspalte + Suche
+- `src/components/settings/VendorImportDialog.tsx` (neu) – Excel-Parser, Vorschau, Upsert
+- (optional) `src/lib/vendorImport.ts` (neu) – Header-Mapping & Validierungs-Helpers
 
 ## Nicht enthalten
-- Keine Änderung an Spalten-Reihenfolge, Sortier-Logik innerhalb einer Gruppe oder Gruppen-Subtotals.
-- Kein nested/multi-level Grouping.
+- Keine automatische fortlaufende Nummerierung
+- Kein Re-Import-Verlauf / Undo
+- Keine Änderung an Belegen oder Vendor-Matching-Logik
+- Kein Export (besteht bei Bedarf separat)

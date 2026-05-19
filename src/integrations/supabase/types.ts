@@ -3621,6 +3621,7 @@ export type Database = {
           total_amount: number | null
           updated_at: string | null
           user_id: string
+          vendor_number: string | null
           website: string | null
         }
         Insert: {
@@ -3650,6 +3651,7 @@ export type Database = {
           total_amount?: number | null
           updated_at?: string | null
           user_id: string
+          vendor_number?: string | null
           website?: string | null
         }
         Update: {
@@ -3679,6 +3681,7 @@ export type Database = {
           total_amount?: number | null
           updated_at?: string | null
           user_id?: string
+          vendor_number?: string | null
           website?: string | null
         }
         Relationships: [

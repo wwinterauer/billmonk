@@ -1,0 +1,2 @@
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS vendor_number text;
+CREATE UNIQUE INDEX IF NOT EXISTS vendors_user_vendor_number_unique ON public.vendors(user_id, vendor_number) WHERE vendor_number IS NOT NULL;
