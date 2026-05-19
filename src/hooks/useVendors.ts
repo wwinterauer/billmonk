@@ -217,7 +217,7 @@ export function useVendors() {
 
   const updateVendor = async (
     id: string,
-    updates: Partial<Pick<Vendor, 'display_name' | 'legal_names' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_tax_type' | 'field_defaults' | 'field_defaults_stats' | 'field_suggestions_dismissed' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
+    updates: Partial<Pick<Vendor, 'display_name' | 'vendor_number' | 'legal_names' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_tax_type' | 'field_defaults' | 'field_defaults_stats' | 'field_suggestions_dismissed' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
   ): Promise<{ vendor: Vendor; syncedReceipts: number; autoApprovedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
     if (isUpdatingRef.current) {
