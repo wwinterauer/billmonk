@@ -29,7 +29,7 @@ export interface ExportTemplate {
   sort_direction: 'asc' | 'desc';
   group_by: string | null;
   group_subtotals: boolean;
-  group_order: Record<string, string[]>;
+  group_order?: Record<string, string[]>;
   include_header: boolean;
   include_totals: boolean;
   date_format: string;
