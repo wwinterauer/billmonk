@@ -476,6 +476,7 @@ export function ExportTemplateEditor({
       sortDirection: editingTemplate.sort_direction,
       groupBy: editingTemplate.group_by,
       groupSubtotals: editingTemplate.group_subtotals,
+      groupOrder: editingTemplate.group_order,
       includeHeader: editingTemplate.include_header,
       includeTotals: editingTemplate.include_totals,
       dateFormat: editingTemplate.date_format,
