@@ -238,15 +238,24 @@ export function useVendors() {
       }
     }
 
+    const updatePayload: Record<string, unknown> = { ...updates };
+    if ('vendor_number' in updatePayload) {
+      const vn = updatePayload.vendor_number;
+      updatePayload.vendor_number = typeof vn === 'string' ? (vn.trim() || null) : (vn ?? null);
+    }
+
     const { data, error } = await supabase
       .from('vendors')
-      .update(updates)
+      .update(updatePayload as never)
       .eq('id', id)
       .select()
       .single();
 
     if (error) {
       if (error.code === '23505') {
+        if (error.message?.toLowerCase().includes('vendor_number')) {
+          throw new Error('Diese Lieferantennummer ist bereits vergeben');
+        }
         throw new Error('Ein Lieferant mit diesem Namen existiert bereits');
       }
       throw new Error(error.message);
