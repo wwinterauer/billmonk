@@ -261,6 +261,7 @@ export function BankImportKeywords() {
       vendor_id: '',
       vendor_name: '',
       is_ignore: false,
+      default_tag_ids: [],
     });
     setEditingKeyword(null);
   };
@@ -276,6 +277,7 @@ export function BankImportKeywords() {
       vendor_id: keyword.vendor_id || '',
       vendor_name: (keyword.vendor_id && vendorMap?.[keyword.vendor_id]) || '',
       is_ignore: keyword.is_ignore ?? false,
+      default_tag_ids: (keyword.default_tag_ids ?? []).filter(Boolean),
     });
     setShowDialog(true);
   };
