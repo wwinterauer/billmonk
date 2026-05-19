@@ -137,6 +137,7 @@ export function VendorManagement() {
   // Form state
   const [formData, setFormData] = useState({
     display_name: '',
+    vendor_number: '',
     legal_names: [] as string[],
     detected_names: [] as string[],
     default_category_id: '',
@@ -154,6 +155,7 @@ export function VendorManagement() {
   });
   const [newVariant, setNewVariant] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   const resetForm = () => {
     setFormData({
