@@ -252,6 +252,8 @@ export function ExportTemplateEditor({
     createEmptyTemplate,
   } = useExportTemplates();
 
+  const { user } = useAuth();
+
   const {
     previewData,
     loading: previewLoading,
