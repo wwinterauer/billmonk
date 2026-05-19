@@ -1,28 +1,23 @@
 ## Ziel
+Beim Export der Ausgaben (Excel/CSV) sollen alle Tags in der `tags`-Spalte strikt alphabetisch sortiert ausgegeben werden. Dadurch bleibt die Reihenfolge bei gleicher Tag-Kombination über alle Buchungszeilen identisch – essenziell für späteres Filtern/Gruppieren in Excel.
 
-Wenn eine Split-Buchungszeile als **Privat** markiert ist, soll die exportierte Zeile (Excel/CSV) zusätzlich den Tag **„Privat"** in der Spalte `tags` erhalten — ohne dass dieser Tag dauerhaft in der Datenbank am Beleg gespeichert wird (rein virtuell beim Export).
-
-## Umfang
-
-Nur Export-Ausgabe. Keine Änderung am Datenmodell, an `receipt_tags` oder am Split-Editor.
-
-## Änderungen
+## Änderung
 
 ### `src/components/exports/ExportFormatDialog.tsx`
 
-In der Stelle, wo Belege mit `is_split_booking` in einzelne Zeilen expandiert werden (~Zeile 622–643):
+In der `getFieldValue`-Funktion, Case `'tags'` (Zeile 494–497):
 
-- Beim Erzeugen der expanded-Zeile prüfen, ob `line.is_private === true`.
-- Falls ja, die bestehenden `tags` der Zeile kopieren und einen virtuellen Eintrag `{ id: '__virtual_private__', name: 'Privat', color: '#…' }` anhängen — nur falls noch nicht enthalten (Duplikat-Check per Name, case-insensitive).
-- Die Spalte `tags` wird bereits über `tags.map(t => t.name).join('; ')` ausgegeben (Zeile 494–497), sodass „Privat" automatisch in der Tag-Zelle erscheint.
+```text
+BEFORE:
+tags.map(t => t.name).join('; ')
 
-### Optional: Gruppierung nach Tag
+AFTER:
+tags.map(t => t.name).sort((a, b) => a.localeCompare(b, 'de')).join('; ')
+```
 
-Wenn der Benutzer im Template nach `tags` gruppiert, landen Privat-Splits damit automatisch in der Gruppe „Privat" — gewünschter Nebeneffekt, keine Extra-Logik nötig.
+- Sortierung erfolgt über `localeCompare('de')` für korrekte deutsche Alphabetisierung (Umlaute etc.).
+- Betrifft sowohl normale Belege als auch Split-Buchungszeilen, da beide denselben `case 'tags'`-Codepfad durchlaufen.
 
 ## Nicht betroffen
-
-- `useExportPreview.ts` (expandiert keine Splits)
-- `TaxExportDialog.tsx` (nutzt `is_private` bereits explizit für Steuer-Logik)
-- Split-Editor & DB-Schema bleiben unverändert
-- Bestehende echte „Privat"-Tags am Beleg werden nicht doppelt angefügt
+- `TaxExportDialog.tsx` / `taxExportFormats.ts` – diese Formate (DATEV, BMD) exportieren keine Tag-Spalte.
+- Datenbank oder Split-Editor – reine Präsentationsänderung beim Export.
