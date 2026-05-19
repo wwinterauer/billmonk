@@ -347,6 +347,9 @@ export function useExportTemplates() {
       if (updates.columns) {
         updateData.columns = updates.columns as unknown as Json;
       }
+      if (updates.group_order) {
+        updateData.group_order = updates.group_order as unknown as Json;
+      }
 
       const { error } = await supabase
         .from('export_templates')
