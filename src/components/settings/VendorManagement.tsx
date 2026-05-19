@@ -2206,6 +2206,14 @@ export function VendorManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <VendorImportDialog
+        open={isImportDialogOpen}
+        onOpenChange={setIsImportDialogOpen}
+        existingVendors={vendors}
+        userCategories={userCategories}
+        onImported={() => { fetchVendors(); }}
+      />
     </div>
   );
 }
