@@ -29,6 +29,7 @@ export interface ExportTemplate {
   sort_direction: 'asc' | 'desc';
   group_by: string | null;
   group_subtotals: boolean;
+  group_order: Record<string, string[]>;
   include_header: boolean;
   include_totals: boolean;
   date_format: string;
@@ -37,6 +38,21 @@ export interface ExportTemplate {
   created_at: string;
   updated_at: string;
 }
+
+// Sort group keys according to a saved order. Unknown keys are appended alphabetically (de).
+export const sortGroupKeys = (
+  keys: string[],
+  groupBy: string | null,
+  groupOrder: Record<string, string[]> | null | undefined,
+): string[] => {
+  if (!groupBy) return keys;
+  const saved = (groupOrder && groupOrder[groupBy]) || [];
+  const inSaved = saved.filter(k => keys.includes(k));
+  const rest = keys
+    .filter(k => !inSaved.includes(k))
+    .sort((a, b) => a.localeCompare(b, 'de'));
+  return [...inSaved, ...rest];
+};
 
 // Default columns for new templates
 export const DEFAULT_COLUMNS: ExportColumn[] = [
