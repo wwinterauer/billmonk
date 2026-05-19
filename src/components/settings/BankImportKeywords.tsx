@@ -167,6 +167,7 @@ export function BankImportKeywords() {
         tax_type: data.tax_type || null,
         vendor_id: vendorId,
         is_ignore: data.is_ignore,
+        default_tag_ids: data.default_tag_ids ?? [],
       };
 
       if (editingKeyword) {
