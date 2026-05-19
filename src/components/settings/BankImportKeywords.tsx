@@ -84,6 +84,7 @@ export function BankImportKeywords() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { taxCategories } = useCategories();
+  const { activeTags } = useTags();
 
   const [showDialog, setShowDialog] = useState(false);
   const [editingKeyword, setEditingKeyword] = useState<BankKeyword | null>(null);
@@ -96,7 +97,13 @@ export function BankImportKeywords() {
     vendor_id: '' as string | '',
     vendor_name: '',
     is_ignore: false,
+    default_tag_ids: [] as string[],
   });
+
+  const sortedTags = [...activeTags].sort((a, b) =>
+    a.name.localeCompare(b.name, 'de', { sensitivity: 'base' })
+  );
+  const tagsById = Object.fromEntries(activeTags.map((t) => [t.id, t]));
 
   // Vendor-Namen für Tabelle laden
   const { data: vendorMap } = useQuery({
