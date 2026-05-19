@@ -1,29 +1,39 @@
 ## Ziel
-Bank-Import-Schlagwörter sollen zusätzlich zu Kategorie, Buchungsart, USt und Lieferant auch **Standard-Tags** mitgeben können. Werden über ein Schlagwort beim Bank-Import oder bei der Abstimmung Belege angelegt, werden die hinterlegten Tags automatisch zugewiesen.
+Beim Excel-Export soll die Reihenfolge der Gruppen (z. B. Kategorien, Lieferanten, Tags, Zahlungsart, Buchungsart, MwSt-Satz, Monat/Quartal/Jahr) frei per Drag & Drop festlegbar sein — analog zur Spaltenreihenfolge.
 
 ## Umsetzung
 
-**1. Datenbank**
-- Neue Spalte `default_tag_ids uuid[]` (Default `'{}'`) in `bank_import_keywords`.
+### 1. Datenmodell
+- Neue Spalte `group_order jsonb` in `export_templates` (Default `'{}'`).
+- Struktur: `{ "<group_by>": ["Wert1", "Wert2", ...] }` — pro Gruppierungsfeld eine eigene Reihenfolge.
+- Migration via Supabase-Tool.
+- Typ `ExportTemplate` um `group_order: Record<string, string[]>` erweitern.
 
-**2. Einstellungen → Bank-Import Schlagwörter (`src/components/settings/BankImportKeywords.tsx`)**
-- Neue Spalte/Feld **Tags** im Bearbeitungs- und Anlegen-Formular.
-- Auswahl per `SearchableSelect` mit Suchfunktion, Mausrad-Scrollen und alphabetischer Sortierung (entsprechend dem bestehenden Standard für Dropdowns) – Multi-Select über Chips: ausgewählte Tags werden als entfernbare Badges angezeigt, weitere Tags werden per Searchable-Select hinzugefügt.
-- Tags via `useTags()` laden, nur aktive Tags zur Auswahl.
-- Speichern/Updaten schreibt `default_tag_ids`.
+### 2. Editor-UI (`ExportTemplateEditor.tsx`)
+Im Bereich "Gruppierung" (nur sichtbar wenn `group_by` gesetzt):
+- Distinct-Gruppenwerte aus den vorhandenen Belegen/Rechnungen des Users laden (per Query, abhängig vom gewählten `group_by` und `template_type`).
+- Für Datums-Gruppen (month/quarter/year): chronologisch vorbelegen.
+- Werte als sortierbare Liste mit `@dnd-kit` rendern (gleiches Pattern wie Spalten-Drag-Drop, bereits im Editor vorhanden).
+- Drag & Drop aktualisiert `editingTemplate.group_order[group_by]`.
+- Neue/unbekannte Werte (die noch nicht in der gespeicherten Reihenfolge stehen) werden alphabetisch ans Ende angehängt.
+- Button "Alphabetisch sortieren" / "Zurücksetzen".
 
-**3. Beleg-Erzeugung**
-- `src/pages/BankImport.tsx` (Zeile 348 ff.): Nach `insert` in `receipts` für jeden Tag in `matchedKeyword.default_tag_ids` einen Eintrag in `receipt_tags` anlegen.
-- `src/pages/Reconciliation.tsx` (Zeile 636 ff.): Gleiche Logik beim Anlegen des Beleges aus Bank-Transaktion.
+### 3. Export-Anwendung
+In `ExportFormatDialog.tsx` (CSV/Excel/PDF-Branches, Zeilen ~700, ~760, ~835) und `useExportPreview.ts`:
+- Nach Gruppierung in `Map`/`Record` die Keys gemäß `template.group_order[group_by]` sortieren.
+- Nicht gelistete Keys (neue Werte) alphabetisch dahinter.
+- Bei Datumsgruppen ohne explizite Order: chronologisch.
 
-**4. Anzeige**
-- In der Schlagwort-Liste die zugeordneten Tags als kleine farbige Badges anzeigen (analog zu Kategorie).
+### 4. Verhalten beim Wechsel von `group_by`
+- `group_order` bleibt erhalten (pro Feld separat gespeichert), wird beim erneuten Wählen wieder verwendet.
 
-## Technische Details
-- Spalte als `uuid[]` (kein Join-Table nötig, da nur Defaults, keine Referenzintegrität gegenüber Tag-Löschung kritisch; verwaiste IDs werden beim Anwenden ignoriert).
-- Insert in `receipt_tags`: `tags.map(tag_id => ({ receipt_id, tag_id }))`, Fehler bei Duplikat-Constraint ignorieren.
-- Types in `src/integrations/supabase/types.ts` werden nach Migration automatisch aktualisiert.
+## Geänderte/neue Dateien
+- Migration: neue Spalte `group_order`
+- `src/hooks/useExportTemplates.ts` — Typ + Default + Persistenz
+- `src/components/exports/ExportTemplateEditor.tsx` — neue Drag-Liste, Distinct-Loader
+- `src/components/exports/ExportFormatDialog.tsx` — Sortierung der Gruppen vor Ausgabe
+- `src/hooks/useExportPreview.ts` — gleiche Sortierung für Vorschau
 
-## Nicht im Umfang
-- Keine Änderung an Tag-Verwaltung selbst.
-- Keine rückwirkende Zuweisung auf bereits importierte Belege.
+## Nicht enthalten
+- Keine Änderung an Spalten-Reihenfolge, Sortier-Logik innerhalb einer Gruppe oder Gruppen-Subtotals.
+- Kein nested/multi-level Grouping.
