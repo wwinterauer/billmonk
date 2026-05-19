@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge, Download, Loader2, ArrowLeftRight, Users, ScanSearch, CheckCircle, Sparkles, AlertTriangle, Zap, Euro } from 'lucide-react';
+import { Building, Plus, Trash2, Edit2, ExternalLink, X, Check, Search, RotateCcw, ChevronLeft, ChevronRight, Tag, Merge, Download, Loader2, ArrowLeftRight, Users, ScanSearch, CheckCircle, Sparkles, AlertTriangle, Zap, Euro, Upload } from 'lucide-react';
+import { VendorImportDialog } from './VendorImportDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -136,6 +137,7 @@ export function VendorManagement() {
   // Form state
   const [formData, setFormData] = useState({
     display_name: '',
+    vendor_number: '',
     legal_names: [] as string[],
     detected_names: [] as string[],
     default_category_id: '',
@@ -153,10 +155,12 @@ export function VendorManagement() {
   });
   const [newVariant, setNewVariant] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   const resetForm = () => {
     setFormData({
       display_name: '',
+      vendor_number: '',
       legal_names: [],
       detected_names: [],
       default_category_id: '',
@@ -180,6 +184,7 @@ export function VendorManagement() {
     setEditingVendor(vendor);
     setFormData({
       display_name: vendor.display_name,
+      vendor_number: vendor.vendor_number || '',
       legal_names: vendor.legal_names || [],
       detected_names: vendor.detected_names || [],
       default_category_id: vendor.default_category_id || '',
@@ -259,6 +264,7 @@ export function VendorManagement() {
       if (editingVendor) {
         const result = await updateVendor(editingVendor.id, {
           display_name: formData.display_name.trim(),
+          vendor_number: formData.vendor_number.trim() || null,
           legal_names: effectiveLegalNames.filter(n => n.trim()),
           detected_names: formData.detected_names,
           default_category_id: formData.default_category_id || null,
@@ -302,6 +308,7 @@ export function VendorManagement() {
           defaultPaymentMethod: formData.default_payment_method || undefined,
           website: formData.website.trim() || undefined,
           notes: formData.notes.trim() || undefined,
+          vendorNumber: formData.vendor_number.trim() || undefined,
         });
         toast.success('Lieferant hinzugefügt');
       }
@@ -697,6 +704,7 @@ export function VendorManagement() {
       const query = searchQuery.toLowerCase();
       result = result.filter(v =>
         v.display_name.toLowerCase().includes(query) ||
+        v.vendor_number?.toLowerCase().includes(query) ||
         v.legal_names?.some(n => n.toLowerCase().includes(query)) ||
         v.detected_names.some(n => n.toLowerCase().includes(query)) ||
         v.notes?.toLowerCase().includes(query)
@@ -805,6 +813,10 @@ export function VendorManagement() {
               <Download className="h-4 w-4 mr-2" />
             )}
             Aus Belegen importieren
+          </Button>
+          <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Excel importieren
           </Button>
           <Button onClick={() => setIsAddDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
@@ -986,6 +998,7 @@ export function VendorManagement() {
                           onCheckedChange={toggleSelectAll}
                         />
                       </TableHead>
+                      <TableHead className="w-[100px]">Nr.</TableHead>
                       <TableHead>Markenname</TableHead>
                       <TableHead>Rechtlicher Name</TableHead>
                       <TableHead>Erkannte Varianten</TableHead>
@@ -1005,6 +1018,9 @@ export function VendorManagement() {
                               checked={selectedVendors.includes(vendor.id)}
                               onCheckedChange={() => toggleSelect(vendor.id)}
                             />
+                          </TableCell>
+                          <TableCell className="text-muted-foreground font-mono text-xs">
+                            {vendor.vendor_number || '–'}
                           </TableCell>
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
@@ -1214,6 +1230,21 @@ export function VendorManagement() {
               />
               <p className="text-xs text-muted-foreground">
                 Bekannter Name/Marke – wird in Listen und zur Identifikation verwendet
+              </p>
+            </div>
+
+            {/* Lieferantennummer */}
+            <div className="space-y-2">
+              <Label htmlFor="vendor_number">Lieferantennummer</Label>
+              <Input
+                id="vendor_number"
+                value={formData.vendor_number}
+                onChange={(e) => setFormData(prev => ({ ...prev, vendor_number: e.target.value }))}
+                placeholder="z.B. L-001, 70001"
+                maxLength={50}
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional – frei vergebbare Nummer (muss pro Konto eindeutig sein)
               </p>
             </div>
 
@@ -2175,6 +2206,14 @@ export function VendorManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <VendorImportDialog
+        open={isImportDialogOpen}
+        onOpenChange={setIsImportDialogOpen}
+        existingVendors={vendors}
+        userCategories={userCategories}
+        onImported={() => { fetchVendors(); }}
+      />
     </div>
   );
 }

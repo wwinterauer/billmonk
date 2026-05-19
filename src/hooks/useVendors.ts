@@ -18,6 +18,7 @@ export interface Vendor {
   id: string;
   user_id: string;
   display_name: string;
+  vendor_number: string | null;
   legal_names: string[];
   detected_names: string[];
   default_category_id: string | null;
@@ -141,6 +142,7 @@ export function useVendors() {
       defaultPaymentMethod?: string;
       notes?: string;
       website?: string;
+      vendorNumber?: string;
     }
   ): Promise<Vendor> => {
     if (!user) throw new Error('Nicht angemeldet');
@@ -163,21 +165,25 @@ export function useVendors() {
       .insert({
         user_id: user.id,
         display_name: displayName,
+        vendor_number: options?.vendorNumber?.trim() || null,
         legal_names: options?.legalName ? [options.legalName] : [],
         detected_names: options?.detectedNames || [],
         default_category_id: options?.defaultCategoryId || null,
         default_tag_id: options?.defaultTagId || null,
-        default_vat_rate: options?.defaultVatRate || null,
+        default_vat_rate: options?.defaultVatRate ?? null,
         default_tax_type: options?.defaultTaxType || null,
         field_defaults: Object.keys(fieldDefaults).length > 0 ? fieldDefaults : {},
         notes: options?.notes || null,
         website: options?.website || null,
-      })
+      } as never)
       .select()
       .single();
 
     if (error) {
       if (error.code === '23505') {
+        if (error.message?.toLowerCase().includes('vendor_number')) {
+          throw new Error('Diese Lieferantennummer ist bereits vergeben');
+        }
         throw new Error('Ein Lieferant mit diesem Namen existiert bereits');
       }
       throw new Error(error.message);
@@ -211,7 +217,7 @@ export function useVendors() {
 
   const updateVendor = async (
     id: string,
-    updates: Partial<Pick<Vendor, 'display_name' | 'legal_names' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_tax_type' | 'field_defaults' | 'field_defaults_stats' | 'field_suggestions_dismissed' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
+    updates: Partial<Pick<Vendor, 'display_name' | 'vendor_number' | 'legal_names' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_tax_type' | 'field_defaults' | 'field_defaults_stats' | 'field_suggestions_dismissed' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
   ): Promise<{ vendor: Vendor; syncedReceipts: number; autoApprovedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
     if (isUpdatingRef.current) {
@@ -232,15 +238,24 @@ export function useVendors() {
       }
     }
 
+    const updatePayload: Record<string, unknown> = { ...updates };
+    if ('vendor_number' in updatePayload) {
+      const vn = updatePayload.vendor_number;
+      updatePayload.vendor_number = typeof vn === 'string' ? (vn.trim() || null) : (vn ?? null);
+    }
+
     const { data, error } = await supabase
       .from('vendors')
-      .update(updates)
+      .update(updatePayload as never)
       .eq('id', id)
       .select()
       .single();
 
     if (error) {
       if (error.code === '23505') {
+        if (error.message?.toLowerCase().includes('vendor_number')) {
+          throw new Error('Diese Lieferantennummer ist bereits vergeben');
+        }
         throw new Error('Ein Lieferant mit diesem Namen existiert bereits');
       }
       throw new Error(error.message);
