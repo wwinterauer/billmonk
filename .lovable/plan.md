@@ -1,38 +1,29 @@
-## Problem
+## Ziel
+Bank-Import-Schlagwörter sollen zusätzlich zu Kategorie, Buchungsart, USt und Lieferant auch **Standard-Tags** mitgeben können. Werden über ein Schlagwort beim Bank-Import oder bei der Abstimmung Belege angelegt, werden die hinterlegten Tags automatisch zugewiesen.
 
-Du wirst nach Login auf `/beta` umgeleitet, weil `BetaGate` nur `localStorage`/Cookie + `profiles.is_beta_user` prüft. Beide fehlen bei dir (Admin, Plan `business`, `is_beta_user=false`). Außerdem: wer einmal einen Beta-Code eingegeben hat, sollte serverseitig für 180 Tage freigeschaltet bleiben – aktuell wird `beta_expires_at` nur gesetzt, wenn der Code selbst ein Ablaufdatum hat, und ein neues Gerät ohne lokales Flag wäre dann trotzdem gesperrt.
+## Umsetzung
 
-## Fix 1 — `src/pages/Beta.tsx` (Beta-Code-Einlösung)
+**1. Datenbank**
+- Neue Spalte `default_tag_ids uuid[]` (Default `'{}'`) in `bank_import_keywords`.
 
-Beim erfolgreichen Einlösen für eingeloggte User immer ein User-spezifisches 180-Tage-Ablauf in `profiles.beta_expires_at` schreiben (nicht das Code-Ablauf-Datum übernehmen):
+**2. Einstellungen → Bank-Import Schlagwörter (`src/components/settings/BankImportKeywords.tsx`)**
+- Neue Spalte/Feld **Tags** im Bearbeitungs- und Anlegen-Formular.
+- Auswahl per `SearchableSelect` mit Suchfunktion, Mausrad-Scrollen und alphabetischer Sortierung (entsprechend dem bestehenden Standard für Dropdowns) – Multi-Select über Chips: ausgewählte Tags werden als entfernbare Badges angezeigt, weitere Tags werden per Searchable-Select hinzugefügt.
+- Tags via `useTags()` laden, nur aktive Tags zur Auswahl.
+- Speichern/Updaten schreibt `default_tag_ids`.
 
-```ts
-updateData.beta_expires_at = new Date(Date.now() + 180*24*60*60*1000).toISOString();
-```
+**3. Beleg-Erzeugung**
+- `src/pages/BankImport.tsx` (Zeile 348 ff.): Nach `insert` in `receipts` für jeden Tag in `matchedKeyword.default_tag_ids` einen Eintrag in `receipt_tags` anlegen.
+- `src/pages/Reconciliation.tsx` (Zeile 636 ff.): Gleiche Logik beim Anlegen des Beleges aus Bank-Transaktion.
 
-Damit ist der User serverseitig 180 Tage als Beta-User markiert; `BetaGate` setzt das lokale Flag auf neuen Geräten automatisch nach Login (`is_beta_user`-Zweig existiert bereits).
+**4. Anzeige**
+- In der Schlagwort-Liste die zugeordneten Tags als kleine farbige Badges anzeigen (analog zu Kategorie).
 
-## Fix 2 — `src/components/BetaGate.tsx` (Bestandskunden & Admins nicht aussperren)
+## Technische Details
+- Spalte als `uuid[]` (kein Join-Table nötig, da nur Defaults, keine Referenzintegrität gegenüber Tag-Löschung kritisch; verwaiste IDs werden beim Anwenden ignoriert).
+- Insert in `receipt_tags`: `tags.map(tag_id => ({ receipt_id, tag_id }))`, Fehler bei Duplikat-Constraint ignorieren.
+- Types in `src/integrations/supabase/types.ts` werden nach Migration automatisch aktualisiert.
 
-`checkExpiry`-Effect erweitern:
-
-1. Zusätzlich `plan` aus `profiles` laden.
-2. Parallel `user_roles` auf `role='admin'` für den User abfragen.
-3. Grant-Bedingung erweitern auf:
-   `isAdmin || plan ∈ {starter, pro, business} || (is_beta_user && !expired)`
-4. Wenn Grant → wie bisher `localStorage` + Cookie (180 Tage) setzen und `setHasAccess(true)`.
-5. Revoke-Zweig bleibt: nur wenn `expired && !isAdmin && plan==='free'`.
-
-## Sofortmaßnahme für dich
-
-Bis der Fix live ist – in der DevTools-Konsole auf `https://billmonk.lovable.app`:
-
-```js
-localStorage.setItem('beta_access','true'); location.href='/dashboard';
-```
-
-## Nicht angefasst
-
-- Auth-Flow / Login
-- Beta-Code-Validierung (Aktiv-Status, Max-Uses, Ablauf)
-- DB-Schema
+## Nicht im Umfang
+- Keine Änderung an Tag-Verwaltung selbst.
+- Keine rückwirkende Zuweisung auf bereits importierte Belege.

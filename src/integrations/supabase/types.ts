@@ -297,6 +297,7 @@ export type Database = {
         Row: {
           category: string | null
           created_at: string | null
+          default_tag_ids: string[]
           description_template: string | null
           id: string
           is_active: boolean | null
@@ -311,6 +312,7 @@ export type Database = {
         Insert: {
           category?: string | null
           created_at?: string | null
+          default_tag_ids?: string[]
           description_template?: string | null
           id?: string
           is_active?: boolean | null
@@ -325,6 +327,7 @@ export type Database = {
         Update: {
           category?: string | null
           created_at?: string | null
+          default_tag_ids?: string[]
           description_template?: string | null
           id?: string
           is_active?: boolean | null

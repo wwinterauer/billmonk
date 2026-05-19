@@ -39,6 +39,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useCategories } from '@/hooks/useCategories';
+import { useTags } from '@/hooks/useTags';
 import { VendorAutocomplete } from '@/components/receipts/VendorAutocomplete';
 import {
   Plus,
@@ -50,6 +51,7 @@ import {
   Info,
   Sparkles,
   Ban,
+  X,
 } from 'lucide-react';
 
 interface BankKeyword {
@@ -62,6 +64,7 @@ interface BankKeyword {
   vendor_id: string | null;
   is_active: boolean;
   is_ignore: boolean;
+  default_tag_ids: string[] | null;
 }
 
 const CATEGORIES = [
@@ -81,6 +84,7 @@ export function BankImportKeywords() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { taxCategories } = useCategories();
+  const { activeTags } = useTags();
 
   const [showDialog, setShowDialog] = useState(false);
   const [editingKeyword, setEditingKeyword] = useState<BankKeyword | null>(null);
@@ -93,7 +97,13 @@ export function BankImportKeywords() {
     vendor_id: '' as string | '',
     vendor_name: '',
     is_ignore: false,
+    default_tag_ids: [] as string[],
   });
+
+  const sortedTags = [...activeTags].sort((a, b) =>
+    a.name.localeCompare(b.name, 'de', { sensitivity: 'base' })
+  );
+  const tagsById = Object.fromEntries(activeTags.map((t) => [t.id, t]));
 
   // Vendor-Namen für Tabelle laden
   const { data: vendorMap } = useQuery({
@@ -157,6 +167,7 @@ export function BankImportKeywords() {
         tax_type: data.tax_type || null,
         vendor_id: vendorId,
         is_ignore: data.is_ignore,
+        default_tag_ids: data.default_tag_ids ?? [],
       };
 
       if (editingKeyword) {
@@ -250,6 +261,7 @@ export function BankImportKeywords() {
       vendor_id: '',
       vendor_name: '',
       is_ignore: false,
+      default_tag_ids: [],
     });
     setEditingKeyword(null);
   };
@@ -265,6 +277,7 @@ export function BankImportKeywords() {
       vendor_id: keyword.vendor_id || '',
       vendor_name: (keyword.vendor_id && vendorMap?.[keyword.vendor_id]) || '',
       is_ignore: keyword.is_ignore ?? false,
+      default_tag_ids: (keyword.default_tag_ids ?? []).filter(Boolean),
     });
     setShowDialog(true);
   };
@@ -335,6 +348,7 @@ export function BankImportKeywords() {
                   <TableHead>Lieferant</TableHead>
                   <TableHead>Steuerart</TableHead>
                   <TableHead>Beschreibung</TableHead>
+                  <TableHead>Tags</TableHead>
                   <TableHead className="text-right">MwSt</TableHead>
                   <TableHead className="text-center">Aktiv</TableHead>
                   <TableHead className="w-[100px]">Aktionen</TableHead>
@@ -367,6 +381,27 @@ export function BankImportKeywords() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {kw.description_template || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {(kw.default_tag_ids ?? []).map((tid) => {
+                          const t = tagsById[tid];
+                          if (!t) return null;
+                          return (
+                            <Badge
+                              key={tid}
+                              variant="outline"
+                              style={{ borderColor: t.color, color: t.color }}
+                              className="text-xs"
+                            >
+                              {t.name}
+                            </Badge>
+                          );
+                        })}
+                        {(!kw.default_tag_ids || kw.default_tag_ids.length === 0) && (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">{kw.tax_rate}%</TableCell>
                     <TableCell className="text-center">
@@ -521,6 +556,65 @@ export function BankImportKeywords() {
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   Bankgebühren, Versicherungen und Steuern haben meist 0% MwSt
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Standard-Tags</Label>
+                <div className="flex flex-wrap gap-1 min-h-[2rem]">
+                  {formData.default_tag_ids.length === 0 && (
+                    <span className="text-xs text-muted-foreground self-center">
+                      Noch keine Tags ausgewählt
+                    </span>
+                  )}
+                  {formData.default_tag_ids.map((tid) => {
+                    const t = tagsById[tid];
+                    if (!t) return null;
+                    return (
+                      <Badge
+                        key={tid}
+                        variant="outline"
+                        style={{ borderColor: t.color, color: t.color }}
+                        className="text-xs flex items-center gap-1"
+                      >
+                        {t.name}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData({
+                              ...formData,
+                              default_tag_ids: formData.default_tag_ids.filter((id) => id !== tid),
+                            })
+                          }
+                          className="hover:text-destructive"
+                          aria-label={`${t.name} entfernen`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
+                </div>
+                <SearchableSelect
+                  value=""
+                  onChange={(value) => {
+                    if (value && !formData.default_tag_ids.includes(value)) {
+                      setFormData({
+                        ...formData,
+                        default_tag_ids: [...formData.default_tag_ids, value],
+                      });
+                    }
+                  }}
+                  options={sortedTags
+                    .filter((t) => !formData.default_tag_ids.includes(t.id))
+                    .map((t) => ({ value: t.id, label: t.name }))}
+                  placeholder="Tag hinzufügen..."
+                  searchPlaceholder="Tag suchen..."
+                  emptyText="Keine Tags gefunden"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Diese Tags werden automatisch jedem Beleg zugewiesen, der durch dieses Schlagwort
+                  beim Bank-Import angelegt wird.
                 </p>
               </div>
               </>
