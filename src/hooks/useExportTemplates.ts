@@ -417,6 +417,7 @@ export function useExportTemplates() {
     sort_direction: 'desc',
     group_by: null,
     group_subtotals: true,
+    group_order: {},
     include_header: true,
     include_totals: true,
     date_format: 'DD.MM.YYYY',
