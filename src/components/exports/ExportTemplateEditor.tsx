@@ -287,6 +287,126 @@ export function ExportTemplateEditor({
     })
   );
 
+  // Load distinct group values whenever the chosen group_by changes
+  const currentGroupBy = editingTemplate?.group_by || null;
+  const currentTemplateType = editingTemplate?.template_type || 'receipts';
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (!user || !currentGroupBy) {
+        setGroupValues([]);
+        return;
+      }
+      setLoadingGroupValues(true);
+      try {
+        let values: string[] = [];
+        if (currentGroupBy === 'tags') {
+          const { data } = await supabase
+            .from('tags')
+            .select('name')
+            .eq('user_id', user.id)
+            .eq('is_active', true);
+          values = (data || []).map(r => r.name).filter(Boolean);
+        } else if (['month', 'quarter', 'year'].includes(currentGroupBy)) {
+          const dateField = currentTemplateType === 'invoices' ? 'invoice_date' : 'receipt_date';
+          const table = currentTemplateType === 'invoices' ? 'invoices' : 'receipts';
+          const { data } = await supabase
+            .from(table as any)
+            .select(dateField)
+            .eq('user_id', user.id)
+            .limit(5000);
+          const set = new Set<string>();
+          (data || []).forEach((r: any) => {
+            const raw = r[dateField];
+            if (!raw) return;
+            const d = new Date(raw);
+            if (isNaN(d.getTime())) return;
+            if (currentGroupBy === 'month') {
+              set.add(`${GROUP_MONTHS[d.getMonth()]} ${d.getFullYear()}`);
+            } else if (currentGroupBy === 'quarter') {
+              set.add(`Q${Math.ceil((d.getMonth() + 1) / 3)} ${d.getFullYear()}`);
+            } else {
+              set.add(String(d.getFullYear()));
+            }
+          });
+          values = Array.from(set);
+        } else if (currentTemplateType === 'receipts') {
+          const fieldMap: Record<string, string> = {
+            category: 'category',
+            vendor: 'vendor_brand',
+            payment_method: 'payment_method',
+            tax_type: 'tax_type',
+            vat_rate: 'vat_rate',
+          };
+          const field = fieldMap[currentGroupBy];
+          if (field) {
+            const { data } = await supabase
+              .from('receipts')
+              .select(field)
+              .eq('user_id', user.id)
+              .limit(5000);
+            const set = new Set<string>();
+            (data || []).forEach((r: any) => {
+              const v = r[field];
+              if (v === null || v === undefined || v === '') return;
+              set.add(currentGroupBy === 'vat_rate' ? `${v}%` : String(v));
+            });
+            values = Array.from(set);
+          }
+        }
+        if (!cancelled) {
+          values.sort((a, b) => a.localeCompare(b, 'de'));
+          setGroupValues(values);
+        }
+      } finally {
+        if (!cancelled) setLoadingGroupValues(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [user, currentGroupBy, currentTemplateType]);
+
+  // Computed ordered list of group values (saved order first, new values alphabetically)
+  const orderedGroupValues = (() => {
+    if (!currentGroupBy) return [] as string[];
+    const saved = (editingTemplate?.group_order?.[currentGroupBy]) || [];
+    const inSaved = saved.filter(k => groupValues.includes(k));
+    const rest = groupValues.filter(k => !inSaved.includes(k));
+    return [...inSaved, ...rest];
+  })();
+
+  const updateGroupOrder = (newOrder: string[]) => {
+    if (!editingTemplate || !currentGroupBy) return;
+    setEditingTemplate({
+      ...editingTemplate,
+      group_order: {
+        ...(editingTemplate.group_order || {}),
+        [currentGroupBy]: newOrder,
+      },
+    });
+  };
+
+  const handleGroupDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = orderedGroupValues.indexOf(String(active.id));
+    const newIndex = orderedGroupValues.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    updateGroupOrder(arrayMove(orderedGroupValues, oldIndex, newIndex));
+  };
+
+  const resetGroupOrder = () => {
+    if (!editingTemplate || !currentGroupBy) return;
+    const next = { ...(editingTemplate.group_order || {}) };
+    delete next[currentGroupBy];
+    setEditingTemplate({ ...editingTemplate, group_order: next });
+  };
+
+  const sortGroupOrderAlpha = () => {
+    updateGroupOrder([...groupValues].sort((a, b) => a.localeCompare(b, 'de')));
+  };
+
+
   // Initialize with first template or empty
   useEffect(() => {
     if (!loading && templates.length > 0 && !selectedTemplateId) {
