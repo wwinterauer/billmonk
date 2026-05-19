@@ -382,6 +382,27 @@ export function BankImportKeywords() {
                     <TableCell className="text-muted-foreground">
                       {kw.description_template || '-'}
                     </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {(kw.default_tag_ids ?? []).map((tid) => {
+                          const t = tagsById[tid];
+                          if (!t) return null;
+                          return (
+                            <Badge
+                              key={tid}
+                              variant="outline"
+                              style={{ borderColor: t.color, color: t.color }}
+                              className="text-xs"
+                            >
+                              {t.name}
+                            </Badge>
+                          );
+                        })}
+                        {(!kw.default_tag_ids || kw.default_tag_ids.length === 0) && (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">{kw.tax_rate}%</TableCell>
                     <TableCell className="text-center">
                       <Switch
