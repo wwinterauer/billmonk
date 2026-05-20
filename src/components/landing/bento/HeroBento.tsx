@@ -129,51 +129,14 @@ export function HeroBento() {
             </div>
           </BentoTile>
 
-          {/* LIVE FEED tile — wide */}
-          <BentoTile delay={0.05} className="lg:col-span-4 min-h-[320px] p-0 overflow-hidden">
-            <div className="absolute inset-0 bg-sidebar text-sidebar-foreground" />
-            <div className="relative h-full flex flex-col">
-              {/* Window chrome */}
-              <div className="flex items-center justify-between px-5 py-3 border-b border-sidebar-border/60">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-destructive/70" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-warning/70" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-success/70" />
-                </div>
-                <span className="text-xs text-sidebar-foreground/60 font-mono">billmonk.ai · Live Inbox</span>
-                <Badge className="bg-success/20 text-success border-0 text-[10px]">
-                  <span className="mr-1 h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-                  Live
-                </Badge>
-              </div>
-
-              <div className="flex-1 p-5 space-y-2.5 overflow-hidden">
-                {liveReceipts.map((r, i) => (
-                  <motion.div
-                    key={r.name}
-                    initial={{ opacity: 0, x: -16 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.45, delay: 0.2 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-sidebar-accent/60 border border-sidebar-border/50"
-                  >
-                    <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
-                      r.tone === 'success' ? 'bg-success/20 text-success' :
-                      r.tone === 'primary' ? 'bg-primary/20 text-primary' :
-                      'bg-sidebar-foreground/10 text-sidebar-foreground/80'
-                    }`}>
-                      <r.icon className="h-4.5 w-4.5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate">{r.name}</p>
-                      <p className="text-xs text-sidebar-foreground/60 truncate">{r.sub}</p>
-                    </div>
-                    <span className="text-sm font-mono font-semibold tabular-nums">{r.amount}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
+          {/* HERO DEMO VIDEO tile — wide */}
+          <BentoTile delay={0.05} className="lg:col-span-4 min-h-[360px] p-0 overflow-hidden" glow>
+            <TiltCard className="absolute inset-0 rounded-[inherit]" max={4}>
+              <HeroVideo />
+            </TiltCard>
           </BentoTile>
+
+
 
           {/* Trust tile */}
           <BentoTile delay={0.15} tone="warning" className="lg:col-span-2 min-h-[320px] flex flex-col justify-between">
