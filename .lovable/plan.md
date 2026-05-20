@@ -1,69 +1,140 @@
+# Schneller WOW-Pack + Neues Intro-Video
 
-# Frontpage Redesign – Bento Edition
+Wir bauen 5 Wirkungs-Boosts auf der Landing Page – inklusive eines **komplett neu produzierten** Remotion-Intro-Videos (die alte 5-Scene-Komposition wird ersetzt, nicht wiederverwendet).
 
-Neue Landing Page, die alle bestehenden Inhalte transportiert, aber in einem modernen Bento-Grid-Layout mit reichhaltigen Animationen, einem Produkt-Demo-Video und einem starken Hero-Moment präsentiert. Bestehende Farben (Teal Primary, Success, Warning, gradient-hero/gradient-primary) und Fonts bleiben **unverändert** – die Wirkung kommt aus Komposition, Tiefe, Bewegung und Hierarchie.
+## 1. Neues Intro-Video (Remotion, frisch produziert)
 
-## Look & Feel
+**Format:** 1920×1080, 30 fps, ~15 s (450 frames), MP4 H.264, muted/loop, < 6 MB
+**Stil:** „Tech Product / Editorial" – passt zu BillMonk-Brand (Teal Primary, Cream/Paper-Töne, viel Whitespace, ein klarer Akzent)
+**Typo:** Inter / Space Grotesk (matched die Site), keine generischen Sans-Serifs
 
-- **Bento-Grid** als roter Faden: jede Sektion (Hero, How it works, Features, Use Cases, Workflow, Pricing) wird zu einem Raster aus unterschiedlich großen, abgerundeten „Kacheln" (große Hero-Kachel + kleinere Info-Tiles).
-- Tiefe durch sanfte Gradients (`gradient-hero`, `gradient-primary`), subtilen Innenschatten, Glas-/Noise-Hauch und farbige Glows an den Kachelrändern.
-- **Mehr Bewegung**: Scroll-getriggerte Reveal-Animationen (framer-motion `whileInView`), gestaffelte Stagger-Effekte, leichte Parallax-Hintergrund-Blobs, dezenter Magnetic-Hover für CTAs, Number-Counter beim Sichtbarwerden, Marquee mit „Vertraut von…"-Logos/Initialen.
-- **Hero-Demo-Video**: Wir nutzen die bereits vorhandene Remotion-Komposition (`remotion/`) → einmalig in MP4 gerendert und in `src/assets/` abgelegt, dann als auto-play/muted/loop-Background-Video in der zentralen Hero-Bento-Kachel mit poster-Frame und sanftem Overlay.
-- Kein Stilbruch: Tokens (`bg-card`, `text-primary`, `border-border`, `gradient-hero`, `shadow-primary` …) werden konsequent verwendet, damit Dark/Light & Brand erhalten bleiben.
-
-## Inhalte (alle bleiben erhalten – nur neu komponiert)
+**Storyboard (5 Szenen, jede ~90 frames mit ~15 frame Cross-Transitions):**
 
 ```text
-┌──────────────────────────── HERO BENTO ────────────────────────────┐
-│  Big Tile: Headline + CTA + Trust    │  Tile: Demo-Video (Remotion)│
-│  Tile: KI-Genauigkeit (Counter 94%)  │  Tile: Belege 247 (Counter) │
-│  Tile: Mini-Receipt-Stream (animiert)│  Tile: AT-Made / DSGVO Badges│
-└─────────────────────────────────────────────────────────────────────┘
+Scene 1 (3s) — "Der Schmerz"
+  Aufeinander gestapelte Papier-Belege fallen in den Frame,
+  bilden chaotischen Stack. Headline: "Schluss mit dem Schuhkarton."
 
-How it works   → 3-Step-Bento (Upload • KI erkennt • Export Steuerberater)
-Problem/Lösung → Split-Bento „Vorher / Nachher"
-Use Cases      → 2 große Tiles: Privat | Business (mit Icon-Wall)
-Features       → Bento mit 6–8 Kacheln (groß: KI-Extraktion, klein: Bank-Import, Rechnungen, OCR, Tags, Recurring, Export, PWA)
-Business Flow  → horizontaler animierter Pipeline-Stream
-Testimonials   → Bento mit 1 großer + 2 kleinen Karten, sanftes Auto-Scroll
-Pricing        → bestehender <Pricing/> (3 Tiles) erhält Bento-Rahmen
-FAQ + CTA      → unverändert, leicht angepasste Hülle
+Scene 2 (3s) — "Capture"
+  Ein Beleg wird hochgehoben, von Scan-Linie (teal) durchquert.
+  UI-Mockup-Karte fliegt ein: Foto → Beleg-Karte mit Feldern.
+
+Scene 3 (3s) — "KI extrahiert"
+  Felder (Vendor, Datum, Netto, USt, Kategorie) erscheinen
+  staggered, jeweils mit kleinem "✓" und Confidence-Bar (94%).
+
+Scene 4 (3s) — "Pipeline"
+  Horizontaler Flow: Beleg → KI → Buchhaltung → Steuerberater.
+  Icons gleiten über Verbindungslinie, Zahlen ticken hoch.
+
+Scene 5 (3s) — "Outro"
+  BillMonk-Logo fadet ein, Tagline: "KI-Buchhaltung. Made in Austria."
+  Subtiler Teal-Glow, langsamer Pull-Back.
 ```
 
-Nichts wird entfernt: alle aktuellen Sektionen aus `src/pages/Index.tsx` bleiben sichtbar, jedoch in neuer Hülle.
+**Motion-System:**
+- Default Entry: `spring({ damping: 200 })` – smooth, kein Bounce
+- Accent Entry (Hero-Moments): `spring({ damping: 12 })` – leichter Overshoot
+- Scene-Transitions: `fade` + `slide` Mix, je 15 frames
+- Persistent Layer: subtiles Noise-Overlay + langsam driftender Gradient-Blob im Hintergrund
 
-## Technische Umsetzung
+**Render-Pipeline:**
+- Bestehende `remotion/`-Files (`MainVideo.tsx`, `scenes/Scene1–5.tsx`) **überschreiben** mit neuem Storyboard
+- `cd remotion && bun install` (idempotent)
+- Compositor-Fix: musl → gnu binary kopieren, ffmpeg/ffprobe symlinken (siehe video-creator skill)
+- `node scripts/render-remotion.mjs` → `src/assets/landing-demo.mp4`
+- Poster-Frame via `bunx remotion still --frame=15` → `src/assets/landing-demo-poster.jpg`
+- Spot-Check: `bunx remotion still` an Frame 0, 90, 225, 420
 
-1. **Neue Komponenten** unter `src/components/landing/bento/`:
-   - `BentoTile.tsx` (Wrapper: variants `lg | md | sm | feature | video`, Hover-Glow, Reveal)
-   - `HeroBento.tsx` – ersetzt aktuellen `Hero`
-   - `HowItWorksBento.tsx`, `FeaturesBento.tsx`, `UseCasesBento.tsx`, `TestimonialsBento.tsx`, `WorkflowStream.tsx`
-   - `AnimatedCounter.tsx`, `LogoMarquee.tsx`, `MagneticButton.tsx`
-2. **`src/pages/Index.tsx`** → importiert die neuen Bento-Komponenten in gleicher Reihenfolge (Hero → ProblemSolution → HowItWorks → UseCases → Features → Workflow → Testimonials → Pricing → FAQ → CTA). Alte Files bleiben vorerst liegen (rollback-fähig), werden aber nicht mehr gerendert.
-3. **Animationen**: `framer-motion` (bereits installiert) – `whileInView`, `staggerChildren`, `useReducedMotion` respektieren.
-4. **Demo-Video**:
-   - `cd remotion && bun install && bun run scripts/render-remotion.mjs` → MP4 + WebM nach `src/assets/landing-demo.{mp4,webm}` + Poster `landing-demo.jpg`.
-   - In `HeroBento` als `<video autoPlay muted loop playsInline poster=…>` (mobil: nur Poster + Play-Button, kein Autoplay über Mobilfunk-Heuristik).
-5. **Performance**:
-   - Video `preload="metadata"`, lazy mount via IntersectionObserver.
-   - Bilder mit `loading="lazy"` + `decoding="async"`.
-   - Reveal-Animationen einmalig (`viewport={{ once: true, margin: '-80px' }}`).
-6. **Accessibility/SEO**:
-   - Eine `<h1>` bleibt im Hero, `<section aria-labelledby>` pro Block, semantische Reihenfolge unverändert.
-   - Bestehende `PageMeta` + JSON-LD bleiben.
-   - `prefers-reduced-motion` → Animationen werden auf simple Fades reduziert.
-7. **Responsive**:
-   - Mobile: Bento-Grid kollabiert zu einer Spalte, Hero-Video schrumpft auf 16:9-Tile unter der Headline.
-   - `lg:grid-cols-6` Grid mit `col-span`-Mix für Bento-Größen.
+**Einbau in `HeroBento`:**
+- Großes Hero-Tile bekommt `<video autoPlay muted loop playsInline poster={poster} preload="metadata">`
+- Sanftes Gradient-Overlay (von unten, für Text-Lesbarkeit, falls Headline drüber liegt)
+- Mobile: nur Poster + Play-Button (kein Autoplay über Mobilfunk)
+- Lazy mount via `IntersectionObserver` – Video lädt erst, wenn Hero im Viewport
 
-## Out of scope
+## 2. Animated Gradient-Mesh + Noise hinter dem Hero
 
-- Dashboard, Auth, andere Seiten (Pricing-Page, Beta etc.) bleiben unberührt – `<Pricing/>` wird zwar in Bento-Hülle gerendert, aber die innere Komponente nicht umgeschrieben.
-- Keine Änderung an Farb-Tokens, Fonts oder `tailwind.config.ts`.
-- Keine Backend-/DB-Änderungen.
+- Neue Komponente `src/components/landing/bento/HeroBackdrop.tsx`
+- Conic-Gradient aus 3 Brand-Farben (primary, primary-glow, accent), langsam rotierend (~40 s loop) via `@keyframes`
+- Darüber 3 % Noise-PNG (oder SVG `<feTurbulence>`) für Editorial-Feel
+- `pointer-events-none`, absolute hinter `HeroBento`-Grid
 
-## Validierung
+## 3. Magnetic CTA + Tilt-Effekt
 
-- Lokales Render-Check des Videos (kurzer QA: Datei < 8 MB, 1080p, loop-tauglich).
-- Preview öffnen, Scroll durchspielen, Console/Network auf Fehler prüfen.
-- Lighthouse-Spotcheck (LCP-Bild = Hero-Poster, Video lazy).
+- `src/components/landing/bento/MagneticButton.tsx`: Cursor zieht Button um max. 8 px an (mouse-move + spring)
+- `src/components/landing/bento/TiltCard.tsx`: HOC für große Bento-Tiles, ±6° Perspektive, smooth lerp
+- Nur Desktop (`useMediaQuery('(hover: hover)')`), respektiert `prefers-reduced-motion`
+- Anwenden auf: Haupt-CTA „Beta testen" + Hero-Video-Tile + zwei Feature-Highlight-Tiles
+
+## 4. Vorher/Nachher-Slider als neue Sektion
+
+- Neue Komponente `src/components/landing/BeforeAfter.tsx`, einsortiert über `HowItWorksBento`
+- Linke Hälfte: chaotischer Schuhkarton-Belege-Stack (generiertes Bild via `imagegen`)
+- Rechte Hälfte: aufgeräumtes BillMonk-Dashboard (Screenshot oder generiertes Mockup)
+- Draggable Trenner (Pointer-Events), Default 50 %, springt sanft zurück bei Release
+- Labels: „Vorher" / „Nachher" als kleine Pills
+- Mobile: kein Drag, sondern Auto-Animation hin und her (8 s loop)
+
+## 5. Trust-Strip + Sticky Mobile CTA
+
+**Trust-Strip:**
+- Schmaler Streifen direkt unter Hero: „🇦🇹 Made in Austria · 🔒 DSGVO-konform · ⏱ 30 Tage testen · 💳 Keine Kreditkarte nötig"
+- Subtiler `bg-card/50` mit `border-y`, Icons monochrom
+
+**Sticky Mobile CTA:**
+- `src/components/landing/StickyMobileCTA.tsx`
+- Erscheint nach 30 % Scroll auf Mobile (`< md`), slide-up von unten
+- Ein Button: „Jetzt Beta testen →" (primary, full-width minus padding)
+- Dismiss-X rechts, merkt sich Dismiss in `sessionStorage`
+
+---
+
+## Technische Details
+
+**Neue Dateien:**
+- `remotion/src/MainVideo.tsx` (überschrieben)
+- `remotion/src/scenes/Scene1.tsx` … `Scene5.tsx` (überschrieben)
+- `remotion/src/components/PersistentBackdrop.tsx` (neu)
+- `src/assets/landing-demo.mp4` (gerendert)
+- `src/assets/landing-demo-poster.jpg` (gerendert)
+- `src/components/landing/bento/HeroBackdrop.tsx`
+- `src/components/landing/bento/MagneticButton.tsx`
+- `src/components/landing/bento/TiltCard.tsx`
+- `src/components/landing/BeforeAfter.tsx`
+- `src/components/landing/StickyMobileCTA.tsx`
+- ggf. `src/assets/before-shoebox.jpg` (via imagegen)
+
+**Geänderte Dateien:**
+- `src/components/landing/bento/HeroBento.tsx` (Video-Tile + Backdrop + Magnetic CTA + Tilt)
+- `src/pages/Index.tsx` + `src/pages/Beta.tsx` (BeforeAfter einbauen, StickyMobileCTA mounten, Trust-Strip)
+
+**Bibliotheken:** framer-motion (bereits da), keine neuen Deps nötig.
+
+**Performance:**
+- Video `preload="metadata"`, lazy-mount via IntersectionObserver
+- Alle Reveals einmalig (`viewport={{ once: true }}`)
+- `prefers-reduced-motion` → Tilt/Magnetic deaktiviert, Video → nur Poster
+
+**Accessibility/SEO:**
+- Video hat `aria-hidden="true"` (rein dekorativ), Headline bleibt Text-H1
+- BeforeAfter-Slider mit Keyboard-Support (Arrow Keys)
+- Bestehende JSON-LD / PageMeta unverändert
+
+---
+
+## Reihenfolge der Umsetzung
+
+1. Remotion-Setup fixen (Compositor + ffmpeg-Symlinks) und neues Storyboard schreiben
+2. Video rendern, Spot-Check Frames, Datei nach `src/assets/`
+3. `HeroBackdrop` + `MagneticButton` + `TiltCard` bauen
+4. `HeroBento` umbauen (Video-Tile + neue Effekte)
+5. `BeforeAfter`-Sektion + Trust-Strip einbauen
+6. `StickyMobileCTA` einbauen
+7. Auf `/` **und** `/beta` mounten, Preview-Check
+
+## Out of Scope
+
+- Kein Backend, keine DB-Änderungen
+- Keine neuen Farb-Tokens oder Fonts
+- Dashboard, Auth, andere Seiten bleiben unberührt
+- Andere Wow-Ideen aus der vorherigen Liste (ROI-Calculator, Live-Demo-Widget, Cursor-Trail) bleiben für später
