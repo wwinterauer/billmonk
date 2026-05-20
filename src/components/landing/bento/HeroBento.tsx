@@ -58,18 +58,21 @@ export function HeroBento() {
 
             <div className="mt-8 space-y-5">
               <div className="flex flex-col sm:flex-row gap-3">
-                <Link to="/register">
-                  <Button size="lg" className="gradient-primary shadow-primary text-base px-8 h-12 group active:scale-[0.97]">
-                    Kostenlos testen
-                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </Link>
+                <MagneticWrap>
+                  <Link to="/register">
+                    <Button size="lg" className="gradient-primary shadow-primary text-base px-8 h-12 group active:scale-[0.97]">
+                      Kostenlos testen
+                      <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                  </Link>
+                </MagneticWrap>
                 <a href="#how-it-works">
                   <Button size="lg" variant="outline" className="h-12 px-6 text-base">
                     So funktioniert's
                   </Button>
                 </a>
               </div>
+
 
               <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
                 {['30 Tage kostenlos', 'DSGVO-konform', 'Made in Austria'].map((t) => (
