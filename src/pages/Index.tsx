@@ -95,6 +95,8 @@ const Index = () => {
       <Header />
       <main>
         <HeroBento />
+        <TrustStrip />
+        <BeforeAfter />
         <ProblemSolution />
         <HowItWorksBento />
         <PrivateCustomers />
