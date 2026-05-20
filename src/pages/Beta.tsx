@@ -13,10 +13,11 @@ import { toast } from 'sonner';
 import { Lock, ArrowRight, Loader2, UserPlus, KeyRound, CheckCircle2, LogIn } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { Hero } from '@/components/landing/Hero';
+import { HeroBento } from '@/components/landing/bento/HeroBento';
 import { ProblemSolution } from '@/components/landing/ProblemSolution';
-import { HowItWorks } from '@/components/landing/HowItWorks';
-import { Features } from '@/components/landing/Features';
+import { HowItWorksBento } from '@/components/landing/bento/HowItWorksBento';
+import { FeaturesBento } from '@/components/landing/bento/FeaturesBento';
+import { WorkflowStream } from '@/components/landing/bento/WorkflowStream';
 import { Pricing } from '@/components/landing/Pricing';
 import { Footer } from '@/components/landing/Footer';
 
