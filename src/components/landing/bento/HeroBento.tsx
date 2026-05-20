@@ -1,17 +1,14 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Brain, CheckCircle2, FileText, Receipt, Sparkles, Star, ScanLine, Mail, Camera } from 'lucide-react';
+import { ArrowRight, Brain, CheckCircle2, Receipt, Sparkles, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BentoTile } from './BentoTile';
 import { AnimatedCounter } from './AnimatedCounter';
-
-const liveReceipts = [
-  { icon: Mail, name: 'Amazon Business', sub: 'E-Mail-Import • Büromaterial', amount: '€ 89,99', tone: 'success' as const },
-  { icon: ScanLine, name: 'BILLA', sub: 'KI erkennt 10 % & 20 % MwSt', amount: '€ 47,32', tone: 'primary' as const },
-  { icon: Camera, name: 'A1 Telekom', sub: 'Foto-Scan • Mobilfunk', amount: '€ 29,90', tone: 'muted' as const },
-  { icon: FileText, name: 'Hofer', sub: 'Bank-Match gefunden', amount: '€ 18,45', tone: 'success' as const },
-];
+import { HeroBackdrop } from './HeroBackdrop';
+import { HeroVideo } from './HeroVideo';
+import { MagneticWrap } from './MagneticWrap';
+import { TiltCard } from './TiltCard';
 
 export function HeroBento() {
   return (
