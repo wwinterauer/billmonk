@@ -14,12 +14,15 @@ import { Lock, ArrowRight, Loader2, UserPlus, KeyRound, CheckCircle2, LogIn } fr
 import { Link } from 'react-router-dom';
 
 import { HeroBento } from '@/components/landing/bento/HeroBento';
+import { TrustStrip } from '@/components/landing/TrustStrip';
+import { BeforeAfter } from '@/components/landing/BeforeAfter';
 import { ProblemSolution } from '@/components/landing/ProblemSolution';
 import { HowItWorksBento } from '@/components/landing/bento/HowItWorksBento';
 import { FeaturesBento } from '@/components/landing/bento/FeaturesBento';
 import { WorkflowStream } from '@/components/landing/bento/WorkflowStream';
 import { Pricing } from '@/components/landing/Pricing';
 import { Footer } from '@/components/landing/Footer';
+import { StickyMobileCTA } from '@/components/landing/StickyMobileCTA';
 
 export default function Beta() {
   const [activeTab, setActiveTab] = useState<'apply' | 'code'>('apply');
@@ -67,11 +70,14 @@ export default function Beta() {
 
       {/* Landing content */}
       <HeroBento />
+      <TrustStrip />
+      <BeforeAfter />
       <ProblemSolution />
       <HowItWorksBento />
       <FeaturesBento />
       <WorkflowStream />
       <Pricing />
+      <StickyMobileCTA />
 
       {/* Beta signup section */}
       <section id="beta-signup" className="py-20 bg-secondary/30">
