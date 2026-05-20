@@ -13,28 +13,9 @@ import { TiltCard } from './TiltCard';
 export function HeroBento() {
   return (
     <section className="relative overflow-hidden">
-      {/* Ambient background */}
-      <div aria-hidden className="absolute inset-0 -z-10 gradient-hero" />
-      <div aria-hidden className="absolute inset-0 -z-10 overflow-hidden">
-        <motion.div
-          className="absolute -top-32 -left-24 h-[28rem] w-[28rem] rounded-full bg-primary/15 blur-3xl"
-          animate={{ x: [0, 40, 0], y: [0, 20, 0] }}
-          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-          className="absolute top-40 -right-32 h-[32rem] w-[32rem] rounded-full bg-accent/15 blur-3xl"
-          animate={{ x: [0, -50, 0], y: [0, 30, 0] }}
-          transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <div
-          className="absolute inset-0 opacity-[0.035]"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 1px 1px, hsl(var(--foreground)) 1px, transparent 0)',
-            backgroundSize: '24px 24px',
-          }}
-        />
-      </div>
+      <HeroBackdrop />
+
+
 
       <div className="container pt-20 pb-16 lg:pt-28 lg:pb-24">
         {/* HERO Bento Grid */}
