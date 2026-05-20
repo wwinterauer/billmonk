@@ -1,5 +1,7 @@
 import { Header } from '@/components/landing/Header';
 import { HeroBento } from '@/components/landing/bento/HeroBento';
+import { TrustStrip } from '@/components/landing/TrustStrip';
+import { BeforeAfter } from '@/components/landing/BeforeAfter';
 import { ProblemSolution } from '@/components/landing/ProblemSolution';
 import { HowItWorksBento } from '@/components/landing/bento/HowItWorksBento';
 import { PrivateCustomers } from '@/components/landing/PrivateCustomers';
@@ -11,6 +13,7 @@ import { Pricing } from '@/components/landing/Pricing';
 import { FAQ } from '@/components/landing/FAQ';
 import { CTA } from '@/components/landing/CTA';
 import { Footer } from '@/components/landing/Footer';
+import { StickyMobileCTA } from '@/components/landing/StickyMobileCTA';
 import { PageMeta } from '@/components/PageMeta';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate, useLocation } from 'react-router-dom';
@@ -92,6 +95,8 @@ const Index = () => {
       <Header />
       <main>
         <HeroBento />
+        <TrustStrip />
+        <BeforeAfter />
         <ProblemSolution />
         <HowItWorksBento />
         <PrivateCustomers />
@@ -104,6 +109,7 @@ const Index = () => {
         <CTA />
       </main>
       <Footer />
+      <StickyMobileCTA />
     </div>
   );
 };

@@ -1,9 +1,12 @@
 import { bundle } from "@remotion/bundler";
-import { renderMedia, selectComposition, openBrowser } from "@remotion/renderer";
+import { renderMedia, selectComposition, openBrowser, renderStill } from "@remotion/renderer";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ASSETS = path.resolve(__dirname, "../../src/assets");
+fs.mkdirSync(ASSETS, { recursive: true });
 
 const bundled = await bundle({
   entryPoint: path.resolve(__dirname, "../src/index.ts"),
@@ -25,15 +28,32 @@ const composition = await selectComposition({
   puppeteerInstance: browser,
 });
 
+const videoOut = path.join(ASSETS, "landing-demo.mp4");
 await renderMedia({
   composition,
   serveUrl: bundled,
   codec: "h264",
-  outputLocation: "/mnt/documents/billmonk-launch.mp4",
+  outputLocation: videoOut,
   puppeteerInstance: browser,
   muted: true,
   concurrency: 1,
+  jpegQuality: 80,
+  crf: 26,
+});
+
+// Poster frame
+const posterOut = path.join(ASSETS, "landing-demo-poster.jpg");
+await renderStill({
+  composition,
+  serveUrl: bundled,
+  output: posterOut,
+  frame: 240,
+  puppeteerInstance: browser,
+  imageFormat: "jpeg",
+  jpegQuality: 85,
+  overwrite: true,
 });
 
 await browser.close({ silent: false });
-console.log("✅ Video rendered to /mnt/documents/billmonk-launch.mp4");
+console.log(`✅ Video: ${videoOut}`);
+console.log(`✅ Poster: ${posterOut}`);

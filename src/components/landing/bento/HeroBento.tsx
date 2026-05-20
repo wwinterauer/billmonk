@@ -1,43 +1,21 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Brain, CheckCircle2, FileText, Receipt, Sparkles, Star, ScanLine, Mail, Camera } from 'lucide-react';
+import { ArrowRight, Brain, CheckCircle2, Receipt, Sparkles, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BentoTile } from './BentoTile';
 import { AnimatedCounter } from './AnimatedCounter';
-
-const liveReceipts = [
-  { icon: Mail, name: 'Amazon Business', sub: 'E-Mail-Import • Büromaterial', amount: '€ 89,99', tone: 'success' as const },
-  { icon: ScanLine, name: 'BILLA', sub: 'KI erkennt 10 % & 20 % MwSt', amount: '€ 47,32', tone: 'primary' as const },
-  { icon: Camera, name: 'A1 Telekom', sub: 'Foto-Scan • Mobilfunk', amount: '€ 29,90', tone: 'muted' as const },
-  { icon: FileText, name: 'Hofer', sub: 'Bank-Match gefunden', amount: '€ 18,45', tone: 'success' as const },
-];
+import { HeroBackdrop } from './HeroBackdrop';
+import { HeroVideo } from './HeroVideo';
+import { MagneticWrap } from './MagneticWrap';
+import { TiltCard } from './TiltCard';
 
 export function HeroBento() {
   return (
     <section className="relative overflow-hidden">
-      {/* Ambient background */}
-      <div aria-hidden className="absolute inset-0 -z-10 gradient-hero" />
-      <div aria-hidden className="absolute inset-0 -z-10 overflow-hidden">
-        <motion.div
-          className="absolute -top-32 -left-24 h-[28rem] w-[28rem] rounded-full bg-primary/15 blur-3xl"
-          animate={{ x: [0, 40, 0], y: [0, 20, 0] }}
-          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-          className="absolute top-40 -right-32 h-[32rem] w-[32rem] rounded-full bg-accent/15 blur-3xl"
-          animate={{ x: [0, -50, 0], y: [0, 30, 0] }}
-          transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <div
-          className="absolute inset-0 opacity-[0.035]"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 1px 1px, hsl(var(--foreground)) 1px, transparent 0)',
-            backgroundSize: '24px 24px',
-          }}
-        />
-      </div>
+      <HeroBackdrop />
+
+
 
       <div className="container pt-20 pb-16 lg:pt-28 lg:pb-24">
         {/* HERO Bento Grid */}
@@ -80,18 +58,21 @@ export function HeroBento() {
 
             <div className="mt-8 space-y-5">
               <div className="flex flex-col sm:flex-row gap-3">
-                <Link to="/register">
-                  <Button size="lg" className="gradient-primary shadow-primary text-base px-8 h-12 group active:scale-[0.97]">
-                    Kostenlos testen
-                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </Link>
+                <MagneticWrap>
+                  <Link to="/register">
+                    <Button size="lg" className="gradient-primary shadow-primary text-base px-8 h-12 group active:scale-[0.97]">
+                      Kostenlos testen
+                      <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                  </Link>
+                </MagneticWrap>
                 <a href="#how-it-works">
                   <Button size="lg" variant="outline" className="h-12 px-6 text-base">
                     So funktioniert's
                   </Button>
                 </a>
               </div>
+
 
               <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
                 {['30 Tage kostenlos', 'DSGVO-konform', 'Made in Austria'].map((t) => (
@@ -148,51 +129,14 @@ export function HeroBento() {
             </div>
           </BentoTile>
 
-          {/* LIVE FEED tile — wide */}
-          <BentoTile delay={0.05} className="lg:col-span-4 min-h-[320px] p-0 overflow-hidden">
-            <div className="absolute inset-0 bg-sidebar text-sidebar-foreground" />
-            <div className="relative h-full flex flex-col">
-              {/* Window chrome */}
-              <div className="flex items-center justify-between px-5 py-3 border-b border-sidebar-border/60">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-destructive/70" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-warning/70" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-success/70" />
-                </div>
-                <span className="text-xs text-sidebar-foreground/60 font-mono">billmonk.ai · Live Inbox</span>
-                <Badge className="bg-success/20 text-success border-0 text-[10px]">
-                  <span className="mr-1 h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-                  Live
-                </Badge>
-              </div>
-
-              <div className="flex-1 p-5 space-y-2.5 overflow-hidden">
-                {liveReceipts.map((r, i) => (
-                  <motion.div
-                    key={r.name}
-                    initial={{ opacity: 0, x: -16 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.45, delay: 0.2 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-sidebar-accent/60 border border-sidebar-border/50"
-                  >
-                    <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
-                      r.tone === 'success' ? 'bg-success/20 text-success' :
-                      r.tone === 'primary' ? 'bg-primary/20 text-primary' :
-                      'bg-sidebar-foreground/10 text-sidebar-foreground/80'
-                    }`}>
-                      <r.icon className="h-4.5 w-4.5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate">{r.name}</p>
-                      <p className="text-xs text-sidebar-foreground/60 truncate">{r.sub}</p>
-                    </div>
-                    <span className="text-sm font-mono font-semibold tabular-nums">{r.amount}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
+          {/* HERO DEMO VIDEO tile — wide */}
+          <BentoTile delay={0.05} className="lg:col-span-4 min-h-[360px] p-0 overflow-hidden" glow>
+            <TiltCard className="absolute inset-0 rounded-[inherit]" max={4}>
+              <HeroVideo />
+            </TiltCard>
           </BentoTile>
+
+
 
           {/* Trust tile */}
           <BentoTile delay={0.15} tone="warning" className="lg:col-span-2 min-h-[320px] flex flex-col justify-between">
