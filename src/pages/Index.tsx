@@ -1,11 +1,11 @@
 import { Header } from '@/components/landing/Header';
-import { Hero } from '@/components/landing/Hero';
+import { HeroBento } from '@/components/landing/bento/HeroBento';
 import { ProblemSolution } from '@/components/landing/ProblemSolution';
-import { HowItWorks } from '@/components/landing/HowItWorks';
+import { HowItWorksBento } from '@/components/landing/bento/HowItWorksBento';
 import { PrivateCustomers } from '@/components/landing/PrivateCustomers';
 import { BusinessCustomers } from '@/components/landing/BusinessCustomers';
-import { Features } from '@/components/landing/Features';
-import { BusinessWorkflow } from '@/components/landing/BusinessWorkflow';
+import { FeaturesBento } from '@/components/landing/bento/FeaturesBento';
+import { WorkflowStream } from '@/components/landing/bento/WorkflowStream';
 import { Testimonials } from '@/components/landing/Testimonials';
 import { Pricing } from '@/components/landing/Pricing';
 import { FAQ } from '@/components/landing/FAQ';
@@ -91,13 +91,13 @@ const Index = () => {
       />
       <Header />
       <main>
-        <Hero />
+        <HeroBento />
         <ProblemSolution />
-        <HowItWorks />
+        <HowItWorksBento />
         <PrivateCustomers />
         <BusinessCustomers />
-        <Features />
-        <BusinessWorkflow />
+        <FeaturesBento />
+        <WorkflowStream />
         <Testimonials />
         <Pricing />
         <FAQ />
