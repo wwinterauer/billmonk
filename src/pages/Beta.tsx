@@ -66,10 +66,11 @@ export default function Beta() {
       </header>
 
       {/* Landing content */}
-      <Hero />
+      <HeroBento />
       <ProblemSolution />
-      <HowItWorks />
-      <Features />
+      <HowItWorksBento />
+      <FeaturesBento />
+      <WorkflowStream />
       <Pricing />
 
       {/* Beta signup section */}
