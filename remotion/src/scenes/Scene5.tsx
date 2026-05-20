@@ -1,113 +1,99 @@
-import { AbsoluteFill, useCurrentFrame, interpolate, spring, useVideoConfig, Img, staticFile } from "remotion";
-import { loadFont } from "@remotion/google-fonts/Outfit";
+import { AbsoluteFill, useCurrentFrame, useVideoConfig, spring, interpolate } from "remotion";
 
-const { fontFamily } = loadFont("normal", { weights: ["300", "400", "600", "700", "800"], subsets: ["latin"] });
+const FONT_DISPLAY = "Space Grotesk, Inter, sans-serif";
+const FONT_BODY = "Inter, sans-serif";
 
+// Scene 5 — "Outro": logo + tagline + subtle teal glow
 export const Scene5: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Logo entrance
-  const logoS = spring({ frame: frame - 10, fps, config: { damping: 12 } });
-  const logoScale = interpolate(logoS, [0, 1], [0.5, 1]);
-  const logoOp = interpolate(logoS, [0, 1], [0, 1]);
+  const logoSpring = spring({ frame, fps, config: { damping: 16 } });
+  const logoScale = interpolate(logoSpring, [0, 1], [0.7, 1]);
+  const logoOpacity = interpolate(frame, [0, 18], [0, 1], { extrapolateRight: "clamp" });
 
-  // CTA text
-  const ctaS = spring({ frame: frame - 35, fps, config: { damping: 16 } });
-  const ctaY = interpolate(ctaS, [0, 1], [50, 0]);
-  const ctaOp = interpolate(ctaS, [0, 1], [0, 1]);
+  const taglineOpacity = interpolate(frame, [25, 45], [0, 1], { extrapolateRight: "clamp" });
+  const taglineY = interpolate(frame, [25, 45], [20, 0], { extrapolateRight: "clamp" });
 
-  // Button
-  const btnS = spring({ frame: frame - 55, fps, config: { damping: 14, stiffness: 80 } });
-  const btnScale = interpolate(btnS, [0, 1], [0.8, 1]);
-  const btnOp = interpolate(btnS, [0, 1], [0, 1]);
+  const subOpacity = interpolate(frame, [45, 65], [0, 1], { extrapolateRight: "clamp" });
 
-  // Pulsing ring around logo
-  const ringScale = interpolate(frame, [0, 120], [0.9, 1.1], { extrapolateRight: "clamp" });
-  const ringOp = 0.08 + Math.sin(frame / 20) * 0.04;
-
-  // Floating particles
-  const particles = Array.from({ length: 20 }, (_, i) => {
-    const angle = (i / 20) * Math.PI * 2 + frame / 80;
-    const radius = 280 + Math.sin(frame / 30 + i) * 40;
-    const x = 960 + Math.cos(angle) * radius;
-    const y = 440 + Math.sin(angle) * radius;
-    const op = 0.1 + Math.sin(frame / 15 + i * 2) * 0.06;
-    const size = 3 + (i % 3) * 2;
-    return { x, y, op, size };
-  });
+  const pullback = interpolate(frame, [0, 94], [1.04, 1]);
 
   return (
-    <AbsoluteFill style={{ fontFamily }}>
-      <AbsoluteFill style={{
-        background: "linear-gradient(155deg, #0a2e2e 0%, #0d4a4a 40%, #0a2e2e 100%)",
-      }} />
-
-      {/* Orbiting particles */}
-      {particles.map((p, i) => (
-        <div key={i} style={{
+    <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", transform: `scale(${pullback})` }}>
+      {/* Soft radial glow */}
+      <div
+        style={{
           position: "absolute",
-          left: p.x, top: p.y,
-          width: p.size, height: p.size,
+          width: 1200,
+          height: 1200,
           borderRadius: "50%",
-          background: "#2dd4a8",
-          opacity: p.op,
-        }} />
-      ))}
+          background: "radial-gradient(circle, rgba(14,122,111,0.22) 0%, rgba(14,122,111,0) 60%)",
+          opacity: logoOpacity,
+        }}
+      />
 
-      {/* Ring */}
-      <div style={{
-        position: "absolute",
-        left: "50%", top: "40%",
-        transform: `translate(-50%, -50%) scale(${ringScale})`,
-        width: 300, height: 300,
-        borderRadius: "50%",
-        border: "1px solid rgba(45,212,168,0.2)",
-        opacity: ringOp,
-      }} />
-
-      {/* Logo */}
-      <div style={{
-        position: "absolute",
-        left: "50%", top: "38%",
-        transform: `translate(-50%, -50%) scale(${logoScale})`,
-        opacity: logoOp,
-      }}>
-        <Img src={staticFile("images/logo-white.png")} style={{ height: 90 }} />
-      </div>
-
-      {/* CTA text */}
-      <div style={{
-        position: "absolute",
-        left: "50%", top: "58%",
-        transform: `translate(-50%, -50%) translateY(${ctaY}px)`,
-        opacity: ctaOp,
-        textAlign: "center",
-      }}>
-        <h2 style={{ fontSize: 56, fontWeight: 700, color: "#fff", marginBottom: 12 }}>
-          Jetzt kostenlos starten.
-        </h2>
-        <p style={{ fontSize: 24, fontWeight: 300, color: "rgba(255,255,255,0.5)" }}>
-          billmonk.ai
-        </p>
-      </div>
-
-      {/* Button */}
-      <div style={{
-        position: "absolute",
-        left: "50%", top: "74%",
-        transform: `translate(-50%, -50%) scale(${btnScale})`,
-        opacity: btnOp,
-      }}>
-        <div style={{
-          padding: "22px 64px",
-          background: "linear-gradient(135deg, #0d8070, #2dd4a8)",
-          borderRadius: 60,
-          boxShadow: "0 15px 50px -10px rgba(45,212,168,0.35)",
-        }}>
-          <span style={{ fontSize: 26, fontWeight: 600, color: "#fff" }}>
-            Kostenlos testen →
+      <div style={{ textAlign: "center", position: "relative" }}>
+        {/* Logo mark */}
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 18,
+            opacity: logoOpacity,
+            transform: `scale(${logoScale})`,
+            marginBottom: 28,
+          }}
+        >
+          <div
+            style={{
+              width: 84,
+              height: 84,
+              borderRadius: 20,
+              background: "linear-gradient(135deg, #0E7A6F, #1AB8A6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 44,
+              boxShadow: "0 20px 50px -10px rgba(14,122,111,0.5)",
+            }}
+          >
+            🧾
+          </div>
+          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 84, fontWeight: 700, color: "#0F172A", letterSpacing: -2 }}>
+            BillMonk
           </span>
+        </div>
+
+        <div
+          style={{
+            opacity: taglineOpacity,
+            transform: `translateY(${taglineY}px)`,
+            marginTop: 12,
+          }}
+        >
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 56, fontWeight: 700, color: "#0F172A", margin: 0, letterSpacing: -1.5 }}>
+            KI-Buchhaltung. <span style={{ color: "#0E7A6F" }}>Made in Austria.</span>
+          </h2>
+        </div>
+
+        <div
+          style={{
+            opacity: subOpacity,
+            marginTop: 36,
+            display: "flex",
+            justifyContent: "center",
+            gap: 36,
+            fontFamily: FONT_BODY,
+            color: "#64748B",
+            fontSize: 18,
+          }}
+        >
+          <span>🇦🇹 Bad Goisern</span>
+          <span>·</span>
+          <span>🔒 DSGVO-konform</span>
+          <span>·</span>
+          <span>⏱ 30 Tage testen</span>
         </div>
       </div>
     </AbsoluteFill>

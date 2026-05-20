@@ -1,128 +1,112 @@
-import { AbsoluteFill, useCurrentFrame, interpolate, spring, useVideoConfig, Img, staticFile } from "remotion";
-import { loadFont } from "@remotion/google-fonts/Outfit";
+import { AbsoluteFill, useCurrentFrame, useVideoConfig, spring, interpolate } from "remotion";
 
-const { fontFamily } = loadFont("normal", { weights: ["300", "400", "600", "700", "800"], subsets: ["latin"] });
+const FONT_DISPLAY = "Space Grotesk, Inter, sans-serif";
+const FONT_BODY = "Inter, sans-serif";
 
+// Scene 1 — "Der Schmerz": chaotic stack of paper receipts falling in
 export const Scene1: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Background pulse
-  const bgScale = interpolate(frame, [0, 120], [1.05, 1], { extrapolateRight: "clamp" });
+  const receipts = [
+    { x: -280, y: -120, rot: -18, delay: 0, w: 240, h: 320 },
+    { x: -80, y: -160, rot: 8, delay: 4, w: 220, h: 290 },
+    { x: 160, y: -140, rot: 22, delay: 8, w: 250, h: 310 },
+    { x: -200, y: 60, rot: -28, delay: 12, w: 230, h: 300 },
+    { x: 60, y: 80, rot: 14, delay: 16, w: 260, h: 330 },
+    { x: 280, y: 40, rot: -10, delay: 20, w: 210, h: 280 },
+    { x: -340, y: 180, rot: 32, delay: 24, w: 220, h: 290 },
+    { x: 200, y: 220, rot: -22, delay: 28, w: 240, h: 310 },
+  ];
 
-  // Logo entrance — spring up from below
-  const logoSpring = spring({ frame: frame - 10, fps, config: { damping: 14, stiffness: 120 } });
-  const logoY = interpolate(logoSpring, [0, 1], [80, 0]);
-  const logoOpacity = interpolate(logoSpring, [0, 1], [0, 1]);
-  const logoScale = interpolate(logoSpring, [0, 1], [0.7, 1]);
-
-  // Tagline reveal
-  const tagSpring = spring({ frame: frame - 40, fps, config: { damping: 18, stiffness: 100 } });
-  const tagY = interpolate(tagSpring, [0, 1], [40, 0]);
-  const tagOpacity = interpolate(tagSpring, [0, 1], [0, 1]);
-
-  // Subtle floating particles
-  const particles = Array.from({ length: 12 }, (_, i) => {
-    const x = 15 + (i * 7) % 85;
-    const baseY = 10 + (i * 11) % 80;
-    const drift = Math.sin((frame + i * 30) / 40) * 15;
-    const opacity = interpolate(frame, [0, 30], [0, 0.15 + (i % 3) * 0.05], { extrapolateRight: "clamp" });
-    const size = 3 + (i % 4) * 2;
-    return { x, y: baseY + drift, opacity, size };
-  });
-
-  // Accent line reveal
-  const lineWidth = interpolate(
-    spring({ frame: frame - 55, fps, config: { damping: 20 } }),
-    [0, 1], [0, 200]
-  );
+  const headlineSpring = spring({ frame: frame - 36, fps, config: { damping: 18 } });
+  const headlineY = interpolate(headlineSpring, [0, 1], [30, 0]);
+  const headlineOpacity = interpolate(frame, [36, 60], [0, 1], { extrapolateRight: "clamp" });
 
   return (
-    <AbsoluteFill style={{ fontFamily }}>
-      {/* Deep teal gradient background */}
-      <AbsoluteFill style={{
-        background: "linear-gradient(155deg, #0a2e2e 0%, #0d3d3d 30%, #115454 60%, #0a2e2e 100%)",
-        transform: `scale(${bgScale})`,
-      }} />
-
-      {/* Grid pattern overlay */}
-      <AbsoluteFill style={{
-        opacity: 0.04,
-        backgroundImage: `
-          linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)
-        `,
-        backgroundSize: "60px 60px",
-      }} />
-
-      {/* Floating particles */}
-      {particles.map((p, i) => (
-        <div key={i} style={{
-          position: "absolute",
-          left: `${p.x}%`,
-          top: `${p.y}%`,
-          width: p.size,
-          height: p.size,
-          borderRadius: "50%",
-          background: "#2dd4a8",
-          opacity: p.opacity,
-          filter: "blur(1px)",
-        }} />
-      ))}
-
-      {/* Radial glow behind logo */}
-      <div style={{
-        position: "absolute",
-        left: "50%",
-        top: "42%",
-        transform: "translate(-50%, -50%)",
-        width: 600,
-        height: 600,
-        borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(45,212,168,0.12) 0%, transparent 70%)",
-        opacity: logoOpacity,
-      }} />
-
-      {/* Logo */}
-      <div style={{
-        position: "absolute",
-        left: "50%",
-        top: "38%",
-        transform: `translate(-50%, -50%) translateY(${logoY}px) scale(${logoScale})`,
-        opacity: logoOpacity,
-      }}>
-        <Img src={staticFile("images/logo-white.png")} style={{ height: 100 }} />
+    <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
+      {/* Receipt pile */}
+      <div style={{ position: "relative", width: 0, height: 0 }}>
+        {receipts.map((r, i) => {
+          const s = spring({ frame: frame - r.delay, fps, config: { damping: 14, stiffness: 90 } });
+          const y = interpolate(s, [0, 1], [-900, r.y]);
+          const opacity = interpolate(frame, [r.delay, r.delay + 10], [0, 1], { extrapolateRight: "clamp" });
+          return (
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                left: r.x - r.w / 2,
+                top: y - r.h / 2,
+                width: r.w,
+                height: r.h,
+                transform: `rotate(${r.rot}deg)`,
+                background: "#FFFFFF",
+                borderRadius: 6,
+                boxShadow: "0 20px 40px -10px rgba(15,23,42,0.25), 0 8px 16px -8px rgba(15,23,42,0.15)",
+                opacity,
+                padding: 18,
+                fontFamily: "monospace",
+                fontSize: 10,
+                color: "#94A3B8",
+                lineHeight: 1.6,
+              }}
+            >
+              <div style={{ borderBottom: "1px dashed #CBD5E1", paddingBottom: 6, marginBottom: 8, fontWeight: 700, color: "#475569" }}>
+                RECHNUNG
+              </div>
+              {Array.from({ length: 8 }).map((_, k) => (
+                <div key={k} style={{ height: 6, background: "#E2E8F0", marginBottom: 6, borderRadius: 2, width: `${60 + ((i * 7 + k * 11) % 35)}%` }} />
+              ))}
+              <div style={{ marginTop: 12, fontWeight: 700, color: "#0F172A", fontSize: 14 }}>
+                € {(20 + ((i * 31) % 180)).toFixed(2)}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Accent line */}
-      <div style={{
-        position: "absolute",
-        left: "50%",
-        top: "52%",
-        transform: "translateX(-50%)",
-        width: lineWidth,
-        height: 2,
-        background: "linear-gradient(90deg, transparent, #2dd4a8, transparent)",
-      }} />
-
-      {/* Tagline */}
-      <div style={{
-        position: "absolute",
-        left: "50%",
-        top: "58%",
-        transform: `translate(-50%, -50%) translateY(${tagY}px)`,
-        opacity: tagOpacity,
-        textAlign: "center",
-      }}>
-        <p style={{
-          fontSize: 28,
-          fontWeight: 300,
-          color: "rgba(255,255,255,0.7)",
-          letterSpacing: 6,
-          textTransform: "uppercase",
-        }}>
-          Belege. Intelligent. Organisiert.
-        </p>
+      {/* Headline */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 120,
+          left: 0,
+          right: 0,
+          textAlign: "center",
+          opacity: headlineOpacity,
+          transform: `translateY(${headlineY}px)`,
+        }}
+      >
+        <div
+          style={{
+            display: "inline-block",
+            padding: "10px 20px",
+            background: "rgba(15,148,135,0.1)",
+            color: "#0E7A6F",
+            borderRadius: 999,
+            fontFamily: FONT_BODY,
+            fontSize: 18,
+            fontWeight: 600,
+            marginBottom: 24,
+            letterSpacing: 0.5,
+          }}
+        >
+          Kennst du das?
+        </div>
+        <h1
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontSize: 96,
+            fontWeight: 700,
+            color: "#0F172A",
+            margin: 0,
+            letterSpacing: -2,
+            lineHeight: 1.02,
+          }}
+        >
+          Schluss mit dem <span style={{ color: "#0E7A6F" }}>Schuhkarton</span>.
+        </h1>
       </div>
     </AbsoluteFill>
   );
