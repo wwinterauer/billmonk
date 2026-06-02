@@ -16,15 +16,36 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body = await req.json();
-    const { user_id, vendor_name, category, country, pattern_type, vat_rate } = body;
+    // --- Authentication: require valid JWT, derive user_id from token ---
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (!token) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const authedUserId = userData.user.id;
 
-    if (!user_id || !category) {
+    const body = await req.json();
+    const { vendor_name, category, country, pattern_type, vat_rate } = body;
+    // SECURITY: ignore body.user_id — always use authenticated user id
+    const user_id = authedUserId;
+
+    if (!category) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
 
     // 1. Check if platform learning is active
     const { data: settings } = await supabase
