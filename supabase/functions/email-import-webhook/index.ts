@@ -208,21 +208,29 @@ serve(async (req: Request) => {
     const webhookSecret = Deno.env.get("EMAIL_WEBHOOK_SECRET");
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // SECURITY: webhook secret is mandatory. Reject all traffic if it is not configured.
+    if (!webhookSecret) {
+      console.error("EMAIL_WEBHOOK_SECRET is not configured — rejecting all webhook traffic.");
+      return new Response(JSON.stringify({ error: "Service not configured" }), {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Read raw body for signature verification
     const rawBody = await req.text();
 
-    // Webhook signature verification (if secret is configured)
-    if (webhookSecret) {
-      const signature = req.headers.get("x-webhook-signature");
-      const isValid = await verifyWebhookSignature(rawBody, signature, webhookSecret);
-      if (!isValid) {
-        console.error("Invalid webhook signature from IP:", clientIp);
-        return new Response(JSON.stringify({ error: "Invalid signature" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    // Mandatory HMAC signature verification
+    const signature = req.headers.get("x-webhook-signature");
+    const isValid = await verifyWebhookSignature(rawBody, signature, webhookSecret);
+    if (!isValid) {
+      console.error("Invalid webhook signature from IP:", clientIp);
+      return new Response(JSON.stringify({ error: "Invalid signature" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+
 
     // Parse incoming email webhook
     const contentType = req.headers.get("content-type") || "";
