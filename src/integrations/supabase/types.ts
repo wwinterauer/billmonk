@@ -3753,6 +3753,7 @@ export type Database = {
           read_ct: number
         }[]
       }
+      redeem_beta_code: { Args: { _code: string }; Returns: Json }
       reset_checklist: { Args: { p_checklist_id: string }; Returns: undefined }
       reset_monthly_credits: { Args: never; Returns: undefined }
     }
