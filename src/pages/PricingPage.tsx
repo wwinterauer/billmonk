@@ -55,10 +55,7 @@ const PricingPage = () => {
         title="Preise — BillMonk | Ab €2,99/Monat"
         description="Transparente Preise für Einnahmen-Ausgaben-Verwaltung. Starter, Pro & Business — alle Pläne monatlich kündbar. Beta-Nutzer erhalten 50 % Rabatt."
         canonical="/pricing"
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(pricingStructuredData) }}
+        jsonLd={pricingStructuredData}
       />
       <Header />
       <main>

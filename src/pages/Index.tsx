@@ -87,10 +87,7 @@ const Index = () => {
         title="BillMonk — KI-gestützte Einnahmen & Ausgaben Verwaltung"
         description="Belege erfassen, Rechnungen erstellen, Bankabgleich — alles KI-gestützt und vorbereitet für den Steuerberater. Made in Austria. Ab €2,99/Monat."
         canonical="/"
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        jsonLd={structuredData}
       />
       <Header />
       <main>
