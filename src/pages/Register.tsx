@@ -80,24 +80,10 @@ const Register = () => {
         });
       }
     } else {
-      // Check if beta_access is set → mark as beta user
-      const isBetaUser = localStorage.getItem('beta_access') === 'true' || document.cookie.split(';').some(c => c.trim().startsWith('beta_access=true'));
-      if (isBetaUser) {
-        // Mark profile as beta user with business plan (fire-and-forget, will be applied once profile exists)
-        const markBeta = async () => {
-          // Wait briefly for the handle_new_user trigger to create the profile
-          await new Promise(r => setTimeout(r, 1500));
-          const { data: { user: currentUser } } = await supabase.auth.getUser();
-          if (currentUser) {
-            await supabase.from('profiles').update({
-              is_beta_user: true,
-              plan: 'business',
-              subscription_status: 'active',
-            } as any).eq('id', currentUser.id);
-          }
-        };
-        markBeta().catch(() => {});
-      }
+      // Beta-status is now granted server-side when the beta code is redeemed
+      // via the `redeem_beta_code` RPC. Direct client-side updates to `plan`,
+      // `is_beta_user` and `subscription_status` are blocked by a DB trigger.
+
 
       // Send welcome email (fire-and-forget)
       supabase.functions.invoke('send-transactional-email', {

@@ -369,54 +369,36 @@ function BetaCodeEntry() {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('beta_codes')
-        .select('id, code, is_active, used_count, max_uses, expires_at')
-        .eq('code', code.trim())
-        .eq('is_active', true)
-        .maybeSingle();
+      // Server-side validation + privileged profile update via SECURITY DEFINER RPC.
+      // The RPC keeps beta_codes private and applies plan elevation server-side.
+      const { data, error } = await supabase.rpc('redeem_beta_code' as any, {
+        _code: code.trim(),
+      });
 
-      if (error || !data) {
-        toast.error('Ungültiger oder inaktiver Beta-Code');
+      if (error) {
+        toast.error('Fehler bei der Überprüfung');
         setLoading(false);
         return;
       }
 
-      if (data.max_uses !== null && data.used_count >= data.max_uses) {
-        toast.error('Dieser Beta-Code wurde bereits zu oft verwendet');
+      const result = data as { valid: boolean; error?: string } | null;
+      if (!result?.valid) {
+        const msg =
+          result?.error === 'expired'
+            ? 'Dieser Beta-Code ist abgelaufen'
+            : result?.error === 'exhausted'
+            ? 'Dieser Beta-Code wurde bereits zu oft verwendet'
+            : 'Ungültiger oder inaktiver Beta-Code';
+        toast.error(msg);
         setLoading(false);
         return;
       }
 
-      // Check expiry
-      if ((data as any).expires_at && new Date((data as any).expires_at) < new Date()) {
-        toast.error('Dieser Beta-Code ist abgelaufen');
-        setLoading(false);
-        return;
-      }
-
-      // Set localStorage + cookie
+      // UX cookie/localStorage — purely to skip the gate page on this browser.
+      // Real authorization lives in the server-side profile fields.
       localStorage.setItem('beta_access', 'true');
       const expires = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toUTCString();
       document.cookie = `beta_access=true; expires=${expires}; path=/; SameSite=Lax`;
-
-      // Try to increment used_count
-      await supabase
-        .from('beta_codes')
-        .update({ used_count: data.used_count + 1 })
-        .eq('id', data.id);
-
-      // If user is logged in, mark as beta user for 180 days server-side
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const updateData: Record<string, any> = {
-          is_beta_user: true,
-          plan: 'business',
-          subscription_status: 'active',
-          beta_expires_at: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
-        };
-        await supabase.from('profiles').update(updateData).eq('id', user.id);
-      }
 
       toast.success('Beta-Zugang freigeschaltet!');
       navigate('/login');
@@ -426,6 +408,7 @@ function BetaCodeEntry() {
       setLoading(false);
     }
   };
+
 
   return (
     <Card>
