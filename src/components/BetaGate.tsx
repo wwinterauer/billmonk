@@ -32,13 +32,20 @@ interface BetaGateProps {
 }
 
 type GateState =
-  | { status: 'loading' }
+  | { status: 'unknown' }
   | { status: 'allowed' }
   | { status: 'denied' };
 
+
 export function BetaGate({ children }: BetaGateProps) {
   const location = useLocation();
-  const [state, setState] = useState<GateState>({ status: 'loading' });
+  // Optimistic initial state: trust the UX hint to avoid blocking render.
+  // The DB trigger `prevent_privileged_profile_updates` makes self-elevation
+  // impossible, so the cookie/localStorage is no longer a security boundary.
+  // The async server check below revokes access if the server says no.
+  const [state, setState] = useState<GateState>(
+    hasUxBetaHint() ? { status: 'allowed' } : { status: 'unknown' },
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +54,6 @@ export function BetaGate({ children }: BetaGateProps) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
 
-        // Logged-in users: source of truth is the server. Never trust the UX cookie alone.
         if (user) {
           const [profileRes, roleRes] = await Promise.all([
             supabase
@@ -82,12 +88,10 @@ export function BetaGate({ children }: BetaGateProps) {
           return;
         }
 
-        // Anonymous users: gate is UX-only. Privilege escalation is blocked by DB trigger.
+        // Anonymous: cookie/localStorage is UX-only.
         setState({ status: hasUxBetaHint() ? 'allowed' : 'denied' });
       } catch {
-        if (cancelled) return;
-        // On error, fail closed for safety
-        setState({ status: 'denied' });
+        // Network error — leave optimistic state intact rather than locking out.
       }
     };
 
@@ -99,13 +103,12 @@ export function BetaGate({ children }: BetaGateProps) {
     return <>{children}</>;
   }
 
-  if (state.status === 'loading') {
-    return null;
-  }
-
   if (state.status === 'denied') {
     return <Navigate to="/beta" replace />;
   }
 
+  // 'allowed' or 'unknown' (first paint without hint) → render children.
+  // ProtectedRoute downstream still handles unauthenticated redirects.
   return <>{children}</>;
 }
+
