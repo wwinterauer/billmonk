@@ -1,60 +1,60 @@
-import { useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 
 interface PageMetaProps {
   title: string;
   description: string;
+  /** Pfad-only, z.B. "/pricing". Wenn leer = Startseite. */
   canonical?: string;
   ogType?: string;
   ogImage?: string;
   noindex?: boolean;
+  /** JSON-LD strukturierte Daten (einzeln oder Array) */
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
 }
 
 const BASE_URL = 'https://billmonk.ai';
 const DEFAULT_OG_IMAGE = `${BASE_URL}/og-image.jpg`;
 
-export function PageMeta({ title, description, canonical, ogType = 'website', ogImage, noindex = false }: PageMetaProps) {
-  useEffect(() => {
-    document.title = title;
+export function PageMeta({
+  title,
+  description,
+  canonical,
+  ogType = 'website',
+  ogImage,
+  noindex = false,
+  jsonLd,
+}: PageMetaProps) {
+  const canonicalUrl = canonical ? `${BASE_URL}${canonical}` : BASE_URL;
+  const imageUrl = ogImage
+    ? ogImage.startsWith('http') ? ogImage : `${BASE_URL}${ogImage}`
+    : DEFAULT_OG_IMAGE;
 
-    const setMeta = (attr: string, key: string, content: string) => {
-      let el = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null;
-      if (!el) {
-        el = document.createElement('meta');
-        el.setAttribute(attr, key);
-        document.head.appendChild(el);
-      }
-      el.setAttribute('content', content);
-    };
+  const schemas = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
 
-    setMeta('name', 'description', description);
-    setMeta('name', 'robots', noindex ? 'noindex, nofollow' : 'index, follow');
+  return (
+    <Helmet>
+      <title>{title}</title>
+      <meta name="description" content={description} />
+      <meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow'} />
+      <link rel="canonical" href={canonicalUrl} />
 
-    // Open Graph
-    setMeta('property', 'og:title', title);
-    setMeta('property', 'og:description', description);
-    setMeta('property', 'og:type', ogType);
-    setMeta('property', 'og:url', canonical ? `${BASE_URL}${canonical}` : BASE_URL);
-    setMeta('property', 'og:image', ogImage ? (ogImage.startsWith('http') ? ogImage : `${BASE_URL}${ogImage}`) : DEFAULT_OG_IMAGE);
+      {/* Open Graph */}
+      <meta property="og:title" content={title} />
+      <meta property="og:description" content={description} />
+      <meta property="og:type" content={ogType} />
+      <meta property="og:url" content={canonicalUrl} />
+      <meta property="og:image" content={imageUrl} />
 
-    // Twitter
-    setMeta('name', 'twitter:title', title);
-    setMeta('name', 'twitter:description', description);
-    setMeta('name', 'twitter:image', ogImage ? (ogImage.startsWith('http') ? ogImage : `${BASE_URL}${ogImage}`) : DEFAULT_OG_IMAGE);
+      {/* Twitter */}
+      <meta name="twitter:title" content={title} />
+      <meta name="twitter:description" content={description} />
+      <meta name="twitter:image" content={imageUrl} />
 
-    // Canonical
-    let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
-    if (!link) {
-      link = document.createElement('link');
-      link.setAttribute('rel', 'canonical');
-      document.head.appendChild(link);
-    }
-    link.setAttribute('href', canonical ? `${BASE_URL}${canonical}` : BASE_URL);
-
-    return () => {
-      // Reset to defaults on unmount
-      document.title = 'BillMonk — Einnahmen & Ausgaben im Griff';
-    };
-  }, [title, description, canonical, ogType, ogImage, noindex]);
-
-  return null;
+      {schemas.map((schema, i) => (
+        <script key={i} type="application/ld+json">
+          {JSON.stringify(schema)}
+        </script>
+      ))}
+    </Helmet>
+  );
 }
