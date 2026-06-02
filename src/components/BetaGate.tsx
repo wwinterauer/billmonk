@@ -32,9 +32,10 @@ interface BetaGateProps {
 }
 
 type GateState =
-  | { status: 'loading' }
+  | { status: 'unknown' }
   | { status: 'allowed' }
   | { status: 'denied' };
+
 
 export function BetaGate({ children }: BetaGateProps) {
   const location = useLocation();
