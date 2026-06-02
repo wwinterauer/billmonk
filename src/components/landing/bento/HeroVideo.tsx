@@ -28,6 +28,24 @@ export function HeroVideo() {
     return () => io.disconnect();
   }, []);
 
+  // Try to start autoplay on desktop as soon as the video is mounted.
+  useEffect(() => {
+    if (!shouldMount || isMobile) return;
+    const v = videoRef.current;
+    if (!v) return;
+    const tryPlay = () => {
+      const p = v.play();
+      if (p && typeof p.then === 'function') {
+        p.then(() => setPlaying(true)).catch(() => {
+          /* autoplay blocked, user can tap */
+        });
+      }
+    };
+    if (v.readyState >= 2) tryPlay();
+    else v.addEventListener('loadeddata', tryPlay, { once: true });
+    return () => v.removeEventListener('loadeddata', tryPlay);
+  }, [shouldMount, isMobile]);
+
   const handlePlay = () => {
     videoRef.current?.play();
     setPlaying(true);
@@ -36,10 +54,17 @@ export function HeroVideo() {
   return (
     <div
       ref={ref}
-      className="relative h-full w-full overflow-hidden rounded-[inherit] bg-sidebar"
-      aria-hidden
+      className="relative h-full w-full overflow-hidden rounded-[inherit] bg-background"
     >
-      {shouldMount && (!isMobile || playing) ? (
+      {/* Poster shown until video has rendered a real frame */}
+      {!playing && (
+        <img
+          src={demoPoster}
+          alt="BillMonk Produkt-Demo"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      )}
+      {shouldMount && (!isMobile || playing) && (
         <video
           ref={videoRef}
           src={demoVideo}
@@ -48,15 +73,9 @@ export function HeroVideo() {
           muted
           loop
           playsInline
-          preload="metadata"
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        <img
-          src={demoPoster}
-          alt=""
-          className="h-full w-full object-cover"
-          loading="lazy"
+          preload="auto"
+          onPlaying={() => setPlaying(true)}
+          className="relative h-full w-full object-cover"
         />
       )}
       {isMobile && !playing && (
@@ -70,9 +89,7 @@ export function HeroVideo() {
           </span>
         </button>
       )}
-      {/* subtle bottom gradient for any overlaid text */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-foreground/40 to-transparent" />
-      <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-card/80 backdrop-blur px-3 py-1.5 text-xs font-semibold text-primary border border-primary/20">
+      <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-full bg-card/80 backdrop-blur px-3 py-1.5 text-xs font-semibold text-primary border border-primary/20">
         <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
         Produkt-Demo · 15 s
       </div>
