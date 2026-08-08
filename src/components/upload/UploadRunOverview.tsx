@@ -94,7 +94,7 @@ export function UploadRunOverview({ runId, userId, isActive, onRunClosed }: Uplo
       .from('upload_runs')
       .update({
         status: 'completed',
-        finished_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
         uploaded_count: buckets.uploaded.length,
         duplicate_count: buckets.duplicate.length,
         rejected_count: buckets.rejected.length,
