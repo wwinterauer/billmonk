@@ -15,7 +15,17 @@ Der Upload prüft Duplikate **einmalig vorab gegen die Datenbank** und lädt dan
 1. **Keine Prüfung innerhalb des Stapels**: Ist dieselbe Datei zweimal in der Auswahl (bzw. wird der Ordner nachgezogen, während der erste Lauf noch läuft), ist der Hash zum Prüfzeitpunkt noch in keiner der beiden Runden in der DB — beide werden als "neu" eingestuft.
 2. **Race Condition durch Parallelität**: Zwei parallele Uploads derselben Datei prüfen/schreiben gleichzeitig; es gibt **keinen eindeutigen DB-Index** auf `(user_id, file_hash)`, der das abfangen würde.
 
-Die Meldung "viele Dateien wurden nicht hochgeladen" kommt vom Validierungs-Toast (Dateityp/Größe) bzw. dem 500-Dateien-Limit — die abgelehnten Dateien tauchen nirgends auf; das ist konsistent mit 288 gewollten vs. 230 eindeutig angekommenen Dateien.
+## Warum von 287 Dateien nur 230 angekommen sind
+
+Zwischen 17:56 und 18:05 (Ortszeit) sind 343 Datensätze mit 230 verschiedenen Dateien entstanden — es fehlen also **57 Dateien**. Aus der Datenbank lässt sich nicht rekonstruieren, welche das waren, weil abgelehnte und übersprungene Dateien nirgends protokolliert werden. Es kommen genau drei Wege in Frage:
+
+1. **Übersprungene Duplikate (wahrscheinlichste Hauptursache)**: Die Vorab-Prüfung vergleicht gegen **alle** früheren Belege — davon gibt es bereits 217. Alles, was du im Duplikat-Dialog auf "überspringen" gesetzt hast, wurde gar nicht erst hochgeladen und erscheint nirgends.
+2. **Validierung**: Dateityp nicht erlaubt (nur PDF/JPG/PNG/WebP — z. B. HEIC, TIFF, ZIP, E-Mail-Dateien fallen raus) oder größer als 10 MB. Diese landen im Toast "Einige Dateien wurden abgelehnt", der aber nur 3 Namen zeigt.
+3. **Fehler während des Uploads**: fehlgeschlagene Bild-zu-PDF-Konvertierung oder Storage-Fehler — in der Liste als roter Eintrag, ohne Datenbankspur.
+
+Weil keine dieser drei Kategorien festgehalten wird, ist die Meldung "viele wurden nicht hochgeladen" für dich nicht nachvollziehbar. Genau das behebt Maßnahme 3.
+
+
 
 ## Vorgeschlagene Maßnahmen
 
