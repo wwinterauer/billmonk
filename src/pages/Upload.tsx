@@ -1293,11 +1293,11 @@ const Upload = () => {
           <p className="text-muted-foreground">Lade deine Belege hoch und lass die KI sie analysieren</p>
         </div>
 
-        {/* Live overview of the current / last upload run */}
-        {overviewRunId && user && (
+        {/* Live overview: today's upload sessions, grouped by day */}
+        {user && (
           <UploadRunOverview
-            runId={overviewRunId}
             userId={user.id}
+            activeRunId={uploadPhase !== 'idle' ? overviewRunId : null}
             isActive={uploadPhase !== 'idle'}
             onRunClosed={() => { activeRunRef.current = null; }}
           />
