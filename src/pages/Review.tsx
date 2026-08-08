@@ -126,6 +126,8 @@ interface FormData {
 
 const Review = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { count: problemCount } = useProblemReceiptCount();
   const { toast } = useToast();
   const { getReceipts, updateReceipt, getReceiptFileUrl, deleteReceipt } = useReceipts();
   const { userCategories, taxCategories, addCategory } = useCategories();
