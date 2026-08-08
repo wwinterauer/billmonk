@@ -1,48 +1,58 @@
-# Analyse: 310 Belege im Review nach dem Upload von heute
+# Kontrollierter Neu-Upload der 287 Belege
 
-## Was heute tatsächlich passiert ist (aus der Datenbank geprüft)
+## Ziel
 
-- Heute wurden **343 Beleg-Datensätze** angelegt, davon nur **230 verschiedene Dateien** (eindeutiger Datei-Hash).
-- **113 Dateien existieren exakt doppelt** — gleicher Hash, zwei Datensätze. Diese 113 Kopien sind **nicht** als Duplikat markiert, deshalb tauchen sie normal im Review auf.
-- Nur **13 Datensätze** haben den Status "duplicate" — das sind genau die, die du im Duplikat-Dialog bewusst trotzdem hochgeladen hast.
-- Aktuell: **310 Belege im Status "review"**, 14 approved, 3 noch in Verarbeitung.
-- Die Zeitabstände der Doppel-Paare liegen bei **0–1 Sekunden** — die Kopien entstanden also im selben Upload-Lauf, nicht durch dein späteres zweites Hineinziehen.
+Den heutigen fehlerhaften Lauf vollständig zurücksetzen, den nächsten Upload lückenlos protokollieren und danach exakt auswerten, welche Dateien hochgeladen, als Duplikat übersprungen, abgelehnt oder mit Fehler beendet wurden.
 
-## Ursache
+## Aktueller Rücksetzungsumfang
 
-Der Upload prüft Duplikate **einmalig vorab gegen die Datenbank** und lädt danach alle Dateien mit abgeschalteter Duplikatprüfung (`skipDuplicateCheck: true`) mit **3 parallelen Uploads** hoch. Daraus folgen zwei Lücken:
+- **343 heute angelegte Datensätze** zwischen 17:56 und 18:05 Uhr Ortszeit
+- Davon: 310 Review, 16 Duplikate, 14 Approved, 3 Processing
+- **230 unterschiedliche Dateien** im Storage
+- Alle 343 Datensätze und ihre zugehörigen Storage-Dateien werden entfernt; ältere Belege bleiben unangetastet.
 
-1. **Keine Prüfung innerhalb des Stapels**: Ist dieselbe Datei zweimal in der Auswahl (bzw. wird der Ordner nachgezogen, während der erste Lauf noch läuft), ist der Hash zum Prüfzeitpunkt noch in keiner der beiden Runden in der DB — beide werden als "neu" eingestuft.
-2. **Race Condition durch Parallelität**: Zwei parallele Uploads derselben Datei prüfen/schreiben gleichzeitig; es gibt **keinen eindeutigen DB-Index** auf `(user_id, file_hash)`, der das abfangen würde.
+## Ablauf
 
-## Warum von 287 Dateien nur 230 angekommen sind
+### 1. Upload-Protokollierung zuerst einbauen
 
-Zwischen 17:56 und 18:05 (Ortszeit) sind 343 Datensätze mit 230 verschiedenen Dateien entstanden — es fehlen also **57 Dateien**. Aus der Datenbank lässt sich nicht rekonstruieren, welche das waren, weil abgelehnte und übersprungene Dateien nirgends protokolliert werden. Es kommen genau drei Wege in Frage:
+- Neue geschützte Tabelle für Upload-Läufe und einzelne Dateien anlegen.
+- Für jede der 287 ausgewählten Dateien erfassen:
+  - Dateiname, Größe, MIME-Typ und Datei-Hash
+  - Zeitpunkt und eindeutige Lauf-ID
+  - jede Phase: ausgewählt, validiert/abgelehnt, Duplikatprüfung, übersprungen/freigegeben, Storage-Upload, Datenbankeintrag, KI-Verarbeitung, abgeschlossen/fehlgeschlagen
+  - konkrete Fehlerursache und verknüpfte Beleg-ID
+- Ein Upload-Abschlussprotokoll anzeigen: Gesamtzahl sowie hochgeladen / Duplikat / abgelehnt / fehlgeschlagen / offen, jeweils mit Dateiliste.
+- Das Protokoll bleibt auch bei Reload oder Browser-Absturz im Backend erhalten.
 
-1. **Übersprungene Duplikate (wahrscheinlichste Hauptursache)**: Die Vorab-Prüfung vergleicht gegen **alle** früheren Belege — davon gibt es bereits 217. Alles, was du im Duplikat-Dialog auf "überspringen" gesetzt hast, wurde gar nicht erst hochgeladen und erscheint nirgends.
-2. **Validierung**: Dateityp nicht erlaubt (nur PDF/JPG/PNG/WebP — z. B. HEIC, TIFF, ZIP, E-Mail-Dateien fallen raus) oder größer als 10 MB. Diese landen im Toast "Einige Dateien wurden abgelehnt", der aber nur 3 Namen zeigt.
-3. **Fehler während des Uploads**: fehlgeschlagene Bild-zu-PDF-Konvertierung oder Storage-Fehler — in der Liste als roter Eintrag, ohne Datenbankspur.
+### 2. Doppel-Upload während des Tests verhindern
 
-Weil keine dieser drei Kategorien festgehalten wird, ist die Meldung "viele wurden nicht hochgeladen" für dich nicht nachvollziehbar. Genau das behebt Maßnahme 3.
+- Gleiche Hashes bereits innerhalb der 287 ausgewählten Dateien erkennen und separat protokollieren.
+- Unmittelbar vor dem Datenbankeintrag nochmals auf vorhandene Hashes prüfen.
+- Nur einen aktiven Upload-Lauf gleichzeitig zulassen, damit ein zweites Hineinziehen nicht parallel denselben Stapel startet.
+- Noch **keinen Unique-Index** setzen, damit der Test alle realen Pfade protokolliert; die endgültige Absicherung folgt nach der Auswertung.
 
+### 3. Heutigen Lauf vollständig löschen
 
+- Zuerst die 230 heutigen Storage-Dateien entfernen.
+- Danach alle 343 heute erzeugten Datensätze löschen, einschließlich der bereits 14 freigegebenen Belege.
+- Anschließend verifizieren: heute 0 Datensätze und keine heutigen Storage-Pfade mehr vorhanden; ältere Daten unverändert.
 
-## Vorgeschlagene Maßnahmen
+### 4. Kontrollierter Neu-Upload
 
-### 1. Bereinigung der aktuellen Daten
-- Report erstellen: alle 114 Hash-Gruppen mit Mehrfach-Datensätzen auflisten (Datei, Datum, Betrag, Status).
-- Aufräum-Aktion: pro Hash den **ältesten** Datensatz behalten, die späteren Kopien löschen (inkl. Storage-Datei), sofern sie nicht bereits bearbeitet/approved sind. Vorher Vorschau, Löschung erst nach deiner Bestätigung.
+- Du ziehst die 287 Dateien **einmal** in die Upload-Seite.
+- Du lässt den Tab geöffnet, bis die neue Abschlussübersicht erscheint.
+- Bei erkannten Duplikaten kannst du wieder "überspringen" wählen; jede Entscheidung wird diesmal protokolliert.
 
-### 2. Fix im Upload (damit es nicht wieder passiert)
-- **In-Batch-Dedupe**: vor dem Start doppelte Hashes innerhalb der Auswahl entfernen und im Ergebnis-Toast ausweisen.
-- **Duplikatprüfung nicht mehr komplett abschalten**: statt `skipDuplicateCheck: true` unmittelbar vor dem Insert nochmals gegen die DB prüfen (die Vorab-Entscheidung des Nutzers wird dabei respektiert).
-- **Eindeutiger Teil-Index** `unique (user_id, file_hash) where file_hash is not null and is_duplicate = false` als letzte Absicherung; der Insert fängt den Konflikt ab und meldet ihn als übersprungenes Duplikat statt als Fehler.
+### 5. Auswertung direkt danach
 
-### 3. Transparenteres Upload-Ergebnis
-- Abschluss-Zusammenfassung: hochgeladen / übersprungen (Duplikat) / abgelehnt (Typ, Größe, Limit) mit ausklappbarer Dateiliste, damit "viele wurden nicht hochgeladen" nachvollziehbar ist.
+- Erwartete 287 Eingaben gegen das Protokoll und die neu angelegten Belege abgleichen.
+- Für jede fehlende Datei die konkrete Ursache nennen.
+- Prüfen, ob Hash-Duplikate aus dem Stapel, ältere vorhandene Belege, Dateiformat/-größe, Storage, Konvertierung oder KI-Verarbeitung verantwortlich waren.
+- Danach den Upload dauerhaft korrigieren und einen Unique-Index als letzte Absicherung hinzufügen.
 
 ## Technische Details
 
-- Betroffene Stellen: `src/pages/Upload.tsx` (`checkFilesForDuplicates`, `startUploading`, `UPLOAD_CONCURRENCY`), `src/hooks/useReceiptUpload.ts` (`uploadReceipt`, `checkExactDuplicate`).
-- Migration: partieller Unique-Index auf `public.receipts (user_id, file_hash)`; vorher müssen die Duplikate bereinigt sein.
-- Löschung erfolgt über bestehende Receipt-Delete-Logik inkl. Storage-Cleanup.
+- RLS: Nutzer sehen und schreiben ausschließlich ihre eigenen Upload-Läufe und Dateieinträge; Service-Zugriff bleibt für Diagnose möglich.
+- Änderungen betreffen `src/pages/Upload.tsx`, `src/hooks/useReceiptUpload.ts`, die Queue-Hilfe und neue kleine Logging-Helfer/UI-Komponenten.
+- Die Datenlöschung erfolgt als explizite Datenoperation, nicht als Schema-Migration.
+- Vor der Löschung wird die Liste der IDs und Storage-Pfade serverseitig auf den heutigen Zeitraum und deinen Nutzer eingeschränkt.
