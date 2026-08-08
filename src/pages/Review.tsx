@@ -990,7 +990,15 @@ const Review = () => {
             </h2>
             <p className="text-muted-foreground mb-6">
               Keine offenen Überprüfungen vorhanden
+            <p className="text-muted-foreground mb-6">
+              Keine offenen Überprüfungen vorhanden
             </p>
+            {problemCount > 0 && (
+              <Button variant="outline" className="mb-6" onClick={() => setTab('problems')}>
+                <AlertTriangle className="h-4 w-4 mr-2 text-destructive" />
+                {problemCount} Problembelege ansehen
+              </Button>
+            )}
             <div className="flex gap-3">
               <Button 
                 className="gradient-primary hover:opacity-90"
