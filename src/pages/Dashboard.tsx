@@ -41,6 +41,7 @@ import { useDashboardData } from '@/hooks/useDashboardData';
 import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { PageMeta } from '@/components/PageMeta';
+import { ProblemReceiptsBanner } from '@/components/dashboard/ProblemReceiptsBanner';
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   pending: { label: 'Offen', className: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' },
@@ -186,6 +187,7 @@ const Dashboard = () => {
       <PageMeta title="Dashboard — BillMonk" description="Übersicht über deine Einnahmen, Ausgaben und offene Belege auf einen Blick." canonical="/dashboard" noindex />
     <DashboardLayout>
       <div className="p-6 lg:p-8">
+        <ProblemReceiptsBanner />
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
