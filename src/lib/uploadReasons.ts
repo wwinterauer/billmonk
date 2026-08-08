@@ -73,3 +73,55 @@ export function eventsToCsv(rows: UploadEventRow[]): string {
   );
   return [header.map(escape).join(';'), ...lines].join('\n');
 }
+
+// ---------------------------------------------------------------------------
+// Processing errors (receipts.status = 'error' / stuck in pending|processing)
+// ---------------------------------------------------------------------------
+
+export interface ProcessingProblem {
+  title: string;
+  hint: string | null;
+}
+
+export function describeProcessingProblem(
+  status: string,
+  notes: string | null,
+): ProcessingProblem {
+  const text = (notes ?? '').toLowerCase();
+
+  if (status === 'pending') {
+    return {
+      title: 'Verarbeitung nie gestartet',
+      hint: 'Vermutlich wurde der Tab während des Uploads geschlossen. Einfach erneut analysieren.',
+    };
+  }
+  if (status === 'processing') {
+    return {
+      title: 'In Verarbeitung stecken geblieben',
+      hint: 'Die KI-Analyse wurde unterbrochen. Erneut analysieren startet sie neu.',
+    };
+  }
+  if (text.includes('credit') || text.includes('limit') || text.includes('402') || text.includes('403')) {
+    return {
+      title: 'KI-Limit erreicht',
+      hint: 'Das Guthaben-/Nutzungslimit war aufgebraucht. Nach Aufstocken erneut analysieren.',
+    };
+  }
+  if (text.includes('429') || text.includes('rate')) {
+    return {
+      title: 'Zu viele Anfragen gleichzeitig',
+      hint: 'Kurz warten und erneut analysieren.',
+    };
+  }
+  if (text.includes('timeout') || text.includes('zeit')) {
+    return { title: 'Zeitüberschreitung bei der Analyse', hint: 'Erneut analysieren.' };
+  }
+  if (text.includes('pdf') || text.includes('lesbar') || text.includes('parse') || text.includes('convert')) {
+    return {
+      title: 'Datei konnte nicht gelesen werden',
+      hint: 'Datei prüfen (Passwortschutz, Scanqualität) oder Daten manuell erfassen.',
+    };
+  }
+  if (notes) return { title: 'Analyse fehlgeschlagen', hint: notes };
+  return { title: 'Unbekannter Fehler bei der Analyse', hint: 'Erneut analysieren oder manuell erfassen.' };
+}
