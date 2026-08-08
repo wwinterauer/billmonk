@@ -42,6 +42,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { usePlan } from '@/hooks/usePlan';
+import { useProblemReceiptCount } from '@/hooks/useReceiptRetry';
 import { PlanType, PLAN_NAMES, FEATURE_MIN_PLAN, isPlanSufficient } from '@/lib/planConfig';
 import { cn } from '@/lib/utils';
 
@@ -81,6 +82,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   
   const { user, signOut } = useAuth();
   const [reviewCount, setReviewCount] = useState<number>(0);
+  const { count: problemCount } = useProblemReceiptCount();
   const {
     effectivePlan,
     isAdmin,
@@ -229,10 +231,24 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
                   {locked && (
                     <Lock className="h-3.5 w-3.5 ml-auto flex-shrink-0 text-muted-foreground" />
                   )}
-                  {!locked && badgeCount !== null && (
-                    <Badge variant="destructive" className="ml-auto h-auto min-w-5 px-1.5 py-0.5 flex items-center justify-center text-xs">
-                      {badgeCount}
-                    </Badge>
+                  {!locked && (badgeCount !== null || (item.badgeKey === 'review' && problemCount > 0)) && (
+                    <span className="ml-auto flex items-center gap-1">
+                      {badgeCount !== null && (
+                        <Badge variant="destructive" className="h-auto min-w-5 px-1.5 py-0.5 flex items-center justify-center text-xs">
+                          {badgeCount}
+                        </Badge>
+                      )}
+                      {item.badgeKey === 'review' && problemCount > 0 && (
+                        <Badge
+                          variant="outline"
+                          title={`${problemCount} Belege konnten nicht verarbeitet werden`}
+                          className="h-auto min-w-5 px-1.5 py-0.5 flex items-center gap-1 text-xs border-destructive text-destructive"
+                        >
+                          <AlertTriangle className="h-3 w-3" />
+                          {problemCount}
+                        </Badge>
+                      )}
+                    </span>
                   )}
                 </>
               )}
