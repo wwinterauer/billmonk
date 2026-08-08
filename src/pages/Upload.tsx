@@ -36,7 +36,8 @@ import { de } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageMeta } from '@/components/PageMeta';
-import { saveQueue, loadQueue, clearQueue, runWithConcurrency, type UploadQueueState } from '@/lib/upload-queue';
+import { saveQueue, clearQueue, runWithConcurrency } from '@/lib/upload-queue';
+import { UploadRunOverview } from '@/components/upload/UploadRunOverview';
 
 const UPLOAD_CONCURRENCY = 3;
 
@@ -108,7 +109,7 @@ const Upload = () => {
   const [applyToAll, setApplyToAll] = useState(false);
   const [isProcessingVendor, setIsProcessingVendor] = useState(false);
   
-  const [recoveredQueue, setRecoveredQueue] = useState<UploadQueueState | null>(null);
+  const [overviewRunId, setOverviewRunId] = useState<string | null>(null);
   const [runSummary, setRunSummary] = useState<UploadRunSummary | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -220,18 +221,32 @@ const Upload = () => {
     loadPendingReceipts();
   }, [loadPendingReceipts]);
 
-  // Detect an unfinished upload session left over from a previous reload/crash.
+  // Load the most recent upload run so the overview (and any interrupted run)
+  // is visible again after a reload.
   useEffect(() => {
     if (!user) return;
-    const existing = loadQueue(user.id);
-    if (!existing) return;
-    const unfinished = existing.items.filter(i => i.status !== 'complete' && i.status !== 'error');
-    if (unfinished.length === 0) {
-      clearQueue(user.id);
-      return;
-    }
-    setRecoveredQueue(existing);
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('upload_runs')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled && data?.id) setOverviewRunId(data.id);
+    })();
+    return () => { cancelled = true; };
   }, [user]);
+
+  // Warn before leaving the page while an upload is still running.
+  useEffect(() => {
+    if (uploadPhase === 'idle') return;
+    const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [uploadPhase]);
+
 
   // Realtime subscription: keep the pending-receipts list (and the status
   // counter chips) in sync while uploads are happening in the background,
@@ -379,6 +394,7 @@ const Upload = () => {
     setRunSummary(null);
     const runId = crypto.randomUUID();
     activeRunRef.current = runId;
+    setOverviewRunId(runId);
     const initialEvents = files.map((file, ordinal) => ({
       id: crypto.randomUUID(),
       run_id: runId,
@@ -1277,68 +1293,16 @@ const Upload = () => {
           <p className="text-muted-foreground">Lade deine Belege hoch und lass die KI sie analysieren</p>
         </div>
 
-        {/* Recovery banner: previous upload session was interrupted */}
-        {recoveredQueue && user && (() => {
-          const unfinished = recoveredQueue.items.filter(i => i.status !== 'complete' && i.status !== 'error');
-          if (unfinished.length === 0) return null;
-          return (
-            <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-foreground">
-                    Letzter Upload nicht abgeschlossen
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Von {recoveredQueue.total} Dateien wurden {unfinished.length} vor dem Abschluss unterbrochen
-                    (z. B. durch Tab-Wechsel oder Reload). Bitte ziehe die fehlenden Dateien erneut in den Upload —
-                    bereits verarbeitete werden automatisch als Duplikat erkannt und übersprungen.
-                  </p>
-                  <details className="mt-2">
-                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                      Liste der nicht abgeschlossenen Dateien anzeigen
-                    </summary>
-                    <ul className="mt-2 max-h-40 overflow-y-auto text-xs text-muted-foreground space-y-0.5 pl-2">
-                      {unfinished.map((i, idx) => (
-                        <li key={idx} className="truncate">• {i.fileName}</li>
-                      ))}
-                    </ul>
-                  </details>
-                  <div className="mt-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => { clearQueue(user.id); setRecoveredQueue(null); }}
-                    >
-                      Hinweis ausblenden
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {runSummary && (
-          <Card className="mb-6 border-border/50">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Check className="h-5 w-5 text-success" />
-                Upload-Protokoll abgeschlossen
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
-                <div className="rounded-md bg-success/10 p-3"><p className="text-xl font-semibold">{runSummary.uploaded}</p><p className="text-xs text-muted-foreground">Hochgeladen</p></div>
-                <div className="rounded-md bg-warning/10 p-3"><p className="text-xl font-semibold">{runSummary.duplicates}</p><p className="text-xs text-muted-foreground">Duplikate</p></div>
-                <div className="rounded-md bg-muted p-3"><p className="text-xl font-semibold">{runSummary.rejected}</p><p className="text-xs text-muted-foreground">Abgelehnt</p></div>
-                <div className="rounded-md bg-destructive/10 p-3"><p className="text-xl font-semibold">{runSummary.failed}</p><p className="text-xs text-muted-foreground">Fehler</p></div>
-                <div className="rounded-md bg-muted p-3"><p className="text-xl font-semibold">{runSummary.pending}</p><p className="text-xs text-muted-foreground">Offen</p></div>
-              </div>
-              <p className="mt-3 text-sm text-muted-foreground">{runSummary.total} ausgewählte Dateien wurden vollständig protokolliert.</p>
-            </CardContent>
-          </Card>
+        {/* Live overview of the current / last upload run */}
+        {overviewRunId && user && (
+          <UploadRunOverview
+            runId={overviewRunId}
+            userId={user.id}
+            isActive={uploadPhase !== 'idle'}
+            onRunClosed={() => { activeRunRef.current = null; }}
+          />
         )}
+
 
         {/* File Check Progress - shown during checking phase */}
         {uploadPhase === 'checking' && (
