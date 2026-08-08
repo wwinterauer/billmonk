@@ -20,6 +20,7 @@ import {
   Shield,
   FileText,
   Lock,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoBillmonk from '@/assets/logo-billmonk.png';
