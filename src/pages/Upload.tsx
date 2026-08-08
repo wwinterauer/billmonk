@@ -48,6 +48,15 @@ interface FileUpload extends UploadProgress {
   duplicateScore?: number;
 }
 
+interface UploadRunSummary {
+  total: number;
+  uploaded: number;
+  duplicates: number;
+  rejected: number;
+  failed: number;
+  pending: number;
+}
+
 // Represents a receipt loaded from the database (processing/pending/recently completed status)
 interface PendingReceiptFromDB {
   id: string;
@@ -100,12 +109,15 @@ const Upload = () => {
   const [isProcessingVendor, setIsProcessingVendor] = useState(false);
   
   const [recoveredQueue, setRecoveredQueue] = useState<UploadQueueState | null>(null);
+  const [runSummary, setRunSummary] = useState<UploadRunSummary | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeRunRef = useRef<string | null>(null);
+  const eventIdsRef = useRef(new WeakMap<File, string>());
   const navigate = useNavigate();
   const { toast } = useToast();
   const { 
-    validateFiles, 
+    validateFile,
     uploadAndProcessReceipt, 
     generateFileHash,
     finalizeReceiptWithVendor,
@@ -113,6 +125,53 @@ const Upload = () => {
     MAX_FILE_SIZE, 
     MAX_FILES 
   } = useReceipts();
+
+  const updateFileEvent = useCallback(async (
+    file: File,
+    values: {
+      phase?: string;
+      outcome?: 'pending' | 'uploaded' | 'duplicate' | 'rejected' | 'failed';
+      reason_code?: string | null;
+      error_message?: string | null;
+      receipt_id?: string | null;
+      file_hash?: string;
+    },
+  ) => {
+    const eventId = eventIdsRef.current.get(file);
+    if (!eventId) return;
+    const { error } = await supabase.from('upload_file_events').update(values).eq('id', eventId);
+    if (error) console.error('Upload protocol update failed:', error);
+  }, []);
+
+  const finishUploadRun = useCallback(async (runId: string) => {
+    const { data, error } = await supabase
+      .from('upload_file_events')
+      .select('outcome')
+      .eq('run_id', runId);
+    if (error || !data) {
+      console.error('Upload protocol summary failed:', error);
+      return;
+    }
+    const summary: UploadRunSummary = {
+      total: data.length,
+      uploaded: data.filter(item => item.outcome === 'uploaded').length,
+      duplicates: data.filter(item => item.outcome === 'duplicate').length,
+      rejected: data.filter(item => item.outcome === 'rejected').length,
+      failed: data.filter(item => item.outcome === 'failed').length,
+      pending: data.filter(item => item.outcome === 'pending').length,
+    };
+    await supabase.from('upload_runs').update({
+      status: summary.pending > 0 ? 'failed' : 'completed',
+      uploaded_count: summary.uploaded,
+      duplicate_count: summary.duplicates,
+      rejected_count: summary.rejected,
+      failed_count: summary.failed,
+      pending_count: summary.pending,
+      completed_at: new Date().toISOString(),
+    }).eq('id', runId);
+    setRunSummary(summary);
+    activeRunRef.current = null;
+  }, []);
 
   // Load pending/processing receipts from database (used on mount and as a
   // refresh callback for realtime + polling while uploads are in flight).
@@ -234,6 +293,7 @@ const Upload = () => {
     duplicates: FileCheckResult[];
     nonDuplicates: { file: File; hash: string }[];
   }> => {
+    if (!user) throw new Error('Nicht angemeldet');
     const results: FileCheckResult[] = [];
     
     // Calculate all hashes in parallel for speed
@@ -243,6 +303,10 @@ const Upload = () => {
     });
     
     const filesWithHashes = await Promise.all(hashPromises);
+    await Promise.all(filesWithHashes.map(({ file, hash }) => updateFileEvent(file, {
+      phase: 'hash-calculated',
+      file_hash: hash,
+    })));
     
     // Get all hashes to check in one query
     // Only consider certain statuses as duplicates - exclude rejected/not_a_receipt
@@ -251,7 +315,7 @@ const Upload = () => {
     const { data: existingReceipts } = await supabase
       .from('receipts')
       .select('id, file_name, file_url, file_hash, vendor, amount_gross, receipt_date, status')
-      .eq('user_id', user!.id)
+      .eq('user_id', user.id)
       .in('file_hash', hashes)
       .in('status', ['pending', 'processing', 'review', 'approved', 'duplicate']);
     
@@ -259,8 +323,22 @@ const Upload = () => {
       (existingReceipts || []).map(r => [r.file_hash, r])
     );
     
-    // Categorize files
+    // Categorize files. Keep only the first occurrence of a hash in this
+    // selection; later occurrences are logged as in-batch duplicates.
+    const seenHashes = new Map<string, File>();
     for (const { file, hash } of filesWithHashes) {
+      const firstFile = seenHashes.get(hash);
+      if (firstFile) {
+        results.push({ file, hash, isDuplicate: true });
+        await updateFileEvent(file, {
+          phase: 'duplicate-check',
+          outcome: 'duplicate',
+          reason_code: 'duplicate_in_selection',
+          error_message: `Identisch mit ${firstFile.name}`,
+        });
+        continue;
+      }
+      seenHashes.set(hash, file);
       const existing = existingMap.get(hash);
       results.push({
         file,
@@ -275,16 +353,81 @@ const Upload = () => {
           receipt_date: existing.receipt_date,
         } : undefined,
       });
+      await updateFileEvent(file, {
+        phase: 'duplicate-check',
+        ...(existing ? {} : { reason_code: null, error_message: null }),
+      });
     }
     
     return {
-      duplicates: results.filter(r => r.isDuplicate),
+      duplicates: results.filter(r => r.isDuplicate && r.existingReceipt),
       nonDuplicates: results.filter(r => !r.isDuplicate).map(r => ({ file: r.file, hash: r.hash })),
     };
   };
 
   const processFiles = async (files: File[]) => {
-    const { validFiles, errors } = validateFiles(files);
+    if (!user || files.length === 0) return;
+    if (activeRunRef.current) {
+      toast({
+        variant: 'destructive',
+        title: 'Upload läuft bereits',
+        description: 'Bitte warte auf die Abschlussübersicht, bevor du weitere Dateien hinzufügst.',
+      });
+      return;
+    }
+
+    setRunSummary(null);
+    const runId = crypto.randomUUID();
+    activeRunRef.current = runId;
+    const initialEvents = files.map((file, ordinal) => ({
+      id: crypto.randomUUID(),
+      run_id: runId,
+      user_id: user.id,
+      file_name: file.name,
+      file_size: file.size,
+      mime_type: file.type || null,
+      ordinal,
+      phase: 'selected',
+      outcome: 'pending' as const,
+    }));
+    const { error: runError } = await supabase.from('upload_runs').insert({
+      id: runId,
+      user_id: user.id,
+      expected_count: files.length,
+      pending_count: files.length,
+    });
+    const { error: eventError } = runError
+      ? { error: runError }
+      : await supabase.from('upload_file_events').insert(initialEvents);
+    if (eventError) {
+      activeRunRef.current = null;
+      toast({ variant: 'destructive', title: 'Protokollierung fehlgeschlagen', description: eventError.message });
+      return;
+    }
+    files.forEach((file, index) => eventIdsRef.current.set(file, initialEvents[index].id));
+
+    const validFiles: File[] = [];
+    const errors: string[] = [];
+    for (const file of files.slice(0, MAX_FILES)) {
+      const validation = validateFile(file);
+      if (validation.valid) {
+        validFiles.push(file);
+        await updateFileEvent(file, { phase: 'validated' });
+      } else {
+        const message = validation.error || 'Datei wurde abgelehnt';
+        errors.push(`${file.name}: ${message}`);
+        await updateFileEvent(file, {
+          phase: 'validation', outcome: 'rejected',
+          reason_code: file.size > MAX_FILE_SIZE ? 'file_too_large' : 'unsupported_type',
+          error_message: message,
+        });
+      }
+    }
+    for (const file of files.slice(MAX_FILES)) {
+      const message = `Maximal ${MAX_FILES} Dateien pro Lauf erlaubt`;
+      errors.push(`${file.name}: ${message}`);
+      await updateFileEvent(file, { phase: 'validation', outcome: 'rejected', reason_code: 'batch_limit', error_message: message });
+    }
 
     if (errors.length > 0) {
       toast({
@@ -294,7 +437,10 @@ const Upload = () => {
       });
     }
 
-    if (validFiles.length === 0) return;
+    if (validFiles.length === 0) {
+      await finishUploadRun(runId);
+      return;
+    }
 
     // Check total count including only actively uploading/processing files (not completed ones)
     const activeUploadCount = Array.from(uploads.values()).filter(
@@ -307,6 +453,11 @@ const Upload = () => {
         title: 'Zu viele Dateien',
         description: `Maximal ${MAX_FILES} Dateien gleichzeitig erlaubt. Aktuell ${activeUploadCount} in Bearbeitung.`,
       });
+      await Promise.all(validFiles.map(file => updateFileEvent(file, {
+        phase: 'queue', outcome: 'rejected', reason_code: 'active_upload_limit',
+        error_message: 'Maximale Zahl gleichzeitig aktiver Uploads überschritten',
+      })));
+      await finishUploadRun(runId);
       return;
     }
 
@@ -337,7 +488,7 @@ const Upload = () => {
       } else {
         // No duplicates - start uploading directly
         setUploadPhase('uploading');
-        await startUploading(nonDuplicates, []);
+        await startUploading(nonDuplicates, [], runId);
       }
     } catch (error) {
       console.error('Error checking files:', error);
@@ -347,6 +498,11 @@ const Upload = () => {
         title: 'Fehler beim Prüfen',
         description: 'Die Dateien konnten nicht auf Duplikate geprüft werden.',
       });
+      await Promise.all(validFiles.map(file => updateFileEvent(file, {
+        phase: 'duplicate-check', outcome: 'failed', reason_code: 'duplicate_check_failed',
+        error_message: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      })));
+      await finishUploadRun(runId);
     }
   };
 
@@ -360,13 +516,19 @@ const Upload = () => {
     for (const [file, decision] of decisions) {
       if (decision === 'upload') {
         const duplicateInfo = duplicatesToResolve.find(d => d.file === file);
-        if (duplicateInfo) {
+        const duplicateOfId = duplicateInfo?.existingReceipt?.id;
+        if (duplicateInfo && duplicateOfId) {
           duplicatesToUpload.push({
             file,
             hash: duplicateInfo.hash,
-            duplicateOfId: duplicateInfo.existingReceipt!.id,
+            duplicateOfId,
           });
         }
+      }
+      if (decision === 'skip') {
+        await updateFileEvent(file, {
+          phase: 'duplicate-decision', outcome: 'duplicate', reason_code: 'existing_duplicate_skipped',
+        });
       }
     }
     
@@ -374,11 +536,16 @@ const Upload = () => {
     setDuplicatesToResolve([]);
     
     // Start uploading all files
-    await startUploading(nonDuplicateFiles, duplicatesToUpload);
+    const runId = activeRunRef.current;
+    if (runId) await startUploading(nonDuplicateFiles, duplicatesToUpload, runId);
   };
 
   // Handle cancel from duplicate dialog
   const handleDuplicateCancel = () => {
+    const runId = activeRunRef.current;
+    void Promise.all([...nonDuplicateFiles.map(item => item.file), ...duplicatesToResolve.map(item => item.file)].map(file =>
+      updateFileEvent(file, { phase: 'cancelled', outcome: 'failed', reason_code: 'user_cancelled' })
+    )).then(() => runId && finishUploadRun(runId));
     setUploadPhase('idle');
     setDuplicatesToResolve([]);
     setNonDuplicateFiles([]);
@@ -392,7 +559,8 @@ const Upload = () => {
   // Start uploading files after duplicate resolution
   const startUploading = async (
     nonDuplicates: { file: File; hash: string }[],
-    duplicatesToUpload: { file: File; hash: string; duplicateOfId: string }[]
+    duplicatesToUpload: { file: File; hash: string; duplicateOfId: string }[],
+    runId: string,
   ) => {
     // Add all files to upload queue
     const newUploads = new Map(uploads);
@@ -468,7 +636,7 @@ const Upload = () => {
     // throughput on large drops.
     await runWithConcurrency(filesToUpload, UPLOAD_CONCURRENCY, async ({ upload, isDuplicate, duplicateOfId }) => {
       await uploadFile(upload, {
-        skipDuplicateCheck: true,
+        skipDuplicateCheck: false,
         markAsDuplicate: isDuplicate,
         duplicateOfId,
         fileHash: upload.fileHash,
@@ -477,9 +645,11 @@ const Upload = () => {
 
     // All done — drop the recovery snapshot.
     if (user) clearQueue(user.id);
+    await finishUploadRun(runId);
   };
 
   const uploadFile = async (upload: FileUpload, options?: { skipDuplicateCheck?: boolean; markAsDuplicate?: boolean; duplicateOfId?: string; fileHash?: string }) => {
+    await updateFileEvent(upload.file, { phase: 'storage-upload' });
     // Update status to uploading
     setUploads(prev => {
       const updated = new Map(prev);
@@ -523,6 +693,9 @@ const Upload = () => {
 
       // Check if vendor decision is needed
       if (result.vendorDecision) {
+        await updateFileEvent(upload.file, {
+          phase: 'vendor-decision', outcome: 'uploaded', receipt_id: result.receipt.id,
+        });
         // Add to vendor decision queue
         const queueItem: VendorDecisionQueueItem = {
           uploadId: upload.id,
@@ -587,6 +760,13 @@ const Upload = () => {
         }
         return updated;
       });
+      const isKnownDuplicate = Boolean(options?.markAsDuplicate || hasDuplicate);
+      await updateFileEvent(upload.file, {
+        phase: isKnownDuplicate ? 'duplicate-recorded' : 'completed',
+        outcome: isKnownDuplicate ? 'duplicate' : 'uploaded',
+        reason_code: options?.markAsDuplicate ? 'existing_duplicate_uploaded' : hasDuplicate ? 'content_duplicate' : null,
+        receipt_id: result.receipt.id,
+      });
 
       if (hasDuplicate) {
         toast({
@@ -609,6 +789,13 @@ const Upload = () => {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
+      const isDuplicateError = errorMessage.startsWith('DUPLICATE:');
+      await updateFileEvent(upload.file, {
+        phase: 'failed',
+        outcome: isDuplicateError ? 'duplicate' : 'failed',
+        reason_code: isDuplicateError ? 'race_duplicate_preinsert' : 'upload_or_processing_failed',
+        error_message: errorMessage,
+      });
       
       setUploads(prev => {
         const updated = new Map(prev);
@@ -867,7 +1054,7 @@ const Upload = () => {
     setIsDragOver(false);
     const files = Array.from(e.dataTransfer.files);
     processFiles(files);
-  }, [validateFiles, toast, uploads]);
+  }, [user, uploads]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -904,7 +1091,9 @@ const Upload = () => {
   const canRemove = (status: UploadStatus) => status !== 'uploading' && status !== 'processing';
 
   // Combine active uploads with pending receipts from DB (exclude already shown in uploads)
-  const uploadReceiptIds = new Set(uploadsArray.filter(u => u.receipt?.id).map(u => u.receipt!.id));
+  const uploadReceiptIds = new Set(
+    uploadsArray.flatMap(upload => upload.receipt?.id ? [upload.receipt.id] : []),
+  );
   const allPendingReceipts = pendingReceipts.filter(pr => !uploadReceiptIds.has(pr.id));
 
   // Calculate status counts for filter
@@ -1129,6 +1318,27 @@ const Upload = () => {
             </div>
           );
         })()}
+
+        {runSummary && (
+          <Card className="mb-6 border-border/50">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Check className="h-5 w-5 text-success" />
+                Upload-Protokoll abgeschlossen
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+                <div className="rounded-md bg-success/10 p-3"><p className="text-xl font-semibold">{runSummary.uploaded}</p><p className="text-xs text-muted-foreground">Hochgeladen</p></div>
+                <div className="rounded-md bg-warning/10 p-3"><p className="text-xl font-semibold">{runSummary.duplicates}</p><p className="text-xs text-muted-foreground">Duplikate</p></div>
+                <div className="rounded-md bg-muted p-3"><p className="text-xl font-semibold">{runSummary.rejected}</p><p className="text-xs text-muted-foreground">Abgelehnt</p></div>
+                <div className="rounded-md bg-destructive/10 p-3"><p className="text-xl font-semibold">{runSummary.failed}</p><p className="text-xs text-muted-foreground">Fehler</p></div>
+                <div className="rounded-md bg-muted p-3"><p className="text-xl font-semibold">{runSummary.pending}</p><p className="text-xs text-muted-foreground">Offen</p></div>
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">{runSummary.total} ausgewählte Dateien wurden vollständig protokolliert.</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* File Check Progress - shown during checking phase */}
         {uploadPhase === 'checking' && (
