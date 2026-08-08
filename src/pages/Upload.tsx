@@ -394,6 +394,7 @@ const Upload = () => {
     setRunSummary(null);
     const runId = crypto.randomUUID();
     activeRunRef.current = runId;
+    setOverviewRunId(runId);
     const initialEvents = files.map((file, ordinal) => ({
       id: crypto.randomUUID(),
       run_id: runId,
