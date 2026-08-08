@@ -42,6 +42,15 @@ Jede Zeile ist anklickbar und listet die betroffenen Dateien mit Klartext-Grund:
 
 Die Zähler kommen aus dem bereits bestehenden Upload-Protokoll (eine Zeile je ausgewählter Datei) und nicht mehr aus dem flüchtigen UI-State. Beim Neuladen der Seite wird der letzte bzw. laufende Upload-Lauf wieder eingelesen und die Leiste erscheint erneut.
 
+### 5. Falschmeldung "alle unterbrochen" abschalten
+
+Der Hinweis wird nicht mehr aus dem Browser-Schnappschuss gebildet, sondern aus dem serverseitigen Protokoll:
+
+- Läuft der Lauf noch (Einträge mit Ergebnis "offen", Lauf-Status aktiv), zeigt die Leiste "Upload läuft — x von y verarbeitet" statt einer Fehlermeldung.
+- Als wirklich unterbrochen gelten nur Dateien, die nach dem letzten Lebenszeichen des Laufs (mehrere Minuten ohne Fortschritt) noch offen sind; nur diese werden namentlich zum erneuten Hochladen vorgeschlagen.
+- Der lokale Schnappschuss wird weiterhin geschrieben, aber pro Datei mitgeführt und nur noch als Rückfalloption genutzt.
+
+
 ## Technische Details
 
 - Nur Frontend: `src/pages/Upload.tsx` plus neue Komponente `src/components/upload/UploadRunOverview.tsx` (Leiste + aufklappbare Listen) und `src/lib/uploadReasons.ts` (Mapping `reason_code` → deutscher Klartext).
