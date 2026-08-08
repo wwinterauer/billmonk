@@ -142,6 +142,10 @@ const Upload = () => {
     if (!eventId) return;
     const { error } = await supabase.from('upload_file_events').update(values).eq('id', eventId);
     if (error) console.error('Upload protocol update failed:', error);
+    // Keep the sidebar review badge in sync as soon as a file reaches a final state.
+    if (values.outcome && values.outcome !== 'pending') {
+      window.dispatchEvent(new Event('refresh-review-count'));
+    }
   }, []);
 
   const finishUploadRun = useCallback(async (runId: string) => {
