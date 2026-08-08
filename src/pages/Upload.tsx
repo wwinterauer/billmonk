@@ -516,11 +516,12 @@ const Upload = () => {
     for (const [file, decision] of decisions) {
       if (decision === 'upload') {
         const duplicateInfo = duplicatesToResolve.find(d => d.file === file);
-        if (duplicateInfo) {
+        const duplicateOfId = duplicateInfo?.existingReceipt?.id;
+        if (duplicateInfo && duplicateOfId) {
           duplicatesToUpload.push({
             file,
             hash: duplicateInfo.hash,
-            duplicateOfId: duplicateInfo.existingReceipt!.id,
+            duplicateOfId,
           });
         }
       }
@@ -759,10 +760,11 @@ const Upload = () => {
         }
         return updated;
       });
+      const isKnownDuplicate = Boolean(options?.markAsDuplicate || hasDuplicate);
       await updateFileEvent(upload.file, {
-        phase: hasDuplicate ? 'content-duplicate' : 'completed',
-        outcome: hasDuplicate ? 'duplicate' : 'uploaded',
-        reason_code: hasDuplicate ? 'content_duplicate' : null,
+        phase: isKnownDuplicate ? 'duplicate-recorded' : 'completed',
+        outcome: isKnownDuplicate ? 'duplicate' : 'uploaded',
+        reason_code: options?.markAsDuplicate ? 'existing_duplicate_uploaded' : hasDuplicate ? 'content_duplicate' : null,
         receipt_id: result.receipt.id,
       });
 
@@ -1089,7 +1091,9 @@ const Upload = () => {
   const canRemove = (status: UploadStatus) => status !== 'uploading' && status !== 'processing';
 
   // Combine active uploads with pending receipts from DB (exclude already shown in uploads)
-  const uploadReceiptIds = new Set(uploadsArray.filter(u => u.receipt?.id).map(u => u.receipt!.id));
+  const uploadReceiptIds = new Set(
+    uploadsArray.flatMap(upload => upload.receipt?.id ? [upload.receipt.id] : []),
+  );
   const allPendingReceipts = pendingReceipts.filter(pr => !uploadReceiptIds.has(pr.id));
 
   // Calculate status counts for filter

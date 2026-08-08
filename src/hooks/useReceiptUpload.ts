@@ -67,7 +67,8 @@ export function useReceiptUpload(
 
   const getFileExtension = (fileName: string): string => {
     const parts = fileName.split('.');
-    return parts.length > 1 ? parts.pop()!.toLowerCase() : '';
+    const extension = parts.pop();
+    return parts.length > 0 && extension ? extension.toLowerCase() : '';
   };
 
   const generateStoragePath = (userId: string, fileName: string): string => {
