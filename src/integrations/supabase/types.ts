@@ -3455,6 +3455,126 @@ export type Database = {
           },
         ]
       }
+      upload_file_events: {
+        Row: {
+          created_at: string
+          details: Json
+          error_message: string | null
+          file_hash: string | null
+          file_name: string
+          file_size: number
+          id: string
+          mime_type: string | null
+          ordinal: number
+          outcome: string
+          phase: string
+          reason_code: string | null
+          receipt_id: string | null
+          run_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          error_message?: string | null
+          file_hash?: string | null
+          file_name: string
+          file_size?: number
+          id?: string
+          mime_type?: string | null
+          ordinal?: number
+          outcome?: string
+          phase?: string
+          reason_code?: string | null
+          receipt_id?: string | null
+          run_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          error_message?: string | null
+          file_hash?: string | null
+          file_name?: string
+          file_size?: number
+          id?: string
+          mime_type?: string | null
+          ordinal?: number
+          outcome?: string
+          phase?: string
+          reason_code?: string | null
+          receipt_id?: string | null
+          run_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upload_file_events_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_file_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "upload_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      upload_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          duplicate_count: number
+          expected_count: number
+          failed_count: number
+          id: string
+          pending_count: number
+          rejected_count: number
+          started_at: string
+          status: string
+          updated_at: string
+          uploaded_count: number
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          duplicate_count?: number
+          expected_count?: number
+          failed_count?: number
+          id?: string
+          pending_count?: number
+          rejected_count?: number
+          started_at?: string
+          status?: string
+          updated_at?: string
+          uploaded_count?: number
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          duplicate_count?: number
+          expected_count?: number
+          failed_count?: number
+          id?: string
+          pending_count?: number
+          rejected_count?: number
+          started_at?: string
+          status?: string
+          updated_at?: string
+          uploaded_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
