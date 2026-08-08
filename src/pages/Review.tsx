@@ -977,6 +977,7 @@ const Review = () => {
     return (
       <DashboardLayout>
         <div className="p-6 lg:p-8">
+          {tabBar}
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
