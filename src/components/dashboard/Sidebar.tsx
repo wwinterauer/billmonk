@@ -108,16 +108,27 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   }, [user]);
 
   useEffect(() => {
+    if (!user) return;
     fetchReviewCount();
     const channel = supabase
-      .channel('receipts-review-count')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'receipts' }, () => fetchReviewCount())
+      .channel(`receipts-review-count-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'receipts', filter: `user_id=eq.${user.id}` },
+        () => fetchReviewCount(),
+      )
       .subscribe();
     const handleRefreshCount = () => fetchReviewCount();
     window.addEventListener('refresh-review-count', handleRefreshCount);
+    // Safety net: refresh periodically while the tab is in the foreground, in
+    // case the realtime connection drops during a long upload.
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchReviewCount();
+    }, 5000);
     return () => {
       supabase.removeChannel(channel);
       window.removeEventListener('refresh-review-count', handleRefreshCount);
+      clearInterval(interval);
     };
   }, [user, fetchReviewCount]);
 

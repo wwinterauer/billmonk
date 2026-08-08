@@ -142,6 +142,10 @@ const Upload = () => {
     if (!eventId) return;
     const { error } = await supabase.from('upload_file_events').update(values).eq('id', eventId);
     if (error) console.error('Upload protocol update failed:', error);
+    // Keep the sidebar review badge in sync as soon as a file reaches a final state.
+    if (values.outcome && values.outcome !== 'pending') {
+      window.dispatchEvent(new Event('refresh-review-count'));
+    }
   }, []);
 
   const finishUploadRun = useCallback(async (runId: string) => {
@@ -1293,11 +1297,11 @@ const Upload = () => {
           <p className="text-muted-foreground">Lade deine Belege hoch und lass die KI sie analysieren</p>
         </div>
 
-        {/* Live overview of the current / last upload run */}
-        {overviewRunId && user && (
+        {/* Live overview: today's upload sessions, grouped by day */}
+        {user && (
           <UploadRunOverview
-            runId={overviewRunId}
             userId={user.id}
+            activeRunId={uploadPhase !== 'idle' ? overviewRunId : null}
             isActive={uploadPhase !== 'idle'}
             onRunClosed={() => { activeRunRef.current = null; }}
           />
