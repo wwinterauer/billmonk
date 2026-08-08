@@ -896,6 +896,64 @@ const Review = () => {
   // Reviewed count for progress
   const totalToReview = receipts.length;
 
+  const activeTab = searchParams.get('tab') === 'problems' ? 'problems' : 'review';
+  const setTab = (tab: 'review' | 'problems') => {
+    setSearchParams(tab === 'problems' ? { tab: 'problems' } : {}, { replace: true });
+  };
+
+  const tabBar = (
+    <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-muted mb-6">
+      <button
+        type="button"
+        onClick={() => setTab('review')}
+        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+          activeTab === 'review' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'
+        }`}
+      >
+        Zu prüfen
+      </button>
+      <button
+        type="button"
+        onClick={() => setTab('problems')}
+        className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-2 ${
+          activeTab === 'problems' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'
+        }`}
+      >
+        Problembelege
+        {problemCount > 0 && (
+          <Badge variant="destructive" className="h-auto px-1.5 py-0 text-[10px]">
+            {problemCount}
+          </Badge>
+        )}
+      </button>
+    </div>
+  );
+
+  if (activeTab === 'problems') {
+    return (
+      <DashboardLayout>
+        <PageMeta
+          title="Problembelege — BillMonk"
+          description="Belege, die nicht automatisch verarbeitet werden konnten, prüfen und erneut analysieren."
+          canonical="/review"
+          noindex
+        />
+        <div className="p-6 lg:p-8">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-foreground">Belege überprüfen</h1>
+            <p className="text-muted-foreground">
+              Belege, bei denen die automatische Verarbeitung fehlgeschlagen ist
+            </p>
+          </div>
+          {tabBar}
+          <ProblemReceiptsPanel />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+
+
   if (loading) {
     return (
       <DashboardLayout>
