@@ -293,6 +293,7 @@ const Upload = () => {
     duplicates: FileCheckResult[];
     nonDuplicates: { file: File; hash: string }[];
   }> => {
+    if (!user) throw new Error('Nicht angemeldet');
     const results: FileCheckResult[] = [];
     
     // Calculate all hashes in parallel for speed
@@ -314,7 +315,7 @@ const Upload = () => {
     const { data: existingReceipts } = await supabase
       .from('receipts')
       .select('id, file_name, file_url, file_hash, vendor, amount_gross, receipt_date, status')
-      .eq('user_id', user!.id)
+      .eq('user_id', user.id)
       .in('file_hash', hashes)
       .in('status', ['pending', 'processing', 'review', 'approved', 'duplicate']);
     
@@ -1051,7 +1052,7 @@ const Upload = () => {
     setIsDragOver(false);
     const files = Array.from(e.dataTransfer.files);
     processFiles(files);
-  }, [validateFiles, toast, uploads]);
+  }, [user, uploads]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -1313,6 +1314,27 @@ const Upload = () => {
             </div>
           );
         })()}
+
+        {runSummary && (
+          <Card className="mb-6 border-border/50">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Check className="h-5 w-5 text-success" />
+                Upload-Protokoll abgeschlossen
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+                <div className="rounded-md bg-success/10 p-3"><p className="text-xl font-semibold">{runSummary.uploaded}</p><p className="text-xs text-muted-foreground">Hochgeladen</p></div>
+                <div className="rounded-md bg-warning/10 p-3"><p className="text-xl font-semibold">{runSummary.duplicates}</p><p className="text-xs text-muted-foreground">Duplikate</p></div>
+                <div className="rounded-md bg-muted p-3"><p className="text-xl font-semibold">{runSummary.rejected}</p><p className="text-xs text-muted-foreground">Abgelehnt</p></div>
+                <div className="rounded-md bg-destructive/10 p-3"><p className="text-xl font-semibold">{runSummary.failed}</p><p className="text-xs text-muted-foreground">Fehler</p></div>
+                <div className="rounded-md bg-muted p-3"><p className="text-xl font-semibold">{runSummary.pending}</p><p className="text-xs text-muted-foreground">Offen</p></div>
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">{runSummary.total} ausgewählte Dateien wurden vollständig protokolliert.</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* File Check Progress - shown during checking phase */}
         {uploadPhase === 'checking' && (
