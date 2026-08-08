@@ -1,140 +1,38 @@
-# Schneller WOW-Pack + Neues Intro-Video
+# Analyse: 310 Belege im Review nach dem Upload von heute
 
-Wir bauen 5 Wirkungs-Boosts auf der Landing Page – inklusive eines **komplett neu produzierten** Remotion-Intro-Videos (die alte 5-Scene-Komposition wird ersetzt, nicht wiederverwendet).
+## Was heute tatsächlich passiert ist (aus der Datenbank geprüft)
 
-## 1. Neues Intro-Video (Remotion, frisch produziert)
+- Heute wurden **343 Beleg-Datensätze** angelegt, davon nur **230 verschiedene Dateien** (eindeutiger Datei-Hash).
+- **113 Dateien existieren exakt doppelt** — gleicher Hash, zwei Datensätze. Diese 113 Kopien sind **nicht** als Duplikat markiert, deshalb tauchen sie normal im Review auf.
+- Nur **13 Datensätze** haben den Status "duplicate" — das sind genau die, die du im Duplikat-Dialog bewusst trotzdem hochgeladen hast.
+- Aktuell: **310 Belege im Status "review"**, 14 approved, 3 noch in Verarbeitung.
+- Die Zeitabstände der Doppel-Paare liegen bei **0–1 Sekunden** — die Kopien entstanden also im selben Upload-Lauf, nicht durch dein späteres zweites Hineinziehen.
 
-**Format:** 1920×1080, 30 fps, ~15 s (450 frames), MP4 H.264, muted/loop, < 6 MB
-**Stil:** „Tech Product / Editorial" – passt zu BillMonk-Brand (Teal Primary, Cream/Paper-Töne, viel Whitespace, ein klarer Akzent)
-**Typo:** Inter / Space Grotesk (matched die Site), keine generischen Sans-Serifs
+## Ursache
 
-**Storyboard (5 Szenen, jede ~90 frames mit ~15 frame Cross-Transitions):**
+Der Upload prüft Duplikate **einmalig vorab gegen die Datenbank** und lädt danach alle Dateien mit abgeschalteter Duplikatprüfung (`skipDuplicateCheck: true`) mit **3 parallelen Uploads** hoch. Daraus folgen zwei Lücken:
 
-```text
-Scene 1 (3s) — "Der Schmerz"
-  Aufeinander gestapelte Papier-Belege fallen in den Frame,
-  bilden chaotischen Stack. Headline: "Schluss mit dem Schuhkarton."
+1. **Keine Prüfung innerhalb des Stapels**: Ist dieselbe Datei zweimal in der Auswahl (bzw. wird der Ordner nachgezogen, während der erste Lauf noch läuft), ist der Hash zum Prüfzeitpunkt noch in keiner der beiden Runden in der DB — beide werden als "neu" eingestuft.
+2. **Race Condition durch Parallelität**: Zwei parallele Uploads derselben Datei prüfen/schreiben gleichzeitig; es gibt **keinen eindeutigen DB-Index** auf `(user_id, file_hash)`, der das abfangen würde.
 
-Scene 2 (3s) — "Capture"
-  Ein Beleg wird hochgehoben, von Scan-Linie (teal) durchquert.
-  UI-Mockup-Karte fliegt ein: Foto → Beleg-Karte mit Feldern.
+Die Meldung "viele Dateien wurden nicht hochgeladen" kommt vom Validierungs-Toast (Dateityp/Größe) bzw. dem 500-Dateien-Limit — die abgelehnten Dateien tauchen nirgends auf; das ist konsistent mit 288 gewollten vs. 230 eindeutig angekommenen Dateien.
 
-Scene 3 (3s) — "KI extrahiert"
-  Felder (Vendor, Datum, Netto, USt, Kategorie) erscheinen
-  staggered, jeweils mit kleinem "✓" und Confidence-Bar (94%).
+## Vorgeschlagene Maßnahmen
 
-Scene 4 (3s) — "Pipeline"
-  Horizontaler Flow: Beleg → KI → Buchhaltung → Steuerberater.
-  Icons gleiten über Verbindungslinie, Zahlen ticken hoch.
+### 1. Bereinigung der aktuellen Daten
+- Report erstellen: alle 114 Hash-Gruppen mit Mehrfach-Datensätzen auflisten (Datei, Datum, Betrag, Status).
+- Aufräum-Aktion: pro Hash den **ältesten** Datensatz behalten, die späteren Kopien löschen (inkl. Storage-Datei), sofern sie nicht bereits bearbeitet/approved sind. Vorher Vorschau, Löschung erst nach deiner Bestätigung.
 
-Scene 5 (3s) — "Outro"
-  BillMonk-Logo fadet ein, Tagline: "KI-Buchhaltung. Made in Austria."
-  Subtiler Teal-Glow, langsamer Pull-Back.
-```
+### 2. Fix im Upload (damit es nicht wieder passiert)
+- **In-Batch-Dedupe**: vor dem Start doppelte Hashes innerhalb der Auswahl entfernen und im Ergebnis-Toast ausweisen.
+- **Duplikatprüfung nicht mehr komplett abschalten**: statt `skipDuplicateCheck: true` unmittelbar vor dem Insert nochmals gegen die DB prüfen (die Vorab-Entscheidung des Nutzers wird dabei respektiert).
+- **Eindeutiger Teil-Index** `unique (user_id, file_hash) where file_hash is not null and is_duplicate = false` als letzte Absicherung; der Insert fängt den Konflikt ab und meldet ihn als übersprungenes Duplikat statt als Fehler.
 
-**Motion-System:**
-- Default Entry: `spring({ damping: 200 })` – smooth, kein Bounce
-- Accent Entry (Hero-Moments): `spring({ damping: 12 })` – leichter Overshoot
-- Scene-Transitions: `fade` + `slide` Mix, je 15 frames
-- Persistent Layer: subtiles Noise-Overlay + langsam driftender Gradient-Blob im Hintergrund
-
-**Render-Pipeline:**
-- Bestehende `remotion/`-Files (`MainVideo.tsx`, `scenes/Scene1–5.tsx`) **überschreiben** mit neuem Storyboard
-- `cd remotion && bun install` (idempotent)
-- Compositor-Fix: musl → gnu binary kopieren, ffmpeg/ffprobe symlinken (siehe video-creator skill)
-- `node scripts/render-remotion.mjs` → `src/assets/landing-demo.mp4`
-- Poster-Frame via `bunx remotion still --frame=15` → `src/assets/landing-demo-poster.jpg`
-- Spot-Check: `bunx remotion still` an Frame 0, 90, 225, 420
-
-**Einbau in `HeroBento`:**
-- Großes Hero-Tile bekommt `<video autoPlay muted loop playsInline poster={poster} preload="metadata">`
-- Sanftes Gradient-Overlay (von unten, für Text-Lesbarkeit, falls Headline drüber liegt)
-- Mobile: nur Poster + Play-Button (kein Autoplay über Mobilfunk)
-- Lazy mount via `IntersectionObserver` – Video lädt erst, wenn Hero im Viewport
-
-## 2. Animated Gradient-Mesh + Noise hinter dem Hero
-
-- Neue Komponente `src/components/landing/bento/HeroBackdrop.tsx`
-- Conic-Gradient aus 3 Brand-Farben (primary, primary-glow, accent), langsam rotierend (~40 s loop) via `@keyframes`
-- Darüber 3 % Noise-PNG (oder SVG `<feTurbulence>`) für Editorial-Feel
-- `pointer-events-none`, absolute hinter `HeroBento`-Grid
-
-## 3. Magnetic CTA + Tilt-Effekt
-
-- `src/components/landing/bento/MagneticButton.tsx`: Cursor zieht Button um max. 8 px an (mouse-move + spring)
-- `src/components/landing/bento/TiltCard.tsx`: HOC für große Bento-Tiles, ±6° Perspektive, smooth lerp
-- Nur Desktop (`useMediaQuery('(hover: hover)')`), respektiert `prefers-reduced-motion`
-- Anwenden auf: Haupt-CTA „Beta testen" + Hero-Video-Tile + zwei Feature-Highlight-Tiles
-
-## 4. Vorher/Nachher-Slider als neue Sektion
-
-- Neue Komponente `src/components/landing/BeforeAfter.tsx`, einsortiert über `HowItWorksBento`
-- Linke Hälfte: chaotischer Schuhkarton-Belege-Stack (generiertes Bild via `imagegen`)
-- Rechte Hälfte: aufgeräumtes BillMonk-Dashboard (Screenshot oder generiertes Mockup)
-- Draggable Trenner (Pointer-Events), Default 50 %, springt sanft zurück bei Release
-- Labels: „Vorher" / „Nachher" als kleine Pills
-- Mobile: kein Drag, sondern Auto-Animation hin und her (8 s loop)
-
-## 5. Trust-Strip + Sticky Mobile CTA
-
-**Trust-Strip:**
-- Schmaler Streifen direkt unter Hero: „🇦🇹 Made in Austria · 🔒 DSGVO-konform · ⏱ 30 Tage testen · 💳 Keine Kreditkarte nötig"
-- Subtiler `bg-card/50` mit `border-y`, Icons monochrom
-
-**Sticky Mobile CTA:**
-- `src/components/landing/StickyMobileCTA.tsx`
-- Erscheint nach 30 % Scroll auf Mobile (`< md`), slide-up von unten
-- Ein Button: „Jetzt Beta testen →" (primary, full-width minus padding)
-- Dismiss-X rechts, merkt sich Dismiss in `sessionStorage`
-
----
+### 3. Transparenteres Upload-Ergebnis
+- Abschluss-Zusammenfassung: hochgeladen / übersprungen (Duplikat) / abgelehnt (Typ, Größe, Limit) mit ausklappbarer Dateiliste, damit "viele wurden nicht hochgeladen" nachvollziehbar ist.
 
 ## Technische Details
 
-**Neue Dateien:**
-- `remotion/src/MainVideo.tsx` (überschrieben)
-- `remotion/src/scenes/Scene1.tsx` … `Scene5.tsx` (überschrieben)
-- `remotion/src/components/PersistentBackdrop.tsx` (neu)
-- `src/assets/landing-demo.mp4` (gerendert)
-- `src/assets/landing-demo-poster.jpg` (gerendert)
-- `src/components/landing/bento/HeroBackdrop.tsx`
-- `src/components/landing/bento/MagneticButton.tsx`
-- `src/components/landing/bento/TiltCard.tsx`
-- `src/components/landing/BeforeAfter.tsx`
-- `src/components/landing/StickyMobileCTA.tsx`
-- ggf. `src/assets/before-shoebox.jpg` (via imagegen)
-
-**Geänderte Dateien:**
-- `src/components/landing/bento/HeroBento.tsx` (Video-Tile + Backdrop + Magnetic CTA + Tilt)
-- `src/pages/Index.tsx` + `src/pages/Beta.tsx` (BeforeAfter einbauen, StickyMobileCTA mounten, Trust-Strip)
-
-**Bibliotheken:** framer-motion (bereits da), keine neuen Deps nötig.
-
-**Performance:**
-- Video `preload="metadata"`, lazy-mount via IntersectionObserver
-- Alle Reveals einmalig (`viewport={{ once: true }}`)
-- `prefers-reduced-motion` → Tilt/Magnetic deaktiviert, Video → nur Poster
-
-**Accessibility/SEO:**
-- Video hat `aria-hidden="true"` (rein dekorativ), Headline bleibt Text-H1
-- BeforeAfter-Slider mit Keyboard-Support (Arrow Keys)
-- Bestehende JSON-LD / PageMeta unverändert
-
----
-
-## Reihenfolge der Umsetzung
-
-1. Remotion-Setup fixen (Compositor + ffmpeg-Symlinks) und neues Storyboard schreiben
-2. Video rendern, Spot-Check Frames, Datei nach `src/assets/`
-3. `HeroBackdrop` + `MagneticButton` + `TiltCard` bauen
-4. `HeroBento` umbauen (Video-Tile + neue Effekte)
-5. `BeforeAfter`-Sektion + Trust-Strip einbauen
-6. `StickyMobileCTA` einbauen
-7. Auf `/` **und** `/beta` mounten, Preview-Check
-
-## Out of Scope
-
-- Kein Backend, keine DB-Änderungen
-- Keine neuen Farb-Tokens oder Fonts
-- Dashboard, Auth, andere Seiten bleiben unberührt
-- Andere Wow-Ideen aus der vorherigen Liste (ROI-Calculator, Live-Demo-Widget, Cursor-Trail) bleiben für später
+- Betroffene Stellen: `src/pages/Upload.tsx` (`checkFilesForDuplicates`, `startUploading`, `UPLOAD_CONCURRENCY`), `src/hooks/useReceiptUpload.ts` (`uploadReceipt`, `checkExactDuplicate`).
+- Migration: partieller Unique-Index auf `public.receipts (user_id, file_hash)`; vorher müssen die Duplikate bereinigt sein.
+- Löschung erfolgt über bestehende Receipt-Delete-Logik inkl. Storage-Cleanup.
