@@ -40,6 +40,7 @@ import NewsletterStatus from "./pages/NewsletterStatus";
 import { PageTracker } from "./components/PageTracker";
 import { BetaGate } from "./components/BetaGate";
 import Beta from "./pages/Beta";
+import OAuthConsent from "./pages/OAuthConsent";
 
 const queryClient = new QueryClient();
 
@@ -52,6 +53,7 @@ const App = () => (
         <AuthProvider>
           <BetaGate>
           <Routes>
+            <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
             <Route path="/beta" element={<Beta />} />
             <Route path="/" element={<Index />} />
             <Route path="/pricing" element={<PricingPage />} />

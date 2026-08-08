@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PageMeta } from '@/components/PageMeta';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,7 +27,11 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { signIn, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
+
+  const nextParam = searchParams.get('next');
+  const safeNext = nextParam && /^\/(?!\/)/.test(nextParam) ? nextParam : null;
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -56,12 +60,12 @@ const Login = () => {
         title: 'Willkommen zurück!',
         description: 'Monk hat schon angefangen, alles vorzubereiten.',
       });
-      navigate('/dashboard');
+      navigate(safeNext ?? '/dashboard');
     }
   };
 
   const handleGoogleSignIn = async () => {
-    const { error } = await signInWithGoogle();
+    const { error } = await signInWithGoogle(safeNext ?? undefined);
     if (error) {
       toast({
         variant: 'destructive',
