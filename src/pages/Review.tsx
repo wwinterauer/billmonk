@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ProblemReceiptsPanel } from '@/components/receipts/ProblemReceiptsPanel';
+import { useProblemReceiptCount } from '@/hooks/useReceiptRetry';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -124,6 +126,8 @@ interface FormData {
 
 const Review = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { count: problemCount } = useProblemReceiptCount();
   const { toast } = useToast();
   const { getReceipts, updateReceipt, getReceiptFileUrl, deleteReceipt } = useReceipts();
   const { userCategories, taxCategories, addCategory } = useCategories();
@@ -896,6 +900,64 @@ const Review = () => {
   // Reviewed count for progress
   const totalToReview = receipts.length;
 
+  const activeTab = searchParams.get('tab') === 'problems' ? 'problems' : 'review';
+  const setTab = (tab: 'review' | 'problems') => {
+    setSearchParams(tab === 'problems' ? { tab: 'problems' } : {}, { replace: true });
+  };
+
+  const tabBar = (
+    <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-muted mb-6">
+      <button
+        type="button"
+        onClick={() => setTab('review')}
+        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+          activeTab === 'review' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'
+        }`}
+      >
+        Zu prüfen
+      </button>
+      <button
+        type="button"
+        onClick={() => setTab('problems')}
+        className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-2 ${
+          activeTab === 'problems' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'
+        }`}
+      >
+        Problembelege
+        {problemCount > 0 && (
+          <Badge variant="destructive" className="h-auto px-1.5 py-0 text-[10px]">
+            {problemCount}
+          </Badge>
+        )}
+      </button>
+    </div>
+  );
+
+  if (activeTab === 'problems') {
+    return (
+      <DashboardLayout>
+        <PageMeta
+          title="Problembelege — BillMonk"
+          description="Belege, die nicht automatisch verarbeitet werden konnten, prüfen und erneut analysieren."
+          canonical="/review"
+          noindex
+        />
+        <div className="p-6 lg:p-8">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-foreground">Belege überprüfen</h1>
+            <p className="text-muted-foreground">
+              Belege, bei denen die automatische Verarbeitung fehlgeschlagen ist
+            </p>
+          </div>
+          {tabBar}
+          <ProblemReceiptsPanel />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -915,6 +977,7 @@ const Review = () => {
     return (
       <DashboardLayout>
         <div className="p-6 lg:p-8">
+          {tabBar}
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
@@ -929,6 +992,12 @@ const Review = () => {
             <p className="text-muted-foreground mb-6">
               Keine offenen Überprüfungen vorhanden
             </p>
+            {problemCount > 0 && (
+              <Button variant="outline" className="mb-6" onClick={() => setTab('problems')}>
+                <AlertTriangle className="h-4 w-4 mr-2 text-destructive" />
+                {problemCount} Problembelege ansehen
+              </Button>
+            )}
             <div className="flex gap-3">
               <Button 
                 className="gradient-primary hover:opacity-90"
@@ -959,6 +1028,7 @@ const Review = () => {
         noindex
       />
       <div className="p-6 lg:p-8">
+        {tabBar}
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>

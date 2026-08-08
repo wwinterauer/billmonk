@@ -38,6 +38,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PageMeta } from '@/components/PageMeta';
 import { saveQueue, clearQueue, runWithConcurrency } from '@/lib/upload-queue';
 import { UploadRunOverview } from '@/components/upload/UploadRunOverview';
+import { ProblemReceiptsBanner } from '@/components/dashboard/ProblemReceiptsBanner';
 
 const UPLOAD_CONCURRENCY = 3;
 
@@ -1296,6 +1297,9 @@ const Upload = () => {
           <h1 className="text-2xl font-bold text-foreground">Belege hochladen</h1>
           <p className="text-muted-foreground">Lade deine Belege hoch und lass die KI sie analysieren</p>
         </div>
+
+        <ProblemReceiptsBanner />
+
 
         {/* Live overview: today's upload sessions, grouped by day */}
         {user && (
