@@ -1298,6 +1298,9 @@ const Upload = () => {
           <p className="text-muted-foreground">Lade deine Belege hoch und lass die KI sie analysieren</p>
         </div>
 
+        <ProblemReceiptsBanner />
+
+
         {/* Live overview: today's upload sessions, grouped by day */}
         {user && (
           <UploadRunOverview
