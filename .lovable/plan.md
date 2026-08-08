@@ -6,6 +6,10 @@ Die Zusammenfassung erscheint erst am Ende des Laufs, zeigt nur fünf Zahlen ohn
 
 Zusätzlich meldet der Hinweis "Von 266 Dateien wurden 266 vor dem Abschluss unterbrochen" fälschlich einen Totalausfall. Ursache: Der Wiederherstellungs-Schnappschuss im Browser wird beim Start des Laufs einmalig mit allen Dateien im Zustand "pending" geschrieben, danach aber nie pro Datei aktualisiert — er wird erst am Ende des gesamten Laufs gelöscht. Wird die Seite währenddessen neu geladen (oder läuft der Upload noch), erscheinen deshalb immer alle Dateien als "unterbrochen", obwohl sie tatsächlich verarbeitet werden.
 
+Der Zähler "65" im Menü ist dagegen korrekt: Es liegen aktuell tatsächlich 65 Belege im Status Review. Der Lauf ist schlicht noch nicht durch — vom Protokoll sind erst 69 Dateien fertig, 18 als Duplikat übersprungen, 4 inhaltsgleich, 3 in der Auswahl doppelt, 1 abgelehnt; 190 Dateien wurden noch gar nicht gestartet. Der Fortschritt steht seit dem Seiten-Reload still, weil der Upload ausschließlich im Browser-Tab läuft und mit dem Reload abgebrochen wurde. Genau diese beiden Dinge — echter Fortschritt und stillstehender Lauf — sind heute nirgends sichtbar.
+
+
+
 
 ## Was gebaut wird
 
