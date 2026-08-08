@@ -4,6 +4,9 @@
 
 Die Zusammenfassung erscheint erst am Ende des Laufs, zeigt nur fünf Zahlen ohne Begründung und nennt keine Dateinamen. Dadurch bleibt unklar, warum aus 288 gezogenen Dateien z. B. nur 284 sichtbar werden.
 
+Zusätzlich meldet der Hinweis "Von 266 Dateien wurden 266 vor dem Abschluss unterbrochen" fälschlich einen Totalausfall. Ursache: Der Wiederherstellungs-Schnappschuss im Browser wird beim Start des Laufs einmalig mit allen Dateien im Zustand "pending" geschrieben, danach aber nie pro Datei aktualisiert — er wird erst am Ende des gesamten Laufs gelöscht. Wird die Seite währenddessen neu geladen (oder läuft der Upload noch), erscheinen deshalb immer alle Dateien als "unterbrochen", obwohl sie tatsächlich verarbeitet werden.
+
+
 ## Was gebaut wird
 
 ### 1. Übersichtsleiste ganz oben (live, ab dem ersten Moment)
