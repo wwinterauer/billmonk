@@ -54,6 +54,15 @@ Der Hinweis wird nicht mehr aus dem Browser-Schnappschuss gebildet, sondern aus 
 - Als wirklich unterbrochen gelten nur Dateien, die nach dem letzten Lebenszeichen des Laufs (mehrere Minuten ohne Fortschritt) noch offen sind; nur diese werden namentlich zum erneuten Hochladen vorgeschlagen.
 - Der lokale Schnappschuss wird weiterhin geschrieben, aber pro Datei mitgeführt und nur noch als Rückfalloption genutzt.
 
+### 6. Abgebrochenen Lauf sichtbar machen und abschließen
+
+- Steht ein aktiver Lauf länger als 2 Minuten ohne neues Ereignis, wird er als "abgebrochen" ausgewiesen: "x von y verarbeitet, Rest nicht gestartet — Tab wurde geschlossen oder neu geladen".
+- Ein Button "Offene Dateien erneut hochladen" zeigt die Namen der nicht gestarteten Dateien; nach erneutem Reinziehen werden bereits verarbeitete automatisch als Duplikat erkannt.
+- Ein Button "Lauf abschließen" setzt den Lauf sauber auf beendet, damit ein neuer Upload nicht durch die Ein-Lauf-Sperre blockiert wird.
+- Vor dem Verlassen der Seite während eines laufenden Uploads erscheint eine Browser-Warnung ("Upload läuft noch").
+
+
+
 
 ## Technische Details
 
