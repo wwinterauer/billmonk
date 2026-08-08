@@ -4,6 +4,9 @@
 
 Die Zusammenfassung erscheint erst am Ende des Laufs, zeigt nur fünf Zahlen ohne Begründung und nennt keine Dateinamen. Dadurch bleibt unklar, warum aus 288 gezogenen Dateien z. B. nur 284 sichtbar werden.
 
+Zusätzlich meldet der Hinweis "Von 266 Dateien wurden 266 vor dem Abschluss unterbrochen" fälschlich einen Totalausfall. Ursache: Der Wiederherstellungs-Schnappschuss im Browser wird beim Start des Laufs einmalig mit allen Dateien im Zustand "pending" geschrieben, danach aber nie pro Datei aktualisiert — er wird erst am Ende des gesamten Laufs gelöscht. Wird die Seite währenddessen neu geladen (oder läuft der Upload noch), erscheinen deshalb immer alle Dateien als "unterbrochen", obwohl sie tatsächlich verarbeitet werden.
+
+
 ## Was gebaut wird
 
 ### 1. Übersichtsleiste ganz oben (live, ab dem ersten Moment)
@@ -38,6 +41,15 @@ Jede Zeile ist anklickbar und listet die betroffenen Dateien mit Klartext-Grund:
 ### 4. Zählung stabil machen
 
 Die Zähler kommen aus dem bereits bestehenden Upload-Protokoll (eine Zeile je ausgewählter Datei) und nicht mehr aus dem flüchtigen UI-State. Beim Neuladen der Seite wird der letzte bzw. laufende Upload-Lauf wieder eingelesen und die Leiste erscheint erneut.
+
+### 5. Falschmeldung "alle unterbrochen" abschalten
+
+Der Hinweis wird nicht mehr aus dem Browser-Schnappschuss gebildet, sondern aus dem serverseitigen Protokoll:
+
+- Läuft der Lauf noch (Einträge mit Ergebnis "offen", Lauf-Status aktiv), zeigt die Leiste "Upload läuft — x von y verarbeitet" statt einer Fehlermeldung.
+- Als wirklich unterbrochen gelten nur Dateien, die nach dem letzten Lebenszeichen des Laufs (mehrere Minuten ohne Fortschritt) noch offen sind; nur diese werden namentlich zum erneuten Hochladen vorgeschlagen.
+- Der lokale Schnappschuss wird weiterhin geschrieben, aber pro Datei mitgeführt und nur noch als Rückfalloption genutzt.
+
 
 ## Technische Details
 
