@@ -9,7 +9,7 @@ interface AuthContextType {
   loading: boolean;
   signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signInWithGoogle: () => Promise<{ error: Error | null }>;
+  signInWithGoogle: (next?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   checkSubscription: () => Promise<void>;
 }
@@ -143,9 +143,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (next?: string) => {
+    const safeNext = next && /^\/(?!\/)/.test(next) ? next : null;
     const result = await lovable.auth.signInWithOAuth('google', {
-      redirect_uri: window.location.origin,
+      redirect_uri: safeNext ? `${window.location.origin}${safeNext}` : window.location.origin,
     });
     return { error: result.error ?? null };
   };

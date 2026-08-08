@@ -24,7 +24,7 @@ function clearUxBetaHint() {
   document.cookie = 'beta_access=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
 }
 
-const EXEMPT_ROUTES = ['/beta', '/datenschutz', '/unsubscribe', '/share-receive', '/login', '/register', '/reset-password', '/forgot-password'];
+const EXEMPT_ROUTES = ['/beta', '/datenschutz', '/unsubscribe', '/share-receive', '/login', '/register', '/reset-password', '/forgot-password', '/.lovable/oauth/consent'];
 const PAID_PLANS = ['starter', 'pro', 'business'];
 
 interface BetaGateProps {

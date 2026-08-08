@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.1",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://nvvssxykygdxjywncvgd.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "billmonk",
+      "version": "0.1.0",
+      "title": "BillMonk"
+    },
+    "tools": [
+      {
+        "name": "list_receipts",
+        "title": "List receipts",
+        "description": "List the signed-in user's expense receipts, optionally filtered by date range, vendor or status.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "Start receipt date (YYYY-MM-DD).",
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "to": {
+              "description": "End receipt date (YYYY-MM-DD).",
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "vendor": {
+              "description": "Filter by vendor name (partial match).",
+              "type": "string",
+              "minLength": 1
+            },
+            "status": {
+              "description": "Filter by receipt status, e.g. completed.",
+              "type": "string",
+              "minLength": 1
+            },
+            "limit": {
+              "default": 25,
+              "description": "Maximum number of receipts to return.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "expense_summary",
+        "title": "Expense summary",
+        "description": "Aggregate the signed-in user's expenses for a period: totals plus breakdown by category and vendor.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Start receipt date (YYYY-MM-DD)."
+            },
+            "to": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "End receipt date (YYYY-MM-DD)."
+            },
+            "group_by": {
+              "default": "category",
+              "description": "Breakdown dimension.",
+              "type": "string",
+              "enum": [
+                "category",
+                "vendor"
+              ]
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_invoices",
+        "title": "List invoices",
+        "description": "List the signed-in user's outgoing documents (invoices, quotes, orders, delivery notes) with status and totals.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "status": {
+              "description": "Filter by status, e.g. draft, sent, paid.",
+              "type": "string",
+              "minLength": 1
+            },
+            "document_type": {
+              "description": "Filter by document type, e.g. invoice, quote.",
+              "type": "string",
+              "minLength": 1
+            },
+            "from": {
+              "description": "Earliest invoice date (YYYY-MM-DD).",
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "to": {
+              "description": "Latest invoice date (YYYY-MM-DD).",
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "limit": {
+              "default": 25,
+              "description": "Maximum number of documents to return.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_vendors",
+        "title": "List vendors",
+        "description": "List the signed-in user's vendors with receipt counts and accumulated totals.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "search": {
+              "description": "Filter by vendor display name (partial match).",
+              "type": "string",
+              "minLength": 1
+            },
+            "limit": {
+              "default": 50,
+              "description": "Maximum number of vendors to return.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_customers",
+        "title": "List customers",
+        "description": "List the signed-in user's customers with contact and billing defaults.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "search": {
+              "description": "Filter by display name (partial match).",
+              "type": "string",
+              "minLength": 1
+            },
+            "include_archived": {
+              "default": false,
+              "description": "Include archived customers.",
+              "type": "boolean"
+            },
+            "limit": {
+              "default": 50,
+              "description": "Maximum number of customers to return.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
