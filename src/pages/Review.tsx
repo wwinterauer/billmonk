@@ -990,8 +990,6 @@ const Review = () => {
             </h2>
             <p className="text-muted-foreground mb-6">
               Keine offenen Überprüfungen vorhanden
-            <p className="text-muted-foreground mb-6">
-              Keine offenen Überprüfungen vorhanden
             </p>
             {problemCount > 0 && (
               <Button variant="outline" className="mb-6" onClick={() => setTab('problems')}>
