@@ -6,6 +6,10 @@ Die Zusammenfassung erscheint erst am Ende des Laufs, zeigt nur fünf Zahlen ohn
 
 Zusätzlich meldet der Hinweis "Von 266 Dateien wurden 266 vor dem Abschluss unterbrochen" fälschlich einen Totalausfall. Ursache: Der Wiederherstellungs-Schnappschuss im Browser wird beim Start des Laufs einmalig mit allen Dateien im Zustand "pending" geschrieben, danach aber nie pro Datei aktualisiert — er wird erst am Ende des gesamten Laufs gelöscht. Wird die Seite währenddessen neu geladen (oder läuft der Upload noch), erscheinen deshalb immer alle Dateien als "unterbrochen", obwohl sie tatsächlich verarbeitet werden.
 
+Der Zähler "65" im Menü ist dagegen korrekt: Es liegen aktuell tatsächlich 65 Belege im Status Review. Der Lauf ist schlicht noch nicht durch — vom Protokoll sind erst 69 Dateien fertig, 18 als Duplikat übersprungen, 4 inhaltsgleich, 3 in der Auswahl doppelt, 1 abgelehnt; 190 Dateien wurden noch gar nicht gestartet. Der Fortschritt steht seit dem Seiten-Reload still, weil der Upload ausschließlich im Browser-Tab läuft und mit dem Reload abgebrochen wurde. Genau diese beiden Dinge — echter Fortschritt und stillstehender Lauf — sind heute nirgends sichtbar.
+
+
+
 
 ## Was gebaut wird
 
@@ -49,6 +53,15 @@ Der Hinweis wird nicht mehr aus dem Browser-Schnappschuss gebildet, sondern aus 
 - Läuft der Lauf noch (Einträge mit Ergebnis "offen", Lauf-Status aktiv), zeigt die Leiste "Upload läuft — x von y verarbeitet" statt einer Fehlermeldung.
 - Als wirklich unterbrochen gelten nur Dateien, die nach dem letzten Lebenszeichen des Laufs (mehrere Minuten ohne Fortschritt) noch offen sind; nur diese werden namentlich zum erneuten Hochladen vorgeschlagen.
 - Der lokale Schnappschuss wird weiterhin geschrieben, aber pro Datei mitgeführt und nur noch als Rückfalloption genutzt.
+
+### 6. Abgebrochenen Lauf sichtbar machen und abschließen
+
+- Steht ein aktiver Lauf länger als 2 Minuten ohne neues Ereignis, wird er als "abgebrochen" ausgewiesen: "x von y verarbeitet, Rest nicht gestartet — Tab wurde geschlossen oder neu geladen".
+- Ein Button "Offene Dateien erneut hochladen" zeigt die Namen der nicht gestarteten Dateien; nach erneutem Reinziehen werden bereits verarbeitete automatisch als Duplikat erkannt.
+- Ein Button "Lauf abschließen" setzt den Lauf sauber auf beendet, damit ein neuer Upload nicht durch die Ein-Lauf-Sperre blockiert wird.
+- Vor dem Verlassen der Seite während eines laufenden Uploads erscheint eine Browser-Warnung ("Upload läuft noch").
+
+
 
 
 ## Technische Details
