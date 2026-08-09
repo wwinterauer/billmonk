@@ -15,6 +15,9 @@ Zwei bestätigte Ursachen:
 1. **Rabatte werden zu Aufschlägen.** In der Line-Item-Auswertung von `extract-receipt` werden die Positionssummen mit `Math.abs()` addiert. Aus `785,00 + 0,00 + |−117,75|` wird 902,75 statt 667,25. Genau dieser Wert steht im Datensatz — inklusive `vat_detection_method: "line_items"` und `vat_confidence: 1.0`.
 2. **Die Positionssumme sticht die Summenzeile.** Weicht die Positionssumme um mehr als 1 % vom KI-Aggregat ab, überschreibt sie den Gesamtbetrag bedingungslos — auch wenn auf dem Beleg eine eindeutig beschriftete Zeile "Gesamtbetrag" / "Summe inkl. MwSt." steht.
 
+Die IKEA-Rechnung ATINV26000000647047 zeigt eine dritte, schwerere Variante: gespeichert sind 693,93 brutto / 578,28 netto, obwohl der Beleg "Gesamtbetrag 3.055,23", "Gesamtsumme 3.055,23" und "Nettobetrag 2.546,03" ausweist. Hier hat bereits die KI selbst 693,93 als Aggregat geliefert — passend zur Summe der nur 16 erfassten Positionen. Die Positionsliste ist also unvollständig, und niemand hat gegen die beschriftete Summenzeile geprüft: es gibt aktuell keinerlei Abgleich "Positionssumme vs. ausgewiesener Gesamtbetrag".
+
+
 ## Was gebaut wird
 
 ### 1. Beschriftete Summenzeilen als eigene, gewichtete Datenquelle
