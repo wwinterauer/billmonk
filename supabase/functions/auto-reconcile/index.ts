@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildGroupPairs, isProcessorTransaction } from "../_shared/reconcileHelpers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -223,7 +224,7 @@ serve(async (req) => {
 
     if (!transactions || transactions.length === 0) {
       return new Response(
-        JSON.stringify({ matched_receipts: 0, matched_invoices: 0, high_confidence_matched: 0 }),
+        JSON.stringify({ matched_receipts: 0, matched_invoices: 0, high_confidence_matched: 0, group_matched: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -231,6 +232,7 @@ serve(async (req) => {
     let matchedReceipts = 0;
     let highConfidenceMatched = 0;
     let matchedInvoices = 0;
+    let groupMatched = 0;
 
     const expenses = transactions.filter((t) => t.is_expense === true);
     const income = transactions.filter((t) => t.is_expense === false);
@@ -282,6 +284,35 @@ serve(async (req) => {
           const m = findExactMatch(tx, pool, used, 14);
           if (m && await applyMatch(tx, m)) {
             (tx as any).__matched = true;
+            matchedReceipts++;
+          }
+        }
+
+        // Pass 3: group pass — several transactions with the same amount vs. equally
+        // many receipts of one vendor (typical for PayPal-paid IONOS invoices).
+        const openTxs = expenses.filter((t) => t.amount && !(t as any).__matched && t.transaction_date);
+        const openCands = pool.filter((c) => !used.has(c.key) && c.receipt_date && c.amount_gross != null);
+        const pairs = buildGroupPairs(
+          openTxs.map((t: any) => ({ id: t.id, date: t.transaction_date, amount: Number(t.amount) })),
+          openCands.map((c) => ({
+            key: c.key,
+            date: c.receipt_date!,
+            amount: Number(c.amount_gross),
+            vendorKey: (c.vendor ?? "").trim().toLowerCase(),
+          })),
+          14,
+        );
+        for (const p of pairs) {
+          const c = pool.find((x) => x.key === p.key);
+          const tx: any = openTxs.find((t: any) => t.id === p.txId);
+          if (!c || !tx || used.has(c.key) || tx.__matched) continue;
+          const descNorm = normalize(tx.description);
+          const vt = tokensOf(c.vendor);
+          const vendorInDesc = vt.length > 0 && vt.every((t) => descNorm.includes(t));
+          if (!isProcessorTransaction(tx.description) && !vendorInDesc) continue;
+          if (await applyMatch(tx, c)) {
+            tx.__matched = true;
+            groupMatched++;
             matchedReceipts++;
           }
         }
@@ -375,6 +406,7 @@ serve(async (req) => {
       JSON.stringify({
         matched_receipts: matchedReceipts,
         high_confidence_matched: highConfidenceMatched,
+        group_matched: groupMatched,
         matched_invoices: matchedInvoices,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
