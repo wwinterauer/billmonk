@@ -307,6 +307,13 @@ export function ReceiptAssignmentModal({
     setSelectedSplitLine(exact?.id ?? null);
   }, [hasSplitLines, splitLines, transaction]);
 
+  useEffect(() => {
+    const url = preview?.url;
+    return () => {
+      if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+    };
+  }, [preview?.url]);
+
   if (!transaction) return null;
 
   const handleAssign = async () => {
