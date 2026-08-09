@@ -158,7 +158,7 @@ export function ReceiptAssignmentModal({
 
   // Split-line selection (step 2)
   const [selectedSplitLine, setSelectedSplitLine] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ url: string | null; isPdf: boolean; title: string } | null>(null);
+  const [preview, setPreview] = useState<{ url: string | null; isPdf: boolean; title: string; error: string | null } | null>(null);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -307,12 +307,9 @@ export function ReceiptAssignmentModal({
     setSelectedSplitLine(exact?.id ?? null);
   }, [hasSplitLines, splitLines, transaction]);
 
-  useEffect(() => {
-    const url = preview?.url;
-    return () => {
-      if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
-    };
-  }, [preview?.url]);
+  // Note: blob URLs are revoked explicitly when the preview is closed/replaced,
+  // not in an effect cleanup (StrictMode would revoke them immediately).
+
 
   if (!transaction) return null;
 
@@ -362,18 +359,28 @@ export function ReceiptAssignmentModal({
     return null;
   };
 
+  const closePreview = () => {
+    setPreview((prev) => {
+      if (prev?.url?.startsWith('blob:')) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  };
+
   const openReceiptFile = async (e: React.MouseEvent, receipt: Receipt) => {
     e.stopPropagation();
     if (!receipt.file_url) return;
     const isPdf = receipt.file_url.toLowerCase().endsWith('.pdf');
     const title = receipt.vendor || 'Beleg';
-    setPreview({ url: null, isPdf, title });
+    setPreview({ url: null, isPdf, title, error: null });
     const path = receipt.file_url.replace(/^.*\/receipts\//, '');
     const { data, error } = await supabase.storage.from('receipts').download(path);
-    if (error || !data) return;
+    if (error || !data) {
+      console.error('Beleg-Vorschau fehlgeschlagen', { path, error });
+      setPreview({ url: null, isPdf, title, error: error?.message || 'Datei konnte nicht geladen werden.' });
+      return;
+    }
     const blob = isPdf ? new Blob([data], { type: 'application/pdf' }) : data;
-    const objectUrl = URL.createObjectURL(blob);
-    setPreview({ url: objectUrl, isPdf, title });
+    setPreview({ url: URL.createObjectURL(blob), isPdf, title, error: null });
   };
 
 
@@ -715,18 +722,27 @@ export function ReceiptAssignmentModal({
         </DialogFooter>
       </DialogContent>
 
-      <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
+      <Dialog open={!!preview} onOpenChange={(o) => !o && closePreview()}>
         <DialogContent className="sm:max-w-[900px] h-[90vh] flex flex-col p-0">
           <DialogHeader className="px-6 pt-6 pb-3">
             <DialogTitle className="truncate">{preview?.title ?? 'Beleg'}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 px-6 pb-6">
-            {!preview?.url ? (
+            {preview?.error ? (
+              <div className="h-full flex items-center justify-center text-sm text-destructive text-center px-6">
+                {preview.error}
+              </div>
+            ) : !preview?.url ? (
               <div className="h-full flex items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : preview.isPdf ? (
-              <iframe src={preview.url} title="Belegvorschau" className="w-full h-full rounded-lg border" />
+              <object data={preview.url} type="application/pdf" className="w-full h-full rounded-lg border">
+                <div className="h-full flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <span>Vorschau nicht möglich.</span>
+                  <a href={preview.url} download className="underline">Datei herunterladen</a>
+                </div>
+              </object>
             ) : (
               <div className="h-full overflow-auto rounded-lg border bg-muted/30 flex items-start justify-center">
                 <img src={preview.url} alt="Belegvorschau" className="max-w-full" />
