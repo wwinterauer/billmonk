@@ -254,10 +254,18 @@ const Review = () => {
   }, [vendorMap]);
 
 
+  const isUnlinkedVendor = useCallback(
+    (r: Receipt) => r.status === 'review' && !r.vendor_id && Boolean(r.vendor || r.vendor_brand),
+    [],
+  );
+
   const filteredReceipts = useMemo(() => {
-    if (!vendorSearch.trim()) return receipts;
-    return receipts.filter(r => matchesVendorSearch(r, vendorSearch));
-  }, [receipts, vendorSearch, matchesVendorSearch]);
+    let list = receipts;
+    if (unlinkedOnly) list = list.filter(isUnlinkedVendor);
+    if (vendorSearch.trim()) list = list.filter(r => matchesVendorSearch(r, vendorSearch));
+    return list;
+  }, [receipts, vendorSearch, matchesVendorSearch, unlinkedOnly, isUnlinkedVendor]);
+
 
   // Receipts that came back from the AI without any usable data.
   // Documents the AI *correctly* classified as non-receipts are excluded —
