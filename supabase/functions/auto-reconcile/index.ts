@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildGroupPairs, isProcessorTransaction } from "../_shared/reconcileHelpers.ts";
+import { buildGroupPairs, isProcessorTransaction, findReferenceMatch } from "../_shared/reconcileHelpers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -224,7 +224,7 @@ serve(async (req) => {
 
     if (!transactions || transactions.length === 0) {
       return new Response(
-        JSON.stringify({ matched_receipts: 0, matched_invoices: 0, high_confidence_matched: 0, group_matched: 0 }),
+        JSON.stringify({ matched_receipts: 0, matched_invoices: 0, high_confidence_matched: 0, group_matched: 0, reference_matched: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -233,6 +233,7 @@ serve(async (req) => {
     let highConfidenceMatched = 0;
     let matchedInvoices = 0;
     let groupMatched = 0;
+    let referenceMatched = 0;
 
     const expenses = transactions.filter((t) => t.is_expense === true);
     const income = transactions.filter((t) => t.is_expense === false);
@@ -266,9 +267,29 @@ serve(async (req) => {
       };
 
       if (pool.length > 0) {
+        // Pass 0: reference pass — invoice number appears in the payment text.
+        // Strongest signal, therefore no date window and a tolerant amount check.
+        for (const tx of expenses) {
+          if (!tx.amount) continue;
+          const open = pool.filter((c) => !used.has(c.key) && c.amount_gross != null);
+          const hit = findReferenceMatch(
+            tx.description,
+            Number(tx.amount),
+            open.map((c) => ({ key: c.key, amount: Number(c.amount_gross), invoiceNumber: c.invoice_number })),
+          );
+          if (!hit) continue;
+          const c = pool.find((x) => x.key === hit.key);
+          if (c && await applyMatch(tx, c)) {
+            (tx as any).__matched = true;
+            referenceMatched++;
+            matchedReceipts++;
+          }
+        }
+
         // Pass 1: high-confidence (amount + invoice-nr / vendor signal, ±60 days)
         for (const tx of expenses) {
           if (!tx.amount) continue;
+          if ((tx as any).__matched) continue;
           const m = findHighConfidenceMatch(tx, pool, used, 60);
           if (m && await applyMatch(tx, m)) {
             highConfidenceMatched++;
@@ -407,6 +428,7 @@ serve(async (req) => {
         matched_receipts: matchedReceipts,
         high_confidence_matched: highConfidenceMatched,
         group_matched: groupMatched,
+        reference_matched: referenceMatched,
         matched_invoices: matchedInvoices,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
