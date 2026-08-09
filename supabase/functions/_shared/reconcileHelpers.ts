@@ -48,6 +48,36 @@ export function referenceKey(invoiceNumber: string | null | undefined): string |
   return norm;
 }
 
+const hasLetterAndDigit = (s: string) => /[a-z]/.test(s) && /[0-9]/.test(s);
+
+/**
+ * All usable reference keys of an invoice number. Besides the fully normalized
+ * value this also returns the individual parts, so numbers stored with an
+ * appended date ("INET2602889/08.04.2026") still match the payment text.
+ */
+export function refKeys(invoiceNumber: string | null | undefined): string[] {
+  if (!invoiceNumber) return [];
+  const keys = new Set<string>();
+  const full = referenceKey(invoiceNumber);
+  if (full) keys.add(full);
+  for (const raw of String(invoiceNumber).split(/[^A-Za-z0-9]+/)) {
+    const part = normalizeText(raw).replace(/\s+/g, "");
+    if (part.length >= 5 && hasLetterAndDigit(part)) keys.add(part);
+  }
+  return [...keys];
+}
+
+/** Reference-like tokens contained in a bank transaction description. */
+export function extractRefTokens(description: string | null | undefined): string[] {
+  if (!description) return [];
+  const out = new Set<string>();
+  for (const raw of String(description).split(/[^A-Za-z0-9]+/)) {
+    const t = raw.toLowerCase();
+    if (t.length >= 5 && hasLetterAndDigit(t)) out.add(t);
+  }
+  return [...out];
+}
+
 /** Tolerance for reference matches: up to 5% or 10 EUR deviation. */
 export function amountWithinReferenceTolerance(a: number, b: number): boolean {
   const na = Math.abs(a);
@@ -62,6 +92,20 @@ export interface ReferenceCandidate {
   key: string;
   amount: number | null;
   invoiceNumber: string | null;
+}
+
+/** True when any reference key of the invoice number occurs in the payment text. */
+export function referenceHit(
+  invoiceNumber: string | null | undefined,
+  description: string | null | undefined,
+): boolean {
+  const keys = refKeys(invoiceNumber);
+  if (keys.length === 0) return false;
+  const descNoSpace = normalizeText(description).replace(/\s+/g, "");
+  if (!descNoSpace) return false;
+  if (keys.some((k) => descNoSpace.includes(k))) return true;
+  const tokens = extractRefTokens(description);
+  return keys.some((k) => tokens.includes(k));
 }
 
 /**
@@ -79,9 +123,7 @@ export function findReferenceMatch(
 
   const hits: Array<{ key: string; deviationPct: number }> = [];
   for (const c of candidates) {
-    const ref = referenceKey(c.invoiceNumber);
-    if (!ref) continue;
-    if (!descNoSpace.includes(ref)) continue;
+    if (!referenceHit(c.invoiceNumber, description)) continue;
     if (c.amount == null) continue;
     if (!amountWithinReferenceTolerance(Number(c.amount), amount)) continue;
     const receiptAmt = Math.abs(Number(c.amount));
@@ -93,6 +135,7 @@ export function findReferenceMatch(
   if (hits.length !== 1) return null;
   return hits[0];
 }
+
 
 export interface GroupPairInput {
 
