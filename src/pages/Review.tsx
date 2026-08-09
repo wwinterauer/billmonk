@@ -27,6 +27,7 @@ import {
   Copy,
   GitCompare,
   FileX,
+  Search,
 } from 'lucide-react';
 import {
   AlertDialog,
