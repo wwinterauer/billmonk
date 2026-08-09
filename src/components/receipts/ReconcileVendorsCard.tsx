@@ -7,13 +7,16 @@ import { Button } from '@/components/ui/button';
 interface ReconcileVendorsCardProps {
   unlinkedCount: number;
   onDone?: () => void | Promise<void>;
+  onToggleFilter?: () => void;
+  filterActive?: boolean;
 }
 
-export function ReconcileVendorsCard({ unlinkedCount, onDone }: ReconcileVendorsCardProps) {
+export function ReconcileVendorsCard({ unlinkedCount, onDone, onToggleFilter, filterActive }: ReconcileVendorsCardProps) {
   const { toast } = useToast();
   const [running, setRunning] = useState(false);
 
-  if (unlinkedCount === 0) return null;
+  if (unlinkedCount === 0 && !filterActive) return null;
+
 
   const run = async () => {
     setRunning(true);
@@ -53,10 +56,18 @@ export function ReconcileVendorsCard({ unlinkedCount, onDone }: ReconcileVendors
           Namen und Markennamen erneut und gibt passende Belege frei.
         </p>
       </div>
-      <Button size="sm" variant="outline" disabled={running} onClick={run}>
-        {running ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
-        {running ? 'Gleiche ab...' : 'Lieferanten neu zuordnen'}
-      </Button>
+      <div className="flex gap-2">
+        {onToggleFilter && (
+          <Button size="sm" variant={filterActive ? 'secondary' : 'outline'} onClick={onToggleFilter}>
+            {filterActive ? 'Filter aufheben' : 'Anzeigen'}
+          </Button>
+        )}
+        <Button size="sm" variant="outline" disabled={running} onClick={run}>
+          {running ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
+          {running ? 'Gleiche ab...' : 'Lieferanten neu zuordnen'}
+        </Button>
+      </div>
     </div>
   );
 }
+

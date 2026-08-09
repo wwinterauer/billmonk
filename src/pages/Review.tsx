@@ -147,6 +147,8 @@ const Review = () => {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [vendorSearch, setVendorSearch] = useState(() => searchParams.get('vendor') || '');
+  const [unlinkedOnly, setUnlinkedOnly] = useState(() => searchParams.get('filter') === 'unlinked');
+
   const [saving, setSaving] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -254,10 +256,18 @@ const Review = () => {
   }, [vendorMap]);
 
 
+  const isUnlinkedVendor = useCallback(
+    (r: Receipt) => r.status === 'review' && !r.vendor_id && Boolean(r.vendor || r.vendor_brand),
+    [],
+  );
+
   const filteredReceipts = useMemo(() => {
-    if (!vendorSearch.trim()) return receipts;
-    return receipts.filter(r => matchesVendorSearch(r, vendorSearch));
-  }, [receipts, vendorSearch, matchesVendorSearch]);
+    let list = receipts;
+    if (unlinkedOnly) list = list.filter(isUnlinkedVendor);
+    if (vendorSearch.trim()) list = list.filter(r => matchesVendorSearch(r, vendorSearch));
+    return list;
+  }, [receipts, vendorSearch, matchesVendorSearch, unlinkedOnly, isUnlinkedVendor]);
+
 
   // Receipts that came back from the AI without any usable data.
   // Documents the AI *correctly* classified as non-receipts are excluded —
@@ -303,7 +313,7 @@ const Review = () => {
     }
   }, [currentReceipt?.id]);
 
-  // Sync vendor search with URL param
+  // Sync vendor search + filter with URL params
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
     if (vendorSearch.trim()) {
@@ -311,8 +321,21 @@ const Review = () => {
     } else {
       params.delete('vendor');
     }
+    if (unlinkedOnly) {
+      params.set('filter', 'unlinked');
+    } else {
+      params.delete('filter');
+    }
     setSearchParams(params, { replace: true });
-  }, [vendorSearch, setSearchParams]);
+  }, [vendorSearch, unlinkedOnly, setSearchParams]);
+
+  // Auto-reset the filter once nothing matches anymore
+  useEffect(() => {
+    if (unlinkedOnly && unlinkedVendorCount === 0) {
+      setUnlinkedOnly(false);
+    }
+  }, [unlinkedOnly, unlinkedVendorCount]);
+
 
   // Keep currentIndex valid when filtered list changes
   useEffect(() => {
@@ -1246,7 +1269,30 @@ const Review = () => {
         <NonReceiptPanel onChanged={loadReceipts} />
 
         {/* Receipts with a vendor name but no linked vendor record */}
-        <ReconcileVendorsCard unlinkedCount={unlinkedVendorCount} onDone={loadReceipts} />
+        <ReconcileVendorsCard
+          unlinkedCount={unlinkedVendorCount}
+          onDone={loadReceipts}
+          filterActive={unlinkedOnly}
+          onToggleFilter={() => {
+            setUnlinkedOnly(prev => !prev);
+            setCurrentIndex(0);
+          }}
+        />
+
+        {unlinkedOnly && (
+          <div className="mb-4 flex w-fit items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
+            <span>Nur Belege ohne Lieferantenzuordnung</span>
+            <button
+              type="button"
+              onClick={() => setUnlinkedOnly(false)}
+              className="hover:text-foreground"
+              aria-label="Filter aufheben"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
 
 
 
