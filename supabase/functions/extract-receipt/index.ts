@@ -128,65 +128,10 @@ const extractionSchema = {
   additionalProperties: false,
 };
 
-// Legal form suffixes for DACH + common international forms
-const LEGAL_FORM_REGEX = /\b(GmbH(?:\s*&\s*Co\.?\s*KG)?|AG|KG|OG|OHG|e\.?\s*U\.?|EU|UG(?:\s*\(haftungsbeschr[äa]nkt\))?|SE|S\.E\.|Ltd\.?|LLC|Inc\.?|Corp\.?|S\.à\s*r\.?l\.?|S\.A\.|S\.A\.S\.|S\.r\.l\.?|S\.p\.A\.|B\.V\.|N\.V\.|Co\.?\s*KG|Kft\.?|sp\.?\s*z\s*o\.?o\.?|d\.o\.o\.?|GbR|PartG)\b/i;
+// Vendor name helpers live in _shared/vendorMatch.ts so extraction and the
+// retroactive reconcile function use identical matching rules.
+// (imported at the top of this file)
 
-function hasLegalForm(name: string | null | undefined): boolean {
-  if (!name) return false;
-  return LEGAL_FORM_REGEX.test(name);
-}
-
-// Normalize vendor name for matching: lowercase, strip legal form, collapse whitespace/punct.
-function normalizeVendorName(name: string | null | undefined): string {
-  if (!name) return "";
-  return name
-    .toLowerCase()
-    .replace(LEGAL_FORM_REGEX, "")
-    .replace(/[.,&]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-// Combine AI vendor_name with vendor_legal_form if the name doesn't already contain a legal form.
-function combineVendorWithLegalForm(name: string | null | undefined, legalForm: string | null | undefined): string | null {
-  if (!name) return null;
-  const trimmed = name.trim();
-  if (!trimmed) return null;
-  if (!legalForm) return trimmed;
-  const lf = legalForm.trim();
-  if (!lf) return trimmed;
-  // Already contains a legal form → keep AI name as-is
-  if (hasLegalForm(trimmed)) return trimmed;
-  // Append legal form
-  return `${trimmed} ${lf}`.replace(/\s+/g, " ").trim();
-}
-
-function levenshtein(a: string, b: string): number {
-  if (a === b) return 0;
-  if (!a.length) return b.length;
-  if (!b.length) return a.length;
-  const v0 = new Array(b.length + 1);
-  const v1 = new Array(b.length + 1);
-  for (let i = 0; i <= b.length; i++) v0[i] = i;
-  for (let i = 0; i < a.length; i++) {
-    v1[0] = i + 1;
-    for (let j = 0; j < b.length; j++) {
-      const cost = a[i] === b[j] ? 0 : 1;
-      v1[j + 1] = Math.min(v1[j] + 1, v0[j + 1] + 1, v0[j] + cost);
-    }
-    for (let j = 0; j <= b.length; j++) v0[j] = v1[j];
-  }
-  return v1[b.length];
-}
-
-// Similarity 0..1 based on Levenshtein
-function nameSimilarity(a: string, b: string): number {
-  if (!a && !b) return 1;
-  if (!a || !b) return 0;
-  const maxLen = Math.max(a.length, b.length);
-  if (maxLen === 0) return 1;
-  return 1 - levenshtein(a, b) / maxLen;
-}
 
 // ── Map structured output → internal ExtractionResult ──────────────
 function mapSchemaToResult(raw: Record<string, any>): ExtractionResult {
