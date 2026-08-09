@@ -1176,7 +1176,7 @@ const Review = () => {
             <span className="text-sm text-muted-foreground">
               Beleg {currentIndex + 1} von {totalToReview}
             </span>
-            {canApproveAll && receipts.length > 1 && (
+            {canApproveAll && filteredReceipts.length > 1 && (
               <Button
                 size="sm"
                 variant="outline"
