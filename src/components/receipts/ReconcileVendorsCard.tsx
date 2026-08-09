@@ -56,10 +56,18 @@ export function ReconcileVendorsCard({ unlinkedCount, onDone, onToggleFilter, fi
           Namen und Markennamen erneut und gibt passende Belege frei.
         </p>
       </div>
-      <Button size="sm" variant="outline" disabled={running} onClick={run}>
-        {running ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
-        {running ? 'Gleiche ab...' : 'Lieferanten neu zuordnen'}
-      </Button>
+      <div className="flex gap-2">
+        {onToggleFilter && (
+          <Button size="sm" variant={filterActive ? 'secondary' : 'outline'} onClick={onToggleFilter}>
+            {filterActive ? 'Filter aufheben' : 'Anzeigen'}
+          </Button>
+        )}
+        <Button size="sm" variant="outline" disabled={running} onClick={run}>
+          {running ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
+          {running ? 'Gleiche ab...' : 'Lieferanten neu zuordnen'}
+        </Button>
+      </div>
     </div>
   );
 }
+
