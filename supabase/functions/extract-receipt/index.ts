@@ -153,6 +153,8 @@ const extractionSchema = {
     "tax_rate_details", "description", "line_items",
     "vat_confidence", "vat_detection_method", "special_vat_case", "notes",
     "category", "tax_type",
+    "total_amount_label", "net_amount_label", "tax_amount_label", "totals_block",
+
   ],
   additionalProperties: false,
 };
