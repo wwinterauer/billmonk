@@ -47,7 +47,7 @@ interface ExtractionResult {
   confidence: number;
   vendor_country?: string | null;
   vat_confidence?: number | null;
-  vat_detection_method?: 'explicit' | 'calculated' | 'learned' | 'estimated' | null;
+  vat_detection_method?: 'explicit' | 'calculated' | 'learned' | 'estimated' | 'line_items' | 'totals_line' | 'totals_line_conflict' | null;
   special_vat_case?: 'kleinunternehmer' | 'reverse_charge' | 'ig_lieferung' | 'export' | null;
 }
 
