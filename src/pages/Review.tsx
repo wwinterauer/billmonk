@@ -267,6 +267,16 @@ const Review = () => {
     [receipts],
   );
 
+  // Receipts with an extracted vendor name but no linked vendor record —
+  // these never reach the auto-approve rule.
+  const unlinkedVendorCount = useMemo(
+    () =>
+      receipts.filter(
+        r => r.status === 'review' && !r.vendor_id && (r.vendor || r.vendor_brand),
+      ).length,
+    [receipts],
+  );
+
 
   const {
     isRetrying,
