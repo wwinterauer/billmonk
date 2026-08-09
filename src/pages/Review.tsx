@@ -2103,7 +2103,7 @@ const Review = () => {
                       <Button
                         variant="ghost"
                         onClick={skipReceipt}
-                        disabled={saving || receipts.length <= 1}
+                        disabled={saving || filteredReceipts.length <= 1}
                       >
                         <SkipForward className="h-4 w-4 mr-2" />
                         Überspringen
