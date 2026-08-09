@@ -136,8 +136,10 @@ export default function Reconciliation() {
         body: { mode: 'preview' },
       });
       if (error) throw error;
-      const exact = data?.exact_applied ?? 0;
+      const exact = (data?.exact_applied ?? 0) + (data?.high_confidence_applied ?? 0) + (data?.group_applied ?? 0);
+      const grouped = data?.group_applied ?? 0;
       const scanned = data?.scanned_transactions ?? 0;
+
       const candidates: SkontoCandidate[] = data?.skonto_candidates ?? [];
       setSkontoCandidates(candidates);
       setReconcileSummary({ exact, scanned });
