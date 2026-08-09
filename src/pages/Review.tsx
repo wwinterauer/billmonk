@@ -91,7 +91,7 @@ import { SplitBookingEditor } from '@/components/receipts/SplitBookingEditor';
 import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
-import { useVendors } from '@/hooks/useVendors';
+import { useVendors, type Vendor } from '@/hooks/useVendors';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
 import { VendorAutocomplete } from '@/components/receipts/VendorAutocomplete';
 import { VendorBrandAutocomplete } from '@/components/receipts/VendorBrandAutocomplete';
