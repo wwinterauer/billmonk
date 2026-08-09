@@ -9,6 +9,7 @@ import {
   ImageIcon,
   Percent,
   Plus,
+  Eye,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -353,6 +354,14 @@ export function ReceiptAssignmentModal({
     return null;
   };
 
+  const openReceiptFile = async (e: React.MouseEvent, receipt: Receipt) => {
+    e.stopPropagation();
+    if (!receipt.file_url) return;
+    const path = receipt.file_url.replace(/^.*\/receipts\//, '');
+    const { data } = await supabase.storage.from('receipts').createSignedUrl(path, 300);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+  };
+
   const ReceiptCard = ({ receipt, showScore = true }: { receipt: ReceiptWithScore; showScore?: boolean }) => (
     <div
       className={cn(
@@ -405,6 +414,20 @@ export function ReceiptAssignmentModal({
         </p>
         {showScore && getMatchBadge(receipt.matchScore)}
       </div>
+
+      {receipt.file_url && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 flex-shrink-0"
+          title="Beleg öffnen"
+          aria-label="Beleg öffnen"
+          onClick={(e) => openReceiptFile(e, receipt)}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 
