@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { ReceiptPreviewDialog } from '@/components/receipts/ReceiptPreviewDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
@@ -158,7 +159,7 @@ export function ReceiptAssignmentModal({
 
   // Split-line selection (step 2)
   const [selectedSplitLine, setSelectedSplitLine] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ url: string | null; isPdf: boolean; title: string; error: string | null } | null>(null);
+  const [previewReceiptId, setPreviewReceiptId] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -307,10 +308,6 @@ export function ReceiptAssignmentModal({
     setSelectedSplitLine(exact?.id ?? null);
   }, [hasSplitLines, splitLines, transaction]);
 
-  // Note: blob URLs are revoked explicitly when the preview is closed/replaced,
-  // not in an effect cleanup (StrictMode would revoke them immediately).
-
-
   if (!transaction) return null;
 
   const handleAssign = async () => {
@@ -359,32 +356,10 @@ export function ReceiptAssignmentModal({
     return null;
   };
 
-  const closePreview = () => {
-    setPreview((prev) => {
-      if (prev?.url?.startsWith('blob:')) URL.revokeObjectURL(prev.url);
-      return null;
-    });
-  };
-
-  const openReceiptFile = async (e: React.MouseEvent, receipt: Receipt) => {
+  const openReceiptFile = (e: React.MouseEvent, receipt: Receipt) => {
     e.stopPropagation();
-    if (!receipt.file_url) return;
-    const isPdf = receipt.file_url.toLowerCase().endsWith('.pdf');
-    const title = receipt.vendor || 'Beleg';
-    setPreview({ url: null, isPdf, title, error: null });
-    const path = receipt.file_url.replace(/^.*\/receipts\//, '');
-    const { data, error } = await supabase.storage.from('receipts').download(path);
-    if (error || !data) {
-      console.error('Beleg-Vorschau fehlgeschlagen', { path, error });
-      setPreview({ url: null, isPdf, title, error: error?.message || 'Datei konnte nicht geladen werden.' });
-      return;
-    }
-    const blob = isPdf ? new Blob([data], { type: 'application/pdf' }) : data;
-    setPreview({ url: URL.createObjectURL(blob), isPdf, title, error: null });
+    setPreviewReceiptId(receipt.id);
   };
-
-
-
 
   const ReceiptCard = ({ receipt, showScore = true }: { receipt: ReceiptWithScore; showScore?: boolean }) => (
     <div
@@ -456,6 +431,7 @@ export function ReceiptAssignmentModal({
   );
 
   return (
+    <>
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[700px] max-h-[85vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-4">
@@ -722,35 +698,13 @@ export function ReceiptAssignmentModal({
         </DialogFooter>
       </DialogContent>
 
-      <Dialog open={!!preview} onOpenChange={(o) => !o && closePreview()}>
-        <DialogContent className="sm:max-w-[900px] h-[90vh] flex flex-col p-0">
-          <DialogHeader className="px-6 pt-6 pb-3">
-            <DialogTitle className="truncate">{preview?.title ?? 'Beleg'}</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 min-h-0 px-6 pb-6">
-            {preview?.error ? (
-              <div className="h-full flex items-center justify-center text-sm text-destructive text-center px-6">
-                {preview.error}
-              </div>
-            ) : !preview?.url ? (
-              <div className="h-full flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : preview.isPdf ? (
-              <object data={preview.url} type="application/pdf" className="w-full h-full rounded-lg border">
-                <div className="h-full flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <span>Vorschau nicht möglich.</span>
-                  <a href={preview.url} download className="underline">Datei herunterladen</a>
-                </div>
-              </object>
-            ) : (
-              <div className="h-full overflow-auto rounded-lg border bg-muted/30 flex items-start justify-center">
-                <img src={preview.url} alt="Belegvorschau" className="max-w-full" />
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </Dialog>
+
+      <ReceiptPreviewDialog
+        receiptId={previewReceiptId}
+        open={!!previewReceiptId}
+        onClose={() => setPreviewReceiptId(null)}
+      />
+    </>
   );
 }
