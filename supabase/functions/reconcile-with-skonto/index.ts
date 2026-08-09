@@ -504,6 +504,34 @@ serve(async (req) => {
       }
     }
 
+    // 6) Suggestion pass: everything left over that still looks plausible is
+    // offered to the user instead of silently staying open.
+    const skontoTxIds = new Set(skontoCandidates.map((s) => s.transaction_id));
+    const skontoKeys = new Set(
+      skontoCandidates.map((s) => (s.split_line_id ? `line:${s.split_line_id}` : `receipt:${s.receipt_id}`)),
+    );
+    const suggestionTxs = datedTxs
+      .filter((t) => t.amount && !matchedTxIds.has(t.id) && !skontoTxIds.has(t.id))
+      .map((t) => ({
+        id: t.id,
+        date: t.transaction_date,
+        amount: Number(t.amount),
+        description: t.description,
+      }));
+    const suggestionCands = pool
+      .filter((c) => !usedKeys.has(c.key) && !skontoKeys.has(c.key) && c.amount_gross != null)
+      .map((c) => ({
+        key: c.key,
+        receiptId: c.receipt_id,
+        splitLineId: c.split_line_id,
+        amount: Number(c.amount_gross),
+        date: c.receipt_date,
+        vendor: c.vendor,
+        aliases: c.aliases,
+        invoiceNumber: c.invoice_number,
+      }));
+    const matchSuggestions = buildSuggestions(suggestionTxs, suggestionCands);
+
     return new Response(
       JSON.stringify({
         exact_applied: exactApplied,
@@ -511,8 +539,10 @@ serve(async (req) => {
         group_applied: groupApplied,
         reference_applied: referenceApplied,
         skonto_candidates: skontoCandidates,
+        match_suggestions: matchSuggestions,
         scanned_transactions: txs.length,
       }),
+
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
