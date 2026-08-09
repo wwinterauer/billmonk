@@ -7,13 +7,16 @@ import { Button } from '@/components/ui/button';
 interface ReconcileVendorsCardProps {
   unlinkedCount: number;
   onDone?: () => void | Promise<void>;
+  onToggleFilter?: () => void;
+  filterActive?: boolean;
 }
 
-export function ReconcileVendorsCard({ unlinkedCount, onDone }: ReconcileVendorsCardProps) {
+export function ReconcileVendorsCard({ unlinkedCount, onDone, onToggleFilter, filterActive }: ReconcileVendorsCardProps) {
   const { toast } = useToast();
   const [running, setRunning] = useState(false);
 
-  if (unlinkedCount === 0) return null;
+  if (unlinkedCount === 0 && !filterActive) return null;
+
 
   const run = async () => {
     setRunning(true);
