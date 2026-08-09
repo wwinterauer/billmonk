@@ -737,6 +737,7 @@ const Expenses = () => {
       const data = await getReceipts({ 
         dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
         dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
+        excludeStatus: ['split'],
       });
       setReceipts(data);
       
