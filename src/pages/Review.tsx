@@ -208,7 +208,33 @@ const Review = () => {
     loadReceipts();
   }, []);
 
-  const currentReceipt = receipts[currentIndex] || null;
+  // Vendor search: build lookup and filtered list
+  const vendorMap = useMemo(() => {
+    const map = new Map<string, Vendor>();
+    for (const v of vendors) {
+      map.set(v.id, v);
+    }
+    return map;
+  }, [vendors]);
+
+  const matchesVendorSearch = useCallback((receipt: Receipt, term: string) => {
+    if (!term.trim()) return true;
+    const q = term.toLowerCase().trim();
+    const vendor = receipt.vendor_id ? vendorMap.get(receipt.vendor_id) : null;
+    return (
+      (receipt.vendor ?? '').toLowerCase().includes(q) ||
+      (receipt.vendor_brand ?? '').toLowerCase().includes(q) ||
+      (vendor?.display_name ?? '').toLowerCase().includes(q) ||
+      vendor?.legal_names?.some(n => n.toLowerCase().includes(q))
+    );
+  }, [vendorMap]);
+
+  const filteredReceipts = useMemo(() => {
+    if (!vendorSearch.trim()) return receipts;
+    return receipts.filter(r => matchesVendorSearch(r, vendorSearch));
+  }, [receipts, vendorSearch, matchesVendorSearch]);
+
+  const currentReceipt = filteredReceipts[currentIndex] || null;
 
   // Persist current receipt id across navigation
   useEffect(() => {
