@@ -1035,6 +1035,11 @@ export function VendorManagement() {
                                   Auto
                                 </Badge>
                               )}
+                              {vendor.always_not_a_receipt && (
+                                <Badge variant="outline" className="text-xs text-muted-foreground">
+                                  Keine Rechnung
+                                </Badge>
+                              )}
                               {vendor.website && (
                                 <a
                                   href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
