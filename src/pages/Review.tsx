@@ -255,6 +255,35 @@ const Review = () => {
     }
   }, [currentReceipt?.id]);
 
+  // Sync vendor search with URL param
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (vendorSearch.trim()) {
+      params.set('vendor', vendorSearch.trim());
+    } else {
+      params.delete('vendor');
+    }
+    setSearchParams(params, { replace: true });
+  }, [vendorSearch, setSearchParams]);
+
+  // Keep currentIndex valid when filtered list changes
+  useEffect(() => {
+    if (filteredReceipts.length === 0) {
+      setCurrentIndex(0);
+      return;
+    }
+    if (currentIndex >= filteredReceipts.length) {
+      const nextIndex = Math.max(0, filteredReceipts.length - 1);
+      setCurrentIndex(nextIndex);
+      populateForm(filteredReceipts[nextIndex]);
+      loadImage(filteredReceipts[nextIndex]);
+    } else if (currentReceipt === null && filteredReceipts.length > 0) {
+      setCurrentIndex(0);
+      populateForm(filteredReceipts[0]);
+      loadImage(filteredReceipts[0]);
+    }
+  }, [filteredReceipts.length, currentIndex, currentReceipt]);
+
   // Vendor extraction data for ReanalyzeOptions
   const [currentVendorData, setCurrentVendorData] = useState<{
     expenses_only_extraction: boolean;
