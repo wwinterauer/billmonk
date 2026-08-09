@@ -1,7 +1,7 @@
 export type AmountQuery =
   | { kind: 'exact'; min: number; max: number }
-  | { kind: 'gt'; value: number }
-  | { kind: 'lt'; value: number }
+  | { kind: 'gt'; value: number; display: number }
+  | { kind: 'lt'; value: number; display: number }
   | { kind: 'range'; min: number; max: number };
 
 const EPS = 0.005;
@@ -51,8 +51,8 @@ export function parseAmountQuery(input: string): AmountQuery | null {
     const value = parseNumber(opMatch[2]);
     if (value === null) return null;
     const op = opMatch[1];
-    if (op === '>' || op === '>=') return { kind: 'gt', value: op === '>' ? value + EPS : value - EPS };
-    return { kind: 'lt', value: op === '<' ? value - EPS : value + EPS };
+    if (op === '>' || op === '>=') return { kind: 'gt', value: op === '>' ? value + EPS : value - EPS, display: value };
+    return { kind: 'lt', value: op === '<' ? value - EPS : value + EPS, display: value };
   }
 
   const rangeMatch = q.match(/^([\d.,]+)\s*(?:\.\.|--|–|-)\s*([\d.,]+)$/);
@@ -100,9 +100,9 @@ export function describeAmountQuery(aq: AmountQuery): string {
     case 'exact':
       return `Betrag ${fmt((aq.min + aq.max) / 2)} €`;
     case 'gt':
-      return `Betrag über ${fmt(aq.value - EPS)} €`;
+      return `Betrag über ${fmt(aq.display)} €`;
     case 'lt':
-      return `Betrag unter ${fmt(aq.value + EPS)} €`;
+      return `Betrag unter ${fmt(aq.display)} €`;
     case 'range':
       return `Betrag ${fmt(aq.min + EPS)} – ${fmt(aq.max - EPS)} €`;
   }
