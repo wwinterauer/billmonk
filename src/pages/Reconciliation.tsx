@@ -1015,8 +1015,22 @@ export default function Reconciliation() {
 
                     <div className="relative flex-1 min-w-[200px]">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="Suche in Beschreibung..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9" />
+                      <Input
+                        placeholder="Suche: Text, Betrag (3,36) oder Bereich (>100)"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 h-9"
+                      />
+                      {(() => {
+                        const aq = parseAmountQuery(searchQuery);
+                        return aq ? (
+                          <Badge variant="secondary" className="mt-1.5 text-xs font-normal">
+                            {describeAmountQuery(aq)} · Ein- und Ausgänge
+                          </Badge>
+                        ) : null;
+                      })()}
                     </div>
+
                   </div>
                 </CardContent>
               </Card>
