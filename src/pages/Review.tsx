@@ -1128,7 +1128,7 @@ const Review = () => {
       <div className="p-6 lg:p-8">
         {tabBar}
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Belege überprüfen</h1>
             <p className="text-muted-foreground">
@@ -1138,6 +1138,32 @@ const Review = () => {
           <Badge variant="secondary" className="text-sm w-fit">
             {totalToReview} zur Überprüfung
           </Badge>
+        </div>
+
+        {/* Vendor search */}
+        <div className="relative mb-6 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={vendorSearch}
+            onChange={(e) => setVendorSearch(e.target.value)}
+            placeholder="Nach Lieferant / Marke suchen..."
+            className="pl-9 pr-9"
+          />
+          {vendorSearch && (
+            <button
+              type="button"
+              onClick={() => setVendorSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Suche zurücksetzen"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+          {vendorSearch.trim() && (
+            <p className="text-xs text-muted-foreground mt-1.5">
+              {totalToReview} {totalToReview === 1 ? 'Treffer' : 'Treffer'} für „{vendorSearch.trim()}"
+            </p>
+          )}
         </div>
 
         {/* Progress Bar */}
