@@ -131,10 +131,13 @@ const extractionSchema = {
           quantity: { type: "number" as const },
           unit_price: { type: "number" as const },
           total: { type: "number" as const },
+           net_total: { type: "number" as const },
+           tax_amount: { type: "number" as const },
+           gross_total: { type: "number" as const },
           tax_rate: { type: "string" as const },
           category: { type: "string" as const },
         },
-        required: ["description", "quantity", "unit_price", "total", "tax_rate", "category"],
+         required: ["description", "quantity", "unit_price", "total", "net_total", "tax_amount", "gross_total", "tax_rate", "category"],
         additionalProperties: false,
       },
     },
@@ -183,9 +186,9 @@ function mapSchemaToResult(raw: Record<string, any>): ExtractionResult {
     vendor: combinedVendor,
     vendor_brand: raw.vendor_brand || null,
     description: raw.description || null,
-    amount_gross: raw.total_amount || null,
-    amount_net: raw.net_amount || null,
-    vat_amount: raw.tax_amount || null,
+    amount_gross: raw.total_amount ?? null,
+    amount_net: raw.net_amount ?? null,
+    vat_amount: raw.tax_amount ?? null,
     vat_rate: vatRate,
     is_mixed_tax_rate: raw.is_mixed_tax_rate || false,
     tax_rate_details: raw.tax_rate_details && raw.tax_rate_details.length > 0
@@ -292,7 +295,9 @@ STRENGE FILTERREGEL:
 - Jede Zeile genau EINMAL zählen, NICHT Summen-/Zwischensummenzeilen
 - Beträge in Klammern, mit Minus oder in einer Abzugsspalte sind bei diesen Schlagwort-Zeilen ebenfalls AUSGABEN → immer POSITIV erfassen
 - Gutschriften/Erstattungen ohne Schlagwort ignorieren
-- total_amount = Summe ALLER gefundenen Schlagwort-Zeilen (positiv). Beispiel: 0,14 + 12,00 + 1,87 = 14,01
+- Jede gefundene Zeile hat eigene Spalten für Netto, USt und Betrag: net_total = Wert aus „Netto“, tax_amount = Wert aus „USt./MwSt.“, gross_total = Wert aus „Betrag“. total MUSS identisch mit gross_total sein.
+- „Betrag“ ist hier der tatsächlich belastete BRUTTOBETRAG und darf NIEMALS als Netto interpretiert oder nochmals um USt. erhöht werden.
+- total_amount = Summe der gross_total-/„Betrag“-Werte ALLER gefundenen Schlagwort-Zeilen (positiv). amount_net = Summe der net_total-Werte, tax_amount = Summe der USt.-Werte. Beispiel Brutto: 0,14 + 12,00 + 1,87 = 14,01
 - Die Summenzeilen des Dokuments (Gesamtbetrag, Auszahlung, Saldo) gelten NICHT für diesen Beleg: total_amount_label, net_amount_label, tax_amount_label und totals_block MÜSSEN null bzw. leer bleiben
 
 description: Gefundene Positionen mit Beträgen auflisten, z.B.: "Transaktionsgebühr 3,50€; Betreiber-Abonnement 12,00€"`;
@@ -700,6 +705,7 @@ RANGFOLGE (WICHTIGSTE REGEL): Beschriftete Summenzeilen im Summenblock haben IMM
 receipt_number: Rechnungsnummer suchen (RE-Nr, Invoice, Belegnummer etc.) oder "".
 
 LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenzeilen.
+- Pro Position: net_total = Netto-Zeilenwert, tax_amount = ausgewiesene USt./MwSt., gross_total = Brutto-/„Betrag“-Zeilenwert. total = gross_total. Falls nur ein Betrag vorhanden ist, ordne ihn anhand der Spaltenüberschrift zu; erfinde keine Steuerwerte.
 - VOLLSTÄNDIGKEIT: Erfasse ALLE Positionen, auch über mehrere Seiten hinweg. Prüfe zum Schluss selbst: Summe der Positionen muss zum ausgewiesenen Gesamtbetrag passen. Passt sie nicht, hast du Positionen übersehen — suche weiter. Kürze die Liste NIEMALS ab.
 - VORZEICHEN: Rabatte, Gutschriften, Stornos und Abzüge werden als NEGATIVE total/unit_price erfasst (z.B. Rabatt -117.75). Niemals positiv angeben.${expensesOnlyPrompt}${extractionHintPrompt}`;
 
@@ -919,7 +925,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
       const lineItems = Array.isArray(rawData.line_items) ? rawData.line_items : [];
 
       const validLineItems = lineItems.filter((li: any) => {
-        const total = Number(li?.total);
+        const total = Number(expensesOnlyMode ? (li?.gross_total ?? li?.total) : li?.total);
         return li && Number.isFinite(total) && total !== 0 && li.tax_rate != null;
       });
 
@@ -931,7 +937,11 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         for (const li of validLineItems) {
           const rateKey = String(parseFloat(String(li.tax_rate).replace(',', '.').replace('%', '')) || 0);
           if (!rateGroups[rateKey]) rateGroups[rateKey] = { sum: 0, descriptions: [] };
-          const liTotal = expensesOnlyMode ? Math.abs(Number(li.total)) : Number(li.total);
+          // Bei Sammelabrechnungen ist die explizite Spalte „Betrag“/gross_total
+          // maßgeblich. Die danebenstehende Netto-Spalte darf nie summiert oder
+          // nochmals um USt. hochgerechnet werden.
+          const sourceTotal = expensesOnlyMode ? (li.gross_total ?? li.total) : li.total;
+          const liTotal = expensesOnlyMode ? Math.abs(Number(sourceTotal)) : Number(sourceTotal);
           rateGroups[rateKey].sum += liTotal;
           lineItemsSum += liTotal;
           if (li.description) rateGroups[rateKey].descriptions.push(li.description);
@@ -960,6 +970,25 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         const lineItemsGrossTotal = Math.round(
           rateKeys.reduce((s, k) => s + toGross(rateGroups[k].sum, parseFloat(k)), 0) * 100
         ) / 100;
+
+        // Im Ausgaben-Filter-Modus aggregieren wir die explizit ausgewiesenen
+        // Netto-/USt.-Spalten direkt. Das schützt vor dem Fehler „14,01 netto“.
+        if (expensesOnlyMode) {
+          const explicitNet = validLineItems.reduce((sum: number, li: any) => {
+            const value = Number(li?.net_total);
+            return sum + (Number.isFinite(value) ? Math.abs(value) : 0);
+          }, 0);
+          const explicitTax = validLineItems.reduce((sum: number, li: any) => {
+            const value = Number(li?.tax_amount);
+            return sum + (Number.isFinite(value) ? Math.abs(value) : 0);
+          }, 0);
+          extractedData.amount_gross = lineItemsGrossTotal;
+          if (explicitNet > 0 || explicitTax > 0) {
+            extractedData.amount_net = Math.round(explicitNet * 100) / 100;
+            extractedData.vat_amount = Math.round(explicitTax * 100) / 100;
+          }
+          console.log(`[Expenses Line Columns] Brutto=${lineItemsGrossTotal}, Netto=${extractedData.amount_net}, USt=${extractedData.vat_amount}`);
+        }
 
         // Vollständigkeits-/Plausibilitätscheck gegen die beschriftete Summenzeile
         let totalsConflict = false;
@@ -1021,8 +1050,14 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
             ? false
             : (aiGross === 0 || Math.abs(Math.abs(lineItemsGross) - aiGross) / Math.max(aiGross, 1) > 0.01);
           const gross = useLineItemGross ? lineItemsGross : (anchorGross ?? aiGross);
-          const netAmount = rate === 0 ? gross : gross / (1 + rate / 100);
-          const taxAmount = gross - netAmount;
+          const calculatedNet = rate === 0 ? gross : gross / (1 + rate / 100);
+          const calculatedTax = gross - calculatedNet;
+          const explicitNet = Number(extractedData.amount_net);
+          const explicitTax = Number(extractedData.vat_amount);
+          const hasExplicitExpenseColumns = expensesOnlyMode && explicitNet > 0 && explicitTax >= 0
+            && Math.abs((explicitNet + explicitTax) - gross) <= 0.05;
+          const netAmount = hasExplicitExpenseColumns ? explicitNet : calculatedNet;
+          const taxAmount = hasExplicitExpenseColumns ? explicitTax : calculatedTax;
           const prevRate = extractedData.vat_rate;
           extractedData.vat_rate = rate;
           extractedData.amount_gross = Math.round(gross * 100) / 100;
