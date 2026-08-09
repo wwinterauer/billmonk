@@ -369,11 +369,8 @@ export function ReceiptAssignmentModal({
     setPreview({ url: objectUrl, isPdf, title });
   };
 
-  useEffect(() => {
-    return () => {
-      if (preview?.url?.startsWith('blob:')) URL.revokeObjectURL(preview.url);
-    };
-  }, [preview?.url]);
+
+
 
   const ReceiptCard = ({ receipt, showScore = true }: { receipt: ReceiptWithScore; showScore?: boolean }) => (
     <div
