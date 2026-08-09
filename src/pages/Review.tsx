@@ -752,7 +752,7 @@ const Review = () => {
 
   // Skip to next receipt
   const skipReceipt = () => {
-    if (currentIndex < receipts.length - 1) {
+    if (currentIndex < filteredReceipts.length - 1) {
       goToReceipt(currentIndex + 1);
     } else if (currentIndex > 0) {
       goToReceipt(currentIndex - 1);
