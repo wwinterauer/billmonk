@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { uint8ArrayToBase64 } from "../_shared/base64.ts";
-import { hasLegalForm, normalizeVendorName, matchVendor } from "../_shared/vendorMatch.ts";
+import { hasLegalForm, normalizeVendorName, matchVendor, combineVendorWithLegalForm } from "../_shared/vendorMatch.ts";
 
 
 const corsHeaders = {
@@ -748,9 +748,27 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
     if (cleanedContent.endsWith("```")) cleanedContent = cleanedContent.slice(0, -3);
     cleanedContent = cleanedContent.trim();
 
+    let rawData: any;
     try {
-      const rawData = JSON.parse(cleanedContent);
+      rawData = JSON.parse(cleanedContent);
+    } catch (jsonErr) {
+      console.error("AI JSON invalid:", jsonErr, cleanedContent.slice(0, 500));
+      if (receiptId) {
+        await supabase.from('receipts').update({
+          status: 'review',
+          notes: 'KI-Antwort war kein gültiges JSON. Bitte manuell prüfen.',
+          ai_processed_at: new Date().toISOString(),
+        }).eq('id', receiptId);
+      }
+      return new Response(
+        JSON.stringify({ success: false, error: "Failed to parse AI response", raw: content }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    try {
       const extractedData = mapSchemaToResult(rawData);
+
 
       // ── Post-Processing: amounts positive ────────────────────────
       if (extractedData.amount_gross != null && extractedData.amount_gross < 0) {
@@ -1259,7 +1277,8 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } catch (parseError) {
-      console.error("Failed to parse AI response:", cleanedContent);
+      const msg = parseError instanceof Error ? `${parseError.message}\n${parseError.stack}` : String(parseError);
+      console.error("Post-processing failed:", msg);
       // Fallback: Receipt auf review setzen, damit er nicht auf processing hängen bleibt
       if (receiptId) {
         await supabase.from('receipts').update({
@@ -1269,10 +1288,11 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         }).eq('id', receiptId);
       }
       return new Response(
-        JSON.stringify({ success: false, error: "Failed to parse AI response", raw: content }),
+        JSON.stringify({ success: false, error: "Post-processing failed", details: msg }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
   } catch (error) {
     console.error("Extract receipt error:", error);
     // Fallback: Receipt auf review setzen, damit er nicht auf processing hängen bleibt
