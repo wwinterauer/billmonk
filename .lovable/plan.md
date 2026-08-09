@@ -49,7 +49,9 @@ Der bestehende Abgleich-Dialog wird zu einem allgemeinen Vorschlags-Dialog erwei
 
 ## Technische Details
 
-- `supabase/functions/_shared/reconcileHelpers.ts`: neue Funktion `buildAmountSuggestions(txs, candidates)` — gruppiert nach Cent-Betrag, ordnet Buchungen und Belege datumsweise zu (greedy, nächstes Datum zuerst), liefert pro Buchung Hauptvorschlag + Alternativen + Konfidenz. `buildGroupPairs` wird von "nur gleiche Größe" auf "beliebige Größe, Rest als Vorschlag" umgestellt.
+- `supabase/functions/_shared/reconcileHelpers.ts`: neue `scoreMatch(tx, candidate, context)` (gewichtete Signale, liefert Score + Begründung) und `buildSuggestions(txs, candidates)` — gruppiert nach Cent-Betrag, paart datumsweise (greedy), liefert pro Buchung Hauptvorschlag + Alternativen + Konfidenz. `buildGroupPairs` wird von "nur gleiche Größe" auf "beliebige Größe, Rest als Vorschlag" umgestellt.
+- Lieferanten-Erkennung nutzt `vendors` (Markenname, `legal_names`, Schlagwörter) statt nur des Textfelds am Beleg.
+
 - `supabase/functions/reconcile-with-skonto/index.ts` (Preview-Modus): liefert zusätzlich `amount_suggestions`. Apply-Modus akzeptiert weiterhin `accepted_pairs` (funktioniert für beide Vorschlagsarten, inkl. Split-Zeilen über optionale `receipt_split_line_id`).
 - `supabase/functions/auto-reconcile/index.ts`: Gruppen-Pass verbucht nicht mehr unsicher automatisch, sondern nur die eindeutigen Fälle; Zählung im Response angepasst.
 - `src/components/reconciliation/SkontoReconcileDialog.tsx`: erweitert um Tab/Sektion für Betrags-Vorschläge, Alternativen-Auswahl und Beleg-Vorschau.
