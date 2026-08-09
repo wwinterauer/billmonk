@@ -95,6 +95,7 @@ export function useDashboardData(year: number, month: number) {
         .from('receipts')
         .select('id, amount_gross, vat_amount, status, ai_confidence, category, tax_type, is_split_booking')
         .eq('user_id', user.id)
+        .not('status', 'in', '("split")')
         .gte('created_at', startOfMonth.toISOString())
         .lte('created_at', endOfMonth.toISOString());
 
