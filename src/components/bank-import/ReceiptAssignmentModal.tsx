@@ -307,6 +307,13 @@ export function ReceiptAssignmentModal({
     setSelectedSplitLine(exact?.id ?? null);
   }, [hasSplitLines, splitLines, transaction]);
 
+  useEffect(() => {
+    const url = preview?.url;
+    return () => {
+      if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+    };
+  }, [preview?.url]);
+
   if (!transaction) return null;
 
   const handleAssign = async () => {
@@ -369,11 +376,8 @@ export function ReceiptAssignmentModal({
     setPreview({ url: objectUrl, isPdf, title });
   };
 
-  useEffect(() => {
-    return () => {
-      if (preview?.url?.startsWith('blob:')) URL.revokeObjectURL(preview.url);
-    };
-  }, [preview?.url]);
+
+
 
   const ReceiptCard = ({ receipt, showScore = true }: { receipt: ReceiptWithScore; showScore?: boolean }) => (
     <div
