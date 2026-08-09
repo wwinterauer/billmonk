@@ -290,7 +290,10 @@ STRENGE FILTERREGEL:
 - Durchsuche ALLE Seiten des Dokuments, nicht nur die erste
 - Ein Schlagwort kann MEHRFACH vorkommen → jede Zeile einzeln erfassen
 - Jede Zeile genau EINMAL zählen, NICHT Summen-/Zwischensummenzeilen
-- Alle Beträge POSITIV, Gutschriften/Erstattungen ignorieren
+- Beträge in Klammern, mit Minus oder in einer Abzugsspalte sind bei diesen Schlagwort-Zeilen ebenfalls AUSGABEN → immer POSITIV erfassen
+- Gutschriften/Erstattungen ohne Schlagwort ignorieren
+- total_amount = Summe ALLER gefundenen Schlagwort-Zeilen (positiv). Beispiel: 0,14 + 12,00 + 1,87 = 14,01
+- Die Summenzeilen des Dokuments (Gesamtbetrag, Auszahlung, Saldo) gelten NICHT für diesen Beleg: total_amount_label, net_amount_label, tax_amount_label und totals_block MÜSSEN null bzw. leer bleiben
 
 description: Gefundene Positionen mit Beträgen auflisten, z.B.: "Transaktionsgebühr 3,50€; Betreiber-Abonnement 12,00€"`;
   } else {
@@ -871,35 +874,44 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
       let anchorNet: number | null = null;
       let anchorLabel = '';
 
-      if (isGrossLabel(rawData.total_amount_label) && Math.abs(Number(rawData.total_amount)) > 0) {
-        anchorGross = Math.abs(Number(rawData.total_amount));
-        anchorLabel = String(rawData.total_amount_label);
-      } else {
-        const fromBlock = pickFromBlock(isGrossLabel);
-        if (fromBlock != null) {
-          anchorGross = fromBlock;
-          anchorLabel = 'totals_block';
+      // Im Ausgaben-Filter-Modus (Sammelabrechnungen) gelten die Dokument-Summen NICHT
+      // für diesen Beleg – nur die gefilterten Schlagwort-Positionen zählen.
+      const expensesOnlyMode = !!expensesOnlyPrompt;
+      if (expensesOnlyMode) {
+        console.log('[Totals Anchor] Übersprungen – Ausgaben-Filter-Modus aktiv');
+      }
+
+      if (!expensesOnlyMode) {
+        if (isGrossLabel(rawData.total_amount_label) && Math.abs(Number(rawData.total_amount)) > 0) {
+          anchorGross = Math.abs(Number(rawData.total_amount));
+          anchorLabel = String(rawData.total_amount_label);
+        } else {
+          const fromBlock = pickFromBlock(isGrossLabel);
+          if (fromBlock != null) {
+            anchorGross = fromBlock;
+            anchorLabel = 'totals_block';
+          }
         }
-      }
 
-      if (isNetLabel(rawData.net_amount_label) && Math.abs(Number(rawData.net_amount)) > 0) {
-        anchorNet = Math.abs(Number(rawData.net_amount));
-      } else {
-        anchorNet = pickFromBlock(isNetLabel);
-      }
+        if (isNetLabel(rawData.net_amount_label) && Math.abs(Number(rawData.net_amount)) > 0) {
+          anchorNet = Math.abs(Number(rawData.net_amount));
+        } else {
+          anchorNet = pickFromBlock(isNetLabel);
+        }
 
-      // Kein Brutto-Label, aber Netto-Label + ausgewiesene Steuer → Brutto rekonstruieren
-      if (anchorGross == null && anchorNet != null && Math.abs(Number(rawData.tax_amount)) > 0) {
-        anchorGross = Math.round((anchorNet + Math.abs(Number(rawData.tax_amount))) * 100) / 100;
-        anchorLabel = 'netto+steuer';
-      }
+        // Kein Brutto-Label, aber Netto-Label + ausgewiesene Steuer → Brutto rekonstruieren
+        if (anchorGross == null && anchorNet != null && Math.abs(Number(rawData.tax_amount)) > 0) {
+          anchorGross = Math.round((anchorNet + Math.abs(Number(rawData.tax_amount))) * 100) / 100;
+          anchorLabel = 'netto+steuer';
+        }
 
-      if (anchorGross != null) {
-        console.log(`[Totals Anchor] Brutto ${anchorGross} aus Summenzeile "${anchorLabel}"`);
-        extractedData.amount_gross = anchorGross;
-        if (anchorNet != null && anchorNet > 0 && anchorNet <= anchorGross) {
-          extractedData.amount_net = anchorNet;
-          extractedData.vat_amount = Math.round((anchorGross - anchorNet) * 100) / 100;
+        if (anchorGross != null) {
+          console.log(`[Totals Anchor] Brutto ${anchorGross} aus Summenzeile "${anchorLabel}"`);
+          extractedData.amount_gross = anchorGross;
+          if (anchorNet != null && anchorNet > 0 && anchorNet <= anchorGross) {
+            extractedData.amount_net = anchorNet;
+            extractedData.vat_amount = Math.round((anchorGross - anchorNet) * 100) / 100;
+          }
         }
       }
 
@@ -914,12 +926,14 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
       if (validLineItems.length > 0) {
         const rateGroups: Record<string, { sum: number; descriptions: string[] }> = {};
         let lineItemsSum = 0;
-        // Vorzeichen bleiben erhalten: Rabatte/Gutschriften werden abgezogen, nicht addiert
+        // Vorzeichen bleiben erhalten: Rabatte/Gutschriften werden abgezogen, nicht addiert.
+        // Ausnahme: im Ausgaben-Filter-Modus sind auch Klammer-/Minus-Beträge Ausgaben → Betrag positiv.
         for (const li of validLineItems) {
           const rateKey = String(parseFloat(String(li.tax_rate).replace(',', '.').replace('%', '')) || 0);
           if (!rateGroups[rateKey]) rateGroups[rateKey] = { sum: 0, descriptions: [] };
-          rateGroups[rateKey].sum += Number(li.total);
-          lineItemsSum += Number(li.total);
+          const liTotal = expensesOnlyMode ? Math.abs(Number(li.total)) : Number(li.total);
+          rateGroups[rateKey].sum += liTotal;
+          lineItemsSum += liTotal;
           if (li.description) rateGroups[rateKey].descriptions.push(li.description);
         }
 
@@ -928,9 +942,12 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         const aiGrossVal = Number(extractedData.amount_gross);
         const closeTo = (a: number, b: number) =>
           Number.isFinite(a) && Number.isFinite(b) && b > 0 && Math.abs(a - b) / Math.max(b, 1) < 0.01;
-        const lineItemsAreNet =
-          rawData.line_items_are_net === true ||
-          (closeTo(Math.abs(lineItemsSum), aiNet) && !closeTo(Math.abs(lineItemsSum), aiGrossVal));
+        // Im Ausgaben-Filter-Modus sind die gefilterten Positionsbeträge die tatsächlich
+        // belasteten Beträge (brutto) – nicht hochrechnen.
+        const lineItemsAreNet = expensesOnlyMode
+          ? false
+          : (rawData.line_items_are_net === true ||
+            (closeTo(Math.abs(lineItemsSum), aiNet) && !closeTo(Math.abs(lineItemsSum), aiGrossVal)));
         // Positionssumme → Bruttowert je Satz
         const toGross = (sum: number, rate: number) =>
           lineItemsAreNet && rate > 0 ? sum * (1 + rate / 100) : sum;
