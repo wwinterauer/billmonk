@@ -67,7 +67,7 @@ async function buildCandidatePool(
 ): Promise<Candidate[]> {
   const { data: receipts } = await supabase
     .from("receipts")
-    .select("id, amount_gross, receipt_date, vendor, invoice_number, bank_transaction_id")
+    .select("id, amount_gross, receipt_date, vendor, vendor_id, invoice_number, bank_transaction_id")
     .eq("user_id", userId)
     .in("status", ["approved", "completed", "review"])
     .gte("receipt_date", minDate)
@@ -77,6 +77,22 @@ async function buildCandidatePool(
   if (all.length === 0) return [];
 
   const receiptIds = all.map((r: any) => r.id);
+
+  // Vendor aliases (brand, legal names, keywords) sharpen the text matching
+  const { data: vendors } = await supabase
+    .from("vendors")
+    .select("id, display_name, legal_names, detected_names, extraction_keywords")
+    .eq("user_id", userId);
+  const aliasByVendor = new Map<string, string[]>();
+  for (const v of (vendors ?? []) as any[]) {
+    const list = [
+      v.display_name,
+      ...(Array.isArray(v.legal_names) ? v.legal_names : []),
+      ...(Array.isArray(v.detected_names) ? v.detected_names : []),
+      ...(Array.isArray(v.extraction_keywords) ? v.extraction_keywords : []),
+    ].filter((s: unknown): s is string => typeof s === "string" && s.trim().length > 0);
+    aliasByVendor.set(v.id, list);
+  }
 
   const { data: splitLines } = await supabase
     .from("receipt_split_lines")
@@ -101,6 +117,10 @@ async function buildCandidatePool(
 
   const pool: Candidate[] = [];
   for (const r of all as any[]) {
+    const aliases = [
+      ...(r.vendor ? [r.vendor] : []),
+      ...(r.vendor_id ? aliasByVendor.get(r.vendor_id) ?? [] : []),
+    ];
     const lines = linesByReceipt.get(r.id);
     if (lines && lines.length > 0) {
       for (const l of lines) {
@@ -114,6 +134,7 @@ async function buildCandidatePool(
           vendor: r.vendor,
           invoice_number: r.invoice_number,
           extra_text: l.description,
+          aliases: [...aliases, ...(l.description ? [l.description] : [])],
         });
       }
     } else {
@@ -127,9 +148,11 @@ async function buildCandidatePool(
         vendor: r.vendor,
         invoice_number: r.invoice_number,
         extra_text: null,
+        aliases,
       });
     }
   }
+
   return pool;
 }
 
