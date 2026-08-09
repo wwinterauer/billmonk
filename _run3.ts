@@ -1,0 +1,12 @@
+import fs from 'fs';
+import { parseCsvContent, parseDate, normalizeHeader } from './_t';
+let c = fs.readFileSync('/mnt/user-uploads/260808_meinElba_umsaetze_AT953454500000402263_suche_2.csv','utf8');
+if (c.charCodeAt(0)===0xFEFF) c=c.slice(1);
+const rows = parseCsvContent(c,';');
+const HEADER_KEYWORDS=['datum','date','buchung','valuta','wertstellung','umsatztag','betrag','amount','umsatz','soll','haben','belastung','gutschrift','verwendungszweck','buchungstext','beschreibung','empfänger','auftraggeber'];
+const looks=(row:string[])=>{const cells=row.map(normalizeHeader).filter(Boolean); if(cells.length<2) return 0; return cells.filter(c=>HEADER_KEYWORDS.some(k=>c.includes(k))).length;};
+console.log('row0 matches', looks(rows[0]));
+const sample=rows[0];
+const isDate=(s:string)=>parseDate((s||'').trim())!==null;
+const isAmt=(s:string)=>{const v=(s||'').trim(); if(!v||/[a-zA-Z]/.test(v.replace(/EUR|USD|CHF/gi,'')))return false; return /^-?[\d.,]+$/.test(v.replace(/[€$£\s]/g,''));};
+console.log(sample.map((c,i)=>[i,isDate(c),isAmt(c)]));
