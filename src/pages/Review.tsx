@@ -178,15 +178,17 @@ const Review = () => {
   });
 
   // Load receipts with status='review' (multi-invoice PDFs land here too — surfaced via split_suggestion)
-  const loadReceipts = useCallback(async () => {
+  const loadReceipts = useCallback(async (preferredReceiptId?: string) => {
     setLoading(true);
     try {
       const reviewData = await getReceipts({ status: 'review' });
       const allData = reviewData;
-      
+
+      // Always replace the list with fresh server data — no merge with old state,
+      // so receipts deleted in the meantime (e.g. split originals) disappear.
       setReceipts(allData);
       if (allData.length > 0) {
-        const lastId = sessionStorage.getItem('review-last-receipt-id');
+        const lastId = preferredReceiptId ?? sessionStorage.getItem('review-last-receipt-id');
         const initialSearch = searchParams.get('vendor') || '';
         // Simple initial filter (vendorMap may not be ready yet)
         const initialFiltered = initialSearch.trim()
@@ -206,7 +208,11 @@ const Review = () => {
           setCurrentIndex(idx);
           populateForm(initialFiltered[idx]);
           loadImage(initialFiltered[idx]);
+        } else {
+          setCurrentIndex(0);
         }
+      } else {
+        setCurrentIndex(0);
       }
     } catch (error) {
       toast({
@@ -222,6 +228,7 @@ const Review = () => {
   useEffect(() => {
     loadReceipts();
   }, []);
+
 
   // Vendor search: build lookup and filtered list
   const vendorMap = useMemo(() => {
