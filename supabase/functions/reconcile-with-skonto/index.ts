@@ -249,8 +249,11 @@ serve(async (req) => {
     }
     const minDate = new Date(Math.min(...datedTxs.map((t) => new Date(t.transaction_date!).getTime())));
     const maxDate = new Date(Math.max(...datedTxs.map((t) => new Date(t.transaction_date!).getTime())));
-    minDate.setDate(minDate.getDate() - 60);
-    maxDate.setDate(maxDate.getDate() + 60);
+    // Wide window so that reference matches (invoice number in the payment text)
+    // also work when the invoice was paid many months later.
+    minDate.setDate(minDate.getDate() - 400);
+    maxDate.setDate(maxDate.getDate() + 400);
+
 
     const pool = await buildCandidatePool(
       supabase,
