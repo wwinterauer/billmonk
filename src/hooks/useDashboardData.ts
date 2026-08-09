@@ -95,6 +95,7 @@ export function useDashboardData(year: number, month: number) {
         .from('receipts')
         .select('id, amount_gross, vat_amount, status, ai_confidence, category, tax_type, is_split_booking')
         .eq('user_id', user.id)
+        .not('status', 'in', '("split")')
         .gte('created_at', startOfMonth.toISOString())
         .lte('created_at', endOfMonth.toISOString());
 
@@ -105,6 +106,7 @@ export function useDashboardData(year: number, month: number) {
         .from('receipts')
         .select('amount_gross, category')
         .eq('user_id', user.id)
+        .not('status', 'in', '("split")')
         .gte('created_at', startOfPrevMonth.toISOString())
         .lte('created_at', endOfPrevMonth.toISOString());
 
@@ -146,6 +148,7 @@ export function useDashboardData(year: number, month: number) {
         .from('receipts')
         .select('id, receipt_date, created_at, vendor, amount_gross, status')
         .eq('user_id', user.id)
+        .not('status', 'in', '("split")')
         .order('created_at', { ascending: false })
         .limit(5);
 

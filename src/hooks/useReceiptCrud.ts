@@ -24,6 +24,10 @@ export function useReceiptCrud() {
       query = query.eq('status', filters.status);
     }
 
+    if (filters?.excludeStatus && filters.excludeStatus.length > 0) {
+      query = query.not('status', 'in', `(${filters.excludeStatus.join(',')})`);
+    }
+
     const applyDateRangeWithCreatedAtFallback = (dateFrom?: string, dateTo?: string) => {
       const receiptDateConditions: string[] = [];
       const createdAtConditions: string[] = ['receipt_date.is.null'];
