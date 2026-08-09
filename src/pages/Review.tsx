@@ -1415,9 +1415,14 @@ const Review = () => {
                       receiptId={currentReceipt.id}
                       splitSuggestion={currentReceipt.split_suggestion as any}
                       pageCount={currentReceipt.page_count || 1}
-                      onSplitComplete={() => {
+                      onSplitComplete={async () => {
+                        // The original receipt is deleted server-side after a split —
+                        // reload the list so it disappears and the new parts show up.
+                        sessionStorage.removeItem('review-last-receipt-id');
+                        await loadReceipts();
                         queryClient.invalidateQueries({ queryKey: ['receipts'] });
                       }}
+
                     />
                   </div>
                 )}
