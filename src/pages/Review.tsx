@@ -926,27 +926,28 @@ const Review = () => {
     }
   };
   const canApproveAll = useMemo(() => {
-    return receipts.every(r => 
+    return filteredReceipts.every(r => 
       r.ai_confidence !== null && 
       r.ai_confidence >= 0.8 &&
       r.vendor &&
       r.amount_gross
     );
-  }, [receipts]);
+  }, [filteredReceipts]);
 
   const handleApproveAll = async () => {
     if (!canApproveAll) return;
     
     setSaving(true);
     try {
-      for (const receipt of receipts) {
+      for (const receipt of filteredReceipts) {
         await updateReceipt(receipt.id, { status: 'approved' });
       }
-      setReceipts([]);
+      const remaining = receipts.filter(r => !filteredReceipts.some(fr => fr.id === r.id));
+      setReceipts(remaining);
       // Invalidate receipts query and trigger sidebar refresh
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
       window.dispatchEvent(new CustomEvent('refresh-review-count'));
-      toast({ title: `${receipts.length} Belege freigegeben` });
+      toast({ title: `${filteredReceipts.length} Belege freigegeben` });
     } catch (error) {
       toast({
         variant: 'destructive',
