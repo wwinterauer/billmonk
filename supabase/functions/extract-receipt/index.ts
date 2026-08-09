@@ -1419,12 +1419,15 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         // enabled and the AI confidence reaches the vendor's threshold.
         let finalStatus: string = 'review';
         let autoApproved = false;
+        let vendorDefaultTagId: string | null = null;
         if (resolvedVendorId) {
           const { data: vendorAuto } = await supabase
             .from('vendors')
-            .select('auto_approve, auto_approve_min_confidence')
+            .select('auto_approve, auto_approve_min_confidence, default_tag_id')
             .eq('id', resolvedVendorId)
             .maybeSingle();
+
+          vendorDefaultTagId = (vendorAuto as any)?.default_tag_id ?? null;
 
           if (vendorAuto?.auto_approve) {
             const confidence = Number(extractedData.confidence ?? 0);
