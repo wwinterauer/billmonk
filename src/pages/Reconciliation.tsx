@@ -157,8 +157,9 @@ export default function Reconciliation() {
         toast({
           title: 'Abgleich abgeschlossen',
           description: exact > 0
-            ? `${exact} Buchung${exact === 1 ? '' : 'en'} exakt zugeordnet. Keine Skonto-Vorschläge.`
+            ? `${exact} Buchung${exact === 1 ? '' : 'en'} zugeordnet${grouped > 0 ? ` (davon ${grouped} über Gruppen-Zuordnung bei gleichen Beträgen – bitte gegenprüfen)` : ''}. Keine Skonto-Vorschläge.`
             : 'Keine passenden Belege gefunden.',
+
         });
       }
     } catch (e) {
