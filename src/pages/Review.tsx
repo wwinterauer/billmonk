@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ProblemReceiptsPanel } from '@/components/receipts/ProblemReceiptsPanel';
+import { NonReceiptPanel } from '@/components/receipts/NonReceiptPanel';
 import { useProblemReceiptCount, useReceiptRetry } from '@/hooks/useReceiptRetry';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
