@@ -1222,6 +1222,10 @@ const Review = () => {
           </div>
         )}
 
+        {/* Documents the AI classified as non-receipts */}
+        <NonReceiptPanel onChanged={loadReceipts} />
+
+
 
 
         {/* Progress Bar */}
