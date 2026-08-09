@@ -715,14 +715,18 @@ const Review = () => {
 
       if (newStatus) {
         // Remove from list and go to next
-        const newReceipts = receipts.filter((_, i) => i !== currentIndex);
+        const newReceipts = receipts.filter(r => r.id !== currentReceipt.id);
         setReceipts(newReceipts);
-        
-        if (newReceipts.length > 0) {
-          const nextIndex = Math.min(currentIndex, newReceipts.length - 1);
+
+        // Compute next position in the filtered list
+        const newFiltered = vendorSearch.trim()
+          ? newReceipts.filter(r => matchesVendorSearch(r, vendorSearch))
+          : newReceipts;
+        if (newFiltered.length > 0) {
+          const nextIndex = Math.min(currentIndex, newFiltered.length - 1);
           setCurrentIndex(nextIndex);
-          populateForm(newReceipts[nextIndex]);
-          loadImage(newReceipts[nextIndex]);
+          populateForm(newFiltered[nextIndex]);
+          loadImage(newFiltered[nextIndex]);
         }
 
         // Invalidate receipts query and trigger sidebar refresh
