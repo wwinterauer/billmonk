@@ -36,7 +36,10 @@ interface Candidate {
   vendor: string | null;
   invoice_number: string | null;
   extra_text: string | null;
+  /** vendor display name, legal names and extraction keywords */
+  aliases: string[];
 }
+
 
 function normalize(s: string | null | undefined): string {
   if (!s) return "";
