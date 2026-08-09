@@ -147,6 +147,8 @@ const Review = () => {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [vendorSearch, setVendorSearch] = useState(() => searchParams.get('vendor') || '');
+  const [unlinkedOnly, setUnlinkedOnly] = useState(() => searchParams.get('filter') === 'unlinked');
+
   const [saving, setSaving] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
