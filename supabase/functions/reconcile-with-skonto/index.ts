@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildGroupPairs, isProcessorTransaction, findReferenceMatch } from "../_shared/reconcileHelpers.ts";
+import { buildGroupPairs, isProcessorTransaction, findReferenceMatch, buildSuggestions } from "../_shared/reconcileHelpers.ts";
 
 
 const corsHeaders = {
