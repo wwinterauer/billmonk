@@ -1544,6 +1544,26 @@ export function VendorManagement() {
               </p>
             </div>
 
+            {/* Immer als "Keine Rechnung" behandeln */}
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5 pr-4">
+                <Label htmlFor="always_not_a_receipt" className="flex items-center gap-2">
+                  <X className="h-4 w-4 text-muted-foreground" />
+                  Immer als „Keine Rechnung" behandeln
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Belege dieses Lieferanten werden nicht als Ausgabe verbucht, sondern automatisch als Hilfsdokument abgelegt (Status „Kein Beleg") und erscheinen nicht in der Review.
+                </p>
+              </div>
+              <Switch
+                id="always_not_a_receipt"
+                checked={formData.always_not_a_receipt}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, always_not_a_receipt: checked }))}
+              />
+            </div>
+
+
             {/* Vertiefte Betragserkennung */}
             <Separator />
             <div className="space-y-2">
