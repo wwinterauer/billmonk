@@ -357,9 +357,12 @@ export function ReceiptAssignmentModal({
   const openReceiptFile = async (e: React.MouseEvent, receipt: Receipt) => {
     e.stopPropagation();
     if (!receipt.file_url) return;
+    setPreview({ url: null, isPdf: receipt.file_url.toLowerCase().endsWith('.pdf'), title: receipt.vendor || 'Beleg' });
     const path = receipt.file_url.replace(/^.*\/receipts\//, '');
     const { data } = await supabase.storage.from('receipts').createSignedUrl(path, 300);
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+    if (data?.signedUrl) {
+      setPreview({ url: data.signedUrl, isPdf: receipt.file_url.toLowerCase().endsWith('.pdf'), title: receipt.vendor || 'Beleg' });
+    }
   };
 
   const ReceiptCard = ({ receipt, showScore = true }: { receipt: ReceiptWithScore; showScore?: boolean }) => (
