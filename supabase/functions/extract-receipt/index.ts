@@ -665,9 +665,13 @@ VAT-KONFIDENZ:
 - vat_detection_method: "explicit"/"calculated"/"estimated"
 
 BETRÄGE: Dezimalzahlen ohne Währungssymbol. 0 wenn nicht erkennbar. Datum: YYYY-MM-DD oder "".
+- total_amount = IMMER der Endbetrag INKLUSIVE MwSt. (z.B. "Summe EUR inkl. MwSt.", "Gesamtbetrag brutto", "Rechnungsbetrag", "Zu zahlen", "Total incl. VAT").
+- net_amount = Betrag OHNE MwSt. (z.B. "Total EUR ohne MwSt.", "Nettosumme", "Zwischensumme", "Warenwert netto").
+- WARNUNG: Enthält die Zeile "ohne MwSt.", "exkl.", "netto" oder "zzgl. MwSt.", darf dieser Wert NIEMALS in total_amount stehen.
+- Bei mehreren Summenzeilen ist der HÖCHSTE Betrag am Ende des Summenblocks das Brutto.
+- Es muss gelten: net_amount + tax_amount = total_amount.
+- line_items_are_net = true, wenn die Positionspreise OHNE MwSt. ausgewiesen sind (typisch bei B2B-Rechnungen), sonst false.
 receipt_number: Rechnungsnummer suchen (RE-Nr, Invoice, Belegnummer etc.) oder "".
-
-LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenzeilen.${expensesOnlyPrompt}${extractionHintPrompt}`;
 
     // ── AI API Call with structured output ─────────────────────────
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
