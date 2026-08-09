@@ -136,9 +136,11 @@ export default function Reconciliation() {
         body: { mode: 'preview' },
       });
       if (error) throw error;
-      const exact = (data?.exact_applied ?? 0) + (data?.high_confidence_applied ?? 0) + (data?.group_applied ?? 0);
+      const exact = (data?.exact_applied ?? 0) + (data?.high_confidence_applied ?? 0) + (data?.group_applied ?? 0) + (data?.reference_applied ?? 0);
       const grouped = data?.group_applied ?? 0;
+      const viaReference = data?.reference_applied ?? 0;
       const scanned = data?.scanned_transactions ?? 0;
+
 
       const candidates: SkontoCandidate[] = data?.skonto_candidates ?? [];
       setSkontoCandidates(candidates);
@@ -157,8 +159,9 @@ export default function Reconciliation() {
         toast({
           title: 'Abgleich abgeschlossen',
           description: exact > 0
-            ? `${exact} Buchung${exact === 1 ? '' : 'en'} zugeordnet${grouped > 0 ? ` (davon ${grouped} über Gruppen-Zuordnung bei gleichen Beträgen – bitte gegenprüfen)` : ''}. Keine Skonto-Vorschläge.`
+            ? `${exact} Buchung${exact === 1 ? '' : 'en'} zugeordnet${viaReference > 0 ? `, davon ${viaReference} über die Rechnungsnummer` : ''}${grouped > 0 ? `, ${grouped} über Gruppen-Zuordnung bei gleichen Beträgen (bitte gegenprüfen)` : ''}. Keine Skonto-Vorschläge.`
             : 'Keine passenden Belege gefunden.',
+
 
         });
       }
