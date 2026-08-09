@@ -249,11 +249,23 @@ const Review = () => {
     return receipts.filter(r => matchesVendorSearch(r, vendorSearch));
   }, [receipts, vendorSearch, matchesVendorSearch]);
 
-  // Receipts that came back from the AI without any usable data
+  // Receipts that came back from the AI without any usable data.
+  // Documents the AI *correctly* classified as non-receipts are excluded —
+  // re-analysing them would just yield the same result forever.
   const emptyReceipts = useMemo(
-    () => receipts.filter(r => !r.vendor && !r.vendor_brand && r.amount_gross == null),
+    () =>
+      receipts.filter(
+        r =>
+          !r.vendor &&
+          !r.vendor_brand &&
+          r.amount_gross == null &&
+          r.status !== 'not_a_receipt' &&
+          r.category !== 'Keine Rechnung' &&
+          !(r.notes ?? '').startsWith('Dokumenttyp:'),
+      ),
     [receipts],
   );
+
 
   const {
     isRetrying,
