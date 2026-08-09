@@ -462,15 +462,22 @@ export async function parseCsvFile(file: File, bankType: string): Promise<ParseR
 
     if (!headerFound) {
       const sample = rows.find(r => r && r.some(c => c && c.trim() !== '')) || [];
-      const isDateCell = (s: string) => parseDate((s || '').trim()) !== null;
+      // Strict date detection: only real date patterns count (a value like "-9,19"
+      // must never be treated as a date, otherwise no amount column is found).
+      const STRICT_DATE = /^(\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})(\s.*)?$/;
+      const isDateCell = (s: string) => {
+        const v = (s || '').trim().replace(/\uFEFF/g, '');
+        return STRICT_DATE.test(v) && parseDate(v.split(/\s/)[0]) !== null;
+      };
       const isAmountCell = (s: string) => {
         const v = (s || '').trim();
         if (!v || /[a-zA-Z]/.test(v.replace(/EUR|USD|CHF/gi, ''))) return false;
-        return /^-?[\d.,]+$/.test(v.replace(/[€$£\s]/g, ''));
+        return /^[-+]?[\d.,]+[-+]?$/.test(v.replace(/[€$£\s]/g, ''));
       };
 
       const dateCols = sample.map((c, i) => (isDateCell(c) ? i : -1)).filter(i => i !== -1);
       const amountCols = sample.map((c, i) => (isAmountCell(c) && !isDateCell(c) ? i : -1)).filter(i => i !== -1);
+
       const descCol = sample
         .map((c, i) => ({ i, len: (c || '').length, isText: !isDateCell(c) && !isAmountCell(c) }))
         .filter(x => x.isText)
