@@ -346,6 +346,38 @@ serve(async (req) => {
       }
     }
 
+    // 4c) Group pass: several transactions with identical amount vs. equally many
+    // receipts of one single vendor (e.g. PayPal payments for IONOS invoices).
+    const openTxs = datedTxs.filter(
+      (t) => t.amount && !matchedTxIds.has(t.id),
+    );
+    const openCands = pool.filter(
+      (c) => !usedKeys.has(c.key) && c.receipt_date && c.amount_gross != null,
+    );
+    const groupPairs = buildGroupPairs(
+      openTxs.map((t) => ({ id: t.id, date: t.transaction_date!, amount: Number(t.amount) })),
+      openCands.map((c) => ({
+        key: c.key,
+        date: c.receipt_date!,
+        amount: Number(c.amount_gross),
+        vendorKey: (c.vendor ?? "").trim().toLowerCase(),
+      })),
+      14,
+    );
+    for (const p of groupPairs) {
+      const c = pool.find((x) => x.key === p.key);
+      if (!c || usedKeys.has(c.key) || matchedTxIds.has(p.txId)) continue;
+      // Only auto-assign when the payee is a payment processor or no vendor hint conflicts
+      const tx = openTxs.find((t) => t.id === p.txId);
+      const descNorm = normalize(tx?.description);
+      const vt = tokensOf(c.vendor);
+      const vendorInDesc = vt.length > 0 && vt.every((t) => descNorm.includes(t));
+      if (!isProcessorTransaction(tx?.description) && !vendorInDesc) continue;
+      if (await applyMatch(p.txId, c)) groupApplied++;
+    }
+
+
+
     // 5) Skonto pass: 1–5% deviation, vendor/invoice signal, ±30 days
     for (const tx of datedTxs) {
       if (!tx.amount) continue;
