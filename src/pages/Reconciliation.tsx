@@ -52,7 +52,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ReceiptAssignmentModal } from '@/components/bank-import/ReceiptAssignmentModal';
 import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
-import { SkontoReconcileDialog, type SkontoCandidate } from '@/components/reconciliation/SkontoReconcileDialog';
+import { SkontoReconcileDialog, type SkontoCandidate, type MatchSuggestion, type AcceptedPair } from '@/components/reconciliation/SkontoReconcileDialog';
 import { Sparkles } from 'lucide-react';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { EditableTableHead } from '@/components/expenses/EditableTableHead';
