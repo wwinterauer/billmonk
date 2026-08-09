@@ -1,6 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { matchVendor, hasLegalForm, normalizeVendorName } from "../_shared/vendorMatch.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
