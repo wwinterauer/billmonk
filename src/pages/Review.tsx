@@ -1985,6 +1985,21 @@ const Review = () => {
                               Gelernt
                             </Badge>
                           )}
+                          {/* Summenzeile vs. Positionen widersprüchlich */}
+                          {(currentReceipt as any)?.vat_detection_method === 'totals_line_conflict' && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Badge variant="destructive" className="text-xs py-0 px-1.5">
+                                  Summe prüfen
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Die Summe der erkannten Positionen passt nicht zum ausgewiesenen Gesamtbetrag.
+                                Es wurde der Betrag aus der Summenzeile übernommen — bitte kontrollieren.
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+
                         </div>
                         <Select
                           value={formData.is_mixed_tax_rate ? 'mixed' : formData.vat_rate}
