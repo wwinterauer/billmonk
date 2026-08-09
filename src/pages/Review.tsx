@@ -142,6 +142,7 @@ const Review = () => {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [vendorSearch, setVendorSearch] = useState(() => searchParams.get('vendor') || '');
   const [saving, setSaving] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
