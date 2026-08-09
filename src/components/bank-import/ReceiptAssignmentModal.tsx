@@ -307,12 +307,9 @@ export function ReceiptAssignmentModal({
     setSelectedSplitLine(exact?.id ?? null);
   }, [hasSplitLines, splitLines, transaction]);
 
-  useEffect(() => {
-    const url = preview?.url;
-    return () => {
-      if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
-    };
-  }, [preview?.url]);
+  // Note: blob URLs are revoked explicitly when the preview is closed/replaced,
+  // not in an effect cleanup (StrictMode would revoke them immediately).
+
 
   if (!transaction) return null;
 
