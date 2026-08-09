@@ -423,8 +423,17 @@ export default function Reconciliation() {
         query = query.eq('status', statusFilter);
       }
       if (searchQuery) {
-        query = query.ilike('description', `%${searchQuery}%`);
+        const aq = parseAmountQuery(searchQuery);
+        if (aq) {
+          const escaped = searchQuery.replace(/[(),]/g, ' ').trim();
+          const orParts = [buildAmountOrFilter(aq)];
+          if (escaped) orParts.push(`description.ilike.*${escaped}*`);
+          query = query.or(orParts.join(','));
+        } else {
+          query = query.ilike('description', `%${searchQuery}%`);
+        }
       }
+
       if (dateFrom) {
         query = query.gte('transaction_date', format(dateFrom, 'yyyy-MM-dd'));
       }
