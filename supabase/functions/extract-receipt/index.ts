@@ -1208,7 +1208,32 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           finalCategory = null;
         }
 
+        // Auto-approve: mirror the client-side rule — vendor has auto_approve
+        // enabled and the AI confidence reaches the vendor's threshold.
+        let finalStatus: string = 'review';
+        let autoApproved = false;
+        if (resolvedVendorId) {
+          const { data: vendorAuto } = await supabase
+            .from('vendors')
+            .select('auto_approve, auto_approve_min_confidence')
+            .eq('id', resolvedVendorId)
+            .maybeSingle();
+
+          if (vendorAuto?.auto_approve) {
+            const confidence = Number(extractedData.confidence ?? 0);
+            const minConfidence = Number(vendorAuto.auto_approve_min_confidence ?? 0.8);
+            const needsSplitting = (extractedData as any)?.split_suggestion?.contains_multiple_invoices === true;
+            if (confidence >= minConfidence && !needsSplitting) {
+              finalStatus = 'approved';
+              autoApproved = true;
+              console.log(`[Auto-Approve] Receipt ${receiptId} approved (confidence ${confidence} >= ${minConfidence})`);
+            }
+          }
+        }
+
         const { error: updateError } = await supabase.from('receipts').update({
+          vendor_id: resolvedVendorId,
+          auto_approved: autoApproved,
           vendor: extractedData.vendor,
           vendor_brand: extractedData.vendor_brand,
           description: extractedData.description,
