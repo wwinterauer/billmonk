@@ -748,9 +748,27 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
     if (cleanedContent.endsWith("```")) cleanedContent = cleanedContent.slice(0, -3);
     cleanedContent = cleanedContent.trim();
 
+    let rawData: any;
     try {
-      const rawData = JSON.parse(cleanedContent);
+      rawData = JSON.parse(cleanedContent);
+    } catch (jsonErr) {
+      console.error("AI JSON invalid:", jsonErr, cleanedContent.slice(0, 500));
+      if (receiptId) {
+        await supabase.from('receipts').update({
+          status: 'review',
+          notes: 'KI-Antwort war kein gültiges JSON. Bitte manuell prüfen.',
+          ai_processed_at: new Date().toISOString(),
+        }).eq('id', receiptId);
+      }
+      return new Response(
+        JSON.stringify({ success: false, error: "Failed to parse AI response", raw: content }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    try {
       const extractedData = mapSchemaToResult(rawData);
+
 
       // ── Post-Processing: amounts positive ────────────────────────
       if (extractedData.amount_gross != null && extractedData.amount_gross < 0) {
