@@ -980,7 +980,7 @@ const Review = () => {
   }, [currentIndex, goToReceipt]);
 
   // Reviewed count for progress
-  const totalToReview = receipts.length;
+  const totalToReview = filteredReceipts.length;
 
   const activeTab = searchParams.get('tab') === 'problems' ? 'problems' : 'review';
   const setTab = (tab: 'review' | 'problems') => {
