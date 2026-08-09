@@ -266,14 +266,13 @@ export function scoreMatch(
   }
 
   const descNorm = normalizeText(tx.description);
-  const descNoSpace = descNorm.replace(/\s+/g, "");
 
   // Invoice number in the payment text
-  const ref = referenceKey(c.invoiceNumber);
-  if (ref && descNoSpace.includes(ref)) {
+  if (referenceHit(c.invoiceNumber, tx.description)) {
     score += 45;
     reasons.push("Rechnungsnummer im Text");
   }
+
 
   // Vendor / alias hit
   const aliasHit = c.aliases
