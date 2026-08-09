@@ -42,6 +42,7 @@ export interface Vendor {
   auto_approve_min_confidence: number;
   // Expenses-only extraction
   expenses_only_extraction: boolean;
+  always_not_a_receipt: boolean;
   extraction_keywords: string[];
   extraction_hint: string;
   created_at: string;
@@ -113,6 +114,7 @@ export function useVendors() {
           auto_approve: v.auto_approve ?? false,
           auto_approve_min_confidence: v.auto_approve_min_confidence ?? 0.8,
           expenses_only_extraction: v.expenses_only_extraction ?? false,
+          always_not_a_receipt: v.always_not_a_receipt ?? false,
           extraction_keywords: v.extraction_keywords || [],
           extraction_hint: v.extraction_hint ?? '',
         };
@@ -205,6 +207,7 @@ export function useVendors() {
       auto_approve: data.auto_approve ?? false,
       auto_approve_min_confidence: data.auto_approve_min_confidence ?? 0.8,
       expenses_only_extraction: data.expenses_only_extraction ?? false,
+      always_not_a_receipt: data.always_not_a_receipt ?? false,
       extraction_keywords: data.extraction_keywords || [],
       extraction_hint: data.extraction_hint ?? '',
     } as Vendor;
@@ -217,7 +220,7 @@ export function useVendors() {
 
   const updateVendor = async (
     id: string,
-    updates: Partial<Pick<Vendor, 'display_name' | 'vendor_number' | 'legal_names' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_tax_type' | 'field_defaults' | 'field_defaults_stats' | 'field_suggestions_dismissed' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'extraction_keywords' | 'extraction_hint'>>
+    updates: Partial<Pick<Vendor, 'display_name' | 'vendor_number' | 'legal_names' | 'detected_names' | 'default_category_id' | 'default_tag_id' | 'default_vat_rate' | 'default_tax_type' | 'field_defaults' | 'field_defaults_stats' | 'field_suggestions_dismissed' | 'notes' | 'website' | 'auto_approve' | 'auto_approve_min_confidence' | 'expenses_only_extraction' | 'always_not_a_receipt' | 'extraction_keywords' | 'extraction_hint'>>
   ): Promise<{ vendor: Vendor; syncedReceipts: number; autoApprovedReceipts: number }> => {
     if (!user) throw new Error('Nicht angemeldet');
     if (isUpdatingRef.current) {
@@ -518,6 +521,7 @@ export function useVendors() {
       auto_approve: data.auto_approve ?? false,
       auto_approve_min_confidence: data.auto_approve_min_confidence ?? 0.8,
       expenses_only_extraction: data.expenses_only_extraction ?? false,
+      always_not_a_receipt: data.always_not_a_receipt ?? false,
       extraction_keywords: data.extraction_keywords || [],
       extraction_hint: data.extraction_hint ?? '',
     } as Vendor;

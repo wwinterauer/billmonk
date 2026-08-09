@@ -150,6 +150,7 @@ export function VendorManagement() {
     auto_approve: false,
     auto_approve_min_confidence: 0.8,
     expenses_only_extraction: false,
+    always_not_a_receipt: false,
     extraction_keywords: [] as string[],
     extraction_hint: '',
   });
@@ -173,6 +174,7 @@ export function VendorManagement() {
       auto_approve: false,
       auto_approve_min_confidence: 0.8,
       expenses_only_extraction: false,
+      always_not_a_receipt: false,
       extraction_keywords: [],
       extraction_hint: '',
     });
@@ -197,6 +199,7 @@ export function VendorManagement() {
       auto_approve: vendor.auto_approve ?? false,
       auto_approve_min_confidence: vendor.auto_approve_min_confidence ?? 0.8,
       expenses_only_extraction: vendor.expenses_only_extraction ?? false,
+      always_not_a_receipt: vendor.always_not_a_receipt ?? false,
       extraction_keywords: vendor.extraction_keywords || [],
       extraction_hint: vendor.extraction_hint || '',
     });
@@ -280,6 +283,7 @@ export function VendorManagement() {
           auto_approve: formData.auto_approve,
           auto_approve_min_confidence: formData.auto_approve_min_confidence,
           expenses_only_extraction: formData.expenses_only_extraction,
+          always_not_a_receipt: formData.always_not_a_receipt,
           extraction_keywords: formData.extraction_keywords,
           extraction_hint: formData.extraction_hint,
         });
