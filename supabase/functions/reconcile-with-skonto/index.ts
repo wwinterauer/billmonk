@@ -384,9 +384,13 @@ serve(async (req) => {
         if (c.split_line_id) {
           if (lineTokens.some((t) => descNorm.includes(t))) viaVendor = true;
         } else {
-          const vt = tokensOf(c.vendor);
-          if (vt.length > 0 && vt.every((t) => descNorm.includes(t))) viaVendor = true;
+          const aliasHit = (c.aliases ?? []).some((a) => {
+            const at = tokensOf(a);
+            return at.length > 0 && at.every((t) => descNorm.includes(t));
+          });
+          if (aliasHit) viaVendor = true;
         }
+
         if (viaInvoice || viaVendor) matches.push({ c, viaInvoice, viaVendor });
       }
 
