@@ -942,9 +942,12 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         const aiGrossVal = Number(extractedData.amount_gross);
         const closeTo = (a: number, b: number) =>
           Number.isFinite(a) && Number.isFinite(b) && b > 0 && Math.abs(a - b) / Math.max(b, 1) < 0.01;
-        const lineItemsAreNet =
-          rawData.line_items_are_net === true ||
-          (closeTo(Math.abs(lineItemsSum), aiNet) && !closeTo(Math.abs(lineItemsSum), aiGrossVal));
+        // Im Ausgaben-Filter-Modus sind die gefilterten Positionsbeträge die tatsächlich
+        // belasteten Beträge (brutto) – nicht hochrechnen.
+        const lineItemsAreNet = expensesOnlyMode
+          ? false
+          : (rawData.line_items_are_net === true ||
+            (closeTo(Math.abs(lineItemsSum), aiNet) && !closeTo(Math.abs(lineItemsSum), aiGrossVal)));
         // Positionssumme → Bruttowert je Satz
         const toGross = (sum: number, rate: number) =>
           lineItemsAreNet && rate > 0 ? sum * (1 + rate / 100) : sum;
