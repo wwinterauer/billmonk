@@ -93,7 +93,9 @@ export function buildAmountOrFilter(aq: AmountQuery): string {
 
 export function describeAmountQuery(aq: AmountQuery): string {
   const fmt = (n: number) =>
-    new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+    new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+      Math.round(n * 100) / 100,
+    );
   switch (aq.kind) {
     case 'exact':
       return `Betrag ${fmt((aq.min + aq.max) / 2)} €`;
@@ -102,6 +104,6 @@ export function describeAmountQuery(aq: AmountQuery): string {
     case 'lt':
       return `Betrag unter ${fmt(aq.value)} €`;
     case 'range':
-      return `Betrag ${fmt(aq.min)} – ${fmt(aq.max)} €`;
+      return `Betrag ${fmt(aq.min + EPS)} – ${fmt(aq.max - EPS)} €`;
   }
 }
