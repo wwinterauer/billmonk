@@ -414,6 +414,20 @@ export function ReceiptAssignmentModal({
         </p>
         {showScore && getMatchBadge(receipt.matchScore)}
       </div>
+
+      {receipt.file_url && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 flex-shrink-0"
+          title="Beleg öffnen"
+          aria-label="Beleg öffnen"
+          onClick={(e) => openReceiptFile(e, receipt)}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 
