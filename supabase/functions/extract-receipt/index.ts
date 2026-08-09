@@ -801,6 +801,30 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         }));
       }
 
+      // ── Post-Processing: Brutto/Netto-Verwechslung korrigieren ───
+      // Häufiger AI-Fehler: die Zeile "Total ohne MwSt." wird als Gesamtbetrag genommen.
+      {
+        const gross = Number(extractedData.amount_gross);
+        const net = Number(extractedData.amount_net);
+        const vat = Number(extractedData.vat_amount);
+        const rate = Number(extractedData.vat_rate);
+        const nearlyEqual = Number.isFinite(gross) && Number.isFinite(net) && net > 0 &&
+          Math.abs(gross - net) / Math.max(net, 1) < 0.01;
+
+        if (nearlyEqual && Number.isFinite(vat) && vat > 0) {
+          const corrected = Math.round((net + vat) * 100) / 100;
+          console.warn(`[Gross Fix] total_amount ${gross} entsprach dem Nettobetrag → Brutto korrigiert auf ${corrected}`);
+          extractedData.amount_gross = corrected;
+          (extractedData as any).vat_confidence = Math.min(Number((extractedData as any).vat_confidence) || 0.8, 0.7);
+        } else if (nearlyEqual && Number.isFinite(rate) && rate > 0) {
+          const corrected = Math.round(net * (1 + rate / 100) * 100) / 100;
+          console.warn(`[Gross Fix] total_amount ${gross} entsprach dem Nettobetrag → Brutto ${corrected} (${rate}%)`);
+          extractedData.amount_gross = corrected;
+          extractedData.vat_amount = Math.round((corrected - net) * 100) / 100;
+          (extractedData as any).vat_confidence = Math.min(Number((extractedData as any).vat_confidence) || 0.8, 0.7);
+        }
+      }
+
       // ── Post-Processing: rebuild tax_rate_details from line_items (truth from granular data) ──
       const lineItems = Array.isArray(rawData.line_items) ? rawData.line_items : [];
       
