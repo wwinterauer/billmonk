@@ -789,8 +789,13 @@ const Expenses = () => {
     if (dateFrom) params.set('from', format(dateFrom, 'yyyy-MM-dd'));
     if (dateTo) params.set('to', format(dateTo, 'yyyy-MM-dd'));
     if (statusFilter !== 'all') params.set('status', statusFilter);
+    if (tagFilter.includes('__none__')) {
+      params.set('noTags', '1');
+    } else if (tagFilter.length > 0) {
+      params.set('tags', tagFilter.join(','));
+    }
     setSearchParams(params, { replace: true });
-  }, [dateFrom, dateTo, statusFilter, setSearchParams]);
+  }, [dateFrom, dateTo, statusFilter, tagFilter, setSearchParams]);
 
   useEffect(() => {
     loadReceipts();
