@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
       let vendorRow = vendorId ? (vendors ?? []).find(v => v.id === vendorId) ?? null : null;
 
       if (!vendorId) {
-        const match = matchVendor(vendors ?? [], receipt.vendor, receipt.vendor_brand);
+        const match = matchVendor(vendors ?? [], receipt.vendor, receipt.vendor_brand, receiptCounts);
         if (!match) continue;
         vendorId = match.id;
         vendorRow = match;
