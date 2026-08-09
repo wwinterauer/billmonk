@@ -233,15 +233,31 @@ serve(async (req) => {
       throw new Error("Keine Splits konnten erstellt werden");
     }
 
-    // Original-Receipt als "split" markieren
-    await supabase
+    // Original-Receipt und Original-PDF löschen, damit der Beleg nicht doppelt vorkommt
+    const originalFileUrl = originalReceipt.file_url;
+    const { error: deleteReceiptError } = await supabase
       .from('receipts')
-      .update({
-        status: 'split',
-        notes: `Aufgeteilt in ${createdReceipts.length} Teile: ${createdReceipts.map(r => r.file_name).join(', ')}`,
-        split_suggestion: null,
-      })
-      .eq('id', receiptId);
+      .delete()
+      .eq('id', receiptId)
+      .eq('user_id', user.id);
+
+    if (deleteReceiptError) {
+      console.error(`Failed to delete original receipt ${receiptId}:`, deleteReceiptError);
+    } else {
+      console.log(`Deleted original receipt ${receiptId}`);
+    }
+
+    if (originalFileUrl && !deleteReceiptError) {
+      const { error: deleteStorageError } = await supabase.storage
+        .from('receipts')
+        .remove([originalFileUrl]);
+
+      if (deleteStorageError) {
+        console.error(`Failed to delete original PDF ${originalFileUrl}:`, deleteStorageError);
+      } else {
+        console.log(`Deleted original PDF ${originalFileUrl}`);
+      }
+    }
 
     console.log(`Split complete: ${createdReceipts.length} receipts created from ${receiptId}`);
 
