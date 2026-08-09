@@ -27,6 +27,7 @@ import {
   Copy,
   GitCompare,
   FileX,
+  Search,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -90,7 +91,7 @@ import { SplitBookingEditor } from '@/components/receipts/SplitBookingEditor';
 import { usePlan } from '@/hooks/usePlan';
 import { useVatRates } from '@/hooks/useVatRates';
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
-import { useVendors } from '@/hooks/useVendors';
+import { useVendors, type Vendor } from '@/hooks/useVendors';
 import { FieldDefaultSuggestion } from '@/components/receipts/FieldDefaultSuggestion';
 import { VendorAutocomplete } from '@/components/receipts/VendorAutocomplete';
 import { VendorBrandAutocomplete } from '@/components/receipts/VendorBrandAutocomplete';
@@ -135,13 +136,14 @@ const Review = () => {
   const { splitBookingEnabled } = usePlan();
   const { vatRateGroups, defaultVatRate } = useVatRates();
   const { trackFieldChange } = useVendorFieldDefaults();
-  const { updateVendor } = useVendors();
+  const { updateVendor, vendors } = useVendors();
   const queryClient = useQueryClient();
 
   // State
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [vendorSearch, setVendorSearch] = useState(() => searchParams.get('vendor') || '');
   const [saving, setSaving] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -182,14 +184,26 @@ const Review = () => {
       setReceipts(allData);
       if (allData.length > 0) {
         const lastId = sessionStorage.getItem('review-last-receipt-id');
-        const restoredIdx = lastId ? allData.findIndex(r => r.id === lastId) : -1;
-        const idx = restoredIdx >= 0 ? restoredIdx : 0;
-        if (restoredIdx < 0 && lastId) {
-          sessionStorage.removeItem('review-last-receipt-id');
+        const initialSearch = searchParams.get('vendor') || '';
+        // Simple initial filter (vendorMap may not be ready yet)
+        const initialFiltered = initialSearch.trim()
+          ? allData.filter(r =>
+              (r.vendor ?? '').toLowerCase().includes(initialSearch.toLowerCase()) ||
+              (r.vendor_brand ?? '').toLowerCase().includes(initialSearch.toLowerCase())
+            )
+          : allData;
+        const restoredIdx = lastId ? initialFiltered.findIndex(r => r.id === lastId) : -1;
+        const idx = initialFiltered.length > 0
+          ? (restoredIdx >= 0 ? restoredIdx : 0)
+          : 0;
+        if (initialFiltered.length > 0) {
+          if (restoredIdx < 0 && lastId) {
+            sessionStorage.removeItem('review-last-receipt-id');
+          }
+          setCurrentIndex(idx);
+          populateForm(initialFiltered[idx]);
+          loadImage(initialFiltered[idx]);
         }
-        setCurrentIndex(idx);
-        populateForm(allData[idx]);
-        loadImage(allData[idx]);
       }
     } catch (error) {
       toast({
@@ -200,13 +214,39 @@ const Review = () => {
     } finally {
       setLoading(false);
     }
-  }, [getReceipts, toast]);
+  }, [getReceipts, toast, searchParams]);
 
   useEffect(() => {
     loadReceipts();
   }, []);
 
-  const currentReceipt = receipts[currentIndex] || null;
+  // Vendor search: build lookup and filtered list
+  const vendorMap = useMemo(() => {
+    const map = new Map<string, Vendor>();
+    for (const v of vendors) {
+      map.set(v.id, v);
+    }
+    return map;
+  }, [vendors]);
+
+  const matchesVendorSearch = useCallback((receipt: Receipt, term: string) => {
+    if (!term.trim()) return true;
+    const q = term.toLowerCase().trim();
+    const vendor = receipt.vendor_id ? vendorMap.get(receipt.vendor_id) : null;
+    return (
+      (receipt.vendor ?? '').toLowerCase().includes(q) ||
+      (receipt.vendor_brand ?? '').toLowerCase().includes(q) ||
+      (vendor?.display_name ?? '').toLowerCase().includes(q) ||
+      vendor?.legal_names?.some(n => n.toLowerCase().includes(q))
+    );
+  }, [vendorMap]);
+
+  const filteredReceipts = useMemo(() => {
+    if (!vendorSearch.trim()) return receipts;
+    return receipts.filter(r => matchesVendorSearch(r, vendorSearch));
+  }, [receipts, vendorSearch, matchesVendorSearch]);
+
+  const currentReceipt = filteredReceipts[currentIndex] || null;
 
   // Persist current receipt id across navigation
   useEffect(() => {
@@ -214,6 +254,35 @@ const Review = () => {
       sessionStorage.setItem('review-last-receipt-id', currentReceipt.id);
     }
   }, [currentReceipt?.id]);
+
+  // Sync vendor search with URL param
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (vendorSearch.trim()) {
+      params.set('vendor', vendorSearch.trim());
+    } else {
+      params.delete('vendor');
+    }
+    setSearchParams(params, { replace: true });
+  }, [vendorSearch, setSearchParams]);
+
+  // Keep currentIndex valid when filtered list changes
+  useEffect(() => {
+    if (filteredReceipts.length === 0) {
+      setCurrentIndex(0);
+      return;
+    }
+    if (currentIndex >= filteredReceipts.length) {
+      const nextIndex = Math.max(0, filteredReceipts.length - 1);
+      setCurrentIndex(nextIndex);
+      populateForm(filteredReceipts[nextIndex]);
+      loadImage(filteredReceipts[nextIndex]);
+    } else if (currentReceipt === null && filteredReceipts.length > 0) {
+      setCurrentIndex(0);
+      populateForm(filteredReceipts[0]);
+      loadImage(filteredReceipts[0]);
+    }
+  }, [filteredReceipts.length, currentIndex, currentReceipt]);
 
   // Vendor extraction data for ReanalyzeOptions
   const [currentVendorData, setCurrentVendorData] = useState<{
@@ -432,12 +501,12 @@ const Review = () => {
       });
   }, [defaultVatRate, formData.category]);
   const goToReceipt = useCallback((index: number) => {
-    if (index >= 0 && index < receipts.length) {
+    if (index >= 0 && index < filteredReceipts.length) {
       setCurrentIndex(index);
-      populateForm(receipts[index]);
-      loadImage(receipts[index]);
+      populateForm(filteredReceipts[index]);
+      loadImage(filteredReceipts[index]);
     }
-  }, [receipts]);
+  }, [filteredReceipts]);
 
   // Calculate net amount and VAT
   const calculations = useMemo(() => {
@@ -646,14 +715,18 @@ const Review = () => {
 
       if (newStatus) {
         // Remove from list and go to next
-        const newReceipts = receipts.filter((_, i) => i !== currentIndex);
+        const newReceipts = receipts.filter(r => r.id !== currentReceipt.id);
         setReceipts(newReceipts);
-        
-        if (newReceipts.length > 0) {
-          const nextIndex = Math.min(currentIndex, newReceipts.length - 1);
+
+        // Compute next position in the filtered list
+        const newFiltered = vendorSearch.trim()
+          ? newReceipts.filter(r => matchesVendorSearch(r, vendorSearch))
+          : newReceipts;
+        if (newFiltered.length > 0) {
+          const nextIndex = Math.min(currentIndex, newFiltered.length - 1);
           setCurrentIndex(nextIndex);
-          populateForm(newReceipts[nextIndex]);
-          loadImage(newReceipts[nextIndex]);
+          populateForm(newFiltered[nextIndex]);
+          loadImage(newFiltered[nextIndex]);
         }
 
         // Invalidate receipts query and trigger sidebar refresh
@@ -679,7 +752,7 @@ const Review = () => {
 
   // Skip to next receipt
   const skipReceipt = () => {
-    if (currentIndex < receipts.length - 1) {
+    if (currentIndex < filteredReceipts.length - 1) {
       goToReceipt(currentIndex + 1);
     } else if (currentIndex > 0) {
       goToReceipt(currentIndex - 1);
@@ -697,13 +770,17 @@ const Review = () => {
         category: NO_RECEIPT_CATEGORY,
       } as Partial<Receipt>);
 
-      const newReceipts = receipts.filter((_, i) => i !== currentIndex);
+      const newReceipts = receipts.filter(r => r.id !== currentReceipt.id);
       setReceipts(newReceipts);
-      if (newReceipts.length > 0) {
-        const nextIndex = Math.min(currentIndex, newReceipts.length - 1);
+
+      const newFiltered = vendorSearch.trim()
+        ? newReceipts.filter(r => matchesVendorSearch(r, vendorSearch))
+        : newReceipts;
+      if (newFiltered.length > 0) {
+        const nextIndex = Math.min(currentIndex, newFiltered.length - 1);
         setCurrentIndex(nextIndex);
-        populateForm(newReceipts[nextIndex]);
-        loadImage(newReceipts[nextIndex]);
+        populateForm(newFiltered[nextIndex]);
+        loadImage(newFiltered[nextIndex]);
       }
 
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
@@ -727,13 +804,17 @@ const Review = () => {
     setSaving(true);
     try {
       await deleteReceipt(currentReceipt.id);
-      const newReceipts = receipts.filter((_, i) => i !== currentIndex);
+      const newReceipts = receipts.filter(r => r.id !== currentReceipt.id);
       setReceipts(newReceipts);
-      if (newReceipts.length > 0) {
-        const nextIndex = Math.min(currentIndex, newReceipts.length - 1);
+
+      const newFiltered = vendorSearch.trim()
+        ? newReceipts.filter(r => matchesVendorSearch(r, vendorSearch))
+        : newReceipts;
+      if (newFiltered.length > 0) {
+        const nextIndex = Math.min(currentIndex, newFiltered.length - 1);
         setCurrentIndex(nextIndex);
-        populateForm(newReceipts[nextIndex]);
-        loadImage(newReceipts[nextIndex]);
+        populateForm(newFiltered[nextIndex]);
+        loadImage(newFiltered[nextIndex]);
       }
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
       window.dispatchEvent(new CustomEvent('refresh-review-count'));
@@ -845,27 +926,28 @@ const Review = () => {
     }
   };
   const canApproveAll = useMemo(() => {
-    return receipts.every(r => 
+    return filteredReceipts.every(r => 
       r.ai_confidence !== null && 
       r.ai_confidence >= 0.8 &&
       r.vendor &&
       r.amount_gross
     );
-  }, [receipts]);
+  }, [filteredReceipts]);
 
   const handleApproveAll = async () => {
     if (!canApproveAll) return;
     
     setSaving(true);
     try {
-      for (const receipt of receipts) {
+      for (const receipt of filteredReceipts) {
         await updateReceipt(receipt.id, { status: 'approved' });
       }
-      setReceipts([]);
+      const remaining = receipts.filter(r => !filteredReceipts.some(fr => fr.id === r.id));
+      setReceipts(remaining);
       // Invalidate receipts query and trigger sidebar refresh
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
       window.dispatchEvent(new CustomEvent('refresh-review-count'));
-      toast({ title: `${receipts.length} Belege freigegeben` });
+      toast({ title: `${filteredReceipts.length} Belege freigegeben` });
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -898,7 +980,7 @@ const Review = () => {
   }, [currentIndex, goToReceipt]);
 
   // Reviewed count for progress
-  const totalToReview = receipts.length;
+  const totalToReview = filteredReceipts.length;
 
   const activeTab = searchParams.get('tab') === 'problems' ? 'problems' : 'review';
   const setTab = (tab: 'review' | 'problems') => {
@@ -973,7 +1055,8 @@ const Review = () => {
   }
 
   // Empty state
-  if (receipts.length === 0) {
+  if (filteredReceipts.length === 0) {
+    const isSearchEmpty = receipts.length > 0 && vendorSearch.trim();
     return (
       <DashboardLayout>
         <div className="p-6 lg:p-8">
@@ -982,17 +1065,32 @@ const Review = () => {
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="h-20 w-20 rounded-full bg-success/20 flex items-center justify-center mb-6"
+              className={cn(
+                'h-20 w-20 rounded-full flex items-center justify-center mb-6',
+                isSearchEmpty ? 'bg-muted' : 'bg-success/20'
+              )}
             >
-              <CheckCircle className="h-10 w-10 text-success" />
+              {isSearchEmpty ? (
+                <Search className="h-10 w-10 text-muted-foreground" />
+              ) : (
+                <CheckCircle className="h-10 w-10 text-success" />
+              )}
             </motion.div>
             <h2 className="text-2xl font-bold text-foreground mb-2">
-              Alle Belege überprüft! 🎉
+              {isSearchEmpty ? 'Keine Treffer' : 'Alle Belege überprüft! 🎉'}
             </h2>
             <p className="text-muted-foreground mb-6">
-              Keine offenen Überprüfungen vorhanden
+              {isSearchEmpty
+                ? `Kein Beleg passt zu „${vendorSearch.trim()}"`
+                : 'Keine offenen Überprüfungen vorhanden'}
             </p>
-            {problemCount > 0 && (
+            {isSearchEmpty && (
+              <Button variant="outline" className="mb-6" onClick={() => setVendorSearch('')}>
+                <X className="h-4 w-4 mr-2" />
+                Suche zurücksetzen
+              </Button>
+            )}
+            {!isSearchEmpty && problemCount > 0 && (
               <Button variant="outline" className="mb-6" onClick={() => setTab('problems')}>
                 <AlertTriangle className="h-4 w-4 mr-2 text-destructive" />
                 {problemCount} Problembelege ansehen
@@ -1030,7 +1128,7 @@ const Review = () => {
       <div className="p-6 lg:p-8">
         {tabBar}
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Belege überprüfen</h1>
             <p className="text-muted-foreground">
@@ -1040,6 +1138,32 @@ const Review = () => {
           <Badge variant="secondary" className="text-sm w-fit">
             {totalToReview} zur Überprüfung
           </Badge>
+        </div>
+
+        {/* Vendor search */}
+        <div className="relative mb-6 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={vendorSearch}
+            onChange={(e) => setVendorSearch(e.target.value)}
+            placeholder="Nach Lieferant / Marke suchen..."
+            className="pl-9 pr-9"
+          />
+          {vendorSearch && (
+            <button
+              type="button"
+              onClick={() => setVendorSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Suche zurücksetzen"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+          {vendorSearch.trim() && (
+            <p className="text-xs text-muted-foreground mt-1.5">
+              {totalToReview} {totalToReview === 1 ? 'Treffer' : 'Treffer'} für „{vendorSearch.trim()}"
+            </p>
+          )}
         </div>
 
         {/* Progress Bar */}
@@ -1052,7 +1176,7 @@ const Review = () => {
             <span className="text-sm text-muted-foreground">
               Beleg {currentIndex + 1} von {totalToReview}
             </span>
-            {canApproveAll && receipts.length > 1 && (
+            {canApproveAll && filteredReceipts.length > 1 && (
               <Button
                 size="sm"
                 variant="outline"
@@ -1979,7 +2103,7 @@ const Review = () => {
                       <Button
                         variant="ghost"
                         onClick={skipReceipt}
-                        disabled={saving || receipts.length <= 1}
+                        disabled={saving || filteredReceipts.length <= 1}
                       >
                         <SkipForward className="h-4 w-4 mr-2" />
                         Überspringen
