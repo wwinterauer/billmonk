@@ -959,8 +959,16 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
             .select('id, display_name, expenses_only_extraction, legal_names, default_category_id')
             .eq('user_id', receiptUserId);
 
+          // Receipt volume per vendor — used as a tiebreaker / confidence signal.
+          const { data: vendorStats } = await supabase.rpc('get_vendor_stats', { p_user_id: receiptUserId });
+          const receiptCounts: Record<string, number> = {};
+          for (const row of (vendorStats as any[]) || []) {
+            if (row?.vendor_id) receiptCounts[row.vendor_id] = Number(row.receipt_count) || 0;
+          }
+
           const finalVendorMatch: any =
-            matchVendor(allVendors as any[], extractedData.vendor, extractedData.vendor_brand) || null;
+            matchVendor(allVendors as any[], extractedData.vendor, extractedData.vendor_brand, receiptCounts) || null;
+
           if (finalVendorMatch) {
             console.log(`[Vendor Match] "${extractedData.vendor}" → "${finalVendorMatch.display_name}"`);
           }
