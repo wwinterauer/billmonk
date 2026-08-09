@@ -322,7 +322,13 @@ const Expenses = () => {
   const [taxTypeFilter, setTaxTypeFilter] = useState<string>('all');
   const [invoiceFilter, setInvoiceFilter] = useState<string>('all');
   
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string[]>(() => {
+    const tagsParam = searchParams.get('tags');
+    const noTagsParam = searchParams.get('noTags');
+    if (noTagsParam === '1') return ['__none__'];
+    if (tagsParam) return tagsParam.split(',').filter(Boolean);
+    return [];
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -783,8 +789,13 @@ const Expenses = () => {
     if (dateFrom) params.set('from', format(dateFrom, 'yyyy-MM-dd'));
     if (dateTo) params.set('to', format(dateTo, 'yyyy-MM-dd'));
     if (statusFilter !== 'all') params.set('status', statusFilter);
+    if (tagFilter.includes('__none__')) {
+      params.set('noTags', '1');
+    } else if (tagFilter.length > 0) {
+      params.set('tags', tagFilter.join(','));
+    }
     setSearchParams(params, { replace: true });
-  }, [dateFrom, dateTo, statusFilter, setSearchParams]);
+  }, [dateFrom, dateTo, statusFilter, tagFilter, setSearchParams]);
 
   useEffect(() => {
     loadReceipts();
@@ -2108,27 +2119,71 @@ const Expenses = () => {
           {/* Tag Filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className={cn(
-                  "w-[150px] justify-start",
+                  "min-w-[150px] max-w-[220px] justify-start",
                   tagFilter.length > 0 && "border-primary text-primary"
                 )}
               >
-                <Tag className="h-4 w-4 mr-2" />
-                {tagFilter.length === 0 
-                  ? 'Tags' 
+                <Tag className="h-4 w-4 mr-2 flex-shrink-0" />
+                {tagFilter.length === 0
+                  ? 'Tags'
                   : tagFilter.includes('__none__')
                     ? 'Ohne Tags'
-                    : `${tagFilter.length} Tag${tagFilter.length > 1 ? 's' : ''}`
+                    : (() => {
+                        const selected = tagFilter
+                          .map(id => tags.find(t => t.id === id))
+                          .filter((t): t is NonNullable<typeof t> => Boolean(t));
+                        const visible = selected.slice(0, 2);
+                        const rest = selected.length - visible.length;
+                        return (
+                          <span className="flex items-center gap-1 truncate">
+                            {visible.map(t => (
+                              <span
+                                key={t.id}
+                                className="inline-flex items-center rounded-full px-1.5 py-0.5 text-xs text-white"
+                                style={{ backgroundColor: t.color }}
+                              >
+                                {t.name}
+                              </span>
+                            ))}
+                            {rest > 0 && (
+                              <span className="text-xs">+{rest}</span>
+                            )}
+                          </span>
+                        );
+                      })()
                 }
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
               <DropdownMenuLabel className="text-xs">Nach Tags filtern</DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <div className="flex gap-1 px-2 py-1">
+                <DropdownMenuItem
+                  className="flex-1 justify-center text-xs cursor-pointer"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setTagFilter(tags.map(t => t.id));
+                  }}
+                >
+                  Alle auswählen
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="flex-1 justify-center text-xs cursor-pointer"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setTagFilter([]);
+                  }}
+                >
+                  Alle abwählen
+                </DropdownMenuItem>
+              </div>
+              <DropdownMenuSeparator />
               <DropdownMenuCheckboxItem
                 checked={tagFilter.includes('__none__')}
+                onSelect={(e) => e.preventDefault()}
                 onCheckedChange={(checked) => {
                   if (checked) {
                     setTagFilter(['__none__']);
@@ -2144,6 +2199,7 @@ const Expenses = () => {
                 <DropdownMenuCheckboxItem
                   key={tag.id}
                   checked={tagFilter.includes(tag.id)}
+                  onSelect={(e) => e.preventDefault()}
                   onCheckedChange={(checked) => {
                     if (checked) {
                       setTagFilter(prev => [...prev.filter(t => t !== '__none__'), tag.id]);
@@ -2153,8 +2209,8 @@ const Expenses = () => {
                   }}
                 >
                   <div className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
+                    <div
+                      className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: tag.color }}
                     />
                     <span className={!tag.is_active ? 'text-muted-foreground' : ''}>
