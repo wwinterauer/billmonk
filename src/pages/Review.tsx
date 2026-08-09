@@ -236,10 +236,13 @@ const Review = () => {
     return (
       (receipt.vendor ?? '').toLowerCase().includes(q) ||
       (receipt.vendor_brand ?? '').toLowerCase().includes(q) ||
+      (receipt.file_name ?? '').toLowerCase().includes(q) ||
+      (receipt.description ?? '').toLowerCase().includes(q) ||
       (vendor?.display_name ?? '').toLowerCase().includes(q) ||
       vendor?.legal_names?.some(n => n.toLowerCase().includes(q))
     );
   }, [vendorMap]);
+
 
   const filteredReceipts = useMemo(() => {
     if (!vendorSearch.trim()) return receipts;
