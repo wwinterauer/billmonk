@@ -148,6 +148,7 @@ export function useDashboardData(year: number, month: number) {
         .from('receipts')
         .select('id, receipt_date, created_at, vendor, amount_gross, status')
         .eq('user_id', user.id)
+        .not('status', 'in', '("split")')
         .order('created_at', { ascending: false })
         .limit(5);
 
