@@ -71,12 +71,32 @@ export interface VendorCandidate {
 }
 
 export const FUZZY_THRESHOLD = 0.88;
+// A brand token embedded in a longer legal name only counts as a match when the
+// vendor is already established — otherwise big vendors would swallow small ones.
+export const MIN_RECEIPTS_FOR_TOKEN_MATCH = 3;
+// Fuzzy scores within this margin are treated as a tie, broken by receipt volume.
+export const TIE_MARGIN = 0.02;
+
+export type ReceiptCounts = Record<string, number>;
+
+function countOf(counts: ReceiptCounts | undefined, id: string): number {
+  return counts?.[id] ?? 0;
+}
+
+// Does `haystack` contain `needle` as a standalone word sequence?
+function containsToken(haystack: string, needle: string): boolean {
+  if (!haystack || !needle) return false;
+  return new RegExp(`(^| )${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( |$)`).test(haystack);
+}
 
 // Match an extracted vendor name (+ optional brand) against the user's vendors.
+// `receiptCounts` (vendorId -> number of linked receipts) is optional; without it
+// the behaviour is identical to before.
 export function matchVendor<T extends VendorCandidate>(
   vendors: T[] | null | undefined,
   vendorName: string | null | undefined,
   vendorBrand?: string | null,
+  receiptCounts?: ReceiptCounts,
 ): T | null {
   if (!vendors || vendors.length === 0) return null;
   const rawName = (vendorName || "").trim();
@@ -93,32 +113,33 @@ export function matchVendor<T extends VendorCandidate>(
       const dn = (v.display_name || "").toLowerCase().trim();
       return dn && (dn === extractedLower || dn === dedupedLower);
     }) || null;
+  if (match) { console.log(`[vendorMatch] stage=exact-display vendor=${match.display_name}`); return match; }
 
   // 2. Exact legal_names match
-  if (!match) {
-    match =
-      vendors.find(v =>
-        (v.legal_names || []).some((ln: string) => {
-          const l = ln.toLowerCase().trim();
-          return l === extractedLower || l === dedupedLower;
-        }),
-      ) || null;
-  }
+  match =
+    vendors.find(v =>
+      (v.legal_names || []).some((ln: string) => {
+        const l = ln.toLowerCase().trim();
+        return l === extractedLower || l === dedupedLower;
+      }),
+    ) || null;
+  if (match) { console.log(`[vendorMatch] stage=legal-name vendor=${match.display_name}`); return match; }
 
   // 3. Normalized match (legal form stripped) on display_name OR legal_names
-  if (!match && extractedNorm) {
+  if (extractedNorm) {
     match =
       vendors.find(v => {
         if (normalizeVendorName(v.display_name) === extractedNorm) return true;
         return (v.legal_names || []).some((ln: string) => normalizeVendorName(ln) === extractedNorm);
       }) || null;
+    if (match) { console.log(`[vendorMatch] stage=normalized vendor=${match.display_name}`); return match; }
   }
 
   // 4. Brand match — invoices often carry the legal entity in `vendor`
   //    but the known brand in `vendor_brand`.
   const brandLower = brandRaw.toLowerCase();
   const brandNorm = normalizeVendorName(brandRaw);
-  if (!match && brandRaw) {
+  if (brandRaw) {
     match =
       vendors.find(v => {
         if ((v.display_name || "").toLowerCase().trim() === brandLower) return true;
@@ -128,31 +149,81 @@ export function matchVendor<T extends VendorCandidate>(
             ln.toLowerCase().trim() === brandLower || (brandNorm && normalizeVendorName(ln) === brandNorm),
         );
       }) || null;
+    if (match) { console.log(`[vendorMatch] stage=brand vendor=${match.display_name}`); return match; }
   }
 
-  // 5. Fuzzy fallback on normalized names — guard against short names
-  if (!match) {
-    const needles = [extractedNorm, brandNorm].filter(n => n && n.length >= 4);
-    if (needles.length > 0) {
-      let bestScore = 0;
-      let bestVendor: T | null = null;
+  // 4b. Brand token contained in the extracted legal name, e.g.
+  //     "stripe payments europe" → vendor "Stripe". Only for established
+  //     vendors (>= MIN_RECEIPTS_FOR_TOKEN_MATCH linked receipts); ties broken
+  //     by the longer (more specific) vendor name, then by receipt volume.
+  {
+    const haystacks = [extractedNorm, brandNorm].filter(n => n && n.length >= 4);
+    if (haystacks.length > 0) {
+      let best: T | null = null;
+      let bestLen = 0;
+      let bestCount = 0;
       for (const v of vendors) {
+        if (countOf(receiptCounts, v.id) < MIN_RECEIPTS_FOR_TOKEN_MATCH) continue;
         const candidates = [v.display_name, ...((v.legal_names || []) as string[])]
           .map(normalizeVendorName)
           .filter(n => n.length >= 4);
         for (const cand of candidates) {
-          for (const needle of needles) {
-            const score = nameSimilarity(needle, cand);
-            if (score > bestScore) {
-              bestScore = score;
-              bestVendor = v;
-            }
+          if (!haystacks.some(h => containsToken(h, cand))) continue;
+          const count = countOf(receiptCounts, v.id);
+          if (cand.length > bestLen || (cand.length === bestLen && count > bestCount)) {
+            best = v;
+            bestLen = cand.length;
+            bestCount = count;
           }
         }
       }
-      if (bestScore >= FUZZY_THRESHOLD) match = bestVendor;
+      if (best) {
+        console.log(`[vendorMatch] stage=brand-token vendor=${best.display_name} receipts=${bestCount}`);
+        return best;
+      }
     }
   }
 
-  return match;
+  // 5. Fuzzy fallback on normalized names — guard against short names.
+  //    Near-equal scores are decided by receipt volume.
+  const needles = [extractedNorm, brandNorm].filter(n => n && n.length >= 4);
+  if (needles.length > 0) {
+    let bestScore = 0;
+    let bestVendor: T | null = null;
+    for (const v of vendors) {
+      const candidates = [v.display_name, ...((v.legal_names || []) as string[])]
+        .map(normalizeVendorName)
+        .filter(n => n.length >= 4);
+      for (const cand of candidates) {
+        for (const needle of needles) {
+          const score = nameSimilarity(needle, cand);
+          if (score > bestScore + TIE_MARGIN) {
+            bestScore = score;
+            bestVendor = v;
+          } else if (Math.abs(score - bestScore) <= TIE_MARGIN) {
+            // Tie: prefer the vendor with more receipts, keep the better score.
+            if (
+              bestVendor &&
+              v.id !== bestVendor.id &&
+              countOf(receiptCounts, v.id) > countOf(receiptCounts, bestVendor.id)
+            ) {
+              bestVendor = v;
+            } else if (!bestVendor) {
+              bestVendor = v;
+            }
+            if (score > bestScore) bestScore = score;
+          }
+        }
+      }
+    }
+    if (bestScore >= FUZZY_THRESHOLD && bestVendor) {
+      console.log(
+        `[vendorMatch] stage=fuzzy vendor=${bestVendor.display_name} score=${bestScore.toFixed(3)} receipts=${countOf(receiptCounts, bestVendor.id)}`,
+      );
+      return bestVendor;
+    }
+  }
+
+  return null;
 }
+

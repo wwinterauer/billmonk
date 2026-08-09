@@ -41,6 +41,14 @@ Deno.serve(async (req) => {
       .select("id, display_name, legal_names, auto_approve, auto_approve_min_confidence")
       .eq("user_id", user.id);
 
+    // Receipt volume per vendor — tiebreaker / confidence signal for matching.
+    const { data: vendorStats } = await admin.rpc("get_vendor_stats", { p_user_id: user.id });
+    const receiptCounts: Record<string, number> = {};
+    for (const row of (vendorStats as any[]) || []) {
+      if (row?.vendor_id) receiptCounts[row.vendor_id] = Number(row.receipt_count) || 0;
+    }
+
+
     const { data: receipts, error: receiptsError } = await admin
       .from("receipts")
       .select("id, vendor, vendor_brand, vendor_id, ai_confidence, is_duplicate, status")
@@ -57,7 +65,7 @@ Deno.serve(async (req) => {
       let vendorRow = vendorId ? (vendors ?? []).find(v => v.id === vendorId) ?? null : null;
 
       if (!vendorId) {
-        const match = matchVendor(vendors ?? [], receipt.vendor, receipt.vendor_brand);
+        const match = matchVendor(vendors ?? [], receipt.vendor, receipt.vendor_brand, receiptCounts);
         if (!match) continue;
         vendorId = match.id;
         vendorRow = match;
