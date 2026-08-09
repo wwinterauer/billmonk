@@ -1,4 +1,17 @@
 import { supabase } from '@/integrations/supabase/client';
+import {
+  isPlaceholderInvoiceNumber,
+  normalizeInvoiceNumber,
+  invoiceNumbersMatch,
+  amountWithinTolerance,
+  amountsEqual,
+  dateWithinTolerance,
+  daysBetween,
+  classifyDocumentKind,
+  vendorsLikelySame,
+  DATE_TOLERANCE_DAYS,
+  AMOUNT_TOLERANCE,
+} from '@/lib/duplicateRules';
 
 export interface DuplicateCheckResult {
   isDuplicate: boolean;
@@ -10,11 +23,23 @@ export interface DuplicateCheckResult {
 
 export interface ReceiptData {
   vendor?: string | null;
+  vendor_brand?: string | null;
   amount_gross?: number | null;
   receipt_date?: string | null;
   invoice_number?: string | null;
   file_name?: string | null;
+  custom_filename?: string | null;
+  description?: string | null;
 }
+
+const NO_ID = '00000000-0000-0000-0000-000000000000';
+
+// Define which statuses count as "active" duplicates
+// Rejected and not_a_receipt files should NOT block new uploads
+const ACTIVE_STATUSES = ['pending', 'processing', 'review', 'approved', 'duplicate'];
+
+const CANDIDATE_COLUMNS =
+  'id, vendor, vendor_brand, amount_gross, receipt_date, invoice_number, file_name, custom_filename, description, status';
 
 /**
  * Apply vendor filter using the first meaningful token (handles abbreviations
@@ -39,6 +64,35 @@ export async function generateFileHash(file: File): Promise<string> {
   return hashHex;
 }
 
+/** Belege mit Tag "Inoffiziell" werden von der automatischen Markierung ausgenommen. */
+async function hasInoffiziellTag(receiptId?: string): Promise<boolean> {
+  if (!receiptId) return false;
+  try {
+    const { data } = await supabase
+      .from('receipt_tags')
+      .select('tag_id, tags!inner(name)')
+      .eq('receipt_id', receiptId);
+    return (data || []).some((row: any) => String(row.tags?.name || '').toLowerCase().includes('inoffiziell'));
+  } catch {
+    return false;
+  }
+}
+
+function addDays(date: string, days: number): string {
+  const d = new Date(`${date.slice(0, 10)}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function candidateVendorMatches(receiptData: ReceiptData, c: any): boolean {
+  return (
+    vendorsLikelySame(receiptData.vendor, c.vendor) ||
+    vendorsLikelySame(receiptData.vendor, c.vendor_brand) ||
+    vendorsLikelySame(receiptData.vendor_brand, c.vendor) ||
+    vendorsLikelySame(receiptData.vendor_brand, c.vendor_brand)
+  );
+}
+
 /**
  * Check for duplicate receipts based on multiple criteria
  */
@@ -56,20 +110,20 @@ export async function checkForDuplicates(
     matchReasons: []
   };
 
-  // Define which statuses count as "active" duplicates
-  // Rejected and not_a_receipt files should NOT block new uploads
-  const activeStatuses = ['pending', 'processing', 'review', 'approved', 'duplicate'];
+  const excludeId = excludeReceiptId || NO_ID;
+  const invoiceNumber = normalizeInvoiceNumber(receiptData.invoice_number);
+  const ownKind = classifyDocumentKind(receiptData);
 
   try {
-    // 1. Exact hash match (100% - identical file)
+    // 1. Exact hash match (100% - identical file) — gilt immer
     if (fileHash) {
       const { data: hashMatch } = await supabase
         .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date, status')
+        .select('id')
         .eq('user_id', userId)
         .eq('file_hash', fileHash)
-        .in('status', activeStatuses)
-        .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
+        .in('status', ACTIVE_STATUSES)
+        .neq('id', excludeId)
         .limit(1)
         .maybeSingle();
 
@@ -84,159 +138,122 @@ export async function checkForDuplicates(
       }
     }
 
-    // 2. Invoice number + vendor match (95% - very likely)
-    if (receiptData.invoice_number && receiptData.vendor) {
+    // Belege mit Tag "Inoffiziell" werden nicht automatisch als Duplikat markiert
+    if (await hasInoffiziellTag(excludeReceiptId)) {
+      return defaultResult;
+    }
+
+    // 2. Echte Rechnungsnummer + passender Lieferant → Duplikat (unabhängig von Betrag/Datum)
+    if (invoiceNumber && (receiptData.vendor || receiptData.vendor_brand)) {
       let invoiceQuery = supabase
         .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date, status')
+        .select(CANDIDATE_COLUMNS)
         .eq('user_id', userId)
-        .eq('invoice_number', receiptData.invoice_number);
-      invoiceQuery = applyVendorFilter(invoiceQuery, receiptData.vendor);
-      const { data: invoiceMatch } = await invoiceQuery
-        .in('status', activeStatuses)
-        .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
-        .limit(1)
-        .maybeSingle();
+        .eq('invoice_number', invoiceNumber);
+      const vendorNeedle = receiptData.vendor || receiptData.vendor_brand!;
+      invoiceQuery = applyVendorFilter(invoiceQuery, vendorNeedle);
+      const { data: rawMatches } = await invoiceQuery
+        .in('status', ACTIVE_STATUSES)
+        .neq('id', excludeId)
+        .limit(5);
 
-      if (invoiceMatch) {
+      const matches = (rawMatches || []).filter(
+        (c: any) =>
+          !isPlaceholderInvoiceNumber(c.invoice_number) &&
+          invoiceNumbersMatch(invoiceNumber, c.invoice_number) &&
+          candidateVendorMatches(receiptData, c)
+      );
+
+      if (matches.length > 0) {
+        const best = matches[0];
+        const reasons = ['Gleiche Rechnungsnummer', 'Gleicher Lieferant'];
+
+        // Rechnung vs. Zahlungsbeleg: Zahlungsbeleg ist der Nachrang
+        const otherKind = classifyDocumentKind(best);
+        if (
+          amountsEqual(receiptData.amount_gross, best.amount_gross) &&
+          ownKind !== otherKind &&
+          (ownKind === 'payment_receipt' || otherKind === 'payment_receipt') &&
+          (ownKind === 'invoice' || otherKind === 'invoice')
+        ) {
+          reasons.push('Zahlungsbeleg zur Rechnung');
+        }
+
         return {
           isDuplicate: true,
-          duplicateOf: invoiceMatch.id,
+          duplicateOf: best.id,
           score: 95,
           matchType: 'very_likely',
-          matchReasons: ['Gleiche Rechnungsnummer', 'Gleicher Lieferant']
+          matchReasons: reasons
         };
       }
     }
 
-    // 3. Amount + date + vendor match
-    // Strict rule: if both new and candidate have invoice_number, they must match.
-    // If new has no invoice_number but candidate does, we can't be sure → lower score.
-    if (receiptData.amount_gross && receiptData.receipt_date && receiptData.vendor) {
-      let amountQuery = supabase
-        .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date, invoice_number, status')
-        .eq('user_id', userId)
-        .eq('amount_gross', receiptData.amount_gross)
-        .eq('receipt_date', receiptData.receipt_date);
-      amountQuery = applyVendorFilter(amountQuery, receiptData.vendor);
-      if (receiptData.invoice_number) {
-        amountQuery = amountQuery.or(`invoice_number.eq.${receiptData.invoice_number},invoice_number.is.null`);
-      }
-      const { data: candidates } = await amountQuery
-        .in('status', activeStatuses)
-        .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
-        .limit(5);
-
-      const list = candidates || [];
-      // Hard-exclude candidates with a different invoice_number (belt-and-suspenders)
-      const filtered = list.filter(c => {
-        if (receiptData.invoice_number && c.invoice_number && c.invoice_number !== receiptData.invoice_number) {
-          return false;
-        }
-        return true;
-      });
-
-      if (filtered.length > 0) {
-        // Prefer candidate with matching invoice_number, then with no invoice_number
-        const exactInv = filtered.find(c => receiptData.invoice_number && c.invoice_number === receiptData.invoice_number);
-        const nullInv = filtered.find(c => !c.invoice_number);
-        const best = exactInv || nullInv || filtered[0];
-
-        // If new receipt has no invoice_number but candidate does, this is weak evidence
-        // (recurring monthly invoices share amount+date+vendor but differ by invoice number)
-        const weakSignal = !receiptData.invoice_number && best.invoice_number;
-        if (weakSignal) {
-          return {
-            isDuplicate: true,
-            duplicateOf: best.id,
-            score: 65,
-            matchType: 'possible',
-            matchReasons: ['Gleicher Betrag', 'Gleiches Datum', 'Gleicher Lieferant', 'Rechnungsnummer noch nicht extrahiert']
-          };
-        }
-
-        return {
-          isDuplicate: true,
-          duplicateOf: best.id,
-          score: 90,
-          matchType: 'very_likely',
-          matchReasons: ['Gleicher Betrag', 'Gleiches Datum', 'Gleicher Lieferant']
-        };
-      }
+    // Ohne verwertbare Rechnungsnummer entscheiden Betrag (±20 %) und Datum (±3 Tage)
+    if (receiptData.amount_gross == null || !receiptData.receipt_date) {
+      return defaultResult;
     }
 
-    // 4. (entfernt) ±3 Tage Fuzzy-Match — abweichendes Datum = kein Duplikat per Regel
+    const amount = Number(receiptData.amount_gross);
+    const lowAmount = Math.min(amount * (1 - AMOUNT_TOLERANCE), amount * (1 + AMOUNT_TOLERANCE));
+    const highAmount = Math.max(amount * (1 - AMOUNT_TOLERANCE), amount * (1 + AMOUNT_TOLERANCE));
+    const dateFrom = addDays(receiptData.receipt_date, -DATE_TOLERANCE_DAYS);
+    const dateTo = addDays(receiptData.receipt_date, DATE_TOLERANCE_DAYS);
 
-    // 5. Invoice number only match (70% - likely)
-    if (receiptData.invoice_number) {
-      const { data: invoiceOnlyMatch } = await supabase
-        .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date, status')
-        .eq('user_id', userId)
-        .eq('invoice_number', receiptData.invoice_number)
-        .in('status', activeStatuses)
-        .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
-        .limit(1)
-        .maybeSingle();
+    const { data: rawCandidates } = await supabase
+      .from('receipts')
+      .select(CANDIDATE_COLUMNS)
+      .eq('user_id', userId)
+      .gte('amount_gross', lowAmount)
+      .lte('amount_gross', highAmount)
+      .gte('receipt_date', dateFrom)
+      .lte('receipt_date', dateTo)
+      .in('status', ACTIVE_STATUSES)
+      .neq('id', excludeId)
+      .limit(20);
 
-      if (invoiceOnlyMatch) {
-        return {
-          isDuplicate: true,
-          duplicateOf: invoiceOnlyMatch.id,
-          score: 70,
-          matchType: 'likely',
-          matchReasons: ['Gleiche Rechnungsnummer']
-        };
-      }
-    }
+    const candidates = (rawCandidates || []).filter((c: any) => {
+      // Harter Ausschluss: beide haben echte, aber unterschiedliche Rechnungsnummern
+      const candInv = normalizeInvoiceNumber(c.invoice_number);
+      if (invoiceNumber && candInv && !invoiceNumbersMatch(invoiceNumber, candInv)) return false;
+      if (!amountWithinTolerance(receiptData.amount_gross, c.amount_gross)) return false;
+      if (!dateWithinTolerance(receiptData.receipt_date, c.receipt_date)) return false;
+      return true;
+    });
 
-    // 6. Amount + date only (60% - possible)
-    // Hard-exclude candidates with a different invoice_number.
-    if (receiptData.amount_gross && receiptData.receipt_date) {
-      let adQuery = supabase
-        .from('receipts')
-        .select('id, vendor, amount_gross, receipt_date, invoice_number, status')
-        .eq('user_id', userId)
-        .eq('amount_gross', receiptData.amount_gross)
-        .eq('receipt_date', receiptData.receipt_date);
-      if (receiptData.invoice_number) {
-        adQuery = adQuery.or(`invoice_number.eq.${receiptData.invoice_number},invoice_number.is.null`);
-      }
-      const { data: candidates } = await adQuery
-        .in('status', activeStatuses)
-        .neq('id', excludeReceiptId || '00000000-0000-0000-0000-000000000000')
-        .limit(5);
+    if (candidates.length === 0) return defaultResult;
 
-      const filtered = (candidates || []).filter(c => {
-        if (receiptData.invoice_number && c.invoice_number && c.invoice_number !== receiptData.invoice_number) {
-          return false;
-        }
-        return true;
-      });
+    const exactValue = (c: any) =>
+      amountsEqual(receiptData.amount_gross, c.amount_gross) &&
+      (daysBetween(receiptData.receipt_date, c.receipt_date) ?? 99) === 0;
 
-      if (filtered.length > 0) {
-        const best = filtered.find(c => !c.invoice_number) || filtered[0];
-        // Weak signal if new has no invoice but candidate does — lower score further
-        const weakSignal = !receiptData.invoice_number && best.invoice_number;
-        return {
-          isDuplicate: true,
-          duplicateOf: best.id,
-          score: weakSignal ? 45 : 60,
-          matchType: 'possible',
-          matchReasons: weakSignal
-            ? ['Gleicher Betrag', 'Gleiches Datum', 'Rechnungsnummer noch nicht extrahiert']
-            : ['Gleicher Betrag', 'Gleiches Datum']
-        };
-      }
-    }
+    const withVendor = candidates.filter((c: any) => candidateVendorMatches(receiptData, c));
+    const pool = withVendor.length > 0 ? withVendor : candidates;
+    const best = pool.find(exactValue) || pool[0];
+    const isExact = exactValue(best);
+    const vendorMatched = withVendor.length > 0;
 
-    return defaultResult;
+    const reasons: string[] = [];
+    reasons.push(isExact ? 'Gleicher Betrag' : 'Betrag leicht abweichend');
+    reasons.push(isExact ? 'Gleiches Datum' : 'Datum leicht abweichend');
+    if (vendorMatched) reasons.push('Gleicher Lieferant');
+
+    let score = vendorMatched ? 90 : 60;
+    if (!isExact) score -= 10;
+
+    return {
+      isDuplicate: true,
+      duplicateOf: best.id,
+      score,
+      matchType: score >= 90 ? 'very_likely' : score >= 70 ? 'likely' : 'possible',
+      matchReasons: reasons
+    };
   } catch (error) {
     console.error('Error checking for duplicates:', error);
     return defaultResult;
   }
 }
+
 
 /**
  * Mark a receipt as a duplicate
