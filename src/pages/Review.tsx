@@ -804,13 +804,17 @@ const Review = () => {
     setSaving(true);
     try {
       await deleteReceipt(currentReceipt.id);
-      const newReceipts = receipts.filter((_, i) => i !== currentIndex);
+      const newReceipts = receipts.filter(r => r.id !== currentReceipt.id);
       setReceipts(newReceipts);
-      if (newReceipts.length > 0) {
-        const nextIndex = Math.min(currentIndex, newReceipts.length - 1);
+
+      const newFiltered = vendorSearch.trim()
+        ? newReceipts.filter(r => matchesVendorSearch(r, vendorSearch))
+        : newReceipts;
+      if (newFiltered.length > 0) {
+        const nextIndex = Math.min(currentIndex, newFiltered.length - 1);
         setCurrentIndex(nextIndex);
-        populateForm(newReceipts[nextIndex]);
-        loadImage(newReceipts[nextIndex]);
+        populateForm(newFiltered[nextIndex]);
+        loadImage(newFiltered[nextIndex]);
       }
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
       window.dispatchEvent(new CustomEvent('refresh-review-count'));
