@@ -37,7 +37,65 @@ export function isProcessorTransaction(description: string | null | undefined): 
   return PAYMENT_PROCESSORS.some((p) => payeePart.includes(normalizeText(p)));
 }
 
+/**
+ * Normalized invoice number usable as a payment reference.
+ * Returns null when it is too short or has no digits (avoids random hits).
+ */
+export function referenceKey(invoiceNumber: string | null | undefined): string | null {
+  const norm = normalizeText(invoiceNumber).replace(/\s+/g, "");
+  if (norm.length < 5) return null;
+  if (!/[0-9]/.test(norm)) return null;
+  return norm;
+}
+
+/** Tolerance for reference matches: up to 5% or 10 EUR deviation. */
+export function amountWithinReferenceTolerance(a: number, b: number): boolean {
+  const na = Math.abs(a);
+  const nb = Math.abs(b);
+  const diff = Math.abs(na - nb);
+  const max = Math.max(na, nb);
+  if (max === 0) return true;
+  return diff <= Math.max(0.05 * max, 10);
+}
+
+export interface ReferenceCandidate {
+  key: string;
+  amount: number | null;
+  invoiceNumber: string | null;
+}
+
+/**
+ * Finds the single candidate whose invoice number appears in the bank transaction
+ * description. Date is ignored on purpose (invoices are often paid months later).
+ * Returns null when nothing or more than one candidate matches.
+ */
+export function findReferenceMatch(
+  description: string | null | undefined,
+  amount: number,
+  candidates: ReferenceCandidate[],
+): { key: string; deviationPct: number } | null {
+  const descNoSpace = normalizeText(description).replace(/\s+/g, "");
+  if (!descNoSpace) return null;
+
+  const hits: Array<{ key: string; deviationPct: number }> = [];
+  for (const c of candidates) {
+    const ref = referenceKey(c.invoiceNumber);
+    if (!ref) continue;
+    if (!descNoSpace.includes(ref)) continue;
+    if (c.amount == null) continue;
+    if (!amountWithinReferenceTolerance(Number(c.amount), amount)) continue;
+    const receiptAmt = Math.abs(Number(c.amount));
+    const deviationPct = receiptAmt > 0
+      ? ((receiptAmt - Math.abs(amount)) / receiptAmt) * 100
+      : 0;
+    hits.push({ key: c.key, deviationPct });
+  }
+  if (hits.length !== 1) return null;
+  return hits[0];
+}
+
 export interface GroupPairInput {
+
   id: string;
   date: string;
   amount: number;
