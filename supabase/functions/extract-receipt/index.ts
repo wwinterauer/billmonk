@@ -1252,7 +1252,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           ai_confidence: extractedData.confidence,
           ai_raw_response: extractedData,
           ai_processed_at: new Date().toISOString(),
-          status: 'review',
+          status: finalStatus,
           vendor_country: extractedData.vendor_country || null,
           vat_confidence: vatRateSource === 'learned' ? 1.0 : (extractedData.vat_confidence || null),
           vat_detection_method: vatRateSource === 'learned' ? 'learned' : (extractedData.vat_detection_method || null),
