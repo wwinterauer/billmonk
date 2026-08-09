@@ -1100,7 +1100,22 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           extractedData.vat_amount = Math.round((extractedData.amount_gross - extractedData.amount_net) * 100) / 100;
           console.log(`[VAT Consistency] Rule 4: VAT=${extractedData.vat_amount}`);
         }
+
+        // Rule 5: Brutto darf niemals kleiner als Netto sein → aus Netto + USt rekonstruieren
+        if (extractedData.amount_net != null && extractedData.amount_gross != null
+            && Number(extractedData.amount_net) - Number(extractedData.amount_gross) > 0.02) {
+          const vat = Number(extractedData.vat_amount) > 0
+            ? Number(extractedData.vat_amount)
+            : Number(extractedData.amount_net) * (Number(extractedData.vat_rate) || 0) / 100;
+          const fixedGross = Math.round((Number(extractedData.amount_net) + vat) * 100) / 100;
+          console.log(`[VAT Consistency] Rule 5: Brutto ${extractedData.amount_gross} < Netto ${extractedData.amount_net} → korrigiert auf ${fixedGross}`);
+          extractedData.amount_gross = fixedGross;
+          extractedData.vat_amount = Math.round(vat * 100) / 100;
+          (extractedData as any).vat_detection_method = 'totals_line_conflict';
+          (extractedData as any).vat_confidence = 0.5;
+        }
       }
+
 
       // ── Non-receipt document handling ─────────────────────────────
       if (extractedData.is_receipt === false && !forceTreatAsReceipt) {
