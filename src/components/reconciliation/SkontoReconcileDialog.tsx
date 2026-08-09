@@ -175,7 +175,7 @@ export function SkontoReconcileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -193,7 +193,7 @@ export function SkontoReconcileDialog({
               : 'Keine passenden Belege im Datumsbereich der offenen Buchungen gefunden.'}
           </div>
         ) : (
-          <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="flex-1 min-h-0 flex flex-col">
             <TabsList>
               <TabsTrigger value="suggestions">
                 Vorschläge {suggestions.length > 0 && `(${suggestions.length})`}
@@ -204,7 +204,7 @@ export function SkontoReconcileDialog({
             </TabsList>
 
             {/* ---------------- Suggestions ---------------- */}
-            <TabsContent value="suggestions">
+            <TabsContent value="suggestions" className="flex-1 min-h-0 flex flex-col">
               {suggestions.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">
                   Keine weiteren Vorschläge.
@@ -228,7 +228,7 @@ export function SkontoReconcileDialog({
                       </Button>
                     </div>
                   </div>
-                  <ScrollArea className="max-h-[55vh] pr-4">
+                  <ScrollArea className="flex-1 min-h-0 h-[55vh] pr-4">
                     <div className="space-y-2">
                       {suggestions.map((s) => {
                         const chosen = chosenFor(s);
@@ -353,11 +353,11 @@ export function SkontoReconcileDialog({
             </TabsContent>
 
             {/* ---------------- Skonto ---------------- */}
-            <TabsContent value="skonto">
+            <TabsContent value="skonto" className="flex-1 min-h-0 flex flex-col">
               {candidates.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">Keine Skonto-Vorschläge.</div>
               ) : (
-                <ScrollArea className="max-h-[55vh] pr-4">
+                <ScrollArea className="flex-1 min-h-0 h-[55vh] pr-4">
                   <div className="space-y-2">
                     <div className="text-sm text-muted-foreground mb-2">
                       Folgende Buchungen weichen 1–5 % vom Belegbetrag ab und enthalten den Lieferantennamen oder die Rechnungsnummer. Wahrscheinlich Skonto-Abzug.
