@@ -1,0 +1,1 @@
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS always_not_a_receipt boolean NOT NULL DEFAULT false;

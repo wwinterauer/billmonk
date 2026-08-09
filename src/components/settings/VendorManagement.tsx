@@ -150,6 +150,7 @@ export function VendorManagement() {
     auto_approve: false,
     auto_approve_min_confidence: 0.8,
     expenses_only_extraction: false,
+    always_not_a_receipt: false,
     extraction_keywords: [] as string[],
     extraction_hint: '',
   });
@@ -173,6 +174,7 @@ export function VendorManagement() {
       auto_approve: false,
       auto_approve_min_confidence: 0.8,
       expenses_only_extraction: false,
+      always_not_a_receipt: false,
       extraction_keywords: [],
       extraction_hint: '',
     });
@@ -197,6 +199,7 @@ export function VendorManagement() {
       auto_approve: vendor.auto_approve ?? false,
       auto_approve_min_confidence: vendor.auto_approve_min_confidence ?? 0.8,
       expenses_only_extraction: vendor.expenses_only_extraction ?? false,
+      always_not_a_receipt: vendor.always_not_a_receipt ?? false,
       extraction_keywords: vendor.extraction_keywords || [],
       extraction_hint: vendor.extraction_hint || '',
     });
@@ -280,6 +283,7 @@ export function VendorManagement() {
           auto_approve: formData.auto_approve,
           auto_approve_min_confidence: formData.auto_approve_min_confidence,
           expenses_only_extraction: formData.expenses_only_extraction,
+          always_not_a_receipt: formData.always_not_a_receipt,
           extraction_keywords: formData.extraction_keywords,
           extraction_hint: formData.extraction_hint,
         });
@@ -1031,6 +1035,11 @@ export function VendorManagement() {
                                   Auto
                                 </Badge>
                               )}
+                              {vendor.always_not_a_receipt && (
+                                <Badge variant="outline" className="text-xs text-muted-foreground">
+                                  Keine Rechnung
+                                </Badge>
+                              )}
                               {vendor.website && (
                                 <a
                                   href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
@@ -1539,6 +1548,26 @@ export function VendorManagement() {
                 {formData.extraction_hint.length}/500 Zeichen — Trage lieferantenspezifische Regeln ein (z.B. feste Kategorie, Tag-Logik, Beschreibungs-Präfixe, Rechnungsnummern-Muster). Die KI berücksichtigt sie bei jedem neuen Beleg.
               </p>
             </div>
+
+            {/* Immer als "Keine Rechnung" behandeln */}
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5 pr-4">
+                <Label htmlFor="always_not_a_receipt" className="flex items-center gap-2">
+                  <X className="h-4 w-4 text-muted-foreground" />
+                  Immer als „Keine Rechnung" behandeln
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Belege dieses Lieferanten werden nicht als Ausgabe verbucht, sondern automatisch als Hilfsdokument abgelegt (Status „Kein Beleg") und erscheinen nicht in der Review.
+                </p>
+              </div>
+              <Switch
+                id="always_not_a_receipt"
+                checked={formData.always_not_a_receipt}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, always_not_a_receipt: checked }))}
+              />
+            </div>
+
 
             {/* Vertiefte Betragserkennung */}
             <Separator />

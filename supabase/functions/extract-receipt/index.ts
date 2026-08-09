@@ -1223,7 +1223,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           // normalized → brand → fuzzy), identical to `reconcile-vendors`.
           const { data: allVendors } = await supabase
             .from('vendors')
-            .select('id, display_name, expenses_only_extraction, legal_names, default_category_id')
+            .select('id, display_name, expenses_only_extraction, legal_names, default_category_id, always_not_a_receipt')
             .eq('user_id', receiptUserId);
 
           // Receipt volume per vendor — used as a tiebreaker / confidence signal.
@@ -1244,6 +1244,27 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
 
           const vendorId = receipt?.vendor_id || finalVendorMatch?.id;
           resolvedVendorId = vendorId ?? null;
+
+          // ── Vendor rule: always treat documents of this vendor as "Keine Rechnung" ──
+          if (finalVendorMatch?.always_not_a_receipt && !forceTreatAsReceipt && receiptId) {
+            console.log(`[Vendor Rule] "${finalVendorMatch.display_name}" ist als "Keine Rechnung" hinterlegt → not_a_receipt`);
+            await supabase.from('receipts').update({
+              status: 'not_a_receipt',
+              category: 'Keine Rechnung',
+              vendor_id: vendorId ?? null,
+              description: (extractedData.description || 'Kein Rechnungsdokument').substring(0, 100),
+              ai_confidence: extractedData.confidence ?? 0.5,
+              notes: `Regel: Lieferant "${finalVendorMatch.display_name}" ist als "Keine Rechnung" hinterlegt.`,
+              ai_raw_response: extractedData,
+              ai_processed_at: new Date().toISOString(),
+              prompt_version: 'v2',
+            }).eq('id', receiptId);
+
+            return new Response(
+              JSON.stringify({ success: true, is_receipt: false, vendor_rule: 'always_not_a_receipt', receiptId }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
 
           // Auto-learn legal_names: if AI extracted a name with legal form and
           // the matched vendor doesn't yet know it, add it. Also upgrade

@@ -3715,6 +3715,7 @@ export type Database = {
       }
       vendors: {
         Row: {
+          always_not_a_receipt: boolean
           auto_approve: boolean
           auto_approve_min_confidence: number
           correction_count: number | null
@@ -3745,6 +3746,7 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          always_not_a_receipt?: boolean
           auto_approve?: boolean
           auto_approve_min_confidence?: number
           correction_count?: number | null
@@ -3775,6 +3777,7 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          always_not_a_receipt?: boolean
           auto_approve?: boolean
           auto_approve_min_confidence?: number
           correction_count?: number | null
