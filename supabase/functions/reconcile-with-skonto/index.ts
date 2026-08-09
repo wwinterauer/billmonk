@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildGroupPairs, isProcessorTransaction } from "../_shared/reconcileHelpers.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -233,7 +235,7 @@ serve(async (req) => {
 
     if (!txs || txs.length === 0) {
       return new Response(
-        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, skonto_candidates: [], scanned_transactions: 0 }),
+        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, skonto_candidates: [], scanned_transactions: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -241,7 +243,7 @@ serve(async (req) => {
     const datedTxs = txs.filter((t) => t.transaction_date);
     if (datedTxs.length === 0) {
       return new Response(
-        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, skonto_candidates: [], scanned_transactions: txs.length }),
+        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, skonto_candidates: [], scanned_transactions: txs.length }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -259,6 +261,7 @@ serve(async (req) => {
 
     let exactApplied = 0;
     let highConfidenceApplied = 0;
+    let groupApplied = 0;
     const skontoCandidates: SkontoCandidate[] = [];
     const usedKeys = new Set<string>();
     const matchedTxIds = new Set<string>();
@@ -344,6 +347,38 @@ serve(async (req) => {
       }
     }
 
+    // 4c) Group pass: several transactions with identical amount vs. equally many
+    // receipts of one single vendor (e.g. PayPal payments for IONOS invoices).
+    const openTxs = datedTxs.filter(
+      (t) => t.amount && !matchedTxIds.has(t.id),
+    );
+    const openCands = pool.filter(
+      (c) => !usedKeys.has(c.key) && c.receipt_date && c.amount_gross != null,
+    );
+    const groupPairs = buildGroupPairs(
+      openTxs.map((t) => ({ id: t.id, date: t.transaction_date!, amount: Number(t.amount) })),
+      openCands.map((c) => ({
+        key: c.key,
+        date: c.receipt_date!,
+        amount: Number(c.amount_gross),
+        vendorKey: (c.vendor ?? "").trim().toLowerCase(),
+      })),
+      14,
+    );
+    for (const p of groupPairs) {
+      const c = pool.find((x) => x.key === p.key);
+      if (!c || usedKeys.has(c.key) || matchedTxIds.has(p.txId)) continue;
+      // Only auto-assign when the payee is a payment processor or no vendor hint conflicts
+      const tx = openTxs.find((t) => t.id === p.txId);
+      const descNorm = normalize(tx?.description);
+      const vt = tokensOf(c.vendor);
+      const vendorInDesc = vt.length > 0 && vt.every((t) => descNorm.includes(t));
+      if (!isProcessorTransaction(tx?.description) && !vendorInDesc) continue;
+      if (await applyMatch(p.txId, c)) groupApplied++;
+    }
+
+
+
     // 5) Skonto pass: 1–5% deviation, vendor/invoice signal, ±30 days
     for (const tx of datedTxs) {
       if (!tx.amount) continue;
@@ -403,6 +438,7 @@ serve(async (req) => {
       JSON.stringify({
         exact_applied: exactApplied,
         high_confidence_applied: highConfidenceApplied,
+        group_applied: groupApplied,
         skonto_candidates: skontoCandidates,
         scanned_transactions: txs.length,
       }),
