@@ -184,14 +184,26 @@ const Review = () => {
       setReceipts(allData);
       if (allData.length > 0) {
         const lastId = sessionStorage.getItem('review-last-receipt-id');
-        const restoredIdx = lastId ? allData.findIndex(r => r.id === lastId) : -1;
-        const idx = restoredIdx >= 0 ? restoredIdx : 0;
-        if (restoredIdx < 0 && lastId) {
-          sessionStorage.removeItem('review-last-receipt-id');
+        const initialSearch = searchParams.get('vendor') || '';
+        // Simple initial filter (vendorMap may not be ready yet)
+        const initialFiltered = initialSearch.trim()
+          ? allData.filter(r =>
+              (r.vendor ?? '').toLowerCase().includes(initialSearch.toLowerCase()) ||
+              (r.vendor_brand ?? '').toLowerCase().includes(initialSearch.toLowerCase())
+            )
+          : allData;
+        const restoredIdx = lastId ? initialFiltered.findIndex(r => r.id === lastId) : -1;
+        const idx = initialFiltered.length > 0
+          ? (restoredIdx >= 0 ? restoredIdx : 0)
+          : 0;
+        if (initialFiltered.length > 0) {
+          if (restoredIdx < 0 && lastId) {
+            sessionStorage.removeItem('review-last-receipt-id');
+          }
+          setCurrentIndex(idx);
+          populateForm(initialFiltered[idx]);
+          loadImage(initialFiltered[idx]);
         }
-        setCurrentIndex(idx);
-        populateForm(allData[idx]);
-        loadImage(allData[idx]);
       }
     } catch (error) {
       toast({
@@ -202,7 +214,7 @@ const Review = () => {
     } finally {
       setLoading(false);
     }
-  }, [getReceipts, toast]);
+  }, [getReceipts, toast, searchParams]);
 
   useEffect(() => {
     loadReceipts();
