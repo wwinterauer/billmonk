@@ -290,7 +290,10 @@ STRENGE FILTERREGEL:
 - Durchsuche ALLE Seiten des Dokuments, nicht nur die erste
 - Ein Schlagwort kann MEHRFACH vorkommen → jede Zeile einzeln erfassen
 - Jede Zeile genau EINMAL zählen, NICHT Summen-/Zwischensummenzeilen
-- Alle Beträge POSITIV, Gutschriften/Erstattungen ignorieren
+- Beträge in Klammern, mit Minus oder in einer Abzugsspalte sind bei diesen Schlagwort-Zeilen ebenfalls AUSGABEN → immer POSITIV erfassen
+- Gutschriften/Erstattungen ohne Schlagwort ignorieren
+- total_amount = Summe ALLER gefundenen Schlagwort-Zeilen (positiv). Beispiel: 0,14 + 12,00 + 1,87 = 14,01
+- Die Summenzeilen des Dokuments (Gesamtbetrag, Auszahlung, Saldo) gelten NICHT für diesen Beleg: total_amount_label, net_amount_label, tax_amount_label und totals_block MÜSSEN null bzw. leer bleiben
 
 description: Gefundene Positionen mit Beträgen auflisten, z.B.: "Transaktionsgebühr 3,50€; Betreiber-Abonnement 12,00€"`;
   } else {
