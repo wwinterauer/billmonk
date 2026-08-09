@@ -684,15 +684,22 @@ VAT-KONFIDENZ:
 - vat_detection_method: "explicit"/"calculated"/"estimated"
 
 BETRÄGE: Dezimalzahlen ohne Währungssymbol. 0 wenn nicht erkennbar. Datum: YYYY-MM-DD oder "".
-- total_amount = IMMER der Endbetrag INKLUSIVE MwSt. (z.B. "Summe EUR inkl. MwSt.", "Gesamtbetrag brutto", "Rechnungsbetrag", "Zu zahlen", "Total incl. VAT").
-- net_amount = Betrag OHNE MwSt. (z.B. "Total EUR ohne MwSt.", "Nettosumme", "Zwischensumme", "Warenwert netto").
+RANGFOLGE (WICHTIGSTE REGEL): Beschriftete Summenzeilen im Summenblock haben IMMER Vorrang vor selbst berechneten Positionssummen. Rechne NIEMALS die Positionen zusammen, wenn eine beschriftete Summenzeile existiert.
+- total_amount = IMMER der Endbetrag INKLUSIVE MwSt. aus einer beschrifteten Zeile: "Gesamtbetrag", "Gesamtsumme", "Rechnungsbetrag", "Zu zahlen", "Summe inkl. MwSt.", "Total incl. VAT", "Endbetrag", "Zahlbetrag".
+- net_amount = Betrag OHNE MwSt. aus einer beschrifteten Zeile: "Nettobetrag", "Summe netto", "Total EUR ohne MwSt.", "Nettosumme", "Warenwert netto".
+- tax_amount = ausgewiesener MwSt-/USt-Betrag ("MwSt.", "USt.", "VAT", "Steuerbetrag").
+- total_amount_label / net_amount_label / tax_amount_label = der WÖRTLICHE Text der Zeile, aus der du den jeweiligen Betrag genommen hast (z.B. "Summe EUR inkl. MwSt."). Leer "" nur, wenn keine solche Zeile existiert.
+- totals_block = ALLE Zeilen des Summenblocks als Liste {label, amount}, in der Reihenfolge des Belegs. Das ist Pflicht, wenn ein Summenblock existiert.
 - WARNUNG: Enthält die Zeile "ohne MwSt.", "exkl.", "netto" oder "zzgl. MwSt.", darf dieser Wert NIEMALS in total_amount stehen.
 - Bei mehreren Summenzeilen ist der HÖCHSTE Betrag am Ende des Summenblocks das Brutto.
 - Es muss gelten: net_amount + tax_amount = total_amount.
 - line_items_are_net = true, wenn die Positionspreise OHNE MwSt. ausgewiesen sind (typisch bei B2B-Rechnungen), sonst false.
 receipt_number: Rechnungsnummer suchen (RE-Nr, Invoice, Belegnummer etc.) oder "".
 
-LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenzeilen.${expensesOnlyPrompt}${extractionHintPrompt}`;
+LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenzeilen.
+- VOLLSTÄNDIGKEIT: Erfasse ALLE Positionen, auch über mehrere Seiten hinweg. Prüfe zum Schluss selbst: Summe der Positionen muss zum ausgewiesenen Gesamtbetrag passen. Passt sie nicht, hast du Positionen übersehen — suche weiter. Kürze die Liste NIEMALS ab.
+- VORZEICHEN: Rabatte, Gutschriften, Stornos und Abzüge werden als NEGATIVE total/unit_price erfasst (z.B. Rabatt -117.75). Niemals positiv angeben.${expensesOnlyPrompt}${extractionHintPrompt}`;
+
 
 
     // ── AI API Call with structured output ─────────────────────────
