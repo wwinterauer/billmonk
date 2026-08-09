@@ -673,6 +673,9 @@ BETRÄGE: Dezimalzahlen ohne Währungssymbol. 0 wenn nicht erkennbar. Datum: YYY
 - line_items_are_net = true, wenn die Positionspreise OHNE MwSt. ausgewiesen sind (typisch bei B2B-Rechnungen), sonst false.
 receipt_number: Rechnungsnummer suchen (RE-Nr, Invoice, Belegnummer etc.) oder "".
 
+LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenzeilen.${expensesOnlyPrompt}${extractionHintPrompt}`;
+
+
     // ── AI API Call with structured output ─────────────────────────
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
