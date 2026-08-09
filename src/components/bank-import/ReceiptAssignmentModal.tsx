@@ -354,6 +354,14 @@ export function ReceiptAssignmentModal({
     return null;
   };
 
+  const openReceiptFile = async (e: React.MouseEvent, receipt: Receipt) => {
+    e.stopPropagation();
+    if (!receipt.file_url) return;
+    const path = receipt.file_url.replace(/^.*\/receipts\//, '');
+    const { data } = await supabase.storage.from('receipts').createSignedUrl(path, 300);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+  };
+
   const ReceiptCard = ({ receipt, showScore = true }: { receipt: ReceiptWithScore; showScore?: boolean }) => (
     <div
       className={cn(
