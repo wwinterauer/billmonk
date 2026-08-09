@@ -313,7 +313,7 @@ const Review = () => {
     }
   }, [currentReceipt?.id]);
 
-  // Sync vendor search with URL param
+  // Sync vendor search + filter with URL params
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
     if (vendorSearch.trim()) {
@@ -321,8 +321,21 @@ const Review = () => {
     } else {
       params.delete('vendor');
     }
+    if (unlinkedOnly) {
+      params.set('filter', 'unlinked');
+    } else {
+      params.delete('filter');
+    }
     setSearchParams(params, { replace: true });
-  }, [vendorSearch, setSearchParams]);
+  }, [vendorSearch, unlinkedOnly, setSearchParams]);
+
+  // Auto-reset the filter once nothing matches anymore
+  useEffect(() => {
+    if (unlinkedOnly && unlinkedVendorCount === 0) {
+      setUnlinkedOnly(false);
+    }
+  }, [unlinkedOnly, unlinkedVendorCount]);
+
 
   // Keep currentIndex valid when filtered list changes
   useEffect(() => {
