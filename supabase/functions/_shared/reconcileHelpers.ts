@@ -148,3 +148,263 @@ export function buildGroupPairs(
   }
   return result;
 }
+
+// ---------------------------------------------------------------------------
+// Smarter matching: scoring + suggestions
+// ---------------------------------------------------------------------------
+
+export interface ScoreContext {
+  /** Payee is a payment service provider (PayPal, Klarna, ...) */
+  processor: boolean;
+  /** How many candidates in the pool share this exact amount */
+  sameAmountCount: number;
+}
+
+export interface ScoreInput {
+  description: string | null | undefined;
+  amount: number;
+  date: string | null;
+}
+
+export interface ScoreCandidate {
+  key: string;
+  amount: number | null;
+  date: string | null;
+  /** vendor display name, legal names, keywords, split line text */
+  aliases: (string | null | undefined)[];
+  invoiceNumber: string | null;
+}
+
+export interface ScoreResult {
+  score: number;
+  reasons: string[];
+}
+
+function daysApart(a: string, b: string): number {
+  return Math.abs(new Date(a).getTime() - new Date(b).getTime()) / 86400000;
+}
+
+/**
+ * Weighted score for a transaction/candidate pair.
+ * 0 = impossible, higher = better. >= 80 is considered safe enough for
+ * an automatic match, 40-79 becomes a suggestion for the user.
+ */
+export function scoreMatch(
+  tx: ScoreInput,
+  c: ScoreCandidate,
+  ctx: ScoreContext,
+): ScoreResult {
+  const reasons: string[] = [];
+  if (c.amount == null) return { score: 0, reasons };
+  const txAmt = Math.abs(tx.amount);
+  const cAmt = Math.abs(Number(c.amount));
+  const diff = Math.abs(cAmt - txAmt);
+  const maxAmt = Math.max(cAmt, txAmt);
+
+  let score = 0;
+  if (diff < 0.02) {
+    score += 45;
+    reasons.push("Betrag exakt");
+  } else if (maxAmt > 0 && diff <= Math.max(0.05 * maxAmt, 10)) {
+    score += 20;
+    reasons.push("Betrag ähnlich");
+  } else {
+    return { score: 0, reasons };
+  }
+
+  // Date proximity
+  if (tx.date && c.date) {
+    const d = daysApart(tx.date, c.date);
+    if (d <= 3) { score += 20; reasons.push("Datum passt"); }
+    else if (d <= 14) { score += 14; reasons.push("Datum nah"); }
+    else if (d <= 45) { score += 7; }
+    else if (d <= 120) { score += 2; }
+    else { score -= 5; }
+  }
+
+  const descNorm = normalizeText(tx.description);
+  const descNoSpace = descNorm.replace(/\s+/g, "");
+
+  // Invoice number in the payment text
+  const ref = referenceKey(c.invoiceNumber);
+  if (ref && descNoSpace.includes(ref)) {
+    score += 45;
+    reasons.push("Rechnungsnummer im Text");
+  }
+
+  // Vendor / alias hit
+  const aliasHit = c.aliases
+    .filter(Boolean)
+    .map((a) => normalizeText(a))
+    .filter((a) => a.length >= 4)
+    .some((a) => descNorm.includes(a) || a.split(" ").filter((t) => t.length >= 4).every((t) => t && descNorm.includes(t)));
+  if (aliasHit) {
+    score += 25;
+    reasons.push("Lieferant im Text");
+  } else if (ctx.processor) {
+    // Payee is PayPal & co — the vendor is expected to be missing, don't punish
+    reasons.push("Zahlungsdienstleister");
+  } else {
+    score -= 5;
+  }
+
+  // Ambiguity penalty
+  if (ctx.sameAmountCount > 1) {
+    score -= Math.min(20, 4 * (ctx.sameAmountCount - 1));
+    reasons.push(`${ctx.sameAmountCount} Belege mit gleichem Betrag`);
+  }
+
+  return { score: Math.max(0, Math.round(score)), reasons };
+}
+
+export interface SuggestionTx {
+  id: string;
+  date: string | null;
+  amount: number;
+  description: string | null;
+}
+
+export interface SuggestionCandidate extends ScoreCandidate {
+  receiptId: string;
+  splitLineId: string | null;
+  vendor: string | null;
+}
+
+export interface SuggestionAlternative {
+  key: string;
+  receipt_id: string;
+  split_line_id: string | null;
+  receipt_date: string | null;
+  receipt_vendor: string | null;
+  receipt_amount: number;
+  receipt_invoice_number: string | null;
+}
+
+export interface MatchSuggestion {
+  transaction_id: string;
+  transaction_date: string | null;
+  transaction_amount: number;
+  transaction_description: string | null;
+  receipt_id: string;
+  split_line_id: string | null;
+  receipt_date: string | null;
+  receipt_vendor: string | null;
+  receipt_amount: number;
+  receipt_invoice_number: string | null;
+  score: number;
+  confidence: "high" | "medium" | "low";
+  reasons: string[];
+  alternatives: SuggestionAlternative[];
+}
+
+const toAlt = (c: SuggestionCandidate): SuggestionAlternative => ({
+  key: c.key,
+  receipt_id: c.receiptId,
+  split_line_id: c.splitLineId,
+  receipt_date: c.date,
+  receipt_vendor: c.vendor,
+  receipt_amount: Math.abs(Number(c.amount ?? 0)),
+  receipt_invoice_number: c.invoiceNumber,
+});
+
+/**
+ * Builds ranked suggestions for transactions that could not be matched
+ * automatically. Transactions and candidates sharing the same amount are
+ * paired chronologically (typical for recurring PayPal/IONOS payments), and
+ * each pair keeps the other same-amount receipts as selectable alternatives.
+ */
+export function buildSuggestions(
+  txs: SuggestionTx[],
+  candidates: SuggestionCandidate[],
+  opts: { maxAlternatives?: number } = {},
+): MatchSuggestion[] {
+  const maxAlt = opts.maxAlternatives ?? 8;
+  const cents = (n: number) => Math.round(Math.abs(n) * 100);
+
+  const candByAmount = new Map<number, SuggestionCandidate[]>();
+  for (const c of candidates) {
+    if (c.amount == null) continue;
+    const k = cents(Number(c.amount));
+    const arr = candByAmount.get(k) ?? [];
+    arr.push(c);
+    candByAmount.set(k, arr);
+  }
+  for (const arr of candByAmount.values()) {
+    arr.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+  }
+
+  const txByAmount = new Map<number, SuggestionTx[]>();
+  for (const t of txs) {
+    const k = cents(t.amount);
+    const arr = txByAmount.get(k) ?? [];
+    arr.push(t);
+    txByAmount.set(k, arr);
+  }
+  for (const arr of txByAmount.values()) {
+    arr.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+  }
+
+  const suggestions: MatchSuggestion[] = [];
+  const usedKeys = new Set<string>();
+
+  for (const [amount, group] of txByAmount) {
+    const pool = candByAmount.get(amount);
+    if (!pool || pool.length === 0) continue;
+
+    for (const tx of group) {
+      // Best remaining candidate: closest date wins, ties keep chronological order
+      let best: SuggestionCandidate | null = null;
+      let bestDist = Number.POSITIVE_INFINITY;
+      for (const c of pool) {
+        if (usedKeys.has(c.key)) continue;
+        const dist = tx.date && c.date ? daysApart(tx.date, c.date) : 999;
+        if (dist < bestDist) { bestDist = dist; best = c; }
+      }
+      if (!best) continue;
+
+      const ctx: ScoreContext = {
+        processor: isProcessorTransaction(tx.description),
+        sameAmountCount: pool.length,
+      };
+      const { score, reasons } = scoreMatch(
+        { description: tx.description, amount: tx.amount, date: tx.date },
+        best,
+        ctx,
+      );
+      if (score <= 0) continue;
+
+      const unique = pool.length === 1;
+      const vendors = new Set(pool.map((c) => (c.vendor ?? "").trim().toLowerCase()).filter(Boolean));
+      const confidence: MatchSuggestion["confidence"] =
+        score >= 75 || (unique && score >= 55)
+          ? "high"
+          : score >= 45 || vendors.size === 1
+            ? "medium"
+            : "low";
+
+      usedKeys.add(best.key);
+      suggestions.push({
+        transaction_id: tx.id,
+        transaction_date: tx.date,
+        transaction_amount: Math.abs(tx.amount),
+        transaction_description: tx.description,
+        receipt_id: best.receiptId,
+        split_line_id: best.splitLineId,
+        receipt_date: best.date,
+        receipt_vendor: best.vendor,
+        receipt_amount: Math.abs(Number(best.amount ?? 0)),
+        receipt_invoice_number: best.invoiceNumber,
+        score,
+        confidence,
+        reasons,
+        alternatives: pool
+          .filter((c) => c.key !== best!.key)
+          .slice(0, maxAlt)
+          .map(toAlt),
+      });
+    }
+  }
+
+  suggestions.sort((a, b) => b.score - a.score);
+  return suggestions;
+}

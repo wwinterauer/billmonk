@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildGroupPairs, isProcessorTransaction, findReferenceMatch } from "../_shared/reconcileHelpers.ts";
+import { buildGroupPairs, isProcessorTransaction, findReferenceMatch, buildSuggestions } from "../_shared/reconcileHelpers.ts";
 
 
 const corsHeaders = {
@@ -36,7 +36,10 @@ interface Candidate {
   vendor: string | null;
   invoice_number: string | null;
   extra_text: string | null;
+  /** vendor display name, legal names and extraction keywords */
+  aliases: string[];
 }
+
 
 function normalize(s: string | null | undefined): string {
   if (!s) return "";
@@ -64,7 +67,7 @@ async function buildCandidatePool(
 ): Promise<Candidate[]> {
   const { data: receipts } = await supabase
     .from("receipts")
-    .select("id, amount_gross, receipt_date, vendor, invoice_number, bank_transaction_id")
+    .select("id, amount_gross, receipt_date, vendor, vendor_id, invoice_number, bank_transaction_id")
     .eq("user_id", userId)
     .in("status", ["approved", "completed", "review"])
     .gte("receipt_date", minDate)
@@ -74,6 +77,22 @@ async function buildCandidatePool(
   if (all.length === 0) return [];
 
   const receiptIds = all.map((r: any) => r.id);
+
+  // Vendor aliases (brand, legal names, keywords) sharpen the text matching
+  const { data: vendors } = await supabase
+    .from("vendors")
+    .select("id, display_name, legal_names, detected_names, extraction_keywords")
+    .eq("user_id", userId);
+  const aliasByVendor = new Map<string, string[]>();
+  for (const v of (vendors ?? []) as any[]) {
+    const list = [
+      v.display_name,
+      ...(Array.isArray(v.legal_names) ? v.legal_names : []),
+      ...(Array.isArray(v.detected_names) ? v.detected_names : []),
+      ...(Array.isArray(v.extraction_keywords) ? v.extraction_keywords : []),
+    ].filter((s: unknown): s is string => typeof s === "string" && s.trim().length > 0);
+    aliasByVendor.set(v.id, list);
+  }
 
   const { data: splitLines } = await supabase
     .from("receipt_split_lines")
@@ -98,6 +117,10 @@ async function buildCandidatePool(
 
   const pool: Candidate[] = [];
   for (const r of all as any[]) {
+    const aliases = [
+      ...(r.vendor ? [r.vendor] : []),
+      ...(r.vendor_id ? aliasByVendor.get(r.vendor_id) ?? [] : []),
+    ];
     const lines = linesByReceipt.get(r.id);
     if (lines && lines.length > 0) {
       for (const l of lines) {
@@ -111,6 +134,7 @@ async function buildCandidatePool(
           vendor: r.vendor,
           invoice_number: r.invoice_number,
           extra_text: l.description,
+          aliases: [...aliases, ...(l.description ? [l.description] : [])],
         });
       }
     } else {
@@ -124,9 +148,11 @@ async function buildCandidatePool(
         vendor: r.vendor,
         invoice_number: r.invoice_number,
         extra_text: null,
+        aliases,
       });
     }
   }
+
   return pool;
 }
 
@@ -235,7 +261,7 @@ serve(async (req) => {
 
     if (!txs || txs.length === 0) {
       return new Response(
-        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, reference_applied: 0, skonto_candidates: [], scanned_transactions: 0 }),
+        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, reference_applied: 0, skonto_candidates: [], match_suggestions: [], scanned_transactions: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -243,7 +269,7 @@ serve(async (req) => {
     const datedTxs = txs.filter((t) => t.transaction_date);
     if (datedTxs.length === 0) {
       return new Response(
-        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, reference_applied: 0, skonto_candidates: [], scanned_transactions: txs.length }),
+        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, reference_applied: 0, skonto_candidates: [], match_suggestions: [], scanned_transactions: txs.length }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -358,9 +384,13 @@ serve(async (req) => {
         if (c.split_line_id) {
           if (lineTokens.some((t) => descNorm.includes(t))) viaVendor = true;
         } else {
-          const vt = tokensOf(c.vendor);
-          if (vt.length > 0 && vt.every((t) => descNorm.includes(t))) viaVendor = true;
+          const aliasHit = (c.aliases ?? []).some((a) => {
+            const at = tokensOf(a);
+            return at.length > 0 && at.every((t) => descNorm.includes(t));
+          });
+          if (aliasHit) viaVendor = true;
         }
+
         if (viaInvoice || viaVendor) matches.push({ c, viaInvoice, viaVendor });
       }
 
@@ -478,6 +508,34 @@ serve(async (req) => {
       }
     }
 
+    // 6) Suggestion pass: everything left over that still looks plausible is
+    // offered to the user instead of silently staying open.
+    const skontoTxIds = new Set(skontoCandidates.map((s) => s.transaction_id));
+    const skontoKeys = new Set(
+      skontoCandidates.map((s) => (s.split_line_id ? `line:${s.split_line_id}` : `receipt:${s.receipt_id}`)),
+    );
+    const suggestionTxs = datedTxs
+      .filter((t) => t.amount && !matchedTxIds.has(t.id) && !skontoTxIds.has(t.id))
+      .map((t) => ({
+        id: t.id,
+        date: t.transaction_date,
+        amount: Number(t.amount),
+        description: t.description,
+      }));
+    const suggestionCands = pool
+      .filter((c) => !usedKeys.has(c.key) && !skontoKeys.has(c.key) && c.amount_gross != null)
+      .map((c) => ({
+        key: c.key,
+        receiptId: c.receipt_id,
+        splitLineId: c.split_line_id,
+        amount: Number(c.amount_gross),
+        date: c.receipt_date,
+        vendor: c.vendor,
+        aliases: c.aliases,
+        invoiceNumber: c.invoice_number,
+      }));
+    const matchSuggestions = buildSuggestions(suggestionTxs, suggestionCands);
+
     return new Response(
       JSON.stringify({
         exact_applied: exactApplied,
@@ -485,8 +543,10 @@ serve(async (req) => {
         group_applied: groupApplied,
         reference_applied: referenceApplied,
         skonto_candidates: skontoCandidates,
+        match_suggestions: matchSuggestions,
         scanned_transactions: txs.length,
       }),
+
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

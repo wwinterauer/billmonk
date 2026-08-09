@@ -52,7 +52,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ReceiptAssignmentModal } from '@/components/bank-import/ReceiptAssignmentModal';
 import { ReceiptDetailPanel } from '@/components/receipts/ReceiptDetailPanel';
-import { SkontoReconcileDialog, type SkontoCandidate } from '@/components/reconciliation/SkontoReconcileDialog';
+import { SkontoReconcileDialog, type SkontoCandidate, type MatchSuggestion, type AcceptedPair } from '@/components/reconciliation/SkontoReconcileDialog';
 import { Sparkles } from 'lucide-react';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { EditableTableHead } from '@/components/expenses/EditableTableHead';
@@ -127,6 +127,7 @@ export default function Reconciliation() {
   const [reconcileApplying, setReconcileApplying] = useState(false);
   const [reconcileDialogOpen, setReconcileDialogOpen] = useState(false);
   const [skontoCandidates, setSkontoCandidates] = useState<SkontoCandidate[]>([]);
+  const [matchSuggestions, setMatchSuggestions] = useState<MatchSuggestion[]>([]);
   const [reconcileSummary, setReconcileSummary] = useState<{ exact: number; scanned: number }>({ exact: 0, scanned: 0 });
 
   const runAutoReconcile = async () => {
@@ -143,7 +144,9 @@ export default function Reconciliation() {
 
 
       const candidates: SkontoCandidate[] = data?.skonto_candidates ?? [];
+      const suggestions: MatchSuggestion[] = data?.match_suggestions ?? [];
       setSkontoCandidates(candidates);
+      setMatchSuggestions(suggestions);
       setReconcileSummary({ exact, scanned });
 
       // Always refresh after exact matches
@@ -153,18 +156,17 @@ export default function Reconciliation() {
       queryClient.invalidateQueries({ queryKey: ['kpi-receipts-without-payment'] });
       queryClient.invalidateQueries({ queryKey: ['missing-receipts-list'] });
 
-      if (candidates.length > 0) {
+      if (candidates.length > 0 || suggestions.length > 0) {
         setReconcileDialogOpen(true);
       } else {
         toast({
           title: 'Abgleich abgeschlossen',
           description: exact > 0
-            ? `${exact} Buchung${exact === 1 ? '' : 'en'} zugeordnet${viaReference > 0 ? `, davon ${viaReference} über die Rechnungsnummer` : ''}${grouped > 0 ? `, ${grouped} über Gruppen-Zuordnung bei gleichen Beträgen (bitte gegenprüfen)` : ''}. Keine Skonto-Vorschläge.`
+            ? `${exact} Buchung${exact === 1 ? '' : 'en'} zugeordnet${viaReference > 0 ? `, davon ${viaReference} über die Rechnungsnummer` : ''}${grouped > 0 ? `, ${grouped} über Gruppen-Zuordnung bei gleichen Beträgen (bitte gegenprüfen)` : ''}. Keine weiteren Vorschläge.`
             : 'Keine passenden Belege gefunden.',
-
-
         });
       }
+
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unbekannter Fehler';
       toast({ title: 'Fehler beim Abgleich', description: msg, variant: 'destructive' });
@@ -173,7 +175,7 @@ export default function Reconciliation() {
     }
   };
 
-  const applySkontoMatches = async (accepted: { transaction_id: string; receipt_id: string }[]) => {
+  const applySkontoMatches = async (accepted: AcceptedPair[]) => {
     setReconcileApplying(true);
     try {
       const { data, error } = await supabase.functions.invoke('reconcile-with-skonto', {
@@ -182,9 +184,10 @@ export default function Reconciliation() {
       if (error) throw error;
       const applied = data?.applied ?? 0;
       toast({
-        title: 'Skonto-Zuordnungen übernommen',
+        title: 'Zuordnungen übernommen',
         description: `${applied} Buchung${applied === 1 ? '' : 'en'} verknüpft.`,
       });
+
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
       queryClient.invalidateQueries({ queryKey: ['kpi-unmatched-payments'] });
@@ -1526,11 +1529,17 @@ export default function Reconciliation() {
         open={reconcileDialogOpen}
         onOpenChange={setReconcileDialogOpen}
         candidates={skontoCandidates}
+        suggestions={matchSuggestions}
         exactApplied={reconcileSummary.exact}
         scanned={reconcileSummary.scanned}
         onApply={applySkontoMatches}
+        onShowReceipt={(id) => {
+          setSelectedReceiptId(id);
+          setShowReceiptPanel(true);
+        }}
         isApplying={reconcileApplying}
       />
+
       </FeatureGate>
     </DashboardLayout>
   
