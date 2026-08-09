@@ -1342,11 +1342,15 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
             const confidence = Number(extractedData.confidence ?? 0);
             const minConfidence = Number(vendorAuto.auto_approve_min_confidence ?? 0.8);
             const needsSplitting = (extractedData as any)?.split_suggestion?.contains_multiple_invoices === true;
-            if (confidence >= minConfidence && !needsSplitting) {
+            const totalsConflict = (extractedData as any)?.vat_detection_method === 'totals_line_conflict';
+            if (confidence >= minConfidence && !needsSplitting && !totalsConflict) {
               finalStatus = 'approved';
               autoApproved = true;
               console.log(`[Auto-Approve] Receipt ${receiptId} approved (confidence ${confidence} >= ${minConfidence})`);
+            } else if (totalsConflict) {
+              console.log(`[Auto-Approve] Receipt ${receiptId} blockiert: Positionssumme passt nicht zur Summenzeile`);
             }
+
           }
         }
 
