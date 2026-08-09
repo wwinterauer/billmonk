@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ProblemReceiptsPanel } from '@/components/receipts/ProblemReceiptsPanel';
 import { NonReceiptPanel } from '@/components/receipts/NonReceiptPanel';
+import { ReconcileVendorsCard } from '@/components/receipts/ReconcileVendorsCard';
+
 import { useProblemReceiptCount, useReceiptRetry } from '@/hooks/useReceiptRetry';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -264,6 +266,16 @@ const Review = () => {
           r.category !== 'Keine Rechnung' &&
           !(r.notes ?? '').startsWith('Dokumenttyp:'),
       ),
+    [receipts],
+  );
+
+  // Receipts with an extracted vendor name but no linked vendor record —
+  // these never reach the auto-approve rule.
+  const unlinkedVendorCount = useMemo(
+    () =>
+      receipts.filter(
+        r => r.status === 'review' && !r.vendor_id && (r.vendor || r.vendor_brand),
+      ).length,
     [receipts],
   );
 
@@ -1225,6 +1237,10 @@ const Review = () => {
 
         {/* Documents the AI classified as non-receipts */}
         <NonReceiptPanel onChanged={loadReceipts} />
+
+        {/* Receipts with a vendor name but no linked vendor record */}
+        <ReconcileVendorsCard unlinkedCount={unlinkedVendorCount} onDone={loadReceipts} />
+
 
 
 

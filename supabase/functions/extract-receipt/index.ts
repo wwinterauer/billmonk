@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { uint8ArrayToBase64 } from "../_shared/base64.ts";
+import { hasLegalForm, normalizeVendorName, matchVendor } from "../_shared/vendorMatch.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -128,65 +130,10 @@ const extractionSchema = {
   additionalProperties: false,
 };
 
-// Legal form suffixes for DACH + common international forms
-const LEGAL_FORM_REGEX = /\b(GmbH(?:\s*&\s*Co\.?\s*KG)?|AG|KG|OG|OHG|e\.?\s*U\.?|EU|UG(?:\s*\(haftungsbeschr[äa]nkt\))?|SE|S\.E\.|Ltd\.?|LLC|Inc\.?|Corp\.?|S\.à\s*r\.?l\.?|S\.A\.|S\.A\.S\.|S\.r\.l\.?|S\.p\.A\.|B\.V\.|N\.V\.|Co\.?\s*KG|Kft\.?|sp\.?\s*z\s*o\.?o\.?|d\.o\.o\.?|GbR|PartG)\b/i;
+// Vendor name helpers live in _shared/vendorMatch.ts so extraction and the
+// retroactive reconcile function use identical matching rules.
+// (imported at the top of this file)
 
-function hasLegalForm(name: string | null | undefined): boolean {
-  if (!name) return false;
-  return LEGAL_FORM_REGEX.test(name);
-}
-
-// Normalize vendor name for matching: lowercase, strip legal form, collapse whitespace/punct.
-function normalizeVendorName(name: string | null | undefined): string {
-  if (!name) return "";
-  return name
-    .toLowerCase()
-    .replace(LEGAL_FORM_REGEX, "")
-    .replace(/[.,&]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-// Combine AI vendor_name with vendor_legal_form if the name doesn't already contain a legal form.
-function combineVendorWithLegalForm(name: string | null | undefined, legalForm: string | null | undefined): string | null {
-  if (!name) return null;
-  const trimmed = name.trim();
-  if (!trimmed) return null;
-  if (!legalForm) return trimmed;
-  const lf = legalForm.trim();
-  if (!lf) return trimmed;
-  // Already contains a legal form → keep AI name as-is
-  if (hasLegalForm(trimmed)) return trimmed;
-  // Append legal form
-  return `${trimmed} ${lf}`.replace(/\s+/g, " ").trim();
-}
-
-function levenshtein(a: string, b: string): number {
-  if (a === b) return 0;
-  if (!a.length) return b.length;
-  if (!b.length) return a.length;
-  const v0 = new Array(b.length + 1);
-  const v1 = new Array(b.length + 1);
-  for (let i = 0; i <= b.length; i++) v0[i] = i;
-  for (let i = 0; i < a.length; i++) {
-    v1[0] = i + 1;
-    for (let j = 0; j < b.length; j++) {
-      const cost = a[i] === b[j] ? 0 : 1;
-      v1[j + 1] = Math.min(v1[j] + 1, v0[j + 1] + 1, v0[j] + cost);
-    }
-    for (let j = 0; j <= b.length; j++) v0[j] = v1[j];
-  }
-  return v1[b.length];
-}
-
-// Similarity 0..1 based on Levenshtein
-function nameSimilarity(a: string, b: string): number {
-  if (!a && !b) return 1;
-  if (!a || !b) return 0;
-  const maxLen = Math.max(a.length, b.length);
-  if (maxLen === 0) return 1;
-  return 1 - levenshtein(a, b) / maxLen;
-}
 
 // ── Map structured output → internal ExtractionResult ──────────────
 function mapSchemaToResult(raw: Record<string, any>): ExtractionResult {
@@ -1005,76 +952,19 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         let resolvedVendorId: string | null = receipt?.vendor_id ?? null;
 
         if (receiptUserId && extractedData.vendor) {
-          // Vendor matching: load all user vendors and match by normalized name
-          // (strip legal form + lowercase) with Levenshtein fallback. This lets
-          // "Sowana Handels GmbH" and "sowana" resolve to the same vendor.
-          const extractedNorm = normalizeVendorName(extractedData.vendor);
-          const extractedLower = (extractedData.vendor || "").toLowerCase().trim();
-
+          // Vendor matching via the shared matcher (exact → legal names →
+          // normalized → brand → fuzzy), identical to `reconcile-vendors`.
           const { data: allVendors } = await supabase
             .from('vendors')
             .select('id, display_name, expenses_only_extraction, legal_names, default_category_id')
             .eq('user_id', receiptUserId);
 
-          let finalVendorMatch: any = null;
-          if (allVendors && allVendors.length > 0) {
-            // 1. Exact (case-insensitive) display_name match
-            finalVendorMatch = allVendors.find(v =>
-              (v.display_name || '').toLowerCase().trim() === extractedLower
-            ) || null;
-
-            // 2. Exact legal_names match
-            if (!finalVendorMatch) {
-              finalVendorMatch = allVendors.find(v =>
-                (v.legal_names || []).some((ln: string) => ln.toLowerCase().trim() === extractedLower)
-              ) || null;
-            }
-
-            // 3. Normalized match (strip legal form) on display_name OR legal_names
-            if (!finalVendorMatch && extractedNorm) {
-              finalVendorMatch = allVendors.find(v => {
-                if (normalizeVendorName(v.display_name) === extractedNorm) return true;
-                return (v.legal_names || []).some((ln: string) => normalizeVendorName(ln) === extractedNorm);
-              }) || null;
-            }
-
-            // 3b. Match on the brand name (vendor_brand) — many invoices carry a
-            // holding/legal entity in `vendor` but the known brand in `vendor_brand`.
-            const brandRaw = (extractedData.vendor_brand || '').trim();
-            if (!finalVendorMatch && brandRaw) {
-              const brandLower = brandRaw.toLowerCase();
-              const brandNorm = normalizeVendorName(brandRaw);
-              finalVendorMatch = allVendors.find(v => {
-                if ((v.display_name || '').toLowerCase().trim() === brandLower) return true;
-                if (brandNorm && normalizeVendorName(v.display_name) === brandNorm) return true;
-                return (v.legal_names || []).some((ln: string) =>
-                  ln.toLowerCase().trim() === brandLower || (brandNorm && normalizeVendorName(ln) === brandNorm)
-                );
-              }) || null;
-            }
-
-            // 4. Fuzzy fallback (similarity ≥ 0.88) on normalized names — guard short names
-            if (!finalVendorMatch && extractedNorm && extractedNorm.length >= 4) {
-              let bestScore = 0;
-              let bestVendor: any = null;
-              const needles = [extractedNorm, normalizeVendorName(brandRaw)].filter(n => n && n.length >= 4);
-              for (const v of allVendors) {
-                const candidates = [v.display_name, ...(v.legal_names || [])]
-                  .map(normalizeVendorName)
-                  .filter(n => n.length >= 4);
-                for (const cand of candidates) {
-                  for (const needle of needles) {
-                    const score = nameSimilarity(needle, cand);
-                    if (score > bestScore) { bestScore = score; bestVendor = v; }
-                  }
-                }
-              }
-              if (bestScore >= 0.88) {
-                finalVendorMatch = bestVendor;
-                console.log(`[Vendor Match] Fuzzy matched "${extractedData.vendor}" → "${bestVendor.display_name}" (score ${bestScore.toFixed(2)})`);
-              }
-            }
+          const finalVendorMatch: any =
+            matchVendor(allVendors as any[], extractedData.vendor, extractedData.vendor_brand) || null;
+          if (finalVendorMatch) {
+            console.log(`[Vendor Match] "${extractedData.vendor}" → "${finalVendorMatch.display_name}"`);
           }
+
 
 
           const vendorId = receipt?.vendor_id || finalVendorMatch?.id;
