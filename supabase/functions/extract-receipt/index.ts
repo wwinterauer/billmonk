@@ -84,8 +84,24 @@ const extractionSchema = {
     total_amount: { type: "number" as const },
     net_amount: { type: "number" as const },
     tax_amount: { type: "number" as const },
+    total_amount_label: { type: "string" as const },
+    net_amount_label: { type: "string" as const },
+    tax_amount_label: { type: "string" as const },
+    totals_block: {
+      type: "array" as const,
+      items: {
+        type: "object" as const,
+        properties: {
+          label: { type: "string" as const },
+          amount: { type: "number" as const },
+        },
+        required: ["label", "amount"],
+        additionalProperties: false,
+      },
+    },
     tax_rate: { type: "string" as const },
     line_items_are_net: { type: "boolean" as const },
+
     is_mixed_tax_rate: { type: "boolean" as const },
     tax_rate_details: {
       type: "array" as const,
