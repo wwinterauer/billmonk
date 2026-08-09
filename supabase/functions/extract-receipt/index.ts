@@ -1277,7 +1277,8 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } catch (parseError) {
-      console.error("Failed to parse AI response:", cleanedContent);
+      const msg = parseError instanceof Error ? `${parseError.message}\n${parseError.stack}` : String(parseError);
+      console.error("Post-processing failed:", msg);
       // Fallback: Receipt auf review setzen, damit er nicht auf processing hängen bleibt
       if (receiptId) {
         await supabase.from('receipts').update({
@@ -1287,10 +1288,11 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         }).eq('id', receiptId);
       }
       return new Response(
-        JSON.stringify({ success: false, error: "Failed to parse AI response", raw: content }),
+        JSON.stringify({ success: false, error: "Post-processing failed", details: msg }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
   } catch (error) {
     console.error("Extract receipt error:", error);
     // Fallback: Receipt auf review setzen, damit er nicht auf processing hängen bleibt
