@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildGroupPairs, isProcessorTransaction } from "../_shared/reconcileHelpers.ts";
+import { buildGroupPairs, isProcessorTransaction, findReferenceMatch } from "../_shared/reconcileHelpers.ts";
 
 
 const corsHeaders = {
@@ -235,7 +235,7 @@ serve(async (req) => {
 
     if (!txs || txs.length === 0) {
       return new Response(
-        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, skonto_candidates: [], scanned_transactions: 0 }),
+        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, reference_applied: 0, skonto_candidates: [], scanned_transactions: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -243,7 +243,7 @@ serve(async (req) => {
     const datedTxs = txs.filter((t) => t.transaction_date);
     if (datedTxs.length === 0) {
       return new Response(
-        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, skonto_candidates: [], scanned_transactions: txs.length }),
+        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, reference_applied: 0, skonto_candidates: [], scanned_transactions: txs.length }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -265,6 +265,7 @@ serve(async (req) => {
     let exactApplied = 0;
     let highConfidenceApplied = 0;
     let groupApplied = 0;
+    let referenceApplied = 0;
     const skontoCandidates: SkontoCandidate[] = [];
     const usedKeys = new Set<string>();
     const matchedTxIds = new Set<string>();
@@ -290,6 +291,46 @@ serve(async (req) => {
       matchedTxIds.add(txId);
       return true;
     };
+
+    // 4-pre) Reference pass: invoice number appears in the payment text.
+    // Strongest possible signal — no date window, tolerant on the amount.
+    for (const tx of datedTxs) {
+      if (!tx.amount) continue;
+      const open = pool.filter((c) => !usedKeys.has(c.key) && c.amount_gross != null);
+      const hit = findReferenceMatch(
+        tx.description,
+        Number(tx.amount),
+        open.map((c) => ({ key: c.key, amount: Number(c.amount_gross), invoiceNumber: c.invoice_number })),
+      );
+      if (!hit) continue;
+      const c = pool.find((x) => x.key === hit.key);
+      if (!c) continue;
+
+      // Skonto range stays a suggestion instead of an automatic match
+      if (hit.deviationPct >= 1 && hit.deviationPct <= 5) {
+        const receiptAmt = Math.abs(Number(c.amount_gross));
+        skontoCandidates.push({
+          transaction_id: tx.id,
+          receipt_id: c.receipt_id,
+          split_line_id: c.split_line_id,
+          transaction_date: tx.transaction_date,
+          transaction_amount: Math.abs(tx.amount),
+          transaction_description: tx.description,
+          receipt_date: c.receipt_date,
+          receipt_vendor: c.vendor,
+          receipt_amount: receiptAmt,
+          receipt_invoice_number: c.invoice_number,
+          deviation_pct: Math.round(hit.deviationPct * 100) / 100,
+          skonto_amount: Math.round((receiptAmt - Math.abs(tx.amount)) * 100) / 100,
+          matched_via: ["invoice_number"],
+        });
+        usedKeys.add(c.key);
+        matchedTxIds.add(tx.id);
+        continue;
+      }
+
+      if (await applyMatch(tx.id, c)) referenceApplied++;
+    }
 
     // 4a) High-confidence: exact amount + invoice-nr/vendor signal, ±60 days
     for (const tx of datedTxs) {
@@ -442,6 +483,7 @@ serve(async (req) => {
         exact_applied: exactApplied,
         high_confidence_applied: highConfidenceApplied,
         group_applied: groupApplied,
+        reference_applied: referenceApplied,
         skonto_candidates: skontoCandidates,
         scanned_transactions: txs.length,
       }),
