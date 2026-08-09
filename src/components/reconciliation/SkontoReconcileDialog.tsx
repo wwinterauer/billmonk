@@ -174,7 +174,7 @@ export function SkontoReconcileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[90vh] max-h-[90vh] max-w-5xl flex flex-col overflow-hidden">
+      <DialogContent className="h-[90vh] max-h-[90vh] max-w-5xl grid grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden">
         <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -192,7 +192,7 @@ export function SkontoReconcileDialog({
               : 'Keine passenden Belege im Datumsbereich der offenen Buchungen gefunden.'}
           </div>
         ) : (
-          <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="flex flex-1 min-h-0 flex-col overflow-hidden">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
             <TabsList className="shrink-0">
               <TabsTrigger value="suggestions">
                 Vorschläge {suggestions.length > 0 && `(${suggestions.length})`}
@@ -203,7 +203,7 @@ export function SkontoReconcileDialog({
             </TabsList>
 
             {/* ---------------- Suggestions ---------------- */}
-            <TabsContent value="suggestions" className="flex flex-1 min-h-0 flex-col overflow-hidden">
+            <TabsContent value="suggestions" className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
               {suggestions.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">
                   Keine weiteren Vorschläge.
@@ -227,7 +227,7 @@ export function SkontoReconcileDialog({
                       </Button>
                     </div>
                   </div>
-                  <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain pr-4">
+                   <div className="h-full min-h-0 overflow-y-scroll overscroll-contain pr-4">
                     <div className="space-y-2">
                       {suggestions.map((s) => {
                         const chosen = chosenFor(s);
@@ -352,11 +352,11 @@ export function SkontoReconcileDialog({
             </TabsContent>
 
             {/* ---------------- Skonto ---------------- */}
-            <TabsContent value="skonto" className="flex flex-1 min-h-0 flex-col overflow-hidden">
+            <TabsContent value="skonto" className="grid min-h-0 grid-rows-[minmax(0,1fr)] overflow-hidden">
               {candidates.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">Keine Skonto-Vorschläge.</div>
               ) : (
-                <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain pr-4">
+                <div className="h-full min-h-0 overflow-y-scroll overscroll-contain pr-4">
                   <div className="space-y-2">
                     <div className="text-sm text-muted-foreground mb-2">
                       Folgende Buchungen weichen 1–5 % vom Belegbetrag ab und enthalten den Lieferantennamen oder die Rechnungsnummer. Wahrscheinlich Skonto-Abzug.
