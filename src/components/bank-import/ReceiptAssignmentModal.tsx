@@ -158,6 +158,7 @@ export function ReceiptAssignmentModal({
 
   // Split-line selection (step 2)
   const [selectedSplitLine, setSelectedSplitLine] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ url: string | null; isPdf: boolean; title: string } | null>(null);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -357,9 +358,12 @@ export function ReceiptAssignmentModal({
   const openReceiptFile = async (e: React.MouseEvent, receipt: Receipt) => {
     e.stopPropagation();
     if (!receipt.file_url) return;
+    setPreview({ url: null, isPdf: receipt.file_url.toLowerCase().endsWith('.pdf'), title: receipt.vendor || 'Beleg' });
     const path = receipt.file_url.replace(/^.*\/receipts\//, '');
     const { data } = await supabase.storage.from('receipts').createSignedUrl(path, 300);
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+    if (data?.signedUrl) {
+      setPreview({ url: data.signedUrl, isPdf: receipt.file_url.toLowerCase().endsWith('.pdf'), title: receipt.vendor || 'Beleg' });
+    }
   };
 
   const ReceiptCard = ({ receipt, showScore = true }: { receipt: ReceiptWithScore; showScore?: boolean }) => (
@@ -697,6 +701,27 @@ export function ReceiptAssignmentModal({
           </div>
         </DialogFooter>
       </DialogContent>
+
+      <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
+        <DialogContent className="sm:max-w-[900px] h-[90vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-3">
+            <DialogTitle className="truncate">{preview?.title ?? 'Beleg'}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 px-6 pb-6">
+            {!preview?.url ? (
+              <div className="h-full flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : preview.isPdf ? (
+              <iframe src={preview.url} title="Belegvorschau" className="w-full h-full rounded-lg border" />
+            ) : (
+              <div className="h-full overflow-auto rounded-lg border bg-muted/30 flex items-start justify-center">
+                <img src={preview.url} alt="Belegvorschau" className="max-w-full" />
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
