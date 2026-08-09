@@ -144,7 +144,9 @@ export default function Reconciliation() {
 
 
       const candidates: SkontoCandidate[] = data?.skonto_candidates ?? [];
+      const suggestions: MatchSuggestion[] = data?.match_suggestions ?? [];
       setSkontoCandidates(candidates);
+      setMatchSuggestions(suggestions);
       setReconcileSummary({ exact, scanned });
 
       // Always refresh after exact matches
@@ -154,18 +156,17 @@ export default function Reconciliation() {
       queryClient.invalidateQueries({ queryKey: ['kpi-receipts-without-payment'] });
       queryClient.invalidateQueries({ queryKey: ['missing-receipts-list'] });
 
-      if (candidates.length > 0) {
+      if (candidates.length > 0 || suggestions.length > 0) {
         setReconcileDialogOpen(true);
       } else {
         toast({
           title: 'Abgleich abgeschlossen',
           description: exact > 0
-            ? `${exact} Buchung${exact === 1 ? '' : 'en'} zugeordnet${viaReference > 0 ? `, davon ${viaReference} über die Rechnungsnummer` : ''}${grouped > 0 ? `, ${grouped} über Gruppen-Zuordnung bei gleichen Beträgen (bitte gegenprüfen)` : ''}. Keine Skonto-Vorschläge.`
+            ? `${exact} Buchung${exact === 1 ? '' : 'en'} zugeordnet${viaReference > 0 ? `, davon ${viaReference} über die Rechnungsnummer` : ''}${grouped > 0 ? `, ${grouped} über Gruppen-Zuordnung bei gleichen Beträgen (bitte gegenprüfen)` : ''}. Keine weiteren Vorschläge.`
             : 'Keine passenden Belege gefunden.',
-
-
         });
       }
+
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unbekannter Fehler';
       toast({ title: 'Fehler beim Abgleich', description: msg, variant: 'destructive' });
