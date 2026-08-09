@@ -2,6 +2,16 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { uint8ArrayToBase64 } from "../_shared/base64.ts";
 import { hasLegalForm, normalizeVendorName, matchVendor, combineVendorWithLegalForm } from "../_shared/vendorMatch.ts";
+import {
+  normalizeInvoiceNumber,
+  invoiceNumbersMatch,
+  amountWithinTolerance,
+  amountsEqual,
+  dateWithinTolerance,
+  daysBetween,
+  classifyDocumentKind,
+  vendorsLikelySame,
+} from "../_shared/duplicateRules.ts";
 
 
 const corsHeaders = {
