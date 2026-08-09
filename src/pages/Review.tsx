@@ -1269,7 +1269,30 @@ const Review = () => {
         <NonReceiptPanel onChanged={loadReceipts} />
 
         {/* Receipts with a vendor name but no linked vendor record */}
-        <ReconcileVendorsCard unlinkedCount={unlinkedVendorCount} onDone={loadReceipts} />
+        <ReconcileVendorsCard
+          unlinkedCount={unlinkedVendorCount}
+          onDone={loadReceipts}
+          filterActive={unlinkedOnly}
+          onToggleFilter={() => {
+            setUnlinkedOnly(prev => !prev);
+            setCurrentIndex(0);
+          }}
+        />
+
+        {unlinkedOnly && (
+          <div className="mb-4 flex w-fit items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
+            <span>Nur Belege ohne Lieferantenzuordnung</span>
+            <button
+              type="button"
+              onClick={() => setUnlinkedOnly(false)}
+              className="hover:text-foreground"
+              aria-label="Filter aufheben"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
 
 
 
