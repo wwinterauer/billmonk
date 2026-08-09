@@ -926,12 +926,14 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
       if (validLineItems.length > 0) {
         const rateGroups: Record<string, { sum: number; descriptions: string[] }> = {};
         let lineItemsSum = 0;
-        // Vorzeichen bleiben erhalten: Rabatte/Gutschriften werden abgezogen, nicht addiert
+        // Vorzeichen bleiben erhalten: Rabatte/Gutschriften werden abgezogen, nicht addiert.
+        // Ausnahme: im Ausgaben-Filter-Modus sind auch Klammer-/Minus-Beträge Ausgaben → Betrag positiv.
         for (const li of validLineItems) {
           const rateKey = String(parseFloat(String(li.tax_rate).replace(',', '.').replace('%', '')) || 0);
           if (!rateGroups[rateKey]) rateGroups[rateKey] = { sum: 0, descriptions: [] };
-          rateGroups[rateKey].sum += Number(li.total);
-          lineItemsSum += Number(li.total);
+          const liTotal = expensesOnlyMode ? Math.abs(Number(li.total)) : Number(li.total);
+          rateGroups[rateKey].sum += liTotal;
+          lineItemsSum += liTotal;
           if (li.description) rateGroups[rateKey].descriptions.push(li.description);
         }
 
