@@ -96,7 +96,27 @@ export function useReceiptRetry() {
   const [progress, setProgress] = useState<RetryProgress>(emptyProgress);
 
   const retryReceiptIds = useCallback(
-    async (ids: string[]) => {
+    async (inputIds: string[], options?: { force?: boolean }) => {
+      let ids = inputIds;
+
+      // Documents already classified as "not a receipt" would produce the exact
+      // same result again — skip them unless the caller explicitly forces it.
+      if (!options?.force && ids.length > 0) {
+        const { data: skipRows } = await supabase
+          .from('receipts')
+          .select('id')
+          .in('id', ids)
+          .eq('status', 'not_a_receipt');
+        const skip = new Set((skipRows ?? []).map(r => r.id));
+        if (skip.size > 0) {
+          ids = ids.filter(id => !skip.has(id));
+          toast({
+            title: 'Nicht-Belege übersprungen',
+            description: `${skip.size} Dokument(e) wurden bereits als Nicht-Beleg erkannt.`,
+          });
+        }
+      }
+
       if (ids.length === 0) {
         toast({ title: 'Keine Belege', description: 'Es gibt nichts zu verarbeiten.' });
         return { success: 0, failed: 0 };
@@ -108,14 +128,17 @@ export function useReceiptRetry() {
       let success = 0;
       let failed = 0;
 
+
+
       for (let i = 0; i < ids.length; i++) {
         const id = ids[i];
         setProgress(prev => ({ ...prev, current: i + 1 }));
         try {
           await supabase.from('receipts').update({ status: 'processing', notes: null }).eq('id', id);
           const { error } = await supabase.functions.invoke('extract-receipt', {
-            body: { receiptId: id },
+            body: { receiptId: id, forceTreatAsReceipt: options?.force === true },
           });
+
           if (error) throw error;
           success++;
           setProgress(prev => ({ ...prev, success }));
