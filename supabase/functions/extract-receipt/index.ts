@@ -836,18 +836,36 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
       
 
       if (validLineItems.length > 0) {
-        const rateGroups: Record<string, { gross: number; descriptions: string[] }> = {};
+        const rateGroups: Record<string, { sum: number; descriptions: string[] }> = {};
+        let lineItemsSum = 0;
         for (const li of validLineItems) {
           const rateKey = String(parseFloat(String(li.tax_rate).replace(',', '.').replace('%', '')) || 0);
-          if (!rateGroups[rateKey]) rateGroups[rateKey] = { gross: 0, descriptions: [] };
-          rateGroups[rateKey].gross += Math.abs(Number(li.total));
+          if (!rateGroups[rateKey]) rateGroups[rateKey] = { sum: 0, descriptions: [] };
+          rateGroups[rateKey].sum += Math.abs(Number(li.total));
+          lineItemsSum += Math.abs(Number(li.total));
           if (li.description) rateGroups[rateKey].descriptions.push(li.description);
         }
+
+        // Sind die Positionspreise Netto- oder Bruttowerte?
+        const aiNet = Number(extractedData.amount_net);
+        const aiGrossVal = Number(extractedData.amount_gross);
+        const closeTo = (a: number, b: number) =>
+          Number.isFinite(a) && Number.isFinite(b) && b > 0 && Math.abs(a - b) / Math.max(b, 1) < 0.01;
+        const lineItemsAreNet =
+          rawData.line_items_are_net === true ||
+          (closeTo(lineItemsSum, aiNet) && !closeTo(lineItemsSum, aiGrossVal));
+        // Positionssumme → Bruttowert je Satz
+        const toGross = (sum: number, rate: number) =>
+          lineItemsAreNet && rate > 0 ? sum * (1 + rate / 100) : sum;
+        if (lineItemsAreNet) {
+          console.log(`[LineItems] Positionspreise als NETTO erkannt (Summe ${Math.round(lineItemsSum * 100) / 100})`);
+        }
+
         const rateKeys = Object.keys(rateGroups);
         if (rateKeys.length > 1) {
           const newDetails = rateKeys.map(rateStr => {
             const rate = parseFloat(rateStr);
-            const gross = rateGroups[rateStr].gross;
+            const gross = toGross(rateGroups[rateStr].sum, rate);
             const netAmount = rate === 0 ? gross : gross / (1 + rate / 100);
             const taxAmount = gross - netAmount;
             return {
@@ -861,11 +879,12 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           extractedData.is_mixed_tax_rate = true;
           extractedData.amount_net = Math.round(newDetails.reduce((s, d) => s + d.net_amount, 0) * 100) / 100;
           extractedData.vat_amount = Math.round(newDetails.reduce((s, d) => s + d.tax_amount, 0) * 100) / 100;
+          extractedData.amount_gross = Math.round((extractedData.amount_net + extractedData.vat_amount) * 100) / 100;
           
         } else if (rateKeys.length === 1) {
           // Single-Rate Truth aus Line Items: AI-Aggregat überschreiben
           const rate = parseFloat(rateKeys[0]);
-          const lineItemsGross = Math.round(rateGroups[rateKeys[0]].gross * 100) / 100;
+          const lineItemsGross = Math.round(toGross(rateGroups[rateKeys[0]].sum, rate) * 100) / 100;
           const aiGross = Number(extractedData.amount_gross) || 0;
           // Wenn Line-Item-Summe deutlich (>1%) vom AI-Aggregat abweicht, Line-Item-Summe als Brutto verwenden
           const useLineItemGross = aiGross === 0 || Math.abs(lineItemsGross - aiGross) / Math.max(aiGross, 1) > 0.01;
