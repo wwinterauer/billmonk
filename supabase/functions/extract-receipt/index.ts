@@ -850,24 +850,76 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         }
       }
 
+      // ── Post-Processing: Summenzeilen-Anker (Labels schlagen Positionssummen) ──
+      const GROSS_LABEL_RE = /(gesamtbetrag|gesamtsumme|rechnungsbetrag|zu zahlen|zahlbetrag|endbetrag|endsumme|bruttobetrag|brutto|inkl\.?\s*mwst|incl\.?\s*vat|including vat|total amount|grand total|amount due)/i;
+      const NET_LABEL_RE = /(nettobetrag|netto|nettosumme|summe netto|ohne mwst|exkl|excl|zzgl|net amount|subtotal|zwischensumme|warenwert)/i;
+      const isGrossLabel = (l: unknown) => typeof l === 'string' && GROSS_LABEL_RE.test(l) && !NET_LABEL_RE.test(l);
+      const isNetLabel = (l: unknown) => typeof l === 'string' && NET_LABEL_RE.test(l);
+
+      const totalsBlock: Array<{ label?: string; amount?: number }> =
+        Array.isArray(rawData.totals_block) ? rawData.totals_block : [];
+
+      const pickFromBlock = (pred: (l: unknown) => boolean): number | null => {
+        const hits = totalsBlock
+          .filter(e => pred(e?.label) && Number.isFinite(Number(e?.amount)) && Math.abs(Number(e.amount)) > 0)
+          .map(e => Math.abs(Number(e.amount)));
+        if (hits.length === 0) return null;
+        return Math.max(...hits);
+      };
+
+      let anchorGross: number | null = null;
+      let anchorNet: number | null = null;
+      let anchorLabel = '';
+
+      if (isGrossLabel(rawData.total_amount_label) && Math.abs(Number(rawData.total_amount)) > 0) {
+        anchorGross = Math.abs(Number(rawData.total_amount));
+        anchorLabel = String(rawData.total_amount_label);
+      } else {
+        const fromBlock = pickFromBlock(isGrossLabel);
+        if (fromBlock != null) {
+          anchorGross = fromBlock;
+          anchorLabel = 'totals_block';
+        }
+      }
+
+      if (isNetLabel(rawData.net_amount_label) && Math.abs(Number(rawData.net_amount)) > 0) {
+        anchorNet = Math.abs(Number(rawData.net_amount));
+      } else {
+        anchorNet = pickFromBlock(isNetLabel);
+      }
+
+      // Kein Brutto-Label, aber Netto-Label + ausgewiesene Steuer → Brutto rekonstruieren
+      if (anchorGross == null && anchorNet != null && Math.abs(Number(rawData.tax_amount)) > 0) {
+        anchorGross = Math.round((anchorNet + Math.abs(Number(rawData.tax_amount))) * 100) / 100;
+        anchorLabel = 'netto+steuer';
+      }
+
+      if (anchorGross != null) {
+        console.log(`[Totals Anchor] Brutto ${anchorGross} aus Summenzeile "${anchorLabel}"`);
+        extractedData.amount_gross = anchorGross;
+        if (anchorNet != null && anchorNet > 0 && anchorNet <= anchorGross) {
+          extractedData.amount_net = anchorNet;
+          extractedData.vat_amount = Math.round((anchorGross - anchorNet) * 100) / 100;
+        }
+      }
+
       // ── Post-Processing: rebuild tax_rate_details from line_items (truth from granular data) ──
       const lineItems = Array.isArray(rawData.line_items) ? rawData.line_items : [];
-      
 
       const validLineItems = lineItems.filter((li: any) => {
         const total = Number(li?.total);
         return li && Number.isFinite(total) && total !== 0 && li.tax_rate != null;
       });
-      
 
       if (validLineItems.length > 0) {
         const rateGroups: Record<string, { sum: number; descriptions: string[] }> = {};
         let lineItemsSum = 0;
+        // Vorzeichen bleiben erhalten: Rabatte/Gutschriften werden abgezogen, nicht addiert
         for (const li of validLineItems) {
           const rateKey = String(parseFloat(String(li.tax_rate).replace(',', '.').replace('%', '')) || 0);
           if (!rateGroups[rateKey]) rateGroups[rateKey] = { sum: 0, descriptions: [] };
-          rateGroups[rateKey].sum += Math.abs(Number(li.total));
-          lineItemsSum += Math.abs(Number(li.total));
+          rateGroups[rateKey].sum += Number(li.total);
+          lineItemsSum += Number(li.total);
           if (li.description) rateGroups[rateKey].descriptions.push(li.description);
         }
 
@@ -878,7 +930,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           Number.isFinite(a) && Number.isFinite(b) && b > 0 && Math.abs(a - b) / Math.max(b, 1) < 0.01;
         const lineItemsAreNet =
           rawData.line_items_are_net === true ||
-          (closeTo(lineItemsSum, aiNet) && !closeTo(lineItemsSum, aiGrossVal));
+          (closeTo(Math.abs(lineItemsSum), aiNet) && !closeTo(Math.abs(lineItemsSum), aiGrossVal));
         // Positionssumme → Bruttowert je Satz
         const toGross = (sum: number, rate: number) =>
           lineItemsAreNet && rate > 0 ? sum * (1 + rate / 100) : sum;
@@ -887,7 +939,43 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         }
 
         const rateKeys = Object.keys(rateGroups);
-        if (rateKeys.length > 1) {
+        // Gesamt-Brutto laut Positionen (mit korrekten Vorzeichen)
+        const lineItemsGrossTotal = Math.round(
+          rateKeys.reduce((s, k) => s + toGross(rateGroups[k].sum, parseFloat(k)), 0) * 100
+        ) / 100;
+
+        // Vollständigkeits-/Plausibilitätscheck gegen die beschriftete Summenzeile
+        let totalsConflict = false;
+        if (anchorGross != null && anchorGross > 0) {
+          const deviation = Math.abs(Math.abs(lineItemsGrossTotal) - anchorGross) / anchorGross;
+          if (deviation > 0.02) {
+            totalsConflict = true;
+            console.warn(
+              `[Totals Conflict] Positionssumme ${lineItemsGrossTotal} weicht ${(deviation * 100).toFixed(1)}% von der Summenzeile ${anchorGross} ab → Summenzeile gewinnt`
+            );
+          }
+        }
+
+        if (totalsConflict) {
+          // Positionen sind unvollständig/unzuverlässig → nur informativ speichern
+          extractedData.amount_gross = anchorGross!;
+          if (anchorNet != null && anchorNet > 0 && anchorNet <= anchorGross!) {
+            extractedData.amount_net = anchorNet;
+            extractedData.vat_amount = Math.round((anchorGross! - anchorNet) * 100) / 100;
+            const impliedRate = anchorNet > 0
+              ? Math.round(((anchorGross! - anchorNet) / anchorNet) * 100)
+              : null;
+            if (impliedRate != null && impliedRate >= 0 && impliedRate <= 30) {
+              extractedData.vat_rate = impliedRate;
+              extractedData.is_mixed_tax_rate = false;
+              extractedData.tax_rate_details = null;
+            }
+          }
+          (extractedData as any).vat_detection_method = 'totals_line_conflict';
+          (extractedData as any).vat_confidence = Math.min(
+            Number((extractedData as any).vat_confidence) || 0.6, 0.6
+          );
+        } else if (rateKeys.length > 1) {
           const newDetails = rateKeys.map(rateStr => {
             const rate = parseFloat(rateStr);
             const gross = toGross(rateGroups[rateStr].sum, rate);
@@ -905,15 +993,17 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           extractedData.amount_net = Math.round(newDetails.reduce((s, d) => s + d.net_amount, 0) * 100) / 100;
           extractedData.vat_amount = Math.round(newDetails.reduce((s, d) => s + d.tax_amount, 0) * 100) / 100;
           extractedData.amount_gross = Math.round((extractedData.amount_net + extractedData.vat_amount) * 100) / 100;
-          
+
         } else if (rateKeys.length === 1) {
-          // Single-Rate Truth aus Line Items: AI-Aggregat überschreiben
+          // Single-Rate: Summenzeile schlägt Positionssumme, sonst Truth-from-LineItems
           const rate = parseFloat(rateKeys[0]);
           const lineItemsGross = Math.round(toGross(rateGroups[rateKeys[0]].sum, rate) * 100) / 100;
           const aiGross = Number(extractedData.amount_gross) || 0;
-          // Wenn Line-Item-Summe deutlich (>1%) vom AI-Aggregat abweicht, Line-Item-Summe als Brutto verwenden
-          const useLineItemGross = aiGross === 0 || Math.abs(lineItemsGross - aiGross) / Math.max(aiGross, 1) > 0.01;
-          const gross = useLineItemGross ? lineItemsGross : aiGross;
+          // Anker vorhanden → immer der Anker; sonst Positionssumme bei >1% Abweichung
+          const useLineItemGross = anchorGross != null
+            ? false
+            : (aiGross === 0 || Math.abs(Math.abs(lineItemsGross) - aiGross) / Math.max(aiGross, 1) > 0.01);
+          const gross = useLineItemGross ? lineItemsGross : (anchorGross ?? aiGross);
           const netAmount = rate === 0 ? gross : gross / (1 + rate / 100);
           const taxAmount = gross - netAmount;
           const prevRate = extractedData.vat_rate;
@@ -923,13 +1013,19 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           extractedData.vat_amount = Math.round(taxAmount * 100) / 100;
           extractedData.is_mixed_tax_rate = false;
           extractedData.tax_rate_details = null;
-          (extractedData as any).vat_detection_method = 'line_items';
+          (extractedData as any).vat_detection_method = anchorGross != null ? 'totals_line' : 'line_items';
           (extractedData as any).vat_confidence = 1.0;
           if (prevRate !== rate) {
             console.log(`[VAT Truth-from-LineItems] Single-rate ${rate}% aus ${validLineItems.length} Line Items übernommen (AI-Aggregat war ${prevRate}%)`);
           }
         }
       }
+
+      // Endergebnis positiv normalisieren (Gutschriften werden als Betrag geführt)
+      if (Number(extractedData.amount_gross) < 0) extractedData.amount_gross = Math.abs(Number(extractedData.amount_gross));
+      if (Number(extractedData.amount_net) < 0) extractedData.amount_net = Math.abs(Number(extractedData.amount_net));
+      if (Number(extractedData.vat_amount) < 0) extractedData.vat_amount = Math.abs(Number(extractedData.vat_amount));
+
 
 
       // ── Fallback: recalculate tax_rate_details with correct math if line_items didn't trigger ──
