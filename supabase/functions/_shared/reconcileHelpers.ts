@@ -48,6 +48,36 @@ export function referenceKey(invoiceNumber: string | null | undefined): string |
   return norm;
 }
 
+const hasLetterAndDigit = (s: string) => /[a-z]/.test(s) && /[0-9]/.test(s);
+
+/**
+ * All usable reference keys of an invoice number. Besides the fully normalized
+ * value this also returns the individual parts, so numbers stored with an
+ * appended date ("INET2602889/08.04.2026") still match the payment text.
+ */
+export function refKeys(invoiceNumber: string | null | undefined): string[] {
+  if (!invoiceNumber) return [];
+  const keys = new Set<string>();
+  const full = referenceKey(invoiceNumber);
+  if (full) keys.add(full);
+  for (const raw of String(invoiceNumber).split(/[^A-Za-z0-9]+/)) {
+    const part = normalizeText(raw).replace(/\s+/g, "");
+    if (part.length >= 5 && hasLetterAndDigit(part)) keys.add(part);
+  }
+  return [...keys];
+}
+
+/** Reference-like tokens contained in a bank transaction description. */
+export function extractRefTokens(description: string | null | undefined): string[] {
+  if (!description) return [];
+  const out = new Set<string>();
+  for (const raw of String(description).split(/[^A-Za-z0-9]+/)) {
+    const t = raw.toLowerCase();
+    if (t.length >= 5 && hasLetterAndDigit(t)) out.add(t);
+  }
+  return [...out];
+}
+
 /** Tolerance for reference matches: up to 5% or 10 EUR deviation. */
 export function amountWithinReferenceTolerance(a: number, b: number): boolean {
   const na = Math.abs(a);
@@ -62,6 +92,20 @@ export interface ReferenceCandidate {
   key: string;
   amount: number | null;
   invoiceNumber: string | null;
+}
+
+/** True when any reference key of the invoice number occurs in the payment text. */
+export function referenceHit(
+  invoiceNumber: string | null | undefined,
+  description: string | null | undefined,
+): boolean {
+  const keys = refKeys(invoiceNumber);
+  if (keys.length === 0) return false;
+  const descNoSpace = normalizeText(description).replace(/\s+/g, "");
+  if (!descNoSpace) return false;
+  if (keys.some((k) => descNoSpace.includes(k))) return true;
+  const tokens = extractRefTokens(description);
+  return keys.some((k) => tokens.includes(k));
 }
 
 /**
@@ -79,9 +123,7 @@ export function findReferenceMatch(
 
   const hits: Array<{ key: string; deviationPct: number }> = [];
   for (const c of candidates) {
-    const ref = referenceKey(c.invoiceNumber);
-    if (!ref) continue;
-    if (!descNoSpace.includes(ref)) continue;
+    if (!referenceHit(c.invoiceNumber, description)) continue;
     if (c.amount == null) continue;
     if (!amountWithinReferenceTolerance(Number(c.amount), amount)) continue;
     const receiptAmt = Math.abs(Number(c.amount));
@@ -93,6 +135,7 @@ export function findReferenceMatch(
   if (hits.length !== 1) return null;
   return hits[0];
 }
+
 
 export interface GroupPairInput {
 
@@ -223,14 +266,13 @@ export function scoreMatch(
   }
 
   const descNorm = normalizeText(tx.description);
-  const descNoSpace = descNorm.replace(/\s+/g, "");
 
   // Invoice number in the payment text
-  const ref = referenceKey(c.invoiceNumber);
-  if (ref && descNoSpace.includes(ref)) {
+  if (referenceHit(c.invoiceNumber, tx.description)) {
     score += 45;
     reasons.push("Rechnungsnummer im Text");
   }
+
 
   // Vendor / alias hit
   const aliasHit = c.aliases
@@ -346,19 +388,72 @@ export function buildSuggestions(
 
   const suggestions: MatchSuggestion[] = [];
   const usedKeys = new Set<string>();
+  const usedTx = new Set<string>();
+
+  const push = (
+    tx: SuggestionTx,
+    best: SuggestionCandidate,
+    pool: SuggestionCandidate[],
+    score: number,
+    reasons: string[],
+    confidence: MatchSuggestion["confidence"],
+  ) => {
+    usedKeys.add(best.key);
+    usedTx.add(tx.id);
+    suggestions.push({
+      transaction_id: tx.id,
+      transaction_date: tx.date,
+      transaction_amount: Math.abs(tx.amount),
+      transaction_description: tx.description,
+      receipt_id: best.receiptId,
+      split_line_id: best.splitLineId,
+      receipt_date: best.date,
+      receipt_vendor: best.vendor,
+      receipt_amount: Math.abs(Number(best.amount ?? 0)),
+      receipt_invoice_number: best.invoiceNumber,
+      score,
+      confidence,
+      reasons,
+      alternatives: pool.filter((c) => c.key !== best.key).slice(0, maxAlt).map(toAlt),
+    });
+  };
+
+  // 0) Reference pass — invoice number occurs in the payment text. Beats dates.
+  for (const tx of txs) {
+    if (usedTx.has(tx.id)) continue;
+    const hits = candidates.filter(
+      (c) => !usedKeys.has(c.key) && referenceHit(c.invoiceNumber, tx.description),
+    );
+    if (hits.length !== 1) continue;
+    const best = hits[0];
+    const { score, reasons } = scoreMatch(
+      { description: tx.description, amount: tx.amount, date: tx.date },
+      best,
+      { processor: isProcessorTransaction(tx.description), sameAmountCount: 1 },
+    );
+    if (score <= 0) continue;
+    push(tx, best, [best], Math.max(score, 80), reasons, "high");
+  }
 
   for (const [amount, group] of txByAmount) {
     const pool = candByAmount.get(amount);
     if (!pool || pool.length === 0) continue;
 
     for (const tx of group) {
-      // Best remaining candidate: closest date wins, ties keep chronological order
+      if (usedTx.has(tx.id)) continue;
+      // Best remaining candidate: receipts dated before the payment win
+      // (payment follows the invoice), then the closest date.
       let best: SuggestionCandidate | null = null;
-      let bestDist = Number.POSITIVE_INFINITY;
+      let bestRank: [number, number] = [9, Number.POSITIVE_INFINITY];
       for (const c of pool) {
         if (usedKeys.has(c.key)) continue;
         const dist = tx.date && c.date ? daysApart(tx.date, c.date) : 999;
-        if (dist < bestDist) { bestDist = dist; best = c; }
+        const before = tx.date && c.date && c.date <= tx.date ? 0 : 1;
+        const rank: [number, number] = [before, dist];
+        if (rank[0] < bestRank[0] || (rank[0] === bestRank[0] && rank[1] < bestRank[1])) {
+          bestRank = rank;
+          best = c;
+        }
       }
       if (!best) continue;
 
@@ -382,28 +477,42 @@ export function buildSuggestions(
             ? "medium"
             : "low";
 
-      usedKeys.add(best.key);
-      suggestions.push({
-        transaction_id: tx.id,
-        transaction_date: tx.date,
-        transaction_amount: Math.abs(tx.amount),
-        transaction_description: tx.description,
-        receipt_id: best.receiptId,
-        split_line_id: best.splitLineId,
-        receipt_date: best.date,
-        receipt_vendor: best.vendor,
-        receipt_amount: Math.abs(Number(best.amount ?? 0)),
-        receipt_invoice_number: best.invoiceNumber,
-        score,
-        confidence,
-        reasons,
-        alternatives: pool
-          .filter((c) => c.key !== best!.key)
-          .slice(0, maxAlt)
-          .map(toAlt),
-      });
+      push(tx, best, pool, score, reasons, confidence);
     }
   }
+
+  // Net/gross pass: receipt was captured with the net amount while the bank
+  // booked the gross amount (net + 10 / 13 / 20 % VAT).
+  const VAT_RATES = [0.2, 0.13, 0.1];
+  for (const tx of txs) {
+    if (usedTx.has(tx.id)) continue;
+    const txAmt = Math.abs(tx.amount);
+    const hits: Array<{ c: SuggestionCandidate; rate: number }> = [];
+    for (const c of candidates) {
+      if (usedKeys.has(c.key) || c.amount == null) continue;
+      const net = Math.abs(Number(c.amount));
+      if (net <= 0) continue;
+      for (const r of VAT_RATES) {
+        if (Math.abs(net * (1 + r) - txAmt) < 0.02) hits.push({ c, rate: r });
+      }
+    }
+    if (hits.length === 0) continue;
+    const dated = hits
+      .filter((h) => !tx.date || !h.c.date || h.c.date <= tx.date)
+      .sort((a, b) =>
+        (tx.date && a.c.date ? daysApart(tx.date, a.c.date) : 999) -
+        (tx.date && b.c.date ? daysApart(tx.date, b.c.date) : 999),
+      );
+    const chosen = (dated[0] ?? hits[0]);
+    const near = tx.date && chosen.c.date ? daysApart(tx.date, chosen.c.date) <= 45 : false;
+    if (!near) continue;
+    const reasons = [
+      `Beleg vermutlich netto erfasst (+${Math.round(chosen.rate * 100)}% USt)`,
+      "Datum passt",
+    ];
+    push(tx, chosen.c, hits.map((h) => h.c), 55, reasons, "medium");
+  }
+
 
   suggestions.sort((a, b) => b.score - a.score);
   return suggestions;
