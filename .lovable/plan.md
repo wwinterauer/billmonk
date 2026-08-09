@@ -1,38 +1,50 @@
-# Warum nur 1 IONOS-Beleg zugeordnet wurde – und wie der Abgleich schlauer wird
+# Limberger/WeTi: warum zwei Buchungen offen bleiben
 
 ## Befund aus den Daten
 
-Abfragen auf die offenen Buchungen und Belege zeigen genau zwei Blocker:
+Die beiden offenen Buchungen sind:
+- 10.04.2026, 18,90 € – Verwendungszweck enthält `INET2602889`
+- 08.05.2026, 39,90 € – Verwendungszweck enthält `INET2603766`
 
-- **3,36 €**: 12 offene PayPal-Buchungen stehen 12 offenen IONOS-Belegen gegenüber — aber die Belege haben **zwei Lieferantenschreibweisen** ("IONOS" bei 3 Belegen, "IONOS SE" bei 9). Die Gruppen-Zuordnung verlangt aktuell genau *einen* Lieferantennamen in der Gruppe und bricht deshalb komplett ab.
-- **10,76 €**: 7 offene Buchungen gegen 14 offene Belege. Die Gruppen-Zuordnung verlangt **exakt gleich große Gruppen** und bricht ebenfalls ab.
+Die passenden Belege existieren, sind aber **falsch verknüpft** — die Zuordnung ist um einen Monat verschoben:
 
-Der eine bereits verknüpfte 3,36-Beleg stammt aus einem früheren Lauf, als der Betrag noch eindeutig war.
+```text
+Beleg INET2602889 (08.04., 18,90) -> Buchung 08.05. (INET2603698)   falsch
+Beleg INET2603698 (06.05., 18,90) -> Buchung 11.06. (INET2604509)   falsch
+Beleg INET2603766 (06.05., 39,90) -> Buchung 11.06. (INET2604576)   falsch
+```
 
-Die restlichen Fälle landen zwar in den Vorschlägen, werden dort aber als "mittel" eingestuft und sind daher nicht vorausgewählt — es sieht so aus, als wäre nichts passiert.
+Dadurch bleiben die Buchungen vom 10.04. und 08.05. ohne freien Beleg übrig.
+
+**Ursache 1 – Rechnungsnummer wird nicht erkannt:** Die Belegnummern sind als `INET2602889/08.04.2026` gespeichert (mit angehängtem Datum). Der Referenz-Abgleich prüft, ob die Belegnummer im Buchungstext vorkommt — mit dem Datumssuffix schlägt das fehl. Also greift nur der Betrags-/Datums-Abgleich, der bei monatlich gleichen Beträgen den zeitlich nächsten Beleg nimmt: die Buchung kommt aber immer ~2–4 Tage *nach* dem Belegdatum bzw. beim nächsten Lauf auch mal davor, und so verrutscht die Kette.
+
+**Ursache 2 – neuere WeTi-Belege haben den Nettobetrag als Bruttobetrag:** Die Belege ab Juni sind mit 15,75 € und 33,25 € erfasst; die zugehörigen Buchungen lauten auf 18,90 € und 39,90 € (= netto + 20 % USt). Diese Belege können über den Betrag also gar nicht gefunden werden.
 
 ## Was geändert wird
 
-**1. Gruppen-Zuordnung nicht mehr "alles oder nichts"**
-- Ungleich große Gruppen werden erlaubt: Es wird so weit gepaart, wie beide Seiten reichen (7 Buchungen gegen 14 Belege → 7 Paare, chronologisch nach Datum, jeweils der zeitlich nächstliegende offene Beleg).
-- Lieferanten werden über einen **normalisierten Schlüssel** verglichen: Rechtsformen und Zusätze (SE, GmbH, AG, S.a.r.l., Ltd., …) werden abgeschnitten, zusätzlich zählen Markenname (`vendor_brand`), hinterlegte Rechtsnamen und Schlagwörter. "IONOS" und "IONOS SE" gelten damit als derselbe Lieferant.
-- Sicherheitsnetz bleibt: automatisch zugeordnet wird nur, wenn der Zahlungsempfänger ein Zahlungsdienstleister ist (PayPal, Klarna …) oder der Lieferant im Buchungstext steht, alle Belege derselben Betragsgruppe zum selben Lieferanten gehören und die Datumsdifferenz im Fenster liegt (±14 Tage, für Zahlungsdienstleister ±21 Tage, da PayPal-Abbuchungen verzögert kommen).
+**1. Rechnungsnummer-Abgleich robust machen**
+- Belegnummern werden vor dem Vergleich normalisiert: angehängte Datums-/Suffixteile (`/08.04.2026`), Leerzeichen und Sonderzeichen werden entfernt; verglichen wird der reine Nummernkern (`INET2602889`).
+- Zusätzlich wird umgekehrt geprüft: alle Referenz-Token aus dem Buchungstext (Muster wie `INET…`, `RE…`, längere Zahlen-/Buchstabenfolgen) werden gegen die Belegnummern geprüft.
+- Ein Referenztreffer schlägt den Datumsabgleich immer: Wenn Beleg und Buchung dieselbe Nummer tragen, wird diese Paarung fest gesetzt, bevor Betrags-/Datumspaarungen gebildet werden.
 
-**2. Vorschläge deutlicher und vorausgewählt**
-- Wenn alle Belege einer Betragsgruppe zum selben (normalisierten) Lieferanten gehören und die Datumszuordnung eindeutig chronologisch ist, steigt die Bewertung auf "hoch" — solche Vorschläge sind im Dialog vorausgewählt und lassen sich mit einem Klick übernehmen.
-- In der Vorschlagsliste wird der Grund sichtbar ergänzt: "Lieferant gleich (IONOS)", "Gruppe 7 von 14 Belegen".
+**2. Falsche Verschiebungen verhindern**
+- Bei mehreren gleich hohen Beträgen desselben Lieferanten wird zuerst über Referenznummern zugeordnet, erst der Rest chronologisch.
+- Buchungen werden bevorzugt Belegen zugeordnet, deren Datum **vor** der Buchung liegt (Zahlung folgt der Rechnung); ein Beleg nach dem Buchungsdatum wird nur bei fehlender Alternative genutzt.
 
-**3. Nachvollziehbarkeit**
-- Der Abgleich protokolliert pro Betragsgruppe, warum nicht automatisch zugeordnet wurde (Anzahl Buchungen/Belege, Lieferantenvarianten, Datumsabstand). Das erscheint als aufklappbarer Abschnitt "Nicht zugeordnet – Gründe" im Ergebnis-Dialog, damit solche Fälle künftig ohne Nachfrage erkennbar sind.
+**3. Bestehende Fehlzuordnungen korrigieren**
+- Einmaliger Korrekturlauf für die betroffenen WeTi/Limberger-Verknüpfungen, sodass jeder Beleg an der Buchung mit derselben `INET`-Nummer hängt und die beiden offenen Buchungen ihren richtigen Beleg bekommen.
+
+**4. Netto-statt-Brutto bei WeTi**
+- Prüfung und Korrektur der betroffenen Belege (Juni/Juli/August: 15,75 / 33,25) auf den Bruttobetrag inkl. 20 % USt, damit auch diese Buchungen künftig automatisch gefunden werden.
+- Zusätzlich Hinweis im Abgleich: Wenn ein Beleg exakt dem Buchungsbetrag geteilt durch 1,2 / 1,1 / 1,13 entspricht, wird er als Vorschlag mit dem Hinweis „vermutlich Netto erfasst“ angezeigt statt gar nicht.
 
 ## Technische Details
 
 - `supabase/functions/_shared/reconcileHelpers.ts`
-  - Neu: `vendorMatchKey(name)` — normalisiert und entfernt Rechtsformen/Zusätze.
-  - `buildGroupPairs`: Bedingung `cands.length !== group.length` entfällt; stattdessen greedy chronologische Paarung über `min(n_tx, n_cand)`, Vendor-Prüfung über `vendorMatchKey`, konfigurierbares Datumsfenster, Rückgabe zusätzlich mit `unpairedTx`/`unpairedCandidates` und Gruppen-Diagnose.
-  - `buildSuggestions`: Confidence-Regel erweitert (einheitlicher `vendorMatchKey` in der Gruppe + Datumsnähe ≤ 21 Tage ⇒ `high`), Gründe um Lieferanten- und Gruppeninfo ergänzt.
-- `supabase/functions/reconcile-with-skonto/index.ts`: Kandidaten-Pool liefert `vendorKey` aus Vendor + `vendor_brand` + `legal_names`; Gruppen-Pass nutzt das erweiterte Ergebnis; neues Feld `group_diagnostics` in der Antwort.
-- `src/components/reconciliation/SkontoReconcileDialog.tsx`: neue Props `diagnostics`, Anzeige der Gruppen-Gründe, erweiterte Reason-Badges.
-- `src/pages/Reconciliation.tsx`: `group_diagnostics` durchreichen.
-- Tests der Helper gegen die realen Konstellationen (12/12 mit zwei Schreibweisen, 7/14) vor dem Deploy.
-- Keine Datenbankmigration nötig; keine bestehenden Verknüpfungen werden verändert.
+  - Neu `normalizeRef(value)` und `extractRefTokens(description)`; `referenceKey`-Vergleich beidseitig und auf normalisierten Kernen.
+  - Referenz-Pass läuft vor Gruppen-/Datumspass und blockiert bereits gepaarte IDs.
+  - Datumsauswahl bevorzugt `receipt_date <= transaction_date` (Fenster wie bisher, Fallback auf spätere Belege).
+  - Netto-Heuristik in `buildSuggestions`: Kandidat gilt als Treffer, wenn `amount_gross * (1 + r)` für r ∈ {0,10; 0,13; 0,20} dem Buchungsbetrag entspricht (Konfidenz „mittel“, Grund ausgewiesen).
+- `supabase/functions/reconcile-with-skonto/index.ts` und `auto-reconcile`: nutzen die erweiterten Helper, Deploy beider Funktionen.
+- `src/components/reconciliation/SkontoReconcileDialog.tsx`: neuer Grund-Badge „Rechnungsnummer“ bzw. „Netto/Brutto“.
+- Datenkorrektur per gezieltem Update auf `receipts.bank_transaction_id` / `bank_transactions.receipt_id` + `status` für die betroffenen WeTi-Datensätze; keine Schemaänderung.
