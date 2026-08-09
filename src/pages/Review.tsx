@@ -1236,6 +1236,10 @@ const Review = () => {
         {/* Documents the AI classified as non-receipts */}
         <NonReceiptPanel onChanged={loadReceipts} />
 
+        {/* Receipts with a vendor name but no linked vendor record */}
+        <ReconcileVendorsCard unlinkedCount={unlinkedVendorCount} onDone={loadReceipts} />
+
+
 
 
 
