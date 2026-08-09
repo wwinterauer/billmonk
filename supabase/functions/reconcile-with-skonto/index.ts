@@ -261,7 +261,7 @@ serve(async (req) => {
 
     if (!txs || txs.length === 0) {
       return new Response(
-        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, reference_applied: 0, skonto_candidates: [], scanned_transactions: 0 }),
+        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, reference_applied: 0, skonto_candidates: [], match_suggestions: [], scanned_transactions: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -269,7 +269,7 @@ serve(async (req) => {
     const datedTxs = txs.filter((t) => t.transaction_date);
     if (datedTxs.length === 0) {
       return new Response(
-        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, reference_applied: 0, skonto_candidates: [], scanned_transactions: txs.length }),
+        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, reference_applied: 0, skonto_candidates: [], match_suggestions: [], scanned_transactions: txs.length }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
