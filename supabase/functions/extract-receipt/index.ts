@@ -1204,66 +1204,115 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           console.log(`Receipt ${receiptId} updated (V2, VAT: ${vatRateSource})`);
 
           // Post-save duplicate recheck (handles race condition with parallel uploads).
-          // Look for sibling receipts of the same user updated within the last 15 minutes
-          // that match by invoice_number OR (amount_gross + receipt_date).
+          // Regeln: echte Rechnungsnummer + Lieferant = Duplikat; sonst Betrag ±20 % und Datum ±3 Tage.
           try {
             if (userId) {
+              const invNo = normalizeInvoiceNumber(extractedData.invoice_number);
               const sinceIso = new Date(Date.now() - 15 * 60 * 1000).toISOString();
               const activeStatuses = ['pending', 'processing', 'review', 'approved', 'duplicate'];
-              const orFilters: string[] = [];
-              if (extractedData.invoice_number) {
-                orFilters.push(`invoice_number.eq.${extractedData.invoice_number}`);
-              }
-              if (extractedData.amount_gross != null && extractedData.receipt_date) {
-                orFilters.push(`and(amount_gross.eq.${extractedData.amount_gross},receipt_date.eq.${extractedData.receipt_date})`);
-              }
-              if (orFilters.length > 0) {
-                const { data: siblings } = await supabase
-                  .from('receipts')
-                  .select('id, vendor, invoice_number, amount_gross, receipt_date, file_hash, created_at, is_duplicate')
-                  .eq('user_id', userId)
-                  .in('status', activeStatuses)
-                  .neq('id', receiptId)
-                  .gte('updated_at', sinceIso)
-                  .or(orFilters.join(','))
-                  .limit(5);
 
-                const { data: self } = await supabase
-                  .from('receipts')
-                  .select('id, file_hash, created_at')
-                  .eq('id', receiptId)
-                  .single();
+              const { data: self } = await supabase
+                .from('receipts')
+                .select('id, file_hash, created_at, vendor, vendor_brand, file_name, custom_filename, description, amount_gross, receipt_date')
+                .eq('id', receiptId)
+                .single();
 
-                const match = (siblings || []).find((s: any) => {
-                  // Skip if file hashes are equal — that's an exact-file dup handled elsewhere
-                  if (self?.file_hash && s.file_hash && self.file_hash === s.file_hash) return true;
-                  // Strong: same invoice_number
-                  if (extractedData.invoice_number && s.invoice_number === extractedData.invoice_number) return true;
-                  // Strong: same amount + same date
-                  if (extractedData.amount_gross != null && extractedData.receipt_date
-                      && Number(s.amount_gross) === Number(extractedData.amount_gross)
-                      && s.receipt_date === extractedData.receipt_date) return true;
-                  return false;
-                });
+              // Tag "Inoffiziell" → keine automatische Duplikatmarkierung
+              const { data: ownTags } = await supabase
+                .from('receipt_tags')
+                .select('tags!inner(name)')
+                .eq('receipt_id', receiptId);
+              const isInoffiziell = (ownTags || []).some((t: any) =>
+                String(t.tags?.name || '').toLowerCase().includes('inoffiziell')
+              );
 
-                if (match && self) {
-                  // Mark the NEWER one as the duplicate of the OLDER one
-                  const selfIsNewer = new Date(self.created_at).getTime() >= new Date(match.created_at).getTime();
-                  const dupId = selfIsNewer ? receiptId : match.id;
-                  const ofId = selfIsNewer ? match.id : receiptId;
-                  const reasons: string[] = [];
-                  if (extractedData.invoice_number && match.invoice_number === extractedData.invoice_number) reasons.push('Gleiche Rechnungsnummer');
-                  if (extractedData.amount_gross != null && Number(match.amount_gross) === Number(extractedData.amount_gross)) reasons.push('Gleicher Betrag');
-                  if (extractedData.receipt_date && match.receipt_date === extractedData.receipt_date) reasons.push('Gleiches Datum');
-                  await supabase.from('receipts').update({
-                    is_duplicate: true,
-                    duplicate_of: ofId,
-                    duplicate_score: extractedData.invoice_number && match.invoice_number === extractedData.invoice_number ? 95 : 90,
-                    duplicate_checked_at: new Date().toISOString(),
-                    notes: `Mögliches Duplikat (Auto-Recheck): ${reasons.join(', ')}`,
-                  }).eq('id', dupId);
-                  console.log(`[DupRecheck] Marked ${dupId} as duplicate of ${ofId} (${reasons.join(', ')})`);
+              const cols = 'id, vendor, vendor_brand, invoice_number, amount_gross, receipt_date, file_hash, file_name, custom_filename, description, created_at';
+              let match: any = null;
+              let reasons: string[] = [];
+              let score = 90;
+
+              if (self && !isInoffiziell) {
+                const selfVendor = extractedData.vendor_name || self.vendor;
+
+                if (invNo) {
+                  const { data: byInvoice } = await supabase
+                    .from('receipts')
+                    .select(cols)
+                    .eq('user_id', userId)
+                    .eq('invoice_number', invNo)
+                    .in('status', activeStatuses)
+                    .neq('id', receiptId)
+                    .limit(5);
+
+                  match = (byInvoice || []).find((s: any) =>
+                    invoiceNumbersMatch(invNo, s.invoice_number) &&
+                    (vendorsLikelySame(selfVendor, s.vendor) || vendorsLikelySame(selfVendor, s.vendor_brand))
+                  ) || null;
+
+                  if (match) {
+                    score = 95;
+                    reasons = ['Gleiche Rechnungsnummer', 'Gleicher Lieferant'];
+                    const ownKind = classifyDocumentKind(self as any);
+                    const otherKind = classifyDocumentKind(match);
+                    if (
+                      amountsEqual(extractedData.amount_gross, match.amount_gross) &&
+                      ownKind !== otherKind &&
+                      (ownKind === 'payment_receipt' || otherKind === 'payment_receipt') &&
+                      (ownKind === 'invoice' || otherKind === 'invoice')
+                    ) {
+                      reasons.push('Zahlungsbeleg zur Rechnung');
+                    }
+                  }
                 }
+
+                if (!match && extractedData.amount_gross != null && extractedData.receipt_date) {
+                  const { data: recent } = await supabase
+                    .from('receipts')
+                    .select(cols)
+                    .eq('user_id', userId)
+                    .in('status', activeStatuses)
+                    .neq('id', receiptId)
+                    .gte('updated_at', sinceIso)
+                    .limit(50);
+
+                  match = (recent || []).find((s: any) => {
+                    if (self.file_hash && s.file_hash && self.file_hash === s.file_hash) return true;
+                    const candInv = normalizeInvoiceNumber(s.invoice_number);
+                    if (invNo && candInv && !invoiceNumbersMatch(invNo, candInv)) return false;
+                    if (!amountWithinTolerance(extractedData.amount_gross, s.amount_gross)) return false;
+                    if (!dateWithinTolerance(extractedData.receipt_date, s.receipt_date)) return false;
+                    return true;
+                  }) || null;
+
+                  if (match) {
+                    const exact =
+                      amountsEqual(extractedData.amount_gross, match.amount_gross) &&
+                      (daysBetween(extractedData.receipt_date, match.receipt_date) ?? 99) === 0;
+                    const vendorOk =
+                      vendorsLikelySame(selfVendor, match.vendor) || vendorsLikelySame(selfVendor, match.vendor_brand);
+                    score = (vendorOk ? 90 : 60) - (exact ? 0 : 10);
+                    reasons = [
+                      exact ? 'Gleicher Betrag' : 'Betrag leicht abweichend',
+                      exact ? 'Gleiches Datum' : 'Datum leicht abweichend',
+                    ];
+                    if (vendorOk) reasons.push('Gleicher Lieferant');
+                  }
+                }
+              }
+
+              if (match && self) {
+                // Mark the NEWER one as the duplicate of the OLDER one
+                const selfIsNewer = new Date(self.created_at).getTime() >= new Date(match.created_at).getTime();
+                const dupId = selfIsNewer ? receiptId : match.id;
+                const ofId = selfIsNewer ? match.id : receiptId;
+                await supabase.from('receipts').update({
+                  is_duplicate: true,
+                  duplicate_of: ofId,
+                  duplicate_score: score,
+                  duplicate_checked_at: new Date().toISOString(),
+                  notes: `Mögliches Duplikat (Auto-Recheck): ${reasons.join(', ')}`,
+                }).eq('id', dupId);
+                console.log(`[DupRecheck] Marked ${dupId} as duplicate of ${ofId} (${reasons.join(', ')})`);
               }
             }
           } catch (recheckErr) {
