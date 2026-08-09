@@ -501,12 +501,12 @@ const Review = () => {
       });
   }, [defaultVatRate, formData.category]);
   const goToReceipt = useCallback((index: number) => {
-    if (index >= 0 && index < receipts.length) {
+    if (index >= 0 && index < filteredReceipts.length) {
       setCurrentIndex(index);
-      populateForm(receipts[index]);
-      loadImage(receipts[index]);
+      populateForm(filteredReceipts[index]);
+      loadImage(filteredReceipts[index]);
     }
-  }, [receipts]);
+  }, [filteredReceipts]);
 
   // Calculate net amount and VAT
   const calculations = useMemo(() => {
