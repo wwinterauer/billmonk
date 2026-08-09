@@ -127,6 +127,7 @@ export default function Reconciliation() {
   const [reconcileApplying, setReconcileApplying] = useState(false);
   const [reconcileDialogOpen, setReconcileDialogOpen] = useState(false);
   const [skontoCandidates, setSkontoCandidates] = useState<SkontoCandidate[]>([]);
+  const [matchSuggestions, setMatchSuggestions] = useState<MatchSuggestion[]>([]);
   const [reconcileSummary, setReconcileSummary] = useState<{ exact: number; scanned: number }>({ exact: 0, scanned: 0 });
 
   const runAutoReconcile = async () => {
