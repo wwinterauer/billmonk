@@ -100,9 +100,9 @@ export function describeAmountQuery(aq: AmountQuery): string {
     case 'exact':
       return `Betrag ${fmt((aq.min + aq.max) / 2)} €`;
     case 'gt':
-      return `Betrag über ${fmt(aq.value)} €`;
+      return `Betrag über ${fmt(aq.value - EPS)} €`;
     case 'lt':
-      return `Betrag unter ${fmt(aq.value)} €`;
+      return `Betrag unter ${fmt(aq.value + EPS)} €`;
     case 'range':
       return `Betrag ${fmt(aq.min + EPS)} – ${fmt(aq.max - EPS)} €`;
   }
