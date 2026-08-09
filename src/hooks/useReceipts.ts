@@ -82,6 +82,7 @@ export interface DuplicateInfo {
 
 export interface ReceiptFilters {
   status?: string;
+  excludeStatus?: string[];
   month?: number;
   year?: number;
   dateFrom?: string; // Format: YYYY-MM-DD
