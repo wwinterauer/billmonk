@@ -1918,10 +1918,11 @@ const Review = () => {
                     )}
 
                     {/* Amount & VAT Row */}
-                    <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="grid sm:grid-cols-2 gap-4 items-start">
                       {/* Gross Amount */}
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 h-6 flex-nowrap overflow-hidden">
+
                           <Label htmlFor="amount_gross">Bruttobetrag</Label>
                           <Tooltip>
                             <TooltipTrigger>
@@ -1953,8 +1954,9 @@ const Review = () => {
 
                       {/* VAT Rate */}
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Label>MwSt-Satz</Label>
+                        <div className="flex items-center gap-2 h-6 flex-nowrap overflow-hidden">
+                          <Label className="whitespace-nowrap">MwSt-Satz</Label>
+
                           <Tooltip>
                             <TooltipTrigger>
                               <div className={cn(
