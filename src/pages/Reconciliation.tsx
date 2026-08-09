@@ -28,6 +28,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { parseAmountQuery, buildAmountOrFilter, describeAmountQuery } from '@/lib/amountSearch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Table,
@@ -423,8 +424,17 @@ export default function Reconciliation() {
         query = query.eq('status', statusFilter);
       }
       if (searchQuery) {
-        query = query.ilike('description', `%${searchQuery}%`);
+        const aq = parseAmountQuery(searchQuery);
+        if (aq) {
+          const escaped = searchQuery.replace(/[(),]/g, ' ').trim();
+          const orParts = [buildAmountOrFilter(aq)];
+          if (escaped) orParts.push(`description.ilike.*${escaped}*`);
+          query = query.or(orParts.join(','));
+        } else {
+          query = query.ilike('description', `%${searchQuery}%`);
+        }
       }
+
       if (dateFrom) {
         query = query.gte('transaction_date', format(dateFrom, 'yyyy-MM-dd'));
       }
@@ -1005,8 +1015,22 @@ export default function Reconciliation() {
 
                     <div className="relative flex-1 min-w-[200px]">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="Suche in Beschreibung..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9" />
+                      <Input
+                        placeholder="Suche: Text, Betrag (3,36) oder Bereich (>100)"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 h-9"
+                      />
+                      {(() => {
+                        const aq = parseAmountQuery(searchQuery);
+                        return aq ? (
+                          <Badge variant="secondary" className="mt-1.5 text-xs font-normal">
+                            {describeAmountQuery(aq)} · Ein- und Ausgänge
+                          </Badge>
+                        ) : null;
+                      })()}
                     </div>
+
                   </div>
                 </CardContent>
               </Card>
