@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ProblemReceiptsPanel } from '@/components/receipts/ProblemReceiptsPanel';
-import { useProblemReceiptCount } from '@/hooks/useReceiptRetry';
+import { useProblemReceiptCount, useReceiptRetry } from '@/hooks/useReceiptRetry';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -236,17 +236,33 @@ const Review = () => {
     return (
       (receipt.vendor ?? '').toLowerCase().includes(q) ||
       (receipt.vendor_brand ?? '').toLowerCase().includes(q) ||
+      (receipt.file_name ?? '').toLowerCase().includes(q) ||
+      (receipt.description ?? '').toLowerCase().includes(q) ||
       (vendor?.display_name ?? '').toLowerCase().includes(q) ||
       vendor?.legal_names?.some(n => n.toLowerCase().includes(q))
     );
   }, [vendorMap]);
+
 
   const filteredReceipts = useMemo(() => {
     if (!vendorSearch.trim()) return receipts;
     return receipts.filter(r => matchesVendorSearch(r, vendorSearch));
   }, [receipts, vendorSearch, matchesVendorSearch]);
 
+  // Receipts that came back from the AI without any usable data
+  const emptyReceipts = useMemo(
+    () => receipts.filter(r => !r.vendor && !r.vendor_brand && r.amount_gross == null),
+    [receipts],
+  );
+
+  const {
+    isRetrying,
+    progress: retryProgress,
+    retryReceiptIds,
+  } = useReceiptRetry();
+
   const currentReceipt = filteredReceipts[currentIndex] || null;
+
 
   // Persist current receipt id across navigation
   useEffect(() => {
@@ -1165,6 +1181,36 @@ const Review = () => {
             </p>
           )}
         </div>
+
+        {/* Hint: receipts without any extracted data */}
+        {emptyReceipts.length > 0 && (
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">
+                {emptyReceipts.length} Belege ohne erkannte Daten
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Bei diesen Belegen hat die KI-Analyse kein Ergebnis geliefert – kein Lieferant, kein Betrag. Sie sind daher auch nicht durchsuchbar.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isRetrying}
+              onClick={async () => {
+                await retryReceiptIds(emptyReceipts.map(r => r.id));
+                await loadReceipts();
+              }}
+            >
+              {isRetrying
+                ? `Analysiere ${retryProgress.current}/${retryProgress.total}...`
+                : 'Erneut analysieren'}
+            </Button>
+          </div>
+        )}
+
+
 
         {/* Progress Bar */}
         <motion.div

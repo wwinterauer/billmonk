@@ -291,17 +291,20 @@ export function useReceiptProcessing(
       console.error('AI extraction failed:', error);
 
       // AI failed (e.g. edge function 5xx, AI gateway throttle, empty
-      // response). Send the receipt to review so the user sees it in the
-      // list and can fill the data manually instead of having it stuck
-      // invisibly in `pending`.
-      onProgress?.(100, 'KI fehlgeschlagen — manuelle Eingabe');
+      // response). Mark the receipt as a problem receipt so it shows up in
+      // the "Problembelege" tab with a retry button instead of silently
+      // sitting in the review queue without any extracted data.
+      const message = error instanceof Error ? error.message : 'Unbekannter Fehler';
+      onProgress?.(100, 'KI fehlgeschlagen — Problembeleg');
       const updated = await updateReceipt(receiptId, {
-        status: 'review',
+        status: 'error',
+        notes: `KI-Analyse fehlgeschlagen: ${message}`,
         ai_processed_at: new Date().toISOString(),
       });
 
       return { receipt: updated, aiSuccess: false };
     }
+
   };
 
   const createVendorForReceipt = async (
