@@ -1223,7 +1223,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           // normalized → brand → fuzzy), identical to `reconcile-vendors`.
           const { data: allVendors } = await supabase
             .from('vendors')
-            .select('id, display_name, expenses_only_extraction, legal_names, default_category_id')
+            .select('id, display_name, expenses_only_extraction, legal_names, default_category_id, always_not_a_receipt')
             .eq('user_id', receiptUserId);
 
           // Receipt volume per vendor — used as a tiebreaker / confidence signal.
