@@ -322,7 +322,13 @@ const Expenses = () => {
   const [taxTypeFilter, setTaxTypeFilter] = useState<string>('all');
   const [invoiceFilter, setInvoiceFilter] = useState<string>('all');
   
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string[]>(() => {
+    const tagsParam = searchParams.get('tags');
+    const noTagsParam = searchParams.get('noTags');
+    if (noTagsParam === '1') return ['__none__'];
+    if (tagsParam) return tagsParam.split(',').filter(Boolean);
+    return [];
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
