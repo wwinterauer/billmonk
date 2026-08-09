@@ -235,7 +235,7 @@ serve(async (req) => {
 
     if (!txs || txs.length === 0) {
       return new Response(
-        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, skonto_candidates: [], scanned_transactions: 0 }),
+        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, skonto_candidates: [], scanned_transactions: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -243,7 +243,7 @@ serve(async (req) => {
     const datedTxs = txs.filter((t) => t.transaction_date);
     if (datedTxs.length === 0) {
       return new Response(
-        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, skonto_candidates: [], scanned_transactions: txs.length }),
+        JSON.stringify({ exact_applied: 0, high_confidence_applied: 0, group_applied: 0, skonto_candidates: [], scanned_transactions: txs.length }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -261,6 +261,7 @@ serve(async (req) => {
 
     let exactApplied = 0;
     let highConfidenceApplied = 0;
+    let groupApplied = 0;
     const skontoCandidates: SkontoCandidate[] = [];
     const usedKeys = new Set<string>();
     const matchedTxIds = new Set<string>();
@@ -437,6 +438,7 @@ serve(async (req) => {
       JSON.stringify({
         exact_applied: exactApplied,
         high_confidence_applied: highConfidenceApplied,
+        group_applied: groupApplied,
         skonto_candidates: skontoCandidates,
         scanned_transactions: txs.length,
       }),
