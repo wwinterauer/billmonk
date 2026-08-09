@@ -952,76 +952,19 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         let resolvedVendorId: string | null = receipt?.vendor_id ?? null;
 
         if (receiptUserId && extractedData.vendor) {
-          // Vendor matching: load all user vendors and match by normalized name
-          // (strip legal form + lowercase) with Levenshtein fallback. This lets
-          // "Sowana Handels GmbH" and "sowana" resolve to the same vendor.
-          const extractedNorm = normalizeVendorName(extractedData.vendor);
-          const extractedLower = (extractedData.vendor || "").toLowerCase().trim();
-
+          // Vendor matching via the shared matcher (exact → legal names →
+          // normalized → brand → fuzzy), identical to `reconcile-vendors`.
           const { data: allVendors } = await supabase
             .from('vendors')
             .select('id, display_name, expenses_only_extraction, legal_names, default_category_id')
             .eq('user_id', receiptUserId);
 
-          let finalVendorMatch: any = null;
-          if (allVendors && allVendors.length > 0) {
-            // 1. Exact (case-insensitive) display_name match
-            finalVendorMatch = allVendors.find(v =>
-              (v.display_name || '').toLowerCase().trim() === extractedLower
-            ) || null;
-
-            // 2. Exact legal_names match
-            if (!finalVendorMatch) {
-              finalVendorMatch = allVendors.find(v =>
-                (v.legal_names || []).some((ln: string) => ln.toLowerCase().trim() === extractedLower)
-              ) || null;
-            }
-
-            // 3. Normalized match (strip legal form) on display_name OR legal_names
-            if (!finalVendorMatch && extractedNorm) {
-              finalVendorMatch = allVendors.find(v => {
-                if (normalizeVendorName(v.display_name) === extractedNorm) return true;
-                return (v.legal_names || []).some((ln: string) => normalizeVendorName(ln) === extractedNorm);
-              }) || null;
-            }
-
-            // 3b. Match on the brand name (vendor_brand) — many invoices carry a
-            // holding/legal entity in `vendor` but the known brand in `vendor_brand`.
-            const brandRaw = (extractedData.vendor_brand || '').trim();
-            if (!finalVendorMatch && brandRaw) {
-              const brandLower = brandRaw.toLowerCase();
-              const brandNorm = normalizeVendorName(brandRaw);
-              finalVendorMatch = allVendors.find(v => {
-                if ((v.display_name || '').toLowerCase().trim() === brandLower) return true;
-                if (brandNorm && normalizeVendorName(v.display_name) === brandNorm) return true;
-                return (v.legal_names || []).some((ln: string) =>
-                  ln.toLowerCase().trim() === brandLower || (brandNorm && normalizeVendorName(ln) === brandNorm)
-                );
-              }) || null;
-            }
-
-            // 4. Fuzzy fallback (similarity ≥ 0.88) on normalized names — guard short names
-            if (!finalVendorMatch && extractedNorm && extractedNorm.length >= 4) {
-              let bestScore = 0;
-              let bestVendor: any = null;
-              const needles = [extractedNorm, normalizeVendorName(brandRaw)].filter(n => n && n.length >= 4);
-              for (const v of allVendors) {
-                const candidates = [v.display_name, ...(v.legal_names || [])]
-                  .map(normalizeVendorName)
-                  .filter(n => n.length >= 4);
-                for (const cand of candidates) {
-                  for (const needle of needles) {
-                    const score = nameSimilarity(needle, cand);
-                    if (score > bestScore) { bestScore = score; bestVendor = v; }
-                  }
-                }
-              }
-              if (bestScore >= 0.88) {
-                finalVendorMatch = bestVendor;
-                console.log(`[Vendor Match] Fuzzy matched "${extractedData.vendor}" → "${bestVendor.display_name}" (score ${bestScore.toFixed(2)})`);
-              }
-            }
+          const finalVendorMatch: any =
+            matchVendor(allVendors as any[], extractedData.vendor, extractedData.vendor_brand) || null;
+          if (finalVendorMatch) {
+            console.log(`[Vendor Match] "${extractedData.vendor}" → "${finalVendorMatch.display_name}"`);
           }
+
 
 
           const vendorId = receipt?.vendor_id || finalVendorMatch?.id;
