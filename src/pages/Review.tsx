@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ProblemReceiptsPanel } from '@/components/receipts/ProblemReceiptsPanel';
-import { useProblemReceiptCount } from '@/hooks/useReceiptRetry';
+import { useProblemReceiptCount, useReceiptRetry } from '@/hooks/useReceiptRetry';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -249,7 +249,20 @@ const Review = () => {
     return receipts.filter(r => matchesVendorSearch(r, vendorSearch));
   }, [receipts, vendorSearch, matchesVendorSearch]);
 
+  // Receipts that came back from the AI without any usable data
+  const emptyReceipts = useMemo(
+    () => receipts.filter(r => !r.vendor && !r.vendor_brand && r.amount_gross == null),
+    [receipts],
+  );
+
+  const {
+    isRetrying,
+    progress: retryProgress,
+    retryReceiptIds,
+  } = useReceiptRetry();
+
   const currentReceipt = filteredReceipts[currentIndex] || null;
+
 
   // Persist current receipt id across navigation
   useEffect(() => {
