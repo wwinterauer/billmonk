@@ -1419,12 +1419,15 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         // enabled and the AI confidence reaches the vendor's threshold.
         let finalStatus: string = 'review';
         let autoApproved = false;
+        let vendorDefaultTagId: string | null = null;
         if (resolvedVendorId) {
           const { data: vendorAuto } = await supabase
             .from('vendors')
-            .select('auto_approve, auto_approve_min_confidence')
+            .select('auto_approve, auto_approve_min_confidence, default_tag_id')
             .eq('id', resolvedVendorId)
             .maybeSingle();
+
+          vendorDefaultTagId = (vendorAuto as any)?.default_tag_id ?? null;
 
           if (vendorAuto?.auto_approve) {
             const confidence = Number(extractedData.confidence ?? 0);
@@ -1476,6 +1479,27 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           console.error("Failed to update receipt:", updateError);
         } else {
           console.log(`Receipt ${receiptId} updated (V2, VAT: ${vatRateSource})`);
+
+          // Standard-Tag des Lieferanten zuweisen (falls hinterlegt)
+          if (vendorDefaultTagId) {
+            try {
+              const { error: tagError } = await supabase
+                .from('receipt_tags')
+                .upsert(
+                  { receipt_id: receiptId, tag_id: vendorDefaultTagId },
+                  { onConflict: 'receipt_id,tag_id', ignoreDuplicates: true }
+                );
+              if (tagError) {
+                console.error('[Default Tag] Zuweisung fehlgeschlagen:', tagError.message);
+              } else {
+                console.log(`[Default Tag] Tag ${vendorDefaultTagId} → Receipt ${receiptId}`);
+              }
+            } catch (e) {
+              console.error('[Default Tag] Fehler:', e);
+            }
+          }
+
+
 
           // Post-save duplicate recheck (handles race condition with parallel uploads).
           // Regeln: echte Rechnungsnummer + Lieferant = Duplikat; sonst Betrag ±20 % und Datum ±3 Tage.
