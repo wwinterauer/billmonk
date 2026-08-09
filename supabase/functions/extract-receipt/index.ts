@@ -997,6 +997,10 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         let finalCategory = extractedData.category;
 
         const receiptUserId = receipt?.user_id || null;
+        // Vendor resolved during matching below — persisted with the receipt so
+        // server-side processing (retry, email import, batch) links the vendor
+        // just like the client flow does.
+        let resolvedVendorId: string | null = receipt?.vendor_id ?? null;
 
         if (receiptUserId && extractedData.vendor) {
           // Vendor matching: load all user vendors and match by normalized name
