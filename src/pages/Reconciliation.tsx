@@ -1526,11 +1526,17 @@ export default function Reconciliation() {
         open={reconcileDialogOpen}
         onOpenChange={setReconcileDialogOpen}
         candidates={skontoCandidates}
+        suggestions={matchSuggestions}
         exactApplied={reconcileSummary.exact}
         scanned={reconcileSummary.scanned}
         onApply={applySkontoMatches}
+        onShowReceipt={(id) => {
+          setSelectedReceiptId(id);
+          setShowReceiptPanel(true);
+        }}
         isApplying={reconcileApplying}
       />
+
       </FeatureGate>
     </DashboardLayout>
   
