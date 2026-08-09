@@ -85,6 +85,7 @@ const extractionSchema = {
     net_amount: { type: "number" as const },
     tax_amount: { type: "number" as const },
     tax_rate: { type: "string" as const },
+    line_items_are_net: { type: "boolean" as const },
     is_mixed_tax_rate: { type: "boolean" as const },
     tax_rate_details: {
       type: "array" as const,
@@ -132,7 +133,7 @@ const extractionSchema = {
     "tax_rate", "currency", "confidence",
     "reason", "vendor_brand", "vendor_address", "vendor_uid",
     "vendor_legal_form", "vendor_country", "receipt_date", "due_date",
-    "receipt_number", "net_amount", "tax_amount", "is_mixed_tax_rate",
+    "receipt_number", "net_amount", "tax_amount", "is_mixed_tax_rate", "line_items_are_net",
     "tax_rate_details", "description", "line_items",
     "vat_confidence", "vat_detection_method", "special_vat_case", "notes",
     "category", "tax_type",
@@ -665,9 +666,16 @@ VAT-KONFIDENZ:
 - vat_detection_method: "explicit"/"calculated"/"estimated"
 
 BETRÄGE: Dezimalzahlen ohne Währungssymbol. 0 wenn nicht erkennbar. Datum: YYYY-MM-DD oder "".
+- total_amount = IMMER der Endbetrag INKLUSIVE MwSt. (z.B. "Summe EUR inkl. MwSt.", "Gesamtbetrag brutto", "Rechnungsbetrag", "Zu zahlen", "Total incl. VAT").
+- net_amount = Betrag OHNE MwSt. (z.B. "Total EUR ohne MwSt.", "Nettosumme", "Zwischensumme", "Warenwert netto").
+- WARNUNG: Enthält die Zeile "ohne MwSt.", "exkl.", "netto" oder "zzgl. MwSt.", darf dieser Wert NIEMALS in total_amount stehen.
+- Bei mehreren Summenzeilen ist der HÖCHSTE Betrag am Ende des Summenblocks das Brutto.
+- Es muss gelten: net_amount + tax_amount = total_amount.
+- line_items_are_net = true, wenn die Positionspreise OHNE MwSt. ausgewiesen sind (typisch bei B2B-Rechnungen), sonst false.
 receipt_number: Rechnungsnummer suchen (RE-Nr, Invoice, Belegnummer etc.) oder "".
 
 LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenzeilen.${expensesOnlyPrompt}${extractionHintPrompt}`;
+
 
     // ── AI API Call with structured output ─────────────────────────
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -793,6 +801,30 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         }));
       }
 
+      // ── Post-Processing: Brutto/Netto-Verwechslung korrigieren ───
+      // Häufiger AI-Fehler: die Zeile "Total ohne MwSt." wird als Gesamtbetrag genommen.
+      {
+        const gross = Number(extractedData.amount_gross);
+        const net = Number(extractedData.amount_net);
+        const vat = Number(extractedData.vat_amount);
+        const rate = Number(extractedData.vat_rate);
+        const nearlyEqual = Number.isFinite(gross) && Number.isFinite(net) && net > 0 &&
+          Math.abs(gross - net) / Math.max(net, 1) < 0.01;
+
+        if (nearlyEqual && Number.isFinite(vat) && vat > 0) {
+          const corrected = Math.round((net + vat) * 100) / 100;
+          console.warn(`[Gross Fix] total_amount ${gross} entsprach dem Nettobetrag → Brutto korrigiert auf ${corrected}`);
+          extractedData.amount_gross = corrected;
+          (extractedData as any).vat_confidence = Math.min(Number((extractedData as any).vat_confidence) || 0.8, 0.7);
+        } else if (nearlyEqual && Number.isFinite(rate) && rate > 0) {
+          const corrected = Math.round(net * (1 + rate / 100) * 100) / 100;
+          console.warn(`[Gross Fix] total_amount ${gross} entsprach dem Nettobetrag → Brutto ${corrected} (${rate}%)`);
+          extractedData.amount_gross = corrected;
+          extractedData.vat_amount = Math.round((corrected - net) * 100) / 100;
+          (extractedData as any).vat_confidence = Math.min(Number((extractedData as any).vat_confidence) || 0.8, 0.7);
+        }
+      }
+
       // ── Post-Processing: rebuild tax_rate_details from line_items (truth from granular data) ──
       const lineItems = Array.isArray(rawData.line_items) ? rawData.line_items : [];
       
@@ -804,18 +836,36 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
       
 
       if (validLineItems.length > 0) {
-        const rateGroups: Record<string, { gross: number; descriptions: string[] }> = {};
+        const rateGroups: Record<string, { sum: number; descriptions: string[] }> = {};
+        let lineItemsSum = 0;
         for (const li of validLineItems) {
           const rateKey = String(parseFloat(String(li.tax_rate).replace(',', '.').replace('%', '')) || 0);
-          if (!rateGroups[rateKey]) rateGroups[rateKey] = { gross: 0, descriptions: [] };
-          rateGroups[rateKey].gross += Math.abs(Number(li.total));
+          if (!rateGroups[rateKey]) rateGroups[rateKey] = { sum: 0, descriptions: [] };
+          rateGroups[rateKey].sum += Math.abs(Number(li.total));
+          lineItemsSum += Math.abs(Number(li.total));
           if (li.description) rateGroups[rateKey].descriptions.push(li.description);
         }
+
+        // Sind die Positionspreise Netto- oder Bruttowerte?
+        const aiNet = Number(extractedData.amount_net);
+        const aiGrossVal = Number(extractedData.amount_gross);
+        const closeTo = (a: number, b: number) =>
+          Number.isFinite(a) && Number.isFinite(b) && b > 0 && Math.abs(a - b) / Math.max(b, 1) < 0.01;
+        const lineItemsAreNet =
+          rawData.line_items_are_net === true ||
+          (closeTo(lineItemsSum, aiNet) && !closeTo(lineItemsSum, aiGrossVal));
+        // Positionssumme → Bruttowert je Satz
+        const toGross = (sum: number, rate: number) =>
+          lineItemsAreNet && rate > 0 ? sum * (1 + rate / 100) : sum;
+        if (lineItemsAreNet) {
+          console.log(`[LineItems] Positionspreise als NETTO erkannt (Summe ${Math.round(lineItemsSum * 100) / 100})`);
+        }
+
         const rateKeys = Object.keys(rateGroups);
         if (rateKeys.length > 1) {
           const newDetails = rateKeys.map(rateStr => {
             const rate = parseFloat(rateStr);
-            const gross = rateGroups[rateStr].gross;
+            const gross = toGross(rateGroups[rateStr].sum, rate);
             const netAmount = rate === 0 ? gross : gross / (1 + rate / 100);
             const taxAmount = gross - netAmount;
             return {
@@ -829,11 +879,12 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           extractedData.is_mixed_tax_rate = true;
           extractedData.amount_net = Math.round(newDetails.reduce((s, d) => s + d.net_amount, 0) * 100) / 100;
           extractedData.vat_amount = Math.round(newDetails.reduce((s, d) => s + d.tax_amount, 0) * 100) / 100;
+          extractedData.amount_gross = Math.round((extractedData.amount_net + extractedData.vat_amount) * 100) / 100;
           
         } else if (rateKeys.length === 1) {
           // Single-Rate Truth aus Line Items: AI-Aggregat überschreiben
           const rate = parseFloat(rateKeys[0]);
-          const lineItemsGross = Math.round(rateGroups[rateKeys[0]].gross * 100) / 100;
+          const lineItemsGross = Math.round(toGross(rateGroups[rateKeys[0]].sum, rate) * 100) / 100;
           const aiGross = Number(extractedData.amount_gross) || 0;
           // Wenn Line-Item-Summe deutlich (>1%) vom AI-Aggregat abweicht, Line-Item-Summe als Brutto verwenden
           const useLineItemGross = aiGross === 0 || Math.abs(lineItemsGross - aiGross) / Math.max(aiGross, 1) > 0.01;
