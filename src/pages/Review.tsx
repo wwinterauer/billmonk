@@ -1169,6 +1169,36 @@ const Review = () => {
           )}
         </div>
 
+        {/* Hint: receipts without any extracted data */}
+        {emptyReceipts.length > 0 && (
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">
+                {emptyReceipts.length} Belege ohne erkannte Daten
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Bei diesen Belegen hat die KI-Analyse kein Ergebnis geliefert – kein Lieferant, kein Betrag. Sie sind daher auch nicht durchsuchbar.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isRetrying}
+              onClick={async () => {
+                await retryReceiptIds(emptyReceipts.map(r => r.id));
+                await loadReceipts();
+              }}
+            >
+              {isRetrying
+                ? `Analysiere ${retryProgress.current}/${retryProgress.total}...`
+                : 'Erneut analysieren'}
+            </Button>
+          </div>
+        )}
+
+
+
         {/* Progress Bar */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
