@@ -9,6 +9,7 @@ import {
   ImageIcon,
   Percent,
   Plus,
+  Eye,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { de } from 'date-fns/locale';
