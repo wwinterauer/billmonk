@@ -874,35 +874,44 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
       let anchorNet: number | null = null;
       let anchorLabel = '';
 
-      if (isGrossLabel(rawData.total_amount_label) && Math.abs(Number(rawData.total_amount)) > 0) {
-        anchorGross = Math.abs(Number(rawData.total_amount));
-        anchorLabel = String(rawData.total_amount_label);
-      } else {
-        const fromBlock = pickFromBlock(isGrossLabel);
-        if (fromBlock != null) {
-          anchorGross = fromBlock;
-          anchorLabel = 'totals_block';
+      // Im Ausgaben-Filter-Modus (Sammelabrechnungen) gelten die Dokument-Summen NICHT
+      // für diesen Beleg – nur die gefilterten Schlagwort-Positionen zählen.
+      const expensesOnlyMode = !!expensesOnlyPrompt;
+      if (expensesOnlyMode) {
+        console.log('[Totals Anchor] Übersprungen – Ausgaben-Filter-Modus aktiv');
+      }
+
+      if (!expensesOnlyMode) {
+        if (isGrossLabel(rawData.total_amount_label) && Math.abs(Number(rawData.total_amount)) > 0) {
+          anchorGross = Math.abs(Number(rawData.total_amount));
+          anchorLabel = String(rawData.total_amount_label);
+        } else {
+          const fromBlock = pickFromBlock(isGrossLabel);
+          if (fromBlock != null) {
+            anchorGross = fromBlock;
+            anchorLabel = 'totals_block';
+          }
         }
-      }
 
-      if (isNetLabel(rawData.net_amount_label) && Math.abs(Number(rawData.net_amount)) > 0) {
-        anchorNet = Math.abs(Number(rawData.net_amount));
-      } else {
-        anchorNet = pickFromBlock(isNetLabel);
-      }
+        if (isNetLabel(rawData.net_amount_label) && Math.abs(Number(rawData.net_amount)) > 0) {
+          anchorNet = Math.abs(Number(rawData.net_amount));
+        } else {
+          anchorNet = pickFromBlock(isNetLabel);
+        }
 
-      // Kein Brutto-Label, aber Netto-Label + ausgewiesene Steuer → Brutto rekonstruieren
-      if (anchorGross == null && anchorNet != null && Math.abs(Number(rawData.tax_amount)) > 0) {
-        anchorGross = Math.round((anchorNet + Math.abs(Number(rawData.tax_amount))) * 100) / 100;
-        anchorLabel = 'netto+steuer';
-      }
+        // Kein Brutto-Label, aber Netto-Label + ausgewiesene Steuer → Brutto rekonstruieren
+        if (anchorGross == null && anchorNet != null && Math.abs(Number(rawData.tax_amount)) > 0) {
+          anchorGross = Math.round((anchorNet + Math.abs(Number(rawData.tax_amount))) * 100) / 100;
+          anchorLabel = 'netto+steuer';
+        }
 
-      if (anchorGross != null) {
-        console.log(`[Totals Anchor] Brutto ${anchorGross} aus Summenzeile "${anchorLabel}"`);
-        extractedData.amount_gross = anchorGross;
-        if (anchorNet != null && anchorNet > 0 && anchorNet <= anchorGross) {
-          extractedData.amount_net = anchorNet;
-          extractedData.vat_amount = Math.round((anchorGross - anchorNet) * 100) / 100;
+        if (anchorGross != null) {
+          console.log(`[Totals Anchor] Brutto ${anchorGross} aus Summenzeile "${anchorLabel}"`);
+          extractedData.amount_gross = anchorGross;
+          if (anchorNet != null && anchorNet > 0 && anchorNet <= anchorGross) {
+            extractedData.amount_net = anchorNet;
+            extractedData.vat_amount = Math.round((anchorGross - anchorNet) * 100) / 100;
+          }
         }
       }
 
