@@ -16,14 +16,25 @@ Die Zahl im Verwendungszweck ist die **PayPal-Vorgangsnummer**, nicht die IONOS-
 
 Ergebnis: alles bleibt offen, obwohl die Zuordnung für einen Menschen offensichtlich ist.
 
-## Was gebaut wird
+## Intelligenteres Matching (Scoring statt Alles-oder-Nichts)
 
-Ein neuer **Vorschlags-Pass** — nichts wird automatisch verbucht, der User entscheidet.
+Statt starrer Ja/Nein-Regeln bekommt jedes Buchung-Beleg-Paar einen **Score** aus mehreren Signalen:
 
-- Für jede offene Buchung werden Belege mit **exakt gleichem Betrag** (±0,02 €) gesucht, unabhängig davon, ob die Zuordnung eindeutig ist.
-- Bei mehreren Kandidaten werden diese nach Nähe zum Buchungsdatum sortiert; der beste Kandidat wird als Vorschlag markiert, die anderen bleiben als Alternativen wählbar.
-- Zusatzsignale erhöhen die Vertrauensstufe: Zahlungsdienstleister im Text (PayPal, Klarna, Stripe …), Lieferant wiederholt sich mit gleichem Betrag, Datumsabstand klein.
-- Der Gruppen-Pass darf künftig auch bei ungleich großen Gruppen greifen — aber nur noch als **Vorschlag**, nicht als Auto-Buchung.
+- Betrag: exakt (±0,02 €) = stark, Abweichung bis 5 % / 10 € = schwächer (z. B. Skonto, Rundung, Erkennungsfehler).
+- Datum: je näher am Belegdatum, desto höher; Zahlungen nach Belegdatum werden bevorzugt.
+- Rechnungsnummer im Buchungstext = sehr stark.
+- Lieferantenname im Text — inkl. Marken- und rechtlicher Firmenname sowie hinterlegter Schlagwörter des Lieferanten (nicht nur `vendor`).
+- Zahlungsdienstleister erkannt (PayPal, Klarna, Stripe …): Lieferant fehlt im Text erwartungsgemäß → das darf nicht mehr gegen den Treffer zählen.
+- Wiederkehrendes Muster: gleicher Lieferant zahlt regelmäßig denselben Betrag (typisch IONOS-Tagesrechnungen) → Buchungen und Belege werden datumsweise in Reihenfolge gepaart.
+- Bereits bestätigte Zuordnungen desselben Lieferanten dienen als Lernsignal (z. B. „PayPal-Buchungen dieses Betrags gehören zu IONOS").
+
+Entscheidungsregel:
+- Score sehr hoch und eindeutig → automatisch verbuchen (wie bisher).
+- Score gut, aber mehrdeutig oder nur mittelstark → **Vorschlag** statt Auto-Buchung.
+- Score niedrig → bleibt offen.
+
+Damit landet nichts mehr stillschweigend im Nichts: Was nicht sicher genug ist, wird dem User zur Entscheidung vorgelegt. Der Gruppen-Pass greift künftig auch bei ungleich großen Gruppen — dann als Vorschlag.
+
 
 ## Neue Vorschlags-Ansicht
 
