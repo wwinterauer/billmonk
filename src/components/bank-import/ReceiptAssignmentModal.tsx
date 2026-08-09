@@ -359,18 +359,28 @@ export function ReceiptAssignmentModal({
     return null;
   };
 
+  const closePreview = () => {
+    setPreview((prev) => {
+      if (prev?.url?.startsWith('blob:')) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  };
+
   const openReceiptFile = async (e: React.MouseEvent, receipt: Receipt) => {
     e.stopPropagation();
     if (!receipt.file_url) return;
     const isPdf = receipt.file_url.toLowerCase().endsWith('.pdf');
     const title = receipt.vendor || 'Beleg';
-    setPreview({ url: null, isPdf, title });
+    setPreview({ url: null, isPdf, title, error: null });
     const path = receipt.file_url.replace(/^.*\/receipts\//, '');
     const { data, error } = await supabase.storage.from('receipts').download(path);
-    if (error || !data) return;
+    if (error || !data) {
+      console.error('Beleg-Vorschau fehlgeschlagen', { path, error });
+      setPreview({ url: null, isPdf, title, error: error?.message || 'Datei konnte nicht geladen werden.' });
+      return;
+    }
     const blob = isPdf ? new Blob([data], { type: 'application/pdf' }) : data;
-    const objectUrl = URL.createObjectURL(blob);
-    setPreview({ url: objectUrl, isPdf, title });
+    setPreview({ url: URL.createObjectURL(blob), isPdf, title, error: null });
   };
 
 
