@@ -722,18 +722,27 @@ export function ReceiptAssignmentModal({
         </DialogFooter>
       </DialogContent>
 
-      <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
+      <Dialog open={!!preview} onOpenChange={(o) => !o && closePreview()}>
         <DialogContent className="sm:max-w-[900px] h-[90vh] flex flex-col p-0">
           <DialogHeader className="px-6 pt-6 pb-3">
             <DialogTitle className="truncate">{preview?.title ?? 'Beleg'}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 px-6 pb-6">
-            {!preview?.url ? (
+            {preview?.error ? (
+              <div className="h-full flex items-center justify-center text-sm text-destructive text-center px-6">
+                {preview.error}
+              </div>
+            ) : !preview?.url ? (
               <div className="h-full flex items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : preview.isPdf ? (
-              <iframe src={preview.url} title="Belegvorschau" className="w-full h-full rounded-lg border" />
+              <object data={preview.url} type="application/pdf" className="w-full h-full rounded-lg border">
+                <div className="h-full flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <span>Vorschau nicht möglich.</span>
+                  <a href={preview.url} download className="underline">Datei herunterladen</a>
+                </div>
+              </object>
             ) : (
               <div className="h-full overflow-auto rounded-lg border bg-muted/30 flex items-start justify-center">
                 <img src={preview.url} alt="Belegvorschau" className="max-w-full" />
