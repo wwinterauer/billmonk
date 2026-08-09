@@ -965,7 +965,9 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
             : 'Kein Rechnungsdokument';
 
           await supabase.from('receipts').update({
-            status: 'review',
+            // Own status: keeps these documents out of the review queue and out
+            // of the "no data extracted" banner, but still findable + reversible.
+            status: 'not_a_receipt',
             category: 'Keine Rechnung',
             description: documentDescription.substring(0, 100),
             ai_confidence: 0.5,
