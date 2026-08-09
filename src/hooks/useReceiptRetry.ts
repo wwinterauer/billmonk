@@ -136,8 +136,9 @@ export function useReceiptRetry() {
         try {
           await supabase.from('receipts').update({ status: 'processing', notes: null }).eq('id', id);
           const { error } = await supabase.functions.invoke('extract-receipt', {
-            body: { receiptId: id },
+            body: { receiptId: id, forceTreatAsReceipt: options?.force === true },
           });
+
           if (error) throw error;
           success++;
           setProgress(prev => ({ ...prev, success }));
