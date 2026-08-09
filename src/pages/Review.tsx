@@ -1055,7 +1055,8 @@ const Review = () => {
   }
 
   // Empty state
-  if (receipts.length === 0) {
+  if (filteredReceipts.length === 0) {
+    const isSearchEmpty = receipts.length > 0 && vendorSearch.trim();
     return (
       <DashboardLayout>
         <div className="p-6 lg:p-8">
@@ -1064,17 +1065,32 @@ const Review = () => {
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="h-20 w-20 rounded-full bg-success/20 flex items-center justify-center mb-6"
+              className={cn(
+                'h-20 w-20 rounded-full flex items-center justify-center mb-6',
+                isSearchEmpty ? 'bg-muted' : 'bg-success/20'
+              )}
             >
-              <CheckCircle className="h-10 w-10 text-success" />
+              {isSearchEmpty ? (
+                <Search className="h-10 w-10 text-muted-foreground" />
+              ) : (
+                <CheckCircle className="h-10 w-10 text-success" />
+              )}
             </motion.div>
             <h2 className="text-2xl font-bold text-foreground mb-2">
-              Alle Belege überprüft! 🎉
+              {isSearchEmpty ? 'Keine Treffer' : 'Alle Belege überprüft! 🎉'}
             </h2>
             <p className="text-muted-foreground mb-6">
-              Keine offenen Überprüfungen vorhanden
+              {isSearchEmpty
+                ? `Kein Beleg passt zu „${vendorSearch.trim()}"`
+                : 'Keine offenen Überprüfungen vorhanden'}
             </p>
-            {problemCount > 0 && (
+            {isSearchEmpty && (
+              <Button variant="outline" className="mb-6" onClick={() => setVendorSearch('')}>
+                <X className="h-4 w-4 mr-2" />
+                Suche zurücksetzen
+              </Button>
+            )}
+            {!isSearchEmpty && problemCount > 0 && (
               <Button variant="outline" className="mb-6" onClick={() => setTab('problems')}>
                 <AlertTriangle className="h-4 w-4 mr-2 text-destructive" />
                 {problemCount} Problembelege ansehen
