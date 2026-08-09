@@ -1050,8 +1050,14 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
             ? false
             : (aiGross === 0 || Math.abs(Math.abs(lineItemsGross) - aiGross) / Math.max(aiGross, 1) > 0.01);
           const gross = useLineItemGross ? lineItemsGross : (anchorGross ?? aiGross);
-          const netAmount = rate === 0 ? gross : gross / (1 + rate / 100);
-          const taxAmount = gross - netAmount;
+          const calculatedNet = rate === 0 ? gross : gross / (1 + rate / 100);
+          const calculatedTax = gross - calculatedNet;
+          const explicitNet = Number(extractedData.amount_net);
+          const explicitTax = Number(extractedData.vat_amount);
+          const hasExplicitExpenseColumns = expensesOnlyMode && explicitNet > 0 && explicitTax >= 0
+            && Math.abs((explicitNet + explicitTax) - gross) <= 0.05;
+          const netAmount = hasExplicitExpenseColumns ? explicitNet : calculatedNet;
+          const taxAmount = hasExplicitExpenseColumns ? explicitTax : calculatedTax;
           const prevRate = extractedData.vat_rate;
           extractedData.vat_rate = rate;
           extractedData.amount_gross = Math.round(gross * 100) / 100;
