@@ -1057,6 +1057,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           }
 
           const vendorId = receipt?.vendor_id || finalVendorMatch?.id;
+          resolvedVendorId = vendorId ?? null;
 
           // Auto-learn legal_names: if AI extracted a name with legal form and
           // the matched vendor doesn't yet know it, add it. Also upgrade
