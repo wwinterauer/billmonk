@@ -175,7 +175,7 @@ export default function Reconciliation() {
     }
   };
 
-  const applySkontoMatches = async (accepted: { transaction_id: string; receipt_id: string }[]) => {
+  const applySkontoMatches = async (accepted: AcceptedPair[]) => {
     setReconcileApplying(true);
     try {
       const { data, error } = await supabase.functions.invoke('reconcile-with-skonto', {
@@ -184,9 +184,10 @@ export default function Reconciliation() {
       if (error) throw error;
       const applied = data?.applied ?? 0;
       toast({
-        title: 'Skonto-Zuordnungen übernommen',
+        title: 'Zuordnungen übernommen',
         description: `${applied} Buchung${applied === 1 ? '' : 'en'} verknüpft.`,
       });
+
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
       queryClient.invalidateQueries({ queryKey: ['kpi-unmatched-payments'] });
