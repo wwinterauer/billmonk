@@ -358,13 +358,22 @@ export function ReceiptAssignmentModal({
   const openReceiptFile = async (e: React.MouseEvent, receipt: Receipt) => {
     e.stopPropagation();
     if (!receipt.file_url) return;
-    setPreview({ url: null, isPdf: receipt.file_url.toLowerCase().endsWith('.pdf'), title: receipt.vendor || 'Beleg' });
+    const isPdf = receipt.file_url.toLowerCase().endsWith('.pdf');
+    const title = receipt.vendor || 'Beleg';
+    setPreview({ url: null, isPdf, title });
     const path = receipt.file_url.replace(/^.*\/receipts\//, '');
-    const { data } = await supabase.storage.from('receipts').createSignedUrl(path, 300);
-    if (data?.signedUrl) {
-      setPreview({ url: data.signedUrl, isPdf: receipt.file_url.toLowerCase().endsWith('.pdf'), title: receipt.vendor || 'Beleg' });
-    }
+    const { data, error } = await supabase.storage.from('receipts').download(path);
+    if (error || !data) return;
+    const blob = isPdf ? new Blob([data], { type: 'application/pdf' }) : data;
+    const objectUrl = URL.createObjectURL(blob);
+    setPreview({ url: objectUrl, isPdf, title });
   };
+
+  useEffect(() => {
+    return () => {
+      if (preview?.url?.startsWith('blob:')) URL.revokeObjectURL(preview.url);
+    };
+  }, [preview?.url]);
 
   const ReceiptCard = ({ receipt, showScore = true }: { receipt: ReceiptWithScore; showScore?: boolean }) => (
     <div
