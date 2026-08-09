@@ -135,7 +135,7 @@ const Review = () => {
   const { splitBookingEnabled } = usePlan();
   const { vatRateGroups, defaultVatRate } = useVatRates();
   const { trackFieldChange } = useVendorFieldDefaults();
-  const { updateVendor } = useVendors();
+  const { updateVendor, vendors } = useVendors();
   const queryClient = useQueryClient();
 
   // State
