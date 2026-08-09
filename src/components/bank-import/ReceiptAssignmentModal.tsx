@@ -158,7 +158,7 @@ export function ReceiptAssignmentModal({
 
   // Split-line selection (step 2)
   const [selectedSplitLine, setSelectedSplitLine] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ url: string | null; isPdf: boolean; title: string } | null>(null);
+  const [preview, setPreview] = useState<{ url: string | null; isPdf: boolean; title: string; error: string | null } | null>(null);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
