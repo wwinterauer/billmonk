@@ -26,6 +26,22 @@ export function dedupeLegalForms(name: string | null | undefined): string {
   return out.join(" ");
 }
 
+// Combine an extracted vendor name with its legal form (e.g. "HOFER" + "KG"),
+// avoiding duplicates like "HOFER KG KG".
+export function combineVendorWithLegalForm(
+  name: string | null | undefined,
+  legalForm: string | null | undefined,
+): string | null {
+  const base = (name ?? "").trim();
+  if (!base) return null;
+  const lf = (legalForm ?? "").trim();
+  if (!lf) return dedupeLegalForms(base);
+  if (hasLegalForm(base)) return dedupeLegalForms(base);
+  return dedupeLegalForms(`${base} ${lf}`);
+}
+
+
+
 // Normalize vendor name for matching: dedupe legal forms, lowercase,
 // strip legal form, collapse whitespace/punctuation.
 export function normalizeVendorName(name: string | null | undefined): string {
