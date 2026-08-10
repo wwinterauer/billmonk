@@ -866,6 +866,7 @@ const Reports = () => {
       ['Anzahl Belege', stats.count],
     ];
     const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    applyColumnFormat(summarySheet, 1, ACCOUNTING_FMT, 3, 5);
     XLSX.utils.book_append_sheet(workbook, summarySheet, 'Zusammenfassung');
 
     // Categories sheet
