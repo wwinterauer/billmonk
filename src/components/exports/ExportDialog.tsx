@@ -634,5 +634,5 @@ export async function exportAsExcel(receipts: Receipt[]) {
   ws['!cols'] = colWidths;
 
   const exportDate = format(new Date(), 'yyyy-MM-dd');
-  XLSX.writeFile(wb, `belege_export_${exportDate}.xlsx`, { cellDates: true });
+  XLSX.writeFile(wb, `belege_export_${exportDate}.xlsx`);
 }

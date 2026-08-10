@@ -831,7 +831,7 @@ export function ExportFormatDialog({
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Ausgaben');
 
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', cellDates: true });
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     return new Blob([excelBuffer], { 
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
     });

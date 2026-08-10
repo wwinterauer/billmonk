@@ -942,7 +942,7 @@ const Reports = () => {
     XLSX.utils.book_append_sheet(workbook, receiptsSheet, 'Belege');
 
     const fileName = `bericht_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}.xlsx`;
-    XLSX.writeFile(workbook, fileName, { cellDates: true });
+    XLSX.writeFile(workbook, fileName);
 
     toast({
       title: 'Excel exportiert',
