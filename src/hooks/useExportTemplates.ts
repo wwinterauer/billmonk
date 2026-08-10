@@ -31,6 +31,7 @@ export interface ExportTemplate {
   group_by: string | null;
   group_subtotals: boolean;
   group_order?: Record<string, string[]>;
+  tag_filter?: TagFilter;
   include_header: boolean;
   include_totals: boolean;
   date_format: string;
