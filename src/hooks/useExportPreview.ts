@@ -266,20 +266,31 @@ export function useExportPreview() {
         query = query.order(config.sortBy, { ascending: config.sortDirection === 'asc' });
       }
 
-      // Limit for preview
-      query = query.limit(50);
+      // Limit for preview (fetch more when filtering, so 50 rows can survive the filter)
+      const tagFilter = config.tagFilter;
+      const filterActive = !!tagFilter && ((tagFilter.include?.length || 0) > 0 || (tagFilter.exclude?.length || 0) > 0);
+      query = query.limit(filterActive ? 500 : 50);
 
       const { data, error } = await query;
 
       if (error) throw error;
 
       // Transform tags into flat array
-      const receipts = ((data || []) as Record<string, unknown>[]).map(r => ({
+      let receipts = ((data || []) as Record<string, unknown>[]).map(r => ({
         ...r,
         tags: ((r.receipt_tags as Array<{ tag: { id: string; name: string; color: string } }>) || [])
           .map(rt => rt.tag)
           .filter(Boolean),
       }));
+
+      if (filterActive) {
+        receipts = receipts
+          .filter(r => matchesTagFilter(
+            ((r.tags as Array<{ id: string }>) || []).map(t => t.id),
+            tagFilter,
+          ))
+          .slice(0, 50);
+      }
       setRawData(receipts);
 
       // Calculate totals
