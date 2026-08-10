@@ -54,6 +54,7 @@ import {
   DEFAULT_COLUMNS,
   sortGroupKeys,
 } from '@/hooks/useExportTemplates';
+import { matchesTagFilter, isTagFilterActive } from '@/lib/exportFilters';
 
 export type ExportFormat = 'csv' | 'excel' | 'pdf' | 'zip';
 
@@ -591,6 +592,17 @@ export function ExportFormatDialog({
       } else {
         sortedReceipts = sortedReceipts.map(r => ({ ...r, tags: [] } as any));
       }
+    }
+
+    // Apply the template's tag filter (include / exclude)
+    const tagFilter = selectedTemplate?.tag_filter;
+    if (isTagFilterActive(tagFilter)) {
+      sortedReceipts = sortedReceipts.filter(r =>
+        matchesTagFilter(
+          (((r as any).tags || []) as Array<{ id: string }>).map(t => t.id),
+          tagFilter,
+        ),
+      );
     }
 
     // Expand split bookings into multiple rows

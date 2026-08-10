@@ -104,6 +104,7 @@ import {
   type ExportColumn,
 } from '@/hooks/useExportTemplates';
 import { useExportPreview } from '@/hooks/useExportPreview';
+import { TagFilterCard } from '@/components/exports/TagFilterCard';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -632,6 +633,7 @@ export function ExportTemplateSettings() {
       includeTotals: editingTemplate.include_totals,
       dateFormat: editingTemplate.date_format,
       numberFormat: editingTemplate.number_format,
+      tagFilter: editingTemplate.tag_filter,
     });
     setShowPreview(true);
   };
@@ -1026,6 +1028,12 @@ export function ExportTemplateSettings() {
               )}
             </CardContent>
           </Card>
+
+          {/* Tag filter */}
+          <TagFilterCard
+            value={editingTemplate.tag_filter}
+            onChange={(tf) => setEditingTemplate({ ...editingTemplate, tag_filter: tf })}
+          />
 
           {/* Advanced options */}
           <Card>

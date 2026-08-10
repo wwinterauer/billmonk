@@ -1677,6 +1677,7 @@ export type Database = {
           number_format: string | null
           sort_by: string | null
           sort_direction: string | null
+          tag_filter: Json
           template_type: string
           updated_at: string | null
           user_id: string
@@ -1697,6 +1698,7 @@ export type Database = {
           number_format?: string | null
           sort_by?: string | null
           sort_direction?: string | null
+          tag_filter?: Json
           template_type?: string
           updated_at?: string | null
           user_id: string
@@ -1717,6 +1719,7 @@ export type Database = {
           number_format?: string | null
           sort_by?: string | null
           sort_direction?: string | null
+          tag_filter?: Json
           template_type?: string
           updated_at?: string | null
           user_id?: string

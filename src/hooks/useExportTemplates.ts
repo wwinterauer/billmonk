@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Json } from '@/integrations/supabase/types';
+import { parseTagFilter, EMPTY_TAG_FILTER, type TagFilter } from '@/lib/exportFilters';
 
 // Column configuration type
 export interface ExportColumn {
@@ -30,6 +31,7 @@ export interface ExportTemplate {
   group_by: string | null;
   group_subtotals: boolean;
   group_order?: Record<string, string[]>;
+  tag_filter?: TagFilter;
   include_header: boolean;
   include_totals: boolean;
   date_format: string;
@@ -249,7 +251,8 @@ export function useExportTemplates() {
         sort_direction: (t.sort_direction as 'asc' | 'desc') || 'asc',
         template_type: ((t as any).template_type as 'receipts' | 'invoices') || 'receipts',
         group_order: ((t as any).group_order as Record<string, string[]>) || {},
-      })) as ExportTemplate[];
+        tag_filter: parseTagFilter((t as any).tag_filter),
+      })) as unknown as ExportTemplate[];
 
       setTemplates(parsed);
     } catch (error) {
@@ -300,6 +303,7 @@ export function useExportTemplates() {
           date_format: template.date_format,
           number_format: template.number_format,
           group_order: (template.group_order || {}) as unknown as Json,
+          tag_filter: (template.tag_filter || EMPTY_TAG_FILTER) as unknown as Json,
         } as any)
         .select()
         .single();
@@ -310,7 +314,8 @@ export function useExportTemplates() {
         ...data,
         columns: data.columns as unknown as ExportColumn[],
         sort_direction: data.sort_direction as 'asc' | 'desc',
-      } as ExportTemplate;
+        tag_filter: parseTagFilter((data as any).tag_filter),
+      } as unknown as ExportTemplate;
 
       setTemplates(prev => [...prev, newTemplate]);
       toast({ title: 'Vorlage erstellt' });
@@ -349,6 +354,9 @@ export function useExportTemplates() {
       }
       if (updates.group_order) {
         updateData.group_order = updates.group_order as unknown as Json;
+      }
+      if (updates.tag_filter) {
+        updateData.tag_filter = updates.tag_filter as unknown as Json;
       }
 
       const { error } = await supabase
@@ -418,6 +426,7 @@ export function useExportTemplates() {
     group_by: null,
     group_subtotals: true,
     group_order: {},
+    tag_filter: { ...EMPTY_TAG_FILTER },
     include_header: true,
     include_totals: true,
     date_format: 'DD.MM.YYYY',
