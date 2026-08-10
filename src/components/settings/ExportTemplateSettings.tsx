@@ -632,6 +632,7 @@ export function ExportTemplateSettings() {
       includeTotals: editingTemplate.include_totals,
       dateFormat: editingTemplate.date_format,
       numberFormat: editingTemplate.number_format,
+      tagFilter: editingTemplate.tag_filter,
     });
     setShowPreview(true);
   };
