@@ -269,7 +269,8 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
       original: receipt.file_name || 'unbekannt',
       newName: generateFileName(receipt, index),
     }));
-  }, [receipts, settings, loadingSettings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receipts, excludeNoReceipt, settings, loadingSettings]);
 
   // Cancel export
   const handleCancel = () => {
