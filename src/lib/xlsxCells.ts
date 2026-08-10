@@ -35,11 +35,13 @@ export function applyColumnFormat(
   colIndex: number,
   fmt: string,
   startRow = 0,
+  endRow?: number,
 ): void {
   const ref = worksheet['!ref'];
   if (!ref) return;
   const range = XLSX.utils.decode_range(ref);
-  for (let r = Math.max(range.s.r, startRow); r <= range.e.r; r++) {
+  const last = endRow !== undefined ? Math.min(endRow, range.e.r) : range.e.r;
+  for (let r = Math.max(range.s.r, startRow); r <= last; r++) {
     const addr = XLSX.utils.encode_cell({ r, c: colIndex });
     const cell = worksheet[addr] as XLSX.CellObject | undefined;
     if (!cell) continue;
