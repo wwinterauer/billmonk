@@ -467,9 +467,9 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
                       </span>
                     </div>
                   ))}
-                  {receipts.length > 3 && (
+                  {exportableReceipts.length > 3 && (
                     <p className="text-xs text-muted-foreground pt-1">
-                      ... und {receipts.length - 3} weitere
+                      ... und {exportableReceipts.length - 3} weitere
                     </p>
                   )}
                 </div>
