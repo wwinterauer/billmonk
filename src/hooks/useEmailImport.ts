@@ -57,8 +57,9 @@ export interface EmailAccount {
   subject_keywords: string[] | null;
   // OAuth fields
   oauth_provider: OAuthProvider | null;
-  oauth_access_token: string | null;
-  oauth_refresh_token: string | null;
+  // Never selected client-side (column-level SELECT revoked for security)
+  oauth_access_token?: string | null;
+  oauth_refresh_token?: string | null;
   oauth_token_expires_at: string | null;
   oauth_scope: string | null;
   // Timestamps
