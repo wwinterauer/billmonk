@@ -108,7 +108,7 @@ export const CloudStorageSettings = () => {
     try {
       const { data, error } = await supabase
         .from('cloud_connections')
-        .select('*')
+        .select('id, user_id, provider, folder_path, is_active, last_sync, created_at, display_name, oauth_token_expires_at, backup_enabled, backup_folder_id, backup_folder_path, backup_schedule_type, backup_weekday, backup_day_of_month, backup_time, backup_template_id, backup_include_files, backup_file_prefix, backup_status_filter, next_backup_at, last_backup_at, last_backup_count, last_backup_error, updated_at, backup_include_excel, backup_include_csv, backup_zip_pattern, backup_folder_structure, backup_include_invoices')
         .eq('user_id', user.id)
         .eq('provider', 'google_drive')
         .maybeSingle();

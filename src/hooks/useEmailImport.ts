@@ -166,7 +166,7 @@ export const useEmailImport = () => {
       
       const { data, error } = await supabase
         .from('email_accounts')
-        .select('*')
+        .select('id, user_id, email_address, display_name, imap_host, imap_port, imap_username, imap_use_ssl, inbox_folder, processed_folder, sync_interval, is_active, last_sync_at, last_sync_status, last_sync_error, total_imported, created_at, updated_at, provider, last_synced_uid, sender_filter, subject_keywords, last_sync_attempt, oauth_provider, oauth_token_expires_at, oauth_scope')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
