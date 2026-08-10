@@ -430,7 +430,7 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
           <div className="py-6 space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span>Verarbeite Beleg {currentItem} von {receipts.length}...</span>
+                <span>Verarbeite Beleg {currentItem} von {exportableReceipts.length}...</span>
                 <span className="font-medium">{progress}%</span>
               </div>
               <Progress value={progress} className="h-2" />
