@@ -2788,6 +2788,17 @@ const Expenses = () => {
                             onCheckedChange={handleSelectAll}
                           />
                         </TableHead>
+                        <TableHead
+                          className="text-right relative group px-2"
+                          style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}
+                        >
+                          <div
+                            onPointerDown={handleActionsResizeDown}
+                            className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary/40"
+                            title="Spaltenbreite anpassen"
+                          />
+                          Aktionen
+                        </TableHead>
                         {orderedVisibleColumns.map(key => {
                           const cfg = COLUMN_CONFIG.find(c => c.key === key)!;
                           const isSorted = cfg.sortField && sortField === cfg.sortField
@@ -2807,17 +2818,6 @@ const Expenses = () => {
                             />
                           );
                         })}
-                        <TableHead
-                          className="text-right relative group px-2"
-                          style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}
-                        >
-                          <div
-                            onPointerDown={handleActionsResizeDown}
-                            className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary/40"
-                            title="Spaltenbreite anpassen"
-                          />
-                          Aktionen
-                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2852,7 +2852,6 @@ const Expenses = () => {
                               />
                             </div>
                           </TableCell>
-                          {orderedVisibleColumns.map(key => renderCell(receipt, key))}
                           <TableCell className="text-right px-2" style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}>
                             <div className="flex items-center justify-end gap-0.5">
                               {/* Duplicate comparison button */}
@@ -2938,6 +2937,7 @@ const Expenses = () => {
                               </Button>
                             </div>
                           </TableCell>
+                          {orderedVisibleColumns.map(key => renderCell(receipt, key))}
                         </TableRow>
                         {isSplit && isExpanded && (
                           <TableRow key={receipt.id + '-split'} className="bg-muted/30 hover:bg-muted/30">
