@@ -878,6 +878,7 @@ const Reports = () => {
       Vorsteuer: cat.vat,
     }));
     const catSheet = XLSX.utils.json_to_sheet(catData);
+    [2, 3, 4].forEach(c => applyColumnFormat(catSheet, c, ACCOUNTING_FMT, 1));
     XLSX.utils.book_append_sheet(workbook, catSheet, 'Kategorien');
 
     // Tags sheet
