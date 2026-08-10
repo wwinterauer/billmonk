@@ -594,6 +594,17 @@ export function ExportFormatDialog({
       }
     }
 
+    // Apply the template's tag filter (include / exclude)
+    const tagFilter = selectedTemplate?.tag_filter;
+    if (isTagFilterActive(tagFilter)) {
+      sortedReceipts = sortedReceipts.filter(r =>
+        matchesTagFilter(
+          (((r as any).tags || []) as Array<{ id: string }>).map(t => t.id),
+          tagFilter,
+        ),
+      );
+    }
+
     // Expand split bookings into multiple rows
     if (expandSplitBookings && splitBookingEnabled && user) {
       const splitReceiptIds = sortedReceipts
