@@ -29,10 +29,11 @@ Damit sind Beträge am Dezimaltrenner ausgerichtet, Nullwerte erscheinen als „
 
 ## Technische Details
 
-1. Kleiner Helfer (z. B. in `src/lib/exportFilters.ts` oder neuer `src/lib/xlsxCells.ts`):
+1. Kleiner Helfer (neue `src/lib/xlsxCells.ts`):
    - `toExcelDate(value)` → `Date | ''`
-   - `applyDateFormat(worksheet, colIndex, rowIndices, 'DD.MM.YYYY')` setzt `cell.z` nach dem `aoa_to_sheet`/`json_to_sheet`-Aufruf.
-2. `ExportFormatDialog.tsx`: statt `${d}.${m}.${y}`-String das `Date` in die Zeile schreiben; nach `aoa_to_sheet` für alle Spalten mit `col.type === 'date'` das `z`-Format setzen; `XLSX.write(..., { bookType: 'xlsx', type: 'array', cellDates: true })`.
-3. `ExportDialog.tsx` (`exportAsExcel`): `Datum` als `Date`; nach `json_to_sheet` Spalte A formatieren; `XLSX.writeFile(wb, name, { cellDates: true })`.
-4. `Reports.tsx` (Blatt "Belege"): analog für die Spalte `Datum`.
-5. Prüfung: Export erzeugen und im entpackten XLSX kontrollieren, dass die Datumszellen numerisch sind und ein `numFmt` mit `DD.MM.YYYY` (kein `numFmtId="14"`) referenzieren.
+   - `DATE_FMT = 'DD.MM.YYYY'`, `ACCOUNTING_FMT = '_-* #,##0.00\\ "€"_-;\\-* #,##0.00\\ "€"_-;_-* "-"??\\ "€"_-;_-@_-'`
+   - `applyColumnFormat(worksheet, colIndex, rowRange, fmt)` setzt `cell.z` (und `cell.t = 'n'` für Zahlen) nach `aoa_to_sheet`/`json_to_sheet`.
+2. `ExportFormatDialog.tsx`: statt `${d}.${m}.${y}`-String das `Date` in die Zeile schreiben, Geldwerte als Zahl statt formatiertem String; nach `aoa_to_sheet` Spalten mit `col.type === 'date'` bzw. `'currency'` entsprechend formatieren; `XLSX.write(..., { bookType: 'xlsx', type: 'array', cellDates: true })`.
+3. `ExportDialog.tsx` (`exportAsExcel`): `Datum` als `Date`; Brutto/Netto/MwSt mit Buchhaltungsformat (MwSt-Satz bleibt Prozent-/Zahlformat); `XLSX.writeFile(wb, name, { cellDates: true })`.
+4. `Reports.tsx` (Blatt "Belege" und Summenzeilen): analog Datum + Geldspalten.
+5. Prüfung: Export erzeugen und im entpackten XLSX kontrollieren, dass Datums- und Geldzellen numerisch sind und die erwarteten `numFmt`-Einträge referenzieren (kein `numFmtId="14"`).
