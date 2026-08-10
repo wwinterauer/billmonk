@@ -778,9 +778,8 @@ export function ExportFormatDialog({
         if (col.type === 'currency' || col.type === 'number' || col.type === 'percent') {
           return Number(value) || 0;
         }
-        if (col.type === 'date' && value) {
-          const [y, m, d] = String(value).split('-');
-          return `${d}.${m}.${y}`;
+        if (col.type === 'date') {
+          return toExcelDate(value);
         }
         return value || '';
       });
