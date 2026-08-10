@@ -2084,6 +2084,9 @@ const Expenses = () => {
             options={[
               { value: 'all', label: 'Alle Kategorien' },
               { value: '__unassigned__', label: 'Nicht zugeordnet' },
+              ...(userCategories.some(c => c.name === NO_RECEIPT_CATEGORY)
+                ? []
+                : [{ value: NO_RECEIPT_CATEGORY, label: NO_RECEIPT_CATEGORY }]),
               ...userCategories.map(c => ({ value: c.name, label: c.name })),
             ]}
             placeholder="Kategorie"
