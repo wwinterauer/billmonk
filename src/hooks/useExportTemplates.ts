@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Json } from '@/integrations/supabase/types';
+import { parseTagFilter, EMPTY_TAG_FILTER, type TagFilter } from '@/lib/exportFilters';
 
 // Column configuration type
 export interface ExportColumn {
