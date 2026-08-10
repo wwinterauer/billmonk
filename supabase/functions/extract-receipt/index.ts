@@ -1415,6 +1415,22 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
           finalCategory = null;
         }
 
+        // Same strict validation for line-item categories (used when splitting a receipt):
+        // never let the AI invent category names that don't exist in the user's list.
+        const sanitizedLineItems = Array.isArray((rawData as any).line_items)
+          ? (rawData as any).line_items.map((item: any) => {
+              if (!item?.category) return item;
+              const match = userCategoryNames.find(
+                n => n.toLowerCase() === String(item.category).toLowerCase(),
+              );
+              if (!match) {
+                console.log(`[Category Validation] Dropping invented line-item category "${item.category}"`);
+                return { ...item, category: null };
+              }
+              return { ...item, category: match };
+            })
+          : null;
+
         // Auto-approve: mirror the client-side rule — vendor has auto_approve
         // enabled and the AI confidence reaches the vendor's threshold.
         let finalStatus: string = 'review';
