@@ -355,6 +355,9 @@ export function useExportTemplates() {
       if (updates.group_order) {
         updateData.group_order = updates.group_order as unknown as Json;
       }
+      if (updates.tag_filter) {
+        updateData.tag_filter = updates.tag_filter as unknown as Json;
+      }
 
       const { error } = await supabase
         .from('export_templates')
