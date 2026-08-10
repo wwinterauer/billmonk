@@ -28,6 +28,7 @@ export interface ExportPreviewConfig {
   includeTotals: boolean;
   dateFormat: string;
   numberFormat: string;
+  tagFilter?: TagFilter | null;
 }
 
 // Format currency based on locale
