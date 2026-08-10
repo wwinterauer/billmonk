@@ -251,7 +251,8 @@ export function useExportTemplates() {
         sort_direction: (t.sort_direction as 'asc' | 'desc') || 'asc',
         template_type: ((t as any).template_type as 'receipts' | 'invoices') || 'receipts',
         group_order: ((t as any).group_order as Record<string, string[]>) || {},
-      })) as ExportTemplate[];
+        tag_filter: parseTagFilter((t as any).tag_filter),
+      })) as unknown as ExportTemplate[];
 
       setTemplates(parsed);
     } catch (error) {
