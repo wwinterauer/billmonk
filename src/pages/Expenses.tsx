@@ -2852,7 +2852,6 @@ const Expenses = () => {
                               />
                             </div>
                           </TableCell>
-                          {orderedVisibleColumns.map(key => renderCell(receipt, key))}
                           <TableCell className="text-right px-2" style={{ width: actionsColWidth, minWidth: actionsColWidth, maxWidth: actionsColWidth }}>
                             <div className="flex items-center justify-end gap-0.5">
                               {/* Duplicate comparison button */}
@@ -2938,6 +2937,7 @@ const Expenses = () => {
                               </Button>
                             </div>
                           </TableCell>
+                          {orderedVisibleColumns.map(key => renderCell(receipt, key))}
                         </TableRow>
                         {isSplit && isExpanded && (
                           <TableRow key={receipt.id + '-split'} className="bg-muted/30 hover:bg-muted/30">
