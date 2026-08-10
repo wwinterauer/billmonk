@@ -1193,6 +1193,12 @@ export function ExportTemplateEditor({
                 </CardContent>
               </Card>
 
+              {/* Tag filter */}
+              <TagFilterCard
+                value={editingTemplate.tag_filter}
+                onChange={(tf) => setEditingTemplate({ ...editingTemplate, tag_filter: tf })}
+              />
+
               {/* Advanced options */}
               <Card>
                 <CardHeader
