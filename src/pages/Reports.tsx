@@ -920,11 +920,12 @@ const Reports = () => {
       Vorsteuer: v.vat,
     }));
     const vatSheet = XLSX.utils.json_to_sheet(vatSheetData);
+    [2, 3, 4].forEach(c => applyColumnFormat(vatSheet, c, ACCOUNTING_FMT, 1));
     XLSX.utils.book_append_sheet(workbook, vatSheet, 'MwSt');
 
     // All receipts sheet with tags
     const receiptsData = receipts.map((r) => ({
-      Datum: r.receipt_date,
+      Datum: toExcelDate(r.receipt_date),
       Lieferant: r.vendor_brand || r.vendor,
       Beschreibung: r.description,
       Kategorie: r.category,
@@ -935,11 +936,13 @@ const Reports = () => {
       Vorsteuer: r.vat_amount,
       'Rechnungsnr.': r.invoice_number,
     }));
-    const receiptsSheet = XLSX.utils.json_to_sheet(receiptsData);
+    const receiptsSheet = XLSX.utils.json_to_sheet(receiptsData, { cellDates: true });
+    applyColumnFormat(receiptsSheet, 0, DATE_FMT, 1);
+    [5, 6, 8].forEach(c => applyColumnFormat(receiptsSheet, c, ACCOUNTING_FMT, 1));
     XLSX.utils.book_append_sheet(workbook, receiptsSheet, 'Belege');
 
     const fileName = `bericht_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
+    XLSX.writeFile(workbook, fileName, { cellDates: true });
 
     toast({
       title: 'Excel exportiert',
