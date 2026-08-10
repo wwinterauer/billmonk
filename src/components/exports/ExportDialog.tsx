@@ -538,15 +538,26 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
                 </label>
               </div>
 
-              {skippedCount > 0 && (
+              {(missingFileCount > 0 || excludedNoReceiptCount > 0) && (
                 <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                   <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-yellow-700">
-                    {skippedCount === 1
-                      ? '1 Eintrag ohne Dokument wird übersprungen'
-                      : `${skippedCount} Einträge ohne Dokument werden übersprungen`}
-                    {' '}(z.B. manuelle Ausgaben, Schlagwort-Buchungen aus dem Kontoabgleich oder als „Keine Rechnung" markierte Einträge).
-                  </p>
+                  <div className="text-sm text-yellow-700 space-y-1">
+                    {missingFileCount > 0 && (
+                      <p>
+                        {missingFileCount === 1
+                          ? '1 Eintrag ohne hinterlegtes Dokument kann nicht exportiert werden'
+                          : `${missingFileCount} Einträge ohne hinterlegtes Dokument können nicht exportiert werden`}
+                        {' '}(z.B. manuelle Ausgaben, Schlagwort-Buchungen aus dem Kontoabgleich oder „Keine Rechnung"-Einträge ohne Datei). Diese lassen sich auch durch Abwählen der Option oben nicht in das ZIP aufnehmen.
+                      </p>
+                    )}
+                    {excludedNoReceiptCount > 0 && (
+                      <p>
+                        {excludedNoReceiptCount === 1
+                          ? '1 „Keine Rechnung"-Eintrag mit Dokument wird durch die Option oben ausgeschlossen'
+                          : `${excludedNoReceiptCount} „Keine Rechnung"-Einträge mit Dokument werden durch die Option oben ausgeschlossen`}.
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
