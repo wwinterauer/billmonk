@@ -426,6 +426,7 @@ export function useExportTemplates() {
     group_by: null,
     group_subtotals: true,
     group_order: {},
+    tag_filter: { ...EMPTY_TAG_FILTER },
     include_header: true,
     include_totals: true,
     date_format: 'DD.MM.YYYY',
