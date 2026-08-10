@@ -67,16 +67,8 @@ interface BankKeyword {
   default_tag_ids: string[] | null;
 }
 
-const CATEGORIES = [
-  'Bankgebühren',
-  'Steuern & Abgaben',
-  'Versicherungen',
-  'Sozialversicherung',
-  'Betriebskosten',
-  'Miete & Pacht',
-  'Telefon & Internet',
-  'Sonstige Ausgaben',
-];
+
+
 
 const NONE_VALUE = '__none__';
 
