@@ -83,7 +83,7 @@ const NONE_VALUE = '__none__';
 export function BankImportKeywords() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { taxCategories } = useCategories();
+  const { taxCategories, userCategories } = useCategories();
   const { activeTags } = useTags();
 
   const [showDialog, setShowDialog] = useState(false);
@@ -490,7 +490,7 @@ export function BankImportKeywords() {
                 <SearchableSelect
                   value={formData.category}
                   onChange={(value) => setFormData({ ...formData, category: value })}
-                  options={CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
+                  options={userCategories.map((c) => ({ value: c.name, label: c.name }))}
                   placeholder="Kategorie wählen..."
                   searchPlaceholder="Kategorie suchen..."
                   allowClear
