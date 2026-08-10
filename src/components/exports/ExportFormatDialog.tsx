@@ -819,13 +819,19 @@ export function ExportFormatDialog({
       rows.push(totalRow);
     }
 
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    const worksheet = XLSX.utils.aoa_to_sheet(rows, { cellDates: true });
     worksheet['!cols'] = columns.map(col => ({ wch: col.width ? Math.round(col.width / 7) : 15 }));
+
+    // Explizite Zahlenformate: Datum gebietsschema-unabhängig, Geld als "Buchhaltung"
+    columns.forEach((col, i) => {
+      if (col.type === 'date') applyColumnFormat(worksheet, i, DATE_FMT, includeHeader ? 1 : 0);
+      if (col.type === 'currency') applyColumnFormat(worksheet, i, ACCOUNTING_FMT, includeHeader ? 1 : 0);
+    });
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Ausgaben');
 
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', cellDates: true });
     return new Blob([excelBuffer], { 
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
     });
