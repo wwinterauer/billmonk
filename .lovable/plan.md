@@ -21,7 +21,11 @@ Datumswerte als echte Excel-Datumszellen schreiben und ein explizites, gebietssc
 - Ungültige/leere Datumswerte bleiben leer (kein 30.12.1899).
 - Betrifft alle drei Export-Wege; CSV-, DATEV- und BMD-Exporte bleiben unverändert (dort sind Textformate korrekt und vorgeschrieben).
 
-Optional gleiches Vorgehen für Geldspalten: Zahlformat `#,##0.00` statt Standardformat – sag Bescheid, ob das mit rein soll.
+Zusätzlich für alle Geldspalten (Brutto, Netto, MwSt, Summen/Zwischensummen): Zahlen als echte Zahlen schreiben und das Buchhaltungsformat mit 2 Dezimalstellen und €-Symbol setzen:
+
+`_-* #,##0.00\ "€"_-;\-* #,##0.00\ "€"_-;_-* "-"??\ "€"_-;_-@_-`
+
+Damit sind Beträge am Dezimaltrenner ausgerichtet, Nullwerte erscheinen als „-", Negativwerte mit Minus – wie in Excels Formatvorlage „Buchhaltung".
 
 ## Technische Details
 
