@@ -897,6 +897,7 @@ const Reports = () => {
       });
     }
     const tagsSheet = XLSX.utils.json_to_sheet(tagsSheetData);
+    [2, 3].forEach(c => applyColumnFormat(tagsSheet, c, ACCOUNTING_FMT, 1));
     XLSX.utils.book_append_sheet(workbook, tagsSheet, 'Tags');
 
     // Vendors sheet
