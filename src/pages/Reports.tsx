@@ -908,6 +908,7 @@ const Reports = () => {
       Vorsteuer: v.vat,
     }));
     const vendorSheet = XLSX.utils.json_to_sheet(vendorSheetData);
+    [2, 3].forEach(c => applyColumnFormat(vendorSheet, c, ACCOUNTING_FMT, 1));
     XLSX.utils.book_append_sheet(workbook, vendorSheet, 'Lieferanten');
 
     // VAT sheet
