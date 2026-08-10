@@ -265,7 +265,7 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
 
   // Generate preview examples
   const previewExamples = useMemo(() => {
-    return receipts.slice(0, 3).map((receipt, index) => ({
+    return exportableReceipts.slice(0, 3).map((receipt, index) => ({
       original: receipt.file_name || 'unbekannt',
       newName: generateFileName(receipt, index),
     }));
