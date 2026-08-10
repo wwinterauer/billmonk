@@ -54,6 +54,7 @@ import {
   DEFAULT_COLUMNS,
   sortGroupKeys,
 } from '@/hooks/useExportTemplates';
+import { matchesTagFilter, isTagFilterActive } from '@/lib/exportFilters';
 
 export type ExportFormat = 'csv' | 'excel' | 'pdf' | 'zip';
 
