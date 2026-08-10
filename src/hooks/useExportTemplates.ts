@@ -303,6 +303,7 @@ export function useExportTemplates() {
           date_format: template.date_format,
           number_format: template.number_format,
           group_order: (template.group_order || {}) as unknown as Json,
+          tag_filter: (template.tag_filter || EMPTY_TAG_FILTER) as unknown as Json,
         } as any)
         .select()
         .single();
@@ -313,7 +314,8 @@ export function useExportTemplates() {
         ...data,
         columns: data.columns as unknown as ExportColumn[],
         sort_direction: data.sort_direction as 'asc' | 'desc',
-      } as ExportTemplate;
+        tag_filter: parseTagFilter((data as any).tag_filter),
+      } as unknown as ExportTemplate;
 
       setTemplates(prev => [...prev, newTemplate]);
       toast({ title: 'Vorlage erstellt' });
