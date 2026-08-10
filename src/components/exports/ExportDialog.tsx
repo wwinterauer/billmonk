@@ -93,7 +93,10 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
     if (excludeNoReceipt && (r.is_no_receipt_entry || r.category === 'Keine Rechnung')) return false;
     return true;
   });
-  const skippedCount = receipts.length - exportableReceipts.length;
+  const missingFileCount = receipts.filter(r => !r.file_url).length;
+  const excludedNoReceiptCount = excludeNoReceipt
+    ? receipts.filter(r => r.file_url && (r.is_no_receipt_entry || r.category === 'Keine Rechnung')).length
+    : 0;
 
   // Load naming settings from database
   useEffect(() => {
