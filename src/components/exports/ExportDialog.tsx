@@ -93,7 +93,10 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
     if (excludeNoReceipt && (r.is_no_receipt_entry || r.category === 'Keine Rechnung')) return false;
     return true;
   });
-  const skippedCount = receipts.length - exportableReceipts.length;
+  const missingFileCount = receipts.filter(r => !r.file_url).length;
+  const excludedNoReceiptCount = excludeNoReceipt
+    ? receipts.filter(r => r.file_url && (r.is_no_receipt_entry || r.category === 'Keine Rechnung')).length
+    : 0;
 
   // Load naming settings from database
   useEffect(() => {
@@ -262,11 +265,12 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
 
   // Generate preview examples
   const previewExamples = useMemo(() => {
-    return receipts.slice(0, 3).map((receipt, index) => ({
+    return exportableReceipts.slice(0, 3).map((receipt, index) => ({
       original: receipt.file_name || 'unbekannt',
       newName: generateFileName(receipt, index),
     }));
-  }, [receipts, settings, loadingSettings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receipts, excludeNoReceipt, settings, loadingSettings]);
 
   // Cancel export
   const handleCancel = () => {
@@ -427,7 +431,7 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
           <div className="py-6 space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span>Verarbeite Beleg {currentItem} von {receipts.length}...</span>
+                <span>Verarbeite Beleg {currentItem} von {exportableReceipts.length}...</span>
                 <span className="font-medium">{progress}%</span>
               </div>
               <Progress value={progress} className="h-2" />
@@ -464,9 +468,9 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
                       </span>
                     </div>
                   ))}
-                  {receipts.length > 3 && (
+                  {exportableReceipts.length > 3 && (
                     <p className="text-xs text-muted-foreground pt-1">
-                      ... und {receipts.length - 3} weitere
+                      ... und {exportableReceipts.length - 3} weitere
                     </p>
                   )}
                 </div>
@@ -535,15 +539,26 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
                 </label>
               </div>
 
-              {skippedCount > 0 && (
+              {(missingFileCount > 0 || excludedNoReceiptCount > 0) && (
                 <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                   <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-yellow-700">
-                    {skippedCount === 1
-                      ? '1 Eintrag ohne Dokument wird übersprungen'
-                      : `${skippedCount} Einträge ohne Dokument werden übersprungen`}
-                    {' '}(z.B. manuelle Ausgaben, Schlagwort-Buchungen aus dem Kontoabgleich oder als „Keine Rechnung" markierte Einträge).
-                  </p>
+                  <div className="text-sm text-yellow-700 space-y-1">
+                    {missingFileCount > 0 && (
+                      <p>
+                        {missingFileCount === 1
+                          ? '1 Eintrag ohne hinterlegtes Dokument kann nicht exportiert werden'
+                          : `${missingFileCount} Einträge ohne hinterlegtes Dokument können nicht exportiert werden`}
+                        {' '}(z.B. manuelle Ausgaben, Schlagwort-Buchungen aus dem Kontoabgleich oder „Keine Rechnung"-Einträge ohne Datei). Diese lassen sich auch durch Abwählen der Option oben nicht in das ZIP aufnehmen.
+                      </p>
+                    )}
+                    {excludedNoReceiptCount > 0 && (
+                      <p>
+                        {excludedNoReceiptCount === 1
+                          ? '1 „Keine Rechnung"-Eintrag mit Dokument wird durch die Option oben ausgeschlossen'
+                          : `${excludedNoReceiptCount} „Keine Rechnung"-Einträge mit Dokument werden durch die Option oben ausgeschlossen`}.
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
