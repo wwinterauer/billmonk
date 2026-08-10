@@ -46,6 +46,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { toExcelDate, applyColumnFormat, DATE_FMT, ACCOUNTING_FMT } from '@/lib/xlsxCells';
 import { saveAs } from 'file-saver';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -865,6 +866,7 @@ const Reports = () => {
       ['Anzahl Belege', stats.count],
     ];
     const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    applyColumnFormat(summarySheet, 1, ACCOUNTING_FMT, 3, 5);
     XLSX.utils.book_append_sheet(workbook, summarySheet, 'Zusammenfassung');
 
     // Categories sheet
@@ -876,6 +878,7 @@ const Reports = () => {
       Vorsteuer: cat.vat,
     }));
     const catSheet = XLSX.utils.json_to_sheet(catData);
+    [2, 3, 4].forEach(c => applyColumnFormat(catSheet, c, ACCOUNTING_FMT, 1));
     XLSX.utils.book_append_sheet(workbook, catSheet, 'Kategorien');
 
     // Tags sheet
@@ -894,6 +897,7 @@ const Reports = () => {
       });
     }
     const tagsSheet = XLSX.utils.json_to_sheet(tagsSheetData);
+    [2, 3].forEach(c => applyColumnFormat(tagsSheet, c, ACCOUNTING_FMT, 1));
     XLSX.utils.book_append_sheet(workbook, tagsSheet, 'Tags');
 
     // Vendors sheet
@@ -904,6 +908,7 @@ const Reports = () => {
       Vorsteuer: v.vat,
     }));
     const vendorSheet = XLSX.utils.json_to_sheet(vendorSheetData);
+    [2, 3].forEach(c => applyColumnFormat(vendorSheet, c, ACCOUNTING_FMT, 1));
     XLSX.utils.book_append_sheet(workbook, vendorSheet, 'Lieferanten');
 
     // VAT sheet
@@ -915,11 +920,12 @@ const Reports = () => {
       Vorsteuer: v.vat,
     }));
     const vatSheet = XLSX.utils.json_to_sheet(vatSheetData);
+    [2, 3, 4].forEach(c => applyColumnFormat(vatSheet, c, ACCOUNTING_FMT, 1));
     XLSX.utils.book_append_sheet(workbook, vatSheet, 'MwSt');
 
     // All receipts sheet with tags
     const receiptsData = receipts.map((r) => ({
-      Datum: r.receipt_date,
+      Datum: toExcelDate(r.receipt_date),
       Lieferant: r.vendor_brand || r.vendor,
       Beschreibung: r.description,
       Kategorie: r.category,
@@ -930,7 +936,9 @@ const Reports = () => {
       Vorsteuer: r.vat_amount,
       'Rechnungsnr.': r.invoice_number,
     }));
-    const receiptsSheet = XLSX.utils.json_to_sheet(receiptsData);
+    const receiptsSheet = XLSX.utils.json_to_sheet(receiptsData, { cellDates: true });
+    applyColumnFormat(receiptsSheet, 0, DATE_FMT, 1);
+    [5, 6, 8].forEach(c => applyColumnFormat(receiptsSheet, c, ACCOUNTING_FMT, 1));
     XLSX.utils.book_append_sheet(workbook, receiptsSheet, 'Belege');
 
     const fileName = `bericht_${format(dateRange.from, 'yyyy-MM-dd')}_${format(dateRange.to, 'yyyy-MM-dd')}.xlsx`;

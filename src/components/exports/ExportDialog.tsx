@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
+import { toExcelDate, applyColumnFormat, DATE_FMT, ACCOUNTING_FMT } from '@/lib/xlsxCells';
 import { format } from 'date-fns';
 import {
   Dialog,
@@ -593,7 +594,7 @@ export async function exportAsCSV(receipts: Receipt[]) {
 // Export Excel function
 export async function exportAsExcel(receipts: Receipt[]) {
   const rows = receipts.map(r => ({
-    'Datum': r.receipt_date || '',
+    'Datum': toExcelDate(r.receipt_date),
     'Lieferant': r.vendor || '',
     'Rechnungsnummer': r.invoice_number || '',
     'Beschreibung': r.description || '',
@@ -607,9 +608,13 @@ export async function exportAsExcel(receipts: Receipt[]) {
     'Dateiname': r.file_name || '',
   }));
 
-  const ws = XLSX.utils.json_to_sheet(rows);
+  const ws = XLSX.utils.json_to_sheet(rows, { cellDates: true });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Belege');
+
+  // Datum als echtes Datum, Geldspalten im Buchhaltungsformat (ab Zeile 2, Header überspringen)
+  applyColumnFormat(ws, 0, DATE_FMT, 1);
+  [5, 6, 7].forEach(col => applyColumnFormat(ws, col, ACCOUNTING_FMT, 1));
 
   // Adjust column widths
   const colWidths = [
@@ -618,9 +623,9 @@ export async function exportAsExcel(receipts: Receipt[]) {
     { wch: 18 }, // Rechnungsnummer
     { wch: 35 }, // Beschreibung
     { wch: 15 }, // Kategorie
-    { wch: 12 }, // Brutto
-    { wch: 12 }, // Netto
-    { wch: 10 }, // MwSt
+    { wch: 14 }, // Brutto
+    { wch: 14 }, // Netto
+    { wch: 14 }, // MwSt
     { wch: 10 }, // MwSt-Satz
     { wch: 15 }, // Zahlungsart
     { wch: 12 }, // Status

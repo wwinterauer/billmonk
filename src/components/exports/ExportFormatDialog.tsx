@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
+import { toExcelDate, applyColumnFormat, DATE_FMT, ACCOUNTING_FMT } from '@/lib/xlsxCells';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -778,9 +779,8 @@ export function ExportFormatDialog({
         if (col.type === 'currency' || col.type === 'number' || col.type === 'percent') {
           return Number(value) || 0;
         }
-        if (col.type === 'date' && value) {
-          const [y, m, d] = String(value).split('-');
-          return `${d}.${m}.${y}`;
+        if (col.type === 'date') {
+          return toExcelDate(value);
         }
         return value || '';
       });
@@ -819,8 +819,14 @@ export function ExportFormatDialog({
       rows.push(totalRow);
     }
 
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    const worksheet = XLSX.utils.aoa_to_sheet(rows, { cellDates: true });
     worksheet['!cols'] = columns.map(col => ({ wch: col.width ? Math.round(col.width / 7) : 15 }));
+
+    // Explizite Zahlenformate: Datum gebietsschema-unabhängig, Geld als "Buchhaltung"
+    columns.forEach((col, i) => {
+      if (col.type === 'date') applyColumnFormat(worksheet, i, DATE_FMT, includeHeader ? 1 : 0);
+      if (col.type === 'currency') applyColumnFormat(worksheet, i, ACCOUNTING_FMT, includeHeader ? 1 : 0);
+    });
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Ausgaben');
