@@ -583,12 +583,9 @@ export function ReceiptDetailPanel({
   // Download/Open handlers using signedUrl
   const handleDownload = () => {
     if (signedUrl) {
-      const link = document.createElement('a');
-      link.href = signedUrl;
-      link.download = displayFilename; // Use custom or generated filename
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      import('@/lib/downloadFile').then(({ downloadFromUrl }) =>
+        downloadFromUrl(signedUrl, displayFilename)
+      );
     }
   };
 
