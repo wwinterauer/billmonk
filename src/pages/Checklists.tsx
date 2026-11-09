@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { PageMeta } from '@/components/PageMeta';
+import { byName } from '@/lib/checklistSort';
 import {
   Plus,
   ClipboardList,
