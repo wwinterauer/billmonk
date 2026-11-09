@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { PageMeta } from '@/components/PageMeta';
+import { byName } from '@/lib/checklistSort';
 import {
   Plus,
   ClipboardList,
@@ -126,13 +127,19 @@ export default function Checklists() {
         .eq('user_id', user.id)
         .order('sort_order', { ascending: true });
 
-      return (lists || []).map(list => ({
-        ...list,
-        items: (items || []).filter(item => item.checklist_id === list.id).map(item => ({
-          ...item,
-          links: (Array.isArray(item.links) ? item.links : []) as unknown as ChecklistLink[],
-        })),
-      })) as Checklist[];
+      // Automatisch alphabetisch sortieren (Checklisten und Positionen)
+      const sortedItems = (items || []).slice().sort(byName);
+
+      return (lists || [])
+        .slice()
+        .sort(byName)
+        .map(list => ({
+          ...list,
+          items: sortedItems.filter(item => item.checklist_id === list.id).map(item => ({
+            ...item,
+            links: (Array.isArray(item.links) ? item.links : []) as unknown as ChecklistLink[],
+          })),
+        })) as Checklist[];
     },
   });
 
