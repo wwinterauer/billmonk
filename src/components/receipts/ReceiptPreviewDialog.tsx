@@ -143,12 +143,9 @@ export function ReceiptPreviewDialog({
 
   const handleDownload = () => {
     if (signedUrl) {
-      const link = document.createElement('a');
-      link.href = signedUrl;
-      link.download = receipt?.file_name || 'download';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      import('@/lib/downloadFile').then(({ downloadFromUrl }) =>
+        downloadFromUrl(signedUrl, receipt?.file_name || 'download')
+      );
     }
   };
 
