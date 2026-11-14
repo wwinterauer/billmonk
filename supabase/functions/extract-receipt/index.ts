@@ -398,7 +398,7 @@ async function checkForMultipleInvoices(
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-3.8-flash",
         messages: [
           { role: "system", content: "Du analysierst PDFs auf mehrere Rechnungen. Antworte nur mit JSON." },
           {
@@ -409,7 +409,6 @@ async function checkForMultipleInvoices(
             ],
           },
         ],
-        max_tokens: 8192,
         temperature: 0.1,
       }),
     });
@@ -719,7 +718,7 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-3.8-flash",
         messages: [
           { role: "system", content: systemPrompt },
           {
@@ -730,7 +729,6 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
             ],
           },
         ],
-        max_tokens: 8192,
         temperature: 0.1,
         response_format: {
           type: "json_schema",
