@@ -1,5 +1,5 @@
 import { applySkonto, amountFromPercent, percentFromAmount } from '@/lib/skonto';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ProblemReceiptsPanel } from '@/components/receipts/ProblemReceiptsPanel';
 import { NonReceiptPanel } from '@/components/receipts/NonReceiptPanel';
@@ -309,6 +309,10 @@ const Review = () => {
   } = useReceiptRetry();
 
   const currentReceipt = filteredReceipts[currentIndex] || null;
+  // Id of the receipt whose data is currently in the form. Saving is only
+  // allowed when it matches the receipt shown, so a list refresh that shifts
+  // the index can never write one receipt's header data onto another.
+  const formReceiptIdRef = useRef<string | null>(null);
 
 
   // Persist current receipt id across navigation
@@ -341,6 +345,14 @@ const Review = () => {
     }
   }, [unlinkedOnly, unlinkedVendorCount]);
 
+
+  // Re-sync the form whenever the shown receipt changes underneath it
+  useEffect(() => {
+    if (currentReceipt && formReceiptIdRef.current && formReceiptIdRef.current !== currentReceipt.id) {
+      populateForm(currentReceipt);
+      loadImage(currentReceipt);
+    }
+  }, [currentReceipt?.id]);
 
   // Keep currentIndex valid when filtered list changes
   useEffect(() => {
@@ -418,6 +430,7 @@ const Review = () => {
 
   // Populate form with receipt data
   const populateForm = (receipt: Receipt) => {
+    formReceiptIdRef.current = receipt.id;
     const receiptData = receipt as unknown as Record<string, unknown>;
     
     // Calculate expected net/vat to detect manual overrides from DB
@@ -620,6 +633,16 @@ const Review = () => {
   // Save receipt
   const saveReceipt = async (newStatus?: string) => {
     if (!currentReceipt) return;
+    if (formReceiptIdRef.current !== currentReceipt.id) {
+      populateForm(currentReceipt);
+      loadImage(currentReceipt);
+      toast({
+        variant: 'destructive',
+        title: 'Nicht gespeichert',
+        description: 'Die Liste hat sich geändert. Bitte prüfe die Daten dieses Belegs und speichere erneut.',
+      });
+      return;
+    }
     
     setSaving(true);
     try {
