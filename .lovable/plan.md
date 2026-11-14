@@ -35,6 +35,13 @@ Daher der Vorschlag:
 - Kunden- und Rechnungs-Werkzeuge werden entfernt.
 - Behalten: Belege auflisten, Lieferanten, Ausgabenübersicht.
 - Neu: Beleg im Detail lesen, Belege nach Lieferant/Betrag/Zeitraum suchen, Kontobewegungen und offene Abgleiche auflisten.
+- Neu: Review über den Assistenten:
+  - „Offene Review-Belege holen“: liefert pro Beleg die erkannten Daten (Lieferant, Datum, Brutto/Netto/USt, Positionen, Kategorie) plus das Original-PDF bzw. Bild.
+  - Der Assistent liest das PDF selbst und vergleicht es mit den erkannten Daten.
+  - „Beleg korrigieren“: Felder ändern; Netto/USt werden wie in der App aus den Positionen neu berechnet.
+  - „Beleg freigeben“: setzt den Beleg auf erledigt, gleiche Regeln wie der Freigeben-Knopf.
+  - Freigeben nur auf deine Anweisung im Chat; korrigierte Felder fließen ins Lernen der Lieferanten ein wie bisher.
+  - Grenze: große PDFs (viele Seiten) werden auf die ersten Seiten begrenzt, damit die Antwort nicht abbricht.
 - Claude unterstützt das direkt. Bei Grok ist nicht sicher, ob es MCP mit Anmeldung unterstützt; das kann ich nicht garantieren.
 - Damit der Zugang funktioniert, muss die App einmal veröffentlicht werden. Das macht sie nicht für andere nutzbar, weil Registrierung entfällt.
 
@@ -46,5 +53,5 @@ Daher der Vorschlag:
 - Seiten-/Komponentendateien der entfernten Module löschen; Datenbanktabellen, Daten und Speicher bleiben unverändert.
 - Trigger `on_profile_created_send_welcome` deaktivieren; Signups in der Auth-Konfiguration abschalten.
 - Stripe-/Abo-Functions (check-subscription, checkout, webhook) entfernen bzw. nicht mehr aufrufen; Secrets bleiben vorerst bestehen.
-- MCP: `list-customers.ts`, `list-invoices.ts` entfernen, neue Lese-Tools ergänzen, Manifest neu erzeugen.
+- MCP: `list-customers.ts`, `list-invoices.ts` entfernen, neue Lese-Tools sowie review-Tools (get_review_queue mit Datei als eingebettete Ressource aus dem receipts-Bucket über den Nutzer-Client, update_receipt, approve_receipt mit derselben Logik wie Review.tsx) ergänzen, Manifest neu erzeugen.
 - Vorhandene Tests anpassen, `AGENTS.md` und Projektgedächtnis (private Nutzung, keine Abos) aktualisieren.
