@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseForUser } from "../supabase";
 import { fail, ok } from "./_shared";
 import { ReceiptRecord, withReceiptTagNames } from "./_tags";
+import { withSplitInfo } from "./_splits";
 
 const RECEIPT_LIST_FIELDS =
   "id, receipt_date, vendor, vendor_brand, description, amount_gross, amount_net, vat_amount, vat_rate, currency, category, tax_type, status, invoice_number";
@@ -55,10 +56,12 @@ export default defineTool({
     if (error) return fail(error.message);
     const tagged = await withReceiptTagNames(sb, (data ?? []) as ReceiptRecord[]);
     if (tagged.error) return fail(tagged.error);
+    const split = await withSplitInfo(sb, tagged.receipts);
+    if (split.error) return fail(split.error);
 
-    return ok(JSON.stringify(tagged.receipts, null, 2), {
-      receipts: tagged.receipts,
-      count: tagged.receipts.length,
+    return ok(JSON.stringify(split.receipts, null, 2), {
+      receipts: split.receipts,
+      count: split.receipts.length,
     });
   },
 });

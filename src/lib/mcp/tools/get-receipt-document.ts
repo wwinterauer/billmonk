@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseForUser } from "../supabase";
 import { RECEIPT_FIELDS, fail, mimeFor, toBase64 } from "./_shared";
 import { ReceiptRecord, withReceiptTagNames } from "./_tags";
+import { withSplitInfo } from "./_splits";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 
@@ -22,7 +23,9 @@ export default defineTool({
     const { file_url, ...fields } = r as Record<string, unknown> & { file_url: string | null };
     const tagged = await withReceiptTagNames(sb, [fields as ReceiptRecord]);
     if (tagged.error) return fail(tagged.error);
-    const receipt = tagged.receipts[0];
+    const split = await withSplitInfo(sb, tagged.receipts);
+    if (split.error) return fail(split.error);
+    const receipt = split.receipts[0];
     const text = { type: "text" as const, text: JSON.stringify(receipt, null, 2) };
     if (!file_url) return { content: [text, { type: "text" as const, text: "No original file stored." }] };
 

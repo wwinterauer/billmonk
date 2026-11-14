@@ -152,6 +152,37 @@ function flattenTagCounts(rows) {
   }));
 }
 
+// src/lib/mcp/tools/_splits.ts
+var SPLIT_PART_FIELDS = "id, receipt_id, sort_order, amount_gross, amount_net, vat_rate, vat_amount, category, tax_type, description, is_private";
+async function withSplitInfo(sb, receipts) {
+  if (receipts.length === 0) return { receipts: [], error: null };
+  const ids = receipts.map((r) => r.id);
+  const { data: meta, error: e1 } = await sb.from("receipts").select("id, is_split_booking, split_from_receipt_id").in("id", ids);
+  if (e1) return { receipts: null, error: e1.message };
+  const { data: parts, error: e2 } = await sb.from("receipt_split_lines").select(SPLIT_PART_FIELDS).in("receipt_id", ids).order("sort_order");
+  if (e2) return { receipts: null, error: e2.message };
+  const metaById = new Map((meta ?? []).map((m) => [m.id, m]));
+  const partsBy = /* @__PURE__ */ new Map();
+  for (const p of parts ?? []) {
+    const list = partsBy.get(p.receipt_id) ?? [];
+    list.push(p);
+    partsBy.set(p.receipt_id, list);
+  }
+  return {
+    receipts: receipts.map((r) => {
+      const m = metaById.get(r.id);
+      const isSplit = !!m?.is_split_booking;
+      return {
+        ...r,
+        is_split_booking: isSplit,
+        split_parts: isSplit ? (partsBy.get(r.id) ?? []).map(({ receipt_id: _r, ...p }) => ({ ...p, tags: [] })) : [],
+        split_from_receipt_id: m?.split_from_receipt_id ?? null
+      };
+    }),
+    error: null
+  };
+}
+
 // src/lib/mcp/tools/list-receipts.ts
 var RECEIPT_LIST_FIELDS = "id, receipt_date, vendor, vendor_brand, description, amount_gross, amount_net, vat_amount, vat_rate, currency, category, tax_type, status, invoice_number";
 var list_receipts_default = defineTool({
@@ -191,9 +222,11 @@ var list_receipts_default = defineTool({
     if (error) return fail(error.message);
     const tagged = await withReceiptTagNames(sb, data ?? []);
     if (tagged.error) return fail(tagged.error);
-    return ok(JSON.stringify(tagged.receipts, null, 2), {
-      receipts: tagged.receipts,
-      count: tagged.receipts.length
+    const split = await withSplitInfo(sb, tagged.receipts);
+    if (split.error) return fail(split.error);
+    return ok(JSON.stringify(split.receipts, null, 2), {
+      receipts: split.receipts,
+      count: split.receipts.length
     });
   }
 });
@@ -304,9 +337,11 @@ var get_review_queue_default = defineTool4({
     if (error) return fail(error.message);
     const tagged = await withReceiptTagNames(sb, data ?? []);
     if (tagged.error) return fail(tagged.error);
-    return ok(JSON.stringify({ total_in_review: count ?? 0, receipts: tagged.receipts }, null, 2), {
+    const split = await withSplitInfo(sb, tagged.receipts);
+    if (split.error) return fail(split.error);
+    return ok(JSON.stringify({ total_in_review: count ?? 0, receipts: split.receipts }, null, 2), {
       total_in_review: count ?? 0,
-      receipts: tagged.receipts
+      receipts: split.receipts
     });
   }
 });
@@ -330,7 +365,9 @@ var get_receipt_document_default = defineTool5({
     const { file_url, ...fields } = r;
     const tagged = await withReceiptTagNames(sb, [fields]);
     if (tagged.error) return fail(tagged.error);
-    const receipt = tagged.receipts[0];
+    const split = await withSplitInfo(sb, tagged.receipts);
+    if (split.error) return fail(split.error);
+    const receipt = split.receipts[0];
     const text = { type: "text", text: JSON.stringify(receipt, null, 2) };
     if (!file_url) return { content: [text, { type: "text", text: "No original file stored." }] };
     const { data: blob, error: dlErr } = await sb.storage.from("receipts").download(file_url);

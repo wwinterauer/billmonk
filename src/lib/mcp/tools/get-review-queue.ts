@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseForUser } from "../supabase";
 import { RECEIPT_FIELDS, fail, ok } from "./_shared";
 import { ReceiptRecord, withReceiptTagNames } from "./_tags";
+import { withSplitInfo } from "./_splits";
 
 export default defineTool({
   name: "get_review_queue",
@@ -28,9 +29,11 @@ export default defineTool({
     if (error) return fail(error.message);
     const tagged = await withReceiptTagNames(sb, (data ?? []) as ReceiptRecord[]);
     if (tagged.error) return fail(tagged.error);
-    return ok(JSON.stringify({ total_in_review: count ?? 0, receipts: tagged.receipts }, null, 2), {
+    const split = await withSplitInfo(sb, tagged.receipts);
+    if (split.error) return fail(split.error);
+    return ok(JSON.stringify({ total_in_review: count ?? 0, receipts: split.receipts }, null, 2), {
       total_in_review: count ?? 0,
-      receipts: tagged.receipts,
+      receipts: split.receipts,
     });
   },
 });
