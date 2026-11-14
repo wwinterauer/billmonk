@@ -11,6 +11,13 @@ function getSessionId(): string {
   return id;
 }
 
+async function track(record: any) {
+  const { data } = await supabase.auth.getSession();
+  const uid = data.session?.user?.id;
+  if (!uid) return;
+  await supabase.from('page_views').insert({ ...record, user_id: uid });
+}
+
 export function usePageTracking() {
   const location = useLocation();
   const lastPath = useRef('');
@@ -34,7 +41,7 @@ export function usePageTracking() {
     const cachedCountry = sessionStorage.getItem('pv_country');
     if (cachedCountry) {
       record.country = cachedCountry;
-      supabase.from('page_views').insert(record).then();
+      void track(record);
     } else {
       fetch('https://ip-api.com/json/?fields=countryCode')
         .then(r => r.json())
@@ -46,7 +53,7 @@ export function usePageTracking() {
         })
         .catch(() => {})
         .finally(() => {
-          supabase.from('page_views').insert(record).then();
+          void track(record);
         });
     }
   }, [location.pathname]);
