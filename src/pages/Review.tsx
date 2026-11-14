@@ -2178,7 +2178,7 @@ const Review = () => {
                     {/* Skonto (manual) */}
                     {(() => {
                       const g = parseFloat(formData.amount_gross) || 0;
-                      const eff = applySkonto({ amount_gross: g, amount_net: formData.amount_net_override ? parseFloat(formData.amount_net_override) : calculatedAmounts.net, vat_amount: formData.vat_amount_override ? parseFloat(formData.vat_amount_override) : calculatedAmounts.vat, skonto_amount: formData.skonto_amount !== '' ? parseFloat(formData.skonto_amount) : null });
+                      const eff = applySkonto({ amount_gross: g, amount_net: formData.amount_net_override ? parseFloat(formData.amount_net_override) : calculations.net, vat_amount: formData.vat_amount_override ? parseFloat(formData.vat_amount_override) : calculations.vat, skonto_amount: formData.skonto_amount !== '' ? parseFloat(formData.skonto_amount) : null });
                       return (
                         <div className="space-y-2 rounded-md border border-border p-3">
                           <div className="grid grid-cols-2 gap-4">
