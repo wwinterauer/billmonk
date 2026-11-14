@@ -400,7 +400,7 @@ import { z as z6 } from "npm:zod@^4.4.3";
 var LOCKED_RECEIPT_STATUSES = ["approved", "completed"];
 function lockedReceiptError(status) {
   if (status && LOCKED_RECEIPT_STATUSES.includes(status)) {
-    return `Receipt is ${status} and locked. Splitting and other changes are not allowed via MCP for approved receipts; only category, tags and receipt_date can be changed with update_receipt.`;
+    return `Receipt is ${status} and locked. Splitting and other changes are not allowed via MCP for approved receipts; only category, tags, receipt_date and invoice_number can be changed with update_receipt.`;
   }
   return null;
 }
@@ -410,7 +410,7 @@ async function checkReceiptEditable(sb, id) {
   if (!data) return "Receipt not found.";
   return lockedReceiptError(data.status);
 }
-var FIELDS_EDITABLE_WHEN_LOCKED = ["category", "tags", "receipt_date", "no_invoice"];
+var FIELDS_EDITABLE_WHEN_LOCKED = ["category", "tags", "receipt_date", "no_invoice", "invoice_number"];
 var AMOUNT_FIELDS_CLEARABLE_FOR_NO_INVOICE = ["amount_gross", "amount_net", "vat_amount"];
 function lockedFieldsError(status, fields, opts = {}) {
   if (!lockedReceiptError(status)) return null;
@@ -420,7 +420,7 @@ function lockedFieldsError(status, fields, opts = {}) {
     return true;
   });
   if (blocked.length === 0) return null;
-  return `Receipt is ${status}: only category, tags and receipt_date can be changed (amounts may only be cleared to null on Keine Rechnung receipts). Locked fields: ${blocked.join(", ")}.`;
+  return `Receipt is ${status}: only category, tags, receipt_date and invoice_number can be changed (amounts may only be cleared to null on Keine Rechnung receipts). Locked fields: ${blocked.join(", ")}.`;
 }
 var NO_INVOICE_CATEGORY = "Keine Rechnung";
 function deleteReceiptError(status) {
@@ -433,7 +433,7 @@ function deleteReceiptError(status) {
 var update_receipt_default = defineTool6({
   name: "update_receipt",
   title: "Correct receipt data",
-  description: 'Correct extracted fields of a receipt. On approved receipts only category, tags and receipt_date may be changed, all other fields are locked, except that amount_gross, amount_net and vat_amount may be set to null on approved Keine Rechnung receipts. "Keine Rechnung" (no_invoice: true, or category "Keine Rechnung") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when "Keine Rechnung ausschlie\xDFen" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.',
+  description: 'Correct extracted fields of a receipt. On approved receipts only category, tags, receipt_date and invoice_number may be changed, all other fields are locked, except that amount_gross, amount_net and vat_amount may be set to null on approved Keine Rechnung receipts. "Keine Rechnung" (no_invoice: true, or category "Keine Rechnung") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when "Keine Rechnung ausschlie\xDFen" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.',
   inputSchema: {
     id: z6.string().uuid().describe("Receipt id."),
     vendor: z6.string().min(1).optional().describe("Legal vendor name."),

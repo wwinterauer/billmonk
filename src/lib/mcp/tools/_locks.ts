@@ -3,7 +3,7 @@ export const LOCKED_RECEIPT_STATUSES = ["approved", "completed"] as const;
 
 export function lockedReceiptError(status: string | null | undefined): string | null {
   if (status && (LOCKED_RECEIPT_STATUSES as readonly string[]).includes(status)) {
-    return `Receipt is ${status} and locked. Splitting and other changes are not allowed via MCP for approved receipts; only category, tags and receipt_date can be changed with update_receipt.`;
+    return `Receipt is ${status} and locked. Splitting and other changes are not allowed via MCP for approved receipts; only category, tags, receipt_date and invoice_number can be changed with update_receipt.`;
   }
   return null;
 }
@@ -17,7 +17,7 @@ export async function checkReceiptEditable(sb: any, id: string): Promise<string 
 }
 
 /** Fields update_receipt may still change on approved receipts. */
-export const FIELDS_EDITABLE_WHEN_LOCKED = ["category", "tags", "receipt_date", "no_invoice"] as const;
+export const FIELDS_EDITABLE_WHEN_LOCKED = ["category", "tags", "receipt_date", "no_invoice", "invoice_number"] as const;
 
 /** Amount fields that may be cleared (set to null) on approved "Keine Rechnung" receipts. */
 export const AMOUNT_FIELDS_CLEARABLE_FOR_NO_INVOICE = ["amount_gross", "amount_net", "vat_amount"] as const;
@@ -34,7 +34,7 @@ export function lockedFieldsError(
     return true;
   });
   if (blocked.length === 0) return null;
-  return `Receipt is ${status}: only category, tags and receipt_date can be changed (amounts may only be cleared to null on Keine Rechnung receipts). Locked fields: ${blocked.join(", ")}.`;
+  return `Receipt is ${status}: only category, tags, receipt_date and invoice_number can be changed (amounts may only be cleared to null on Keine Rechnung receipts). Locked fields: ${blocked.join(", ")}.`;
 }
 
 /** Category name the app uses for "Keine Rechnung" entries (excluded from totals and tax exports). */
