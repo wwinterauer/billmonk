@@ -1,3 +1,4 @@
+import { deleteReceiptAndFile } from '@/lib/receiptDelete';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -178,40 +179,8 @@ export function useReceiptCrud() {
       throw new Error('Beleg nicht gefunden');
     }
 
-    // Unmark any other receipts that referenced this one as their duplicate original
-    await supabase
-      .from('receipts')
-      .update({
-        is_duplicate: false,
-        duplicate_of: null,
-        duplicate_score: null,
-        duplicate_checked_at: new Date().toISOString(),
-      })
-      .eq('user_id', user.id)
-      .eq('duplicate_of', id);
-
-    // Delete from database
-    const { error: dbError } = await supabase
-      .from('receipts')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id);
-
-    if (dbError) {
-      throw new Error(`Fehler beim Löschen: ${dbError.message}`);
-    }
-
-    // Then delete from storage if file exists
-    if (receipt.file_url) {
-      const { error: storageError } = await supabase.storage
-        .from('receipts')
-        .remove([receipt.file_url]);
-
-      if (storageError) {
-        console.error('Storage deletion failed:', storageError);
-        // Don't throw here as the DB entry is already deleted
-      }
-    }
+    const { storageError } = await deleteReceiptAndFile(supabase, user.id, id, receipt.file_url ?? null);
+    if (storageError) console.error('Storage deletion failed:', storageError);
   };
 
   const getReceiptFileUrl = async (filePath: string): Promise<string> => {
