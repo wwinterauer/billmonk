@@ -1,4 +1,4 @@
-import { fetchInChunks } from '@/lib/chunkedIn';
+import { fetchInChunks, chunkIds } from '@/lib/chunkedIn';
 import { sortTags, sortTagNames, joinTagNames } from '@/lib/tagOrder';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -292,13 +292,14 @@ export function useTags() {
     mutationFn: async ({ receiptIds, tagId }: { receiptIds: string[]; tagId: string }) => {
       if (!user) throw new Error('Nicht angemeldet');
 
-      const { error } = await supabase
-        .from('receipt_tags')
-        .delete()
-        .in('receipt_id', receiptIds)
-        .eq('tag_id', tagId);
-
-      if (error) throw new Error(error.message);
+      for (const chunk of chunkIds(receiptIds)) {
+        const { error } = await supabase
+          .from('receipt_tags')
+          .delete()
+          .in('receipt_id', chunk)
+          .eq('tag_id', tagId);
+        if (error) throw new Error(error.message);
+      }
       return receiptIds.length;
     },
     onSuccess: (count) => {

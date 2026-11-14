@@ -1,3 +1,4 @@
+import { fetchInChunks } from '@/lib/chunkedIn';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,6 +36,13 @@ export function useSplitLines(enabled: boolean, receiptIds?: string[]) {
         .eq('user_id', user.id)
         .order('sort_order', { ascending: true });
 
+      if (receiptIds && receiptIds.length > 100) {
+        const rows = await fetchInChunks(receiptIds, (chunk) =>
+          supabase.from('receipt_split_lines').select('*').eq('user_id', user.id)
+            .order('sort_order', { ascending: true }).in('receipt_id', chunk),
+        );
+        return rows as SplitLine[];
+      }
       if (receiptIds && receiptIds.length > 0) {
         query = query.in('receipt_id', receiptIds);
       }
