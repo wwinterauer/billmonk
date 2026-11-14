@@ -2,16 +2,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { AdminRoute } from "@/components/admin/AdminRoute";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { CameraButton } from "@/components/camera/CameraButton";
-import { CookieBanner } from "@/components/CookieBanner";
-import Index from "./pages/Index";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
 import Review from "./pages/Review";
@@ -22,24 +18,8 @@ import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import ShareReceive from "./pages/ShareReceive";
 import Checklists from "./pages/Checklists";
-import Datenschutz from "./pages/Datenschutz";
-import Onboarding from "./pages/Onboarding";
-import Invoices from "./pages/Invoices";
-import InvoiceEditor from "./pages/InvoiceEditor";
-import Quotes from "./pages/Quotes";
-import DeliveryNotes from "./pages/DeliveryNotes";
-import OrderConfirmations from "./pages/OrderConfirmations";
 import Account from "./pages/Account";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import NotFound from "./pages/NotFound";
-import PricingPage from "./pages/PricingPage";
-import Admin from "./pages/Admin";
-import Unsubscribe from "./pages/Unsubscribe";
-import NewsletterStatus from "./pages/NewsletterStatus";
 import { PageTracker } from "./components/PageTracker";
-import { BetaGate } from "./components/BetaGate";
-import Beta from "./pages/Beta";
 import OAuthConsent from "./pages/OAuthConsent";
 
 const queryClient = new QueryClient();
@@ -51,14 +31,10 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <BetaGate>
           <Routes>
             <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
-            <Route path="/beta" element={<Beta />} />
-            <Route path="/" element={<Index />} />
-            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
             <Route 
               path="/dashboard" 
               element={
@@ -124,14 +100,6 @@ const App = () => (
               }
             />
             <Route 
-              path="/newsletter-status" 
-              element={
-                <ProtectedRoute>
-                  <NewsletterStatus />
-                </ProtectedRoute>
-              }
-            />
-            <Route 
               path="/settings/bank-callback" 
               element={
                 <ProtectedRoute>
@@ -148,62 +116,6 @@ const App = () => (
               } 
             />
             <Route 
-              path="/onboarding" 
-              element={
-                <ProtectedRoute skipOnboardingCheck>
-                  <Onboarding />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/invoices" 
-              element={
-                <ProtectedRoute>
-                  <Invoices />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/invoices/new" 
-              element={
-                <ProtectedRoute>
-                  <InvoiceEditor />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/invoices/:id/edit" 
-              element={
-                <ProtectedRoute>
-                  <InvoiceEditor />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/order-confirmations" 
-              element={
-                <ProtectedRoute>
-                  <OrderConfirmations />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/quotes" 
-              element={
-                <ProtectedRoute>
-                  <Quotes />
-                </ProtectedRoute>
-              }
-            />
-            <Route 
-              path="/delivery-notes" 
-              element={
-                <ProtectedRoute>
-                  <DeliveryNotes />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
               path="/account" 
               element={
                 <ProtectedRoute>
@@ -212,25 +124,11 @@ const App = () => (
               } 
             />
             <Route path="/share-receive" element={<ShareReceive />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/datenschutz" element={<Datenschutz />} />
-            <Route path="/unsubscribe" element={<Unsubscribe />} />
-            <Route 
-              path="/admin" 
-              element={
-                <AdminRoute>
-                  <Admin />
-                </AdminRoute>
-              } 
-            />
-            <Route path="*" element={<NotFound />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
-          </BetaGate>
           <PageTracker />
           <InstallPrompt />
           <CameraButton />
-          <CookieBanner />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

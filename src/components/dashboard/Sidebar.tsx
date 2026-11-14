@@ -63,10 +63,6 @@ const navigation: NavItem[] = [
   { name: 'Alle Ausgaben', href: '/expenses', icon: Receipt },
   { name: 'Kontoabgleich', href: '/reconciliation', icon: Building2, requiredFeature: 'reconciliation' },
   { name: 'Konto-Import', href: '/bank-import', icon: FileUp, requiredFeature: 'bankImport' },
-  { name: 'Angebote', href: '/quotes', icon: FileText, requiredFeature: 'invoiceModule' },
-  { name: 'Auftragsbestätigungen', href: '/order-confirmations', icon: ClipboardCheck, requiredFeature: 'invoiceModule' },
-  { name: 'Lieferscheine', href: '/delivery-notes', icon: Truck, requiredFeature: 'invoiceModule' },
-  { name: 'Ausgangsrechnungen', href: '/invoices', icon: FileText, requiredFeature: 'invoiceModule' },
   { name: 'Berichte', href: '/reports', icon: BarChart3 },
   { name: 'Checklisten', href: '/checklists', icon: ClipboardList },
   { name: 'Einstellungen', href: '/settings', icon: Settings },
@@ -187,7 +183,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-        {isAdmin && (
+        {false && (
           <Link
             to="/admin"
             onClick={onNavigate}
@@ -262,82 +258,6 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
           );
         })}
       </nav>
-
-      {/* Admin Plan Switcher + Quota */}
-      {!collapsed && (
-        <div className="px-4 pb-2 space-y-3">
-          {/* Admin Plan Switcher */}
-          {isAdmin && (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs text-sidebar-foreground/60">
-                <Shield className="h-3 w-3" />
-                <span>Admin-Vorschau</span>
-              </div>
-              <Select
-                value={adminViewPlan || 'business'}
-                onValueChange={(v) => setAdminViewPlan(v === 'business' && !adminViewPlan ? null : v as PlanType)}
-              >
-                <SelectTrigger className="h-8 text-xs bg-sidebar-accent border-sidebar-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(['free', 'starter', 'pro', 'business'] as PlanType[]).map(p => (
-                    <SelectItem key={p} value={p}>{PLAN_NAMES[p]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Quota Bar */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-sidebar-foreground/60">Belege</span>
-              <span className={cn('font-medium', quotaColor)}>
-                {receiptsUsed} / {receiptsLimit}
-              </span>
-            </div>
-            <Progress 
-              value={usagePercent} 
-              className="h-1.5"
-            />
-            {receiptsCredit > 0 && (
-              <p className="text-[10px] text-sidebar-foreground/50">
-                (+{receiptsCredit} Guthaben)
-              </p>
-            )}
-            <div className="flex items-center justify-between text-[10px]">
-              <span className="text-sidebar-foreground/50">{planName}-Plan</span>
-              <span className="text-sidebar-foreground/50">{receiptsAvailable} verfügbar</span>
-            </div>
-          </div>
-
-          {/* Document Quota Bar */}
-          {documentsLimit > 0 && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-sidebar-foreground/60">Dokumente</span>
-                <span className={cn('font-medium', docQuotaColor)}>
-                  {documentsUsed} / {documentsLimit}
-                </span>
-              </div>
-              <Progress 
-                value={docUsagePercent} 
-                className="h-1.5"
-              />
-              {documentsCredit > 0 && (
-                <p className="text-[10px] text-sidebar-foreground/50">
-                  (+{documentsCredit} Guthaben)
-                </p>
-              )}
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-sidebar-foreground/50">Ausgangsbelege</span>
-                <span className="text-sidebar-foreground/50">{documentsAvailable} verfügbar</span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* User Menu */}
       <div className="p-4 border-t border-sidebar-border">
