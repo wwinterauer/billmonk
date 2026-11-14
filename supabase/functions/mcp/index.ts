@@ -399,7 +399,7 @@ import { z as z6 } from "npm:zod@^4.4.3";
 var LOCKED_RECEIPT_STATUSES = ["approved", "completed"];
 function lockedReceiptError(status) {
   if (status && LOCKED_RECEIPT_STATUSES.includes(status)) {
-    return `Receipt is ${status} and locked. Approved receipts cannot be changed via MCP; edit it in the app if really needed.`;
+    return `Receipt is ${status} and locked. Splitting and other changes are not allowed via MCP for approved receipts; only category and tags can be changed with update_receipt.`;
   }
   return null;
 }
@@ -409,12 +409,19 @@ async function checkReceiptEditable(sb, id) {
   if (!data) return "Receipt not found.";
   return lockedReceiptError(data.status);
 }
+var FIELDS_EDITABLE_WHEN_LOCKED = ["category", "tags"];
+function lockedFieldsError(status, fields) {
+  if (!lockedReceiptError(status)) return null;
+  const blocked = fields.filter((f) => !FIELDS_EDITABLE_WHEN_LOCKED.includes(f));
+  if (blocked.length === 0) return null;
+  return `Receipt is ${status}: only category and tags can be changed. Locked fields: ${blocked.join(", ")}.`;
+}
 
 // src/lib/mcp/tools/update-receipt.ts
 var update_receipt_default = defineTool6({
   name: "update_receipt",
   title: "Correct receipt data",
-  description: "Correct extracted fields of a receipt that is not yet approved (approved receipts are locked). Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+  description: "Correct extracted fields of a receipt ; on approved receipts only category and tags may be changed, all other fields are locked. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
   inputSchema: {
     id: z6.string().uuid().describe("Receipt id."),
     vendor: z6.string().min(1).optional().describe("Legal vendor name."),
@@ -438,7 +445,11 @@ var update_receipt_default = defineTool6({
     const { data: cur, error: e1 } = await sb.from("receipts").select("amount_gross, vat_rate, user_modified_fields, status").eq("id", id).maybeSingle();
     if (e1) return fail(e1.message);
     if (!cur) return fail("Receipt not found.");
-    const locked = lockedReceiptError(cur.status);
+    const requestedFields = [
+      ...Object.keys(input).filter((k) => input[k] !== void 0),
+      ...requestedTags !== void 0 ? ["tags"] : []
+    ];
+    const locked = lockedFieldsError(cur.status, requestedFields);
     if (locked) return fail(locked);
     let desiredTagIds;
     let currentTagIds = [];
