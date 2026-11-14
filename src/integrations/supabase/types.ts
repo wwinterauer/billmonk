@@ -3375,6 +3375,30 @@ export type Database = {
           },
         ]
       }
+      recurring_suggestion_dismissals: {
+        Row: {
+          created_at: string
+          id: string
+          label: string | null
+          pattern_key: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          pattern_key: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          pattern_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       support_tickets: {
         Row: {
           admin_reply: string | null
