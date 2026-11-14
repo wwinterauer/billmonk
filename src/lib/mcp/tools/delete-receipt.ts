@@ -10,8 +10,8 @@ export default defineTool({
   name: "delete_receipt",
   title: "Delete receipt",
   description:
-    "Permanently delete a receipt together with its stored file, exactly like \"Beleg löschen\" in the review. Only allowed for receipts in review; approved receipts are refused. Cannot be undone.",
-  inputSchema: { id: z.string().uuid().describe("Receipt id (must have status review).") },
+    "Permanently delete a receipt together with its stored file, exactly like \"Beleg löschen\" in the review. Only allowed for receipts with status review or duplicate; approved receipts are refused. Cannot be undone.",
+  inputSchema: { id: z.string().uuid().describe("Receipt id (must have status review or duplicate).") },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   handler: async ({ id }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");

@@ -418,9 +418,9 @@ function lockedFieldsError(status, fields) {
 }
 var NO_INVOICE_CATEGORY = "Keine Rechnung";
 function deleteReceiptError(status) {
-  if (status === "review") return null;
-  if (lockedReceiptError(status)) return `Receipt is ${status} and cannot be deleted via MCP. Only receipts in review can be deleted.`;
-  return `Receipt has status "${status ?? "unknown"}". Only receipts in review can be deleted.`;
+  if (status === "review" || status === "duplicate") return null;
+  if (lockedReceiptError(status)) return `Receipt is ${status} and cannot be deleted via MCP. Only receipts in review or duplicate can be deleted.`;
+  return `Receipt has status "${status ?? "unknown"}". Only receipts in review or duplicate can be deleted.`;
 }
 
 // src/lib/mcp/tools/update-receipt.ts
@@ -966,8 +966,8 @@ async function deleteReceiptAndFile(sb, userId, id, fileUrl) {
 var delete_receipt_default = defineTool15({
   name: "delete_receipt",
   title: "Delete receipt",
-  description: 'Permanently delete a receipt together with its stored file, exactly like "Beleg l\xF6schen" in the review. Only allowed for receipts in review; approved receipts are refused. Cannot be undone.',
-  inputSchema: { id: z14.string().uuid().describe("Receipt id (must have status review).") },
+  description: 'Permanently delete a receipt together with its stored file, exactly like "Beleg l\xF6schen" in the review. Only allowed for receipts with status review or duplicate; approved receipts are refused. Cannot be undone.',
+  inputSchema: { id: z14.string().uuid().describe("Receipt id (must have status review or duplicate).") },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   handler: async ({ id }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
