@@ -143,7 +143,7 @@ const Account = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['profile', 'address', 'security', 'subscription', 'invoices', 'support'];
+  const validTabs = ['profile', 'address', 'security'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'profile';
 
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -362,18 +362,6 @@ const Account = () => {
             <TabsTrigger value="security" className="gap-2">
               <Lock className="h-4 w-4" />
               <span className="hidden sm:inline">Sicherheit</span>
-            </TabsTrigger>
-            <TabsTrigger value="subscription" className="gap-2">
-              <Crown className="h-4 w-4" />
-              <span className="hidden sm:inline">Abo</span>
-            </TabsTrigger>
-            <TabsTrigger value="invoices" className="gap-2">
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Rechnungen</span>
-            </TabsTrigger>
-            <TabsTrigger value="support" className="gap-2">
-              <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline">Support</span>
             </TabsTrigger>
           </TabsList>
 

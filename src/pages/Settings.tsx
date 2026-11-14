@@ -258,7 +258,7 @@ const Settings = () => {
   // Handle tab from URL query parameter - must be before any early returns
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'bank-live', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage', 'company', 'customers', 'members', 'crm-fields', 'newsletter', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'];
+  const validTabs = ['naming', 'recognition', 'categories', 'tags', 'bank-keywords', 'bank-live', 'vendors', 'export', 'ai-learning', 'email-import', 'cloud-storage'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'naming';
   const [activeTab, setActiveTab] = useState(initialTab);
   
@@ -524,8 +524,8 @@ const Settings = () => {
   };
 
   // Split tabs into expense group and invoice group
-  const expenseTabs = allTabs.filter(t => !['bank-live', 'company', 'customers', 'members', 'crm-fields', 'newsletter', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'].includes(t.value));
-  const invoiceTabs = allTabs.filter(t => ['bank-live', 'company', 'customers', 'members', 'crm-fields', 'newsletter', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'].includes(t.value));
+  const expenseTabs = allTabs.filter(t => !['company', 'customers', 'members', 'crm-fields', 'newsletter', 'invoice-items', 'invoice-templates', 'quote-templates', 'invoice-settings'].includes(t.value));
+  const invoiceTabs: typeof allTabs = [];
 
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
@@ -568,7 +568,7 @@ const Settings = () => {
               })}
             </TabsList>
 
-            <TabsList className="flex flex-wrap w-full h-auto gap-1 p-1 bg-primary/5 border border-primary/10">
+            {invoiceTabs.length > 0 && <TabsList className="flex flex-wrap w-full h-auto gap-1 p-1 bg-primary/5 border border-primary/10">
               {invoiceTabs.map(tab => {
                 const locked = isTabLocked(tab.requiredFeature);
                 return (
@@ -586,7 +586,7 @@ const Settings = () => {
                 </TabsTrigger>
               );
             })}
-            </TabsList>
+            </TabsList>}
           </div>
 
           {/* File Naming Tab */}
