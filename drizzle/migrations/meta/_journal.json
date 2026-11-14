@@ -36,6 +36,13 @@
       "when": 1794666022915,
       "tag": "0004_dashboard_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794677239600,
+      "tag": "0005_migration",
+      "breakpoints": true
     }
   ]
 }

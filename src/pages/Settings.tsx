@@ -60,6 +60,7 @@ import { AILearningSettings } from '@/components/settings/AILearningSettings';
 import { ProcessingRetry } from '@/components/settings/ProcessingRetry';
 import { EmailImportSettings } from '@/components/settings/EmailImportSettings';
 import { BankImportKeywords } from '@/components/settings/BankImportKeywords';
+import { DismissedRecurringSuggestions } from '@/components/settings/DismissedRecurringSuggestions';
 import { TagManagement } from '@/components/settings/TagManagement';
 import { CloudStorageSettings } from '@/components/settings/CloudStorageSettings';
 import { CustomerManagement } from '@/components/settings/CustomerManagement';
@@ -1039,6 +1040,7 @@ const Settings = () => {
         <FeatureGate feature="bankImport">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <BankImportKeywords />
+          <div className="mt-6"><DismissedRecurringSuggestions /></div>
         </motion.div>
         </FeatureGate>
       </TabsContent>
