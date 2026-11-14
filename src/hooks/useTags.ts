@@ -1,3 +1,4 @@
+import { sortTags, sortTagNames, joinTagNames } from '@/lib/tagOrder';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -52,9 +53,7 @@ export function useTags() {
       return [];
     }
 
-    return (data || [])
-      .map(item => item.tags as unknown as Tag)
-      .filter(Boolean);
+    return sortTags((data || []).map(item => item.tags as unknown as Tag));
   };
 
   // Get tags for multiple receipts (for bulk operations)

@@ -1,3 +1,4 @@
+import { sortTags, sortTagNames, joinTagNames } from '@/lib/tagOrder';
 import { withSkontoApplied, skontoFactor, scaleLine } from '@/lib/skonto';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import JSZip from 'jszip';
@@ -499,7 +500,7 @@ export function ExportFormatDialog({
       case 'tags': {
         const tags = (receipt as any).tags as Array<{ name: string }> | undefined;
         return tags && tags.length > 0
-          ? tags.map(t => t.name).sort((a, b) => a.localeCompare(b, 'de')).join('; ')
+          ? joinTagNames(tags)
           : '';
       }
       default: return (receipt as unknown as Record<string, unknown>)[field];
@@ -592,7 +593,7 @@ export function ExportFormatDialog({
         }
         sortedReceipts = sortedReceipts.map(r => ({
           ...r,
-          tags: tagsByReceipt.get(r.id) || [],
+          tags: sortTags(tagsByReceipt.get(r.id) || []),
         } as any));
       } else {
         sortedReceipts = sortedReceipts.map(r => ({ ...r, tags: [] } as any));
@@ -653,7 +654,7 @@ export function ExportFormatDialog({
                   category: line.category ?? receipt.category,
                   description: line.description ?? receipt.description,
                   tax_type: line.tax_type ?? receipt.tax_type,
-                  tags: lineTags,
+                  tags: sortTags(lineTags),
                   _split_position: idx + 1,
                   _split_description: line.description,
                   _split_category: line.category,

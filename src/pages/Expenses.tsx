@@ -1,3 +1,4 @@
+import { sortTags, sortTagNames, joinTagNames } from '@/lib/tagOrder';
 import { applySkonto } from '@/lib/skonto';
 import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -771,6 +772,7 @@ const Expenses = () => {
             }
           }
         }
+        for (const id of Object.keys(cache)) cache[id] = sortTags(cache[id]);
         setReceiptTagsCache(cache);
       }
     } catch (error) {

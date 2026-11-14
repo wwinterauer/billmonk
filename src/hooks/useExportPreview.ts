@@ -1,3 +1,4 @@
+import { sortTags, sortTagNames, joinTagNames } from '@/lib/tagOrder';
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -95,7 +96,7 @@ export function useExportPreview() {
       if (col.field === 'tags') {
         // Format tags as comma-separated list
         const tags = receipt.tags as Array<{ name: string }> | undefined;
-        value = tags && tags.length > 0 ? tags.map(t => t.name).join(', ') : '';
+        value = tags && tags.length > 0 ? joinTagNames(tags, ', ') : '';
       }
       if (col.field === 'tax_type') {
         value = receipt.tax_type || '';
@@ -134,7 +135,7 @@ export function useExportPreview() {
           // Handle tags - a receipt can have multiple tags
           const tags = receipt.tags as Array<{ name: string }> | undefined;
           if (tags && tags.length > 0) {
-            keys = tags.map(t => t.name);
+            keys = sortTagNames(tags.map(t => t.name));
           } else {
             keys = ['Ohne Tags'];
           }
@@ -278,9 +279,8 @@ export function useExportPreview() {
       // Transform tags into flat array
       let receipts = ((data || []) as Record<string, unknown>[]).map(r => ({
         ...r,
-        tags: ((r.receipt_tags as Array<{ tag: { id: string; name: string; color: string } }>) || [])
-          .map(rt => rt.tag)
-          .filter(Boolean),
+        tags: sortTags(((r.receipt_tags as Array<{ tag: { id: string; name: string; color: string } }>) || [])
+          .map(rt => rt.tag)),
       }));
 
       if (filterActive) {

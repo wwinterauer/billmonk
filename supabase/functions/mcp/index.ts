@@ -87,6 +87,15 @@ function netFromGross(gross, vatRate) {
   return Math.round(gross / (1 + vatRate / 100) * 100) / 100;
 }
 
+// src/lib/tagOrder.ts
+var collator = new Intl.Collator("de", { sensitivity: "base", numeric: true });
+function compareTagNames(a, b) {
+  return collator.compare(a ?? "", b ?? "") || (a ?? "").localeCompare(b ?? "");
+}
+function sortTagNames(names) {
+  return [...names].sort(compareTagNames);
+}
+
 // src/lib/mcp/tools/_tags.ts
 function mergeReceiptTagNames(receipts, links) {
   const namesByReceipt = /* @__PURE__ */ new Map();
@@ -99,7 +108,7 @@ function mergeReceiptTagNames(receipts, links) {
   }
   return receipts.map((receipt) => ({
     ...receipt,
-    tags: [...namesByReceipt.get(receipt.id) ?? []].sort((a, b) => a.localeCompare(b, "de"))
+    tags: sortTagNames([...namesByReceipt.get(receipt.id) ?? []])
   }));
 }
 async function withReceiptTagNames(sb, receipts) {

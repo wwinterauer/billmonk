@@ -1,3 +1,4 @@
+import { sortTags, sortTagNames, joinTagNames } from '@/lib/tagOrder';
 import { withSkontoApplied } from '@/lib/skonto';
 import { useState, useMemo } from 'react';
 import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
@@ -171,9 +172,8 @@ const Reports = () => {
       // Transform tags into flat array
       return (data || []).map(r0 => withSkontoApplied(r0)).map(r => ({
         ...r,
-        tags: (r.receipt_tags || [])
-          .map((rt: { tag: { id: string; name: string; color: string } | null }) => rt.tag)
-          .filter(Boolean) as Array<{ id: string; name: string; color: string }>,
+        tags: sortTags((r.receipt_tags || [])
+          .map((rt: { tag: { id: string; name: string; color: string } | null }) => rt.tag)) as Array<{ id: string; name: string; color: string }>,
       }));
     },
     enabled: !!user && !!dateRange.from && !!dateRange.to,
@@ -930,7 +930,7 @@ const Reports = () => {
       Lieferant: r.vendor_brand || r.vendor,
       Beschreibung: r.description,
       Kategorie: r.category,
-      Tags: (r.tags as Array<{ name: string }> || []).map(t => t.name).join(', '),
+      Tags: joinTagNames(r.tags as Array<{ name: string }> || [], ', '),
       Brutto: r.amount_gross,
       Netto: r.amount_net,
       'MwSt-Satz': r.vat_rate,
@@ -973,7 +973,7 @@ const Reports = () => {
       r.vendor_brand || r.vendor || '',
       r.description || '',
       r.category || '',
-      (r.tags as Array<{ name: string }> || []).map(t => t.name).join(', '),
+      joinTagNames(r.tags as Array<{ name: string }> || [], ', '),
       r.amount_gross?.toFixed(2) || '',
       r.amount_net?.toFixed(2) || '',
       r.vat_rate?.toString() || '',
