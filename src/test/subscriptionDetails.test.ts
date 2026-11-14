@@ -6,13 +6,13 @@ describe("Stripe subscription details", () => {
     expect(getSubscriptionDetails({ items: { data: [{
       current_period_end: 1794565504,
       price: { product: "prod_pro" },
-    }] } })).toEqual({ productId: "prod_pro", subscriptionEnd: "2026-11-13T08:38:24.000Z" });
+    }] } })).toEqual({ productId: "prod_pro", subscriptionEnd: "2026-11-13T10:25:04.000Z" });
   });
 
   it("supports older subscription-level periods", () => {
     expect(getSubscriptionDetails({ current_period_end: 1794565504, items: { data: [{
       price: { product: "prod_pro" },
-    }] } }).subscriptionEnd).toBe("2026-11-13T08:38:24.000Z");
+    }] } }).subscriptionEnd).toBe("2026-11-13T10:25:04.000Z");
   });
 
   it("prefers the item period and preserves numeric zero", () => {
