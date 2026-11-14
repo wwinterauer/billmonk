@@ -18,6 +18,12 @@
 
     /* Primary — Teal */
     --primary: 175 84% 26%;
+    --note-yellow: 50 95% 80%;
+    --note-green: 120 55% 82%;
+    --note-blue: 205 85% 84%;
+    --note-pink: 335 85% 87%;
+    --note-orange: 30 95% 80%;
+    --note-foreground: 30 20% 15%;
     --primary-foreground: 0 0% 100%;
 
     /* Secondary — Cool Slate */
@@ -82,6 +88,12 @@
     --popover-foreground: 210 40% 92%;
 
     --primary: 168 76% 48%;
+    --note-yellow: 48 60% 30%;
+    --note-green: 130 30% 26%;
+    --note-blue: 210 40% 28%;
+    --note-pink: 335 35% 30%;
+    --note-orange: 25 55% 30%;
+    --note-foreground: 40 30% 92%;
     --primary-foreground: 222 47% 7%;
 
     --secondary: 217 33% 17%;
