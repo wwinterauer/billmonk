@@ -9,7 +9,7 @@ export default defineTool({
   name: "update_receipt",
   title: "Correct receipt data",
   description:
-    "Correct extracted fields of a receipt ; on approved receipts only category and tags may be changed, all other fields are locked. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+    "Correct extracted fields of a receipt. On approved receipts only category and tags may be changed, all other fields are locked. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
   inputSchema: {
     id: z.string().uuid().describe("Receipt id."),
     vendor: z.string().min(1).optional().describe("Legal vendor name."),
