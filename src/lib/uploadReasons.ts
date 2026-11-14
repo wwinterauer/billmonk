@@ -36,7 +36,9 @@ export function describeReason(row: UploadEventRow): string {
   if (row.error_message) return row.error_message;
   if (row.outcome === 'pending') {
     if (row.phase === 'storage-upload') return 'Wird gerade hochgeladen';
-    if (row.phase === 'selected') return 'Noch nicht gestartet';
+    if (row.phase === 'selected' || row.phase === 'validated') return 'Wartet auf Dateiprüfung — noch nicht hochgeladen';
+    if (row.phase === 'hashing') return 'Datei wird gelesen und auf Identität geprüft';
+    if (row.phase === 'hash-calculated' || row.phase === 'duplicate-check') return 'Duplikatprüfung / wartet auf Upload';
     return 'In Bearbeitung';
   }
   return 'Erfolgreich verarbeitet';
