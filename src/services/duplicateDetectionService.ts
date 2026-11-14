@@ -216,6 +216,8 @@ export async function checkForDuplicates(
       // Harter Ausschluss: beide haben echte, aber unterschiedliche Rechnungsnummern
       const candInv = normalizeInvoiceNumber(c.invoice_number);
       if (invoiceNumber && candInv && !invoiceNumbersMatch(invoiceNumber, candInv)) return false;
+      // Ohne Betrag/Datum beim Kandidaten ist kein Vergleich möglich
+      if (c.amount_gross == null || !c.receipt_date) return false;
       if (!amountWithinTolerance(receiptData.amount_gross, c.amount_gross)) return false;
       if (!dateWithinTolerance(receiptData.receipt_date, c.receipt_date)) return false;
       return true;
@@ -228,10 +230,12 @@ export async function checkForDuplicates(
       (daysBetween(receiptData.receipt_date, c.receipt_date) ?? 99) === 0;
 
     const withVendor = candidates.filter((c: any) => candidateVendorMatches(receiptData, c));
-    const pool = withVendor.length > 0 ? withVendor : candidates;
+    // Ohne passenden Lieferanten nie als Duplikat markieren
+    if (withVendor.length === 0) return defaultResult;
+    const pool = withVendor;
     const best = pool.find(exactValue) || pool[0];
     const isExact = exactValue(best);
-    const vendorMatched = withVendor.length > 0;
+    const vendorMatched = true;
 
     const reasons: string[] = [];
     reasons.push(isExact ? 'Gleicher Betrag' : 'Betrag leicht abweichend');
