@@ -1,3 +1,4 @@
+import { withSkontoApplied, skontoFactor, scaleLine } from '@/lib/skonto';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -579,7 +580,8 @@ export function ExportDialog({ open, onOpenChange, receipts }: ExportDialogProps
 }
 
 // Export CSV function
-export async function exportAsCSV(receipts: Receipt[]) {
+export async function exportAsCSV(input: Receipt[]) {
+  const receipts = input.map(r => withSkontoApplied(r as any) as any);
   const rows = receipts.map(r => ({
     'Datum': r.receipt_date || '',
     'Lieferant': r.vendor || '',
@@ -590,6 +592,7 @@ export async function exportAsCSV(receipts: Receipt[]) {
     'Netto (€)': r.amount_net?.toFixed(2) || '',
     'MwSt (€)': r.vat_amount?.toFixed(2) || '',
     'MwSt-Satz (%)': r.vat_rate?.toString() || '',
+    'Skonto (€)': r.skonto ? r.skonto.toFixed(2) : '',
     'Zahlungsart': r.payment_method || '',
     'Status': r.status || '',
     'Dateiname': r.file_name || '',
@@ -607,7 +610,8 @@ export async function exportAsCSV(receipts: Receipt[]) {
 }
 
 // Export Excel function
-export async function exportAsExcel(receipts: Receipt[]) {
+export async function exportAsExcel(input: Receipt[]) {
+  const receipts = input.map(r => withSkontoApplied(r as any) as any);
   const rows = receipts.map(r => ({
     'Datum': toExcelDate(r.receipt_date),
     'Lieferant': r.vendor || '',
@@ -618,6 +622,7 @@ export async function exportAsExcel(receipts: Receipt[]) {
     'Netto (€)': r.amount_net || 0,
     'MwSt (€)': r.vat_amount || 0,
     'MwSt-Satz (%)': r.vat_rate || 0,
+    'Skonto (€)': r.skonto || 0,
     'Zahlungsart': r.payment_method || '',
     'Status': r.status || '',
     'Dateiname': r.file_name || '',

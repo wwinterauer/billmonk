@@ -1,3 +1,4 @@
+import { withSkontoApplied, skontoFactor, scaleLine } from '@/lib/skonto';
 import { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, startOfQuarter, endOfQuarter, subMonths } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -114,7 +115,7 @@ export function TaxExportDialog({ open, onOpenChange, defaultBookingType = 'both
       if (bookingType === 'expenses' || bookingType === 'both') {
         const { data, error } = await supabase
           .from('receipts')
-          .select('id, receipt_date, amount_gross, amount_net, vat_rate, vat_amount, vendor, vendor_brand, description, invoice_number, category, currency, is_split_booking')
+          .select('id, receipt_date, skonto_amount, skonto_percent, amount_gross, amount_net, vat_rate, vat_amount, vendor, vendor_brand, description, invoice_number, category, currency, is_split_booking')
           .eq('user_id', user.id)
           .eq('status', 'approved')
           .gte('receipt_date', format(dateFrom, 'yyyy-MM-dd'))
@@ -122,7 +123,9 @@ export function TaxExportDialog({ open, onOpenChange, defaultBookingType = 'both
           .neq('category', 'Keine Rechnung');
 
         if (error) throw error;
-        receipts = (data || []) as ReceiptForExport[];
+        const raw = (data || []) as any[];
+        const factorById = new Map(raw.map(r => [r.id, skontoFactor(r)]));
+        receipts = raw.map(r => withSkontoApplied(r)) as ReceiptForExport[];
 
         // Fetch split lines for split bookings
         const splitReceiptIds = receipts
@@ -137,7 +140,7 @@ export function TaxExportDialog({ open, onOpenChange, defaultBookingType = 'both
             .in('receipt_id', splitReceiptIds)
             .order('sort_order', { ascending: true });
           
-          splitLines = (slData || []) as SplitLineForExport[];
+          splitLines = ((slData || []) as SplitLineForExport[]).map(l => scaleLine(l, factorById.get(l.receipt_id) ?? 1));
         }
       }
 

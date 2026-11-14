@@ -1,3 +1,4 @@
+import { withSkontoApplied, skontoFactor, scaleLine } from '@/lib/skonto';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -478,6 +479,8 @@ export function ExportFormatDialog({
       case 'invoice_number': return receipt.invoice_number;
       case 'category': return receipt.category;
       case 'amount_gross': return receipt.amount_gross;
+      case 'skonto': return (receipt as any).skonto || '';
+      case 'invoice_gross': return (receipt as any).invoice_gross ?? receipt.amount_gross;
       case 'amount_net': return receipt.amount_net;
       case 'vat_rate': return receipt.vat_rate;
       case 'vat_amount': return receipt.vat_amount;
@@ -563,7 +566,8 @@ export function ExportFormatDialog({
 
   const prepareExportData = async () => {
     const columns = visibleColumns;
-    let sortedReceipts = [...receipts];
+    const factorById = new Map(receipts.map(r => [r.id, skontoFactor(r as any)]));
+    let sortedReceipts = receipts.map(r => withSkontoApplied(r as any) as unknown as Receipt);
 
     // Filter out "Keine Rechnung" if option is enabled
     if (excludeNoReceipt) {
@@ -632,7 +636,7 @@ export function ExportFormatDialog({
           // Expand receipts
           const expanded: Receipt[] = [];
           for (const receipt of sortedReceipts) {
-            const lines = linesByReceipt.get(receipt.id);
+            const lines = linesByReceipt.get(receipt.id)?.map(l => scaleLine(l, factorById.get(receipt.id) ?? 1));
             if ((receipt as any).is_split_booking && lines && lines.length > 0) {
               lines.forEach((line, idx) => {
                 const baseTags = ((receipt as any).tags || []) as Array<{ id: string; name: string; color: string }>;
