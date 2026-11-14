@@ -1,3 +1,4 @@
+import { StickyNotes } from '@/components/dashboard/StickyNotes';
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -187,6 +188,7 @@ const Dashboard = () => {
     <DashboardLayout>
       <div className="p-6 lg:p-8">
         <ProblemReceiptsBanner />
+        <StickyNotes />
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
