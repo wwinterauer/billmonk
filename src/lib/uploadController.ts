@@ -103,5 +103,31 @@ export class UploadController {
   }
 }
 
-/** Controllers survive an unmount of the upload page (SPA navigation). */
-export const liveUploadRuns = new Map<string, UploadController>();
+// Registries live on globalThis so they survive an unmount of the upload page
+// (SPA navigation) and hot module reloads while a run is still in progress.
+const g = globalThis as typeof globalThis & {
+  __billmonkLiveUploadRuns?: Map<string, UploadController>;
+  __billmonkLiveRunIds?: Set<string>;
+};
+
+/** Controller per run, available once the upload phase has started. */
+export const liveUploadRuns: Map<string, UploadController> = (g.__billmonkLiveUploadRuns ??= new Map());
+
+/** Every run started in this browser tab, from file selection until it is finalised. */
+export const liveRunIds: Set<string> = (g.__billmonkLiveRunIds ??= new Set());
+
+/** A run with protocol activity this recent is still being worked on somewhere. */
+export const RUN_ACTIVITY_GRACE_MS = 3 * 60 * 1000;
+
+export function isRunInterrupted(params: {
+  runId: string;
+  lastActivityAt: string | null;
+  now?: number;
+  liveIds?: Set<string>;
+}): boolean {
+  const live = params.liveIds ?? liveRunIds;
+  if (live.has(params.runId)) return false;
+  if (!params.lastActivityAt) return true;
+  const age = (params.now ?? Date.now()) - new Date(params.lastActivityAt).getTime();
+  return age >= RUN_ACTIVITY_GRACE_MS;
+}

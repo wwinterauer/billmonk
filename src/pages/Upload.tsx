@@ -37,7 +37,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageMeta } from '@/components/PageMeta';
 import { saveQueue, clearQueue } from '@/lib/upload-queue';
-import { UploadController, liveUploadRuns } from '@/lib/uploadController';
+import { UploadController, liveUploadRuns, liveRunIds, isRunInterrupted } from '@/lib/uploadController';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { prepareUploadFiles } from '@/lib/uploadPreparation';
@@ -153,7 +153,10 @@ const Upload = () => {
   ) => {
     const eventId = eventIdsRef.current.get(file);
     if (!eventId) return;
-    const { error } = await supabase.from('upload_file_events').update(values).eq('id', eventId);
+    // Progress-only updates never touch a file that already has a final result.
+    let query = supabase.from('upload_file_events').update(values).eq('id', eventId);
+    if (!values.outcome) query = query.eq('outcome', 'pending');
+    const { error } = await query;
     if (error) {
       protocolErrorsRef.current += 1;
       console.error('Upload protocol update failed:', error);
@@ -213,6 +216,7 @@ const Upload = () => {
       protocolErrorsRef.current = 0;
       if (activeRunRef.current === runId) activeRunRef.current = null;
       liveUploadRuns.delete(runId);
+      liveRunIds.delete(runId);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -296,6 +300,18 @@ const Upload = () => {
           activeRunRef.current = run.id;
           setOverviewRunId(run.id);
           setUploadPhase('uploading');
+          continue;
+        }
+        const { data: lastEvent } = await supabase
+          .from('upload_file_events')
+          .select('updated_at')
+          .eq('run_id', run.id)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!isRunInterrupted({ runId: run.id, lastActivityAt: lastEvent?.updated_at ?? null })) {
+          // Still running (in the background or another tab) — never mark it interrupted.
+          if (!cancelled) setOverviewRunId(run.id);
           continue;
         }
         await supabase
@@ -491,7 +507,7 @@ const Upload = () => {
 
   const processFiles = async (files: File[]) => {
     if (!user || files.length === 0) return;
-    if (activeRunRef.current) {
+    if (activeRunRef.current || liveRunIds.size > 0) {
       toast({
         variant: 'destructive',
         title: 'Upload läuft bereits',
@@ -503,6 +519,7 @@ const Upload = () => {
     setRunSummary(null);
     const runId = crypto.randomUUID();
     activeRunRef.current = runId;
+    liveRunIds.add(runId);
     setOverviewRunId(runId);
     const initialEvents = files.map((file, ordinal) => ({
       id: crypto.randomUUID(),
@@ -526,6 +543,7 @@ const Upload = () => {
       : await supabase.from('upload_file_events').insert(initialEvents);
     if (eventError) {
       activeRunRef.current = null;
+      liveRunIds.delete(runId);
       toast({ variant: 'destructive', title: 'Protokollierung fehlgeschlagen', description: eventError.message });
       return;
     }

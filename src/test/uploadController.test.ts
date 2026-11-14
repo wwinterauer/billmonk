@@ -83,3 +83,18 @@ describe('UploadController', () => {
     expect(onDrained).toHaveBeenCalledTimes(1);
   });
 });
+
+import { isRunInterrupted } from '@/lib/uploadController';
+
+describe('isRunInterrupted', () => {
+  const now = new Date('2026-11-14T13:00:00Z').getTime();
+  it('never treats a run started in this tab as interrupted', () => {
+    expect(isRunInterrupted({ runId: 'r1', lastActivityAt: '2026-11-14T12:00:00Z', now, liveIds: new Set(['r1']) })).toBe(false);
+  });
+  it('keeps a run with activity in the last 3 minutes alive (background or other tab)', () => {
+    expect(isRunInterrupted({ runId: 'r1', lastActivityAt: '2026-11-14T12:57:30Z', now, liveIds: new Set() })).toBe(false);
+  });
+  it('marks a run without activity for 3 minutes as interrupted', () => {
+    expect(isRunInterrupted({ runId: 'r1', lastActivityAt: '2026-11-14T12:57:00Z', now, liveIds: new Set() })).toBe(true);
+  });
+});
