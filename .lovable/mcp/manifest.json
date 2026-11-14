@@ -12,7 +12,7 @@
   "mcp": {
     "server": {
       "name": "billmonk",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "title": "BillMonk"
     },
     "tools": [
@@ -367,6 +367,250 @@
           "$schema": "http://json-schema.org/draft-07/schema#",
           "type": "object",
           "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "split_receipt_ai",
+        "title": "Suggest split booking from AI line items",
+        "description": "Same as the app's 'KI-Vorschläge' button in 'Beleg aufteilen': builds split parts from the line items the AI extracted for this receipt. Returns the proposal only and saves nothing; apply it (optionally adjusted) with split_receipt. Never changes the receipt status.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "Receipt id."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "split_receipt",
+        "title": "Split booking (Beleg aufteilen)",
+        "description": "Same as 'Beleg aufteilen' in the app: books one receipt onto several parts (categories/VAT rates) while the receipt and its file stay one document. Replaces existing parts. The gross sum must equal the receipt gross (±0.02). Never changes the receipt status.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "Receipt id."
+            },
+            "parts": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "amount_gross": {
+                    "type": "number",
+                    "description": "Gross amount of this part."
+                  },
+                  "amount_net": {
+                    "description": "Net amount; if omitted it is calculated from gross and VAT rate.",
+                    "type": "number"
+                  },
+                  "vat_rate": {
+                    "description": "VAT rate in percent; defaults to the receipt's rate.",
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "category": {
+                    "description": "One of the user's existing categories; defaults to the receipt category.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": {
+                    "description": "Description of this part.",
+                    "type": "string"
+                  },
+                  "is_private": {
+                    "description": "Mark this part as private (shown as tag 'Privat' in exports).",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "amount_gross"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Parts of the split booking."
+            }
+          },
+          "required": [
+            "id",
+            "parts"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "update_split_part",
+        "title": "Correct one split part",
+        "description": "Correct a single part of a split booking. Changing the amount must keep the parts' gross sum equal to the receipt gross (±0.02), otherwise use split_receipt to redistribute. Never changes the receipt status.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "part_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "Split part id (from split_parts)."
+            },
+            "amount_gross": {
+              "description": "New gross amount.",
+              "type": "number"
+            },
+            "amount_net": {
+              "description": "New net amount (gross is then derived from net and VAT rate).",
+              "type": "number"
+            },
+            "vat_rate": {
+              "description": "New VAT rate in percent.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "category": {
+              "description": "One of the user's existing categories.",
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "description": "New description.",
+              "type": "string"
+            },
+            "is_private": {
+              "description": "Mark this part as private.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "part_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "remove_split",
+        "title": "Undo split booking",
+        "description": "Same as 'Splitbuchung aufheben' in the app: deletes all split parts so the receipt is booked as one again. Never changes the receipt status.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "Receipt id."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "split_receipt_pdf",
+        "title": "Divide PDF into separate receipts (Beleg teilen)",
+        "description": "Same as 'PDF aufteilen' in the app, for a PDF that contains several invoices: cuts the PDF by page numbers into separate files, creates one new receipt per part (each is re-analysed by the AI and lands in review), and deletes the original receipt and file. Needs at least 2 parts with pages. Irreversible. Does not approve anything.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "Receipt id of the multi-invoice PDF."
+            },
+            "splits": {
+              "minItems": 2,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "pages": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "description": "1-based page numbers for this new receipt."
+                  },
+                  "vendor_name": {
+                    "description": "Optional vendor hint.",
+                    "type": "string"
+                  },
+                  "invoice_number": {
+                    "description": "Optional invoice number hint.",
+                    "type": "string"
+                  },
+                  "total_amount": {
+                    "description": "Optional total amount hint.",
+                    "type": "number"
+                  },
+                  "date": {
+                    "description": "Optional date hint.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "pages"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Parts, as used by the app dialog."
+            }
+          },
+          "required": [
+            "id",
+            "splits"
+          ]
         },
         "outputSchema": null
       }
