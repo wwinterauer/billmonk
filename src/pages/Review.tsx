@@ -1,3 +1,4 @@
+import { applySkonto, amountFromPercent, percentFromAmount } from '@/lib/skonto';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ProblemReceiptsPanel } from '@/components/receipts/ProblemReceiptsPanel';
@@ -124,6 +125,8 @@ interface FormData {
   is_mixed_tax_rate: boolean;
   tax_rate_details: TaxRateDetail[] | null;
   payment_method: string;
+  skonto_percent: string;
+  skonto_amount: string;
   amount_net_override: string;
   vat_amount_override: string;
 }
@@ -175,6 +178,8 @@ const Review = () => {
     is_mixed_tax_rate: false,
     tax_rate_details: null,
     payment_method: '',
+    skonto_percent: '',
+    skonto_amount: '',
     amount_net_override: '',
     vat_amount_override: '',
   });
@@ -466,6 +471,8 @@ const Review = () => {
       is_mixed_tax_rate: isMixed,
       tax_rate_details: taxDetails,
       payment_method: receipt.payment_method || '',
+      skonto_percent: (receipt as any).skonto_percent != null ? String((receipt as any).skonto_percent) : '',
+      skonto_amount: (receipt as any).skonto_amount != null ? String((receipt as any).skonto_amount) : '',
       amount_net_override: amountNetOverride,
       vat_amount_override: vatAmountOverride,
     });
@@ -713,6 +720,8 @@ const Review = () => {
         is_mixed_tax_rate: formData.is_mixed_tax_rate,
         tax_rate_details: formData.is_mixed_tax_rate ? formData.tax_rate_details : null,
         payment_method: formData.payment_method || null,
+        skonto_amount: parseFloat(formData.skonto_amount) > 0 ? parseFloat(formData.skonto_amount) : null,
+        skonto_percent: parseFloat(formData.skonto_percent) > 0 ? parseFloat(formData.skonto_percent) : null,
         vendor_id: resolvedVendorId,
       };
 
@@ -2165,6 +2174,33 @@ const Review = () => {
                       vendorId={currentReceipt?.vendor_id || null}
                       vendorName={formData.vendor}
                     />
+
+                    {/* Skonto (manual) */}
+                    {(() => {
+                      const g = parseFloat(formData.amount_gross) || 0;
+                      const eff = applySkonto({ amount_gross: g, amount_net: formData.amount_net_override ? parseFloat(formData.amount_net_override) : calculatedAmounts.net, vat_amount: formData.vat_amount_override ? parseFloat(formData.vat_amount_override) : calculatedAmounts.vat, skonto_amount: formData.skonto_amount !== '' ? parseFloat(formData.skonto_amount) : null });
+                      return (
+                        <div className="space-y-2 rounded-md border border-border p-3">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <Label htmlFor="skonto_percent">Skonto %</Label>
+                              <Input id="skonto_percent" type="number" step="0.01" min="0" placeholder="0" value={formData.skonto_percent}
+                                onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, skonto_percent: v, skonto_amount: v !== '' && g ? String(amountFromPercent(g, parseFloat(v))) : '' })); }} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="skonto_amount">Skonto €</Label>
+                              <Input id="skonto_amount" type="number" step="0.01" min="0" placeholder="0,00" value={formData.skonto_amount}
+                                onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, skonto_amount: v, skonto_percent: v !== '' && g ? String(percentFromAmount(g, parseFloat(v))) : '' })); }} />
+                            </div>
+                          </div>
+                          {eff.skonto > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Zahlbetrag <span className="font-medium text-foreground">€ {eff.gross?.toFixed(2)}</span> · Netto € {eff.net?.toFixed(2) ?? '—'} · MwSt € {eff.vat?.toFixed(2) ?? '—'} (anteilig gekürzt)
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Payment Method */}
                     <div className="space-y-2">
