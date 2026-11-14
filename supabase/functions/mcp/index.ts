@@ -58,36 +58,134 @@ function supabaseForUser(ctx) {
   });
 }
 
+// src/lib/mcp/tools/_shared.ts
+var RECEIPT_FIELDS = "id, status, file_name, file_type, receipt_date, vendor, vendor_brand, description, invoice_number, amount_gross, amount_net, vat_amount, skonto_amount, skonto_percent, vat_rate, is_mixed_tax_rate, tax_rate_details, line_items_raw, currency, category, tax_type, ai_confidence, is_duplicate, is_no_receipt_entry, notes";
+function ok(text, structured) {
+  return { content: [{ type: "text", text }], structuredContent: structured };
+}
+function fail(text) {
+  return { content: [{ type: "text", text }], isError: true };
+}
+function toBase64(bytes) {
+  let binary = "";
+  const chunk = 32768;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+function mimeFor(fileType, fileName) {
+  const t = (fileType ?? fileName?.split(".").pop() ?? "").toLowerCase();
+  if (t.includes("pdf")) return "application/pdf";
+  if (t.includes("png")) return "image/png";
+  if (t.includes("webp")) return "image/webp";
+  if (t.includes("jp")) return "image/jpeg";
+  return "application/octet-stream";
+}
+function netFromGross(gross, vatRate) {
+  if (vatRate <= 0) return gross;
+  return Math.round(gross / (1 + vatRate / 100) * 100) / 100;
+}
+
+// src/lib/mcp/tools/_tags.ts
+function mergeReceiptTagNames(receipts, links) {
+  const namesByReceipt = /* @__PURE__ */ new Map();
+  for (const link of links) {
+    const tag = Array.isArray(link.tag) ? link.tag[0] : link.tag;
+    if (!tag?.name) continue;
+    const names = namesByReceipt.get(link.receipt_id) ?? /* @__PURE__ */ new Set();
+    names.add(tag.name);
+    namesByReceipt.set(link.receipt_id, names);
+  }
+  return receipts.map((receipt) => ({
+    ...receipt,
+    tags: [...namesByReceipt.get(receipt.id) ?? []].sort((a, b) => a.localeCompare(b, "de"))
+  }));
+}
+async function withReceiptTagNames(sb, receipts) {
+  if (receipts.length === 0) return { receipts: [], error: null };
+  const { data, error } = await sb.from("receipt_tags").select("receipt_id, tag:tags(name)").in("receipt_id", receipts.map((receipt) => receipt.id));
+  if (error) return { receipts: null, error: error.message };
+  return {
+    receipts: mergeReceiptTagNames(receipts, data ?? []),
+    error: null
+  };
+}
+function resolveTagIds(requestedNames, existingTags) {
+  const idsByName = new Map(existingTags.map((tag) => [tag.name, tag.id]));
+  const unknown = [...new Set(requestedNames.filter((name) => !idsByName.has(name)))];
+  if (unknown.length > 0) {
+    return {
+      ok: false,
+      error: `Unknown tag name(s): ${unknown.join(", ")}. No changes were made. Use list_tags to see the available names.`
+    };
+  }
+  return {
+    ok: true,
+    tagIds: [...new Set(requestedNames.map((name) => idsByName.get(name)))]
+  };
+}
+function planTagAssignmentChanges(currentTagIds, desiredTagIds) {
+  const current = new Set(currentTagIds);
+  const desired = new Set(desiredTagIds);
+  return {
+    upsertTagIds: [...desired].filter((tagId) => !current.has(tagId)),
+    deleteTagIds: [...current].filter((tagId) => !desired.has(tagId))
+  };
+}
+function flattenTagCounts(rows) {
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    is_active: row.is_active,
+    receipt_count: row.receipt_tags[0]?.count ?? 0
+  }));
+}
+
 // src/lib/mcp/tools/list-receipts.ts
+var RECEIPT_LIST_FIELDS = "id, receipt_date, vendor, vendor_brand, description, amount_gross, amount_net, vat_amount, vat_rate, currency, category, tax_type, status, invoice_number";
 var list_receipts_default = defineTool({
   name: "list_receipts",
   title: "List receipts",
-  description: "List the signed-in user's expense receipts, optionally filtered by date range, vendor or status.",
+  description: "List the signed-in user's expense receipts with tag names, optionally filtered by date range, vendor, status or one exact tag name.",
   inputSchema: {
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Start receipt date (YYYY-MM-DD)."),
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("End receipt date (YYYY-MM-DD)."),
     vendor: z.string().trim().min(1).optional().describe("Filter by vendor name (partial match)."),
     status: z.string().trim().min(1).optional().describe("Filter by receipt status, e.g. completed."),
+    tag: z.string().trim().min(1).optional().describe("Filter by one exact existing tag name."),
     limit: z.number().int().min(1).max(100).default(25).describe("Maximum number of receipts to return.")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
-  handler: async ({ from, to, vendor, status, limit }, ctx) => {
-    if (!ctx.isAuthenticated()) {
-      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+  handler: async ({ from, to, vendor, status, tag, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    let receiptIdsForTag;
+    if (tag) {
+      const { data: matchingTags, error: tagError } = await sb.from("tags").select("id").eq("name", tag);
+      if (tagError) return fail(tagError.message);
+      const tagIds = (matchingTags ?? []).map((row) => row.id);
+      if (tagIds.length === 0) return ok("[]", { receipts: [], count: 0 });
+      const { data: links, error: linksError } = await sb.from("receipt_tags").select("receipt_id").in("tag_id", tagIds);
+      if (linksError) return fail(linksError.message);
+      receiptIdsForTag = [...new Set((links ?? []).map((row) => row.receipt_id))];
+      if (receiptIdsForTag.length === 0) return ok("[]", { receipts: [], count: 0 });
     }
-    let query = supabaseForUser(ctx).from("receipts").select(
-      "id, receipt_date, vendor, vendor_brand, description, amount_gross, amount_net, vat_amount, vat_rate, currency, category, tax_type, status, invoice_number"
-    ).order("receipt_date", { ascending: false, nullsFirst: false }).limit(limit ?? 25);
+    let query = sb.from("receipts").select(RECEIPT_LIST_FIELDS).order("receipt_date", { ascending: false, nullsFirst: false }).limit(limit ?? 25);
     if (from) query = query.gte("receipt_date", from);
     if (to) query = query.lte("receipt_date", to);
     if (vendor) query = query.ilike("vendor", `%${vendor}%`);
     if (status) query = query.eq("status", status);
+    if (receiptIdsForTag) query = query.in("id", receiptIdsForTag);
     const { data, error } = await query;
-    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
-    return {
-      content: [{ type: "text", text: JSON.stringify(data ?? [], null, 2) }],
-      structuredContent: { receipts: data ?? [], count: data?.length ?? 0 }
-    };
+    if (error) return fail(error.message);
+    const tagged = await withReceiptTagNames(sb, data ?? []);
+    if (tagged.error) return fail(tagged.error);
+    return ok(JSON.stringify(tagged.receipts, null, 2), {
+      receipts: tagged.receipts,
+      count: tagged.receipts.length
+    });
   }
 });
 
@@ -179,41 +277,10 @@ var list_vendors_default = defineTool3({
 // src/lib/mcp/tools/get-review-queue.ts
 import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z4 } from "npm:zod@^4.4.3";
-
-// src/lib/mcp/tools/_shared.ts
-var RECEIPT_FIELDS = "id, status, file_name, file_type, receipt_date, vendor, vendor_brand, description, invoice_number, amount_gross, amount_net, vat_amount, skonto_amount, skonto_percent, vat_rate, is_mixed_tax_rate, tax_rate_details, line_items_raw, currency, category, tax_type, ai_confidence, is_duplicate, is_no_receipt_entry, notes";
-function ok(text, structured) {
-  return { content: [{ type: "text", text }], structuredContent: structured };
-}
-function fail(text) {
-  return { content: [{ type: "text", text }], isError: true };
-}
-function toBase64(bytes) {
-  let binary = "";
-  const chunk = 32768;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  }
-  return btoa(binary);
-}
-function mimeFor(fileType, fileName) {
-  const t = (fileType ?? fileName?.split(".").pop() ?? "").toLowerCase();
-  if (t.includes("pdf")) return "application/pdf";
-  if (t.includes("png")) return "image/png";
-  if (t.includes("webp")) return "image/webp";
-  if (t.includes("jp")) return "image/jpeg";
-  return "application/octet-stream";
-}
-function netFromGross(gross, vatRate) {
-  if (vatRate <= 0) return gross;
-  return Math.round(gross / (1 + vatRate / 100) * 100) / 100;
-}
-
-// src/lib/mcp/tools/get-review-queue.ts
 var get_review_queue_default = defineTool4({
   name: "get_review_queue",
   title: "Get review queue",
-  description: "List receipts waiting for review with their extracted data. Use get_receipt_document to read the original file and compare.",
+  description: "List receipts waiting for review with their extracted data and tag names. Use get_receipt_document to read the original file and compare.",
   inputSchema: {
     limit: z4.number().int().min(1).max(50).default(10).describe("How many receipts to return."),
     offset: z4.number().int().min(0).default(0).describe("Skip this many receipts (paging).")
@@ -223,11 +290,14 @@ var get_review_queue_default = defineTool4({
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const l = limit ?? 10;
     const o = offset ?? 0;
-    const { data, error, count } = await supabaseForUser(ctx).from("receipts").select(RECEIPT_FIELDS, { count: "exact" }).eq("status", "review").order("created_at", { ascending: true }).range(o, o + l - 1);
+    const sb = supabaseForUser(ctx);
+    const { data, error, count } = await sb.from("receipts").select(RECEIPT_FIELDS, { count: "exact" }).eq("status", "review").order("created_at", { ascending: true }).range(o, o + l - 1);
     if (error) return fail(error.message);
-    return ok(JSON.stringify({ total_in_review: count ?? 0, receipts: data ?? [] }, null, 2), {
+    const tagged = await withReceiptTagNames(sb, data ?? []);
+    if (tagged.error) return fail(tagged.error);
+    return ok(JSON.stringify({ total_in_review: count ?? 0, receipts: tagged.receipts }, null, 2), {
       total_in_review: count ?? 0,
-      receipts: JSON.parse(JSON.stringify(data ?? []))
+      receipts: tagged.receipts
     });
   }
 });
@@ -239,7 +309,7 @@ var MAX_BYTES = 8 * 1024 * 1024;
 var get_receipt_document_default = defineTool5({
   name: "get_receipt_document",
   title: "Get receipt with original file",
-  description: "Return one receipt's extracted data plus the original PDF or image, so it can be checked against the document.",
+  description: "Return one receipt's extracted data and tag names plus the original PDF or image, so it can be checked against the document.",
   inputSchema: { id: z5.string().uuid().describe("Receipt id.") },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ id }, ctx) => {
@@ -249,7 +319,10 @@ var get_receipt_document_default = defineTool5({
     if (error) return fail(error.message);
     if (!r) return fail("Receipt not found.");
     const { file_url, ...fields } = r;
-    const text = { type: "text", text: JSON.stringify(fields, null, 2) };
+    const tagged = await withReceiptTagNames(sb, [fields]);
+    if (tagged.error) return fail(tagged.error);
+    const receipt = tagged.receipts[0];
+    const text = { type: "text", text: JSON.stringify(receipt, null, 2) };
     if (!file_url) return { content: [text, { type: "text", text: "No original file stored." }] };
     const { data: blob, error: dlErr } = await sb.storage.from("receipts").download(file_url);
     if (dlErr || !blob) return { content: [text, { type: "text", text: `File could not be loaded: ${dlErr?.message ?? "unknown"}` }] };
@@ -257,7 +330,7 @@ var get_receipt_document_default = defineTool5({
       return { content: [text, { type: "text", text: `File is too large to attach (${Math.round(blob.size / 1024 / 1024)} MB). Check it in the app.` }] };
     }
     const bytes = new Uint8Array(await blob.arrayBuffer());
-    const mimeType = mimeFor(fields.file_type, fields.file_name);
+    const mimeType = mimeFor(receipt.file_type, receipt.file_name);
     const data = toBase64(bytes);
     const fileContent = mimeType.startsWith("image/") ? { type: "image", data, mimeType } : { type: "resource", resource: { uri: `billmonk://receipts/${id}`, mimeType, blob: data } };
     return { content: [text, fileContent] };
@@ -270,7 +343,7 @@ import { z as z6 } from "npm:zod@^4.4.3";
 var update_receipt_default = defineTool6({
   name: "update_receipt",
   title: "Correct receipt data",
-  description: "Correct extracted fields of a receipt. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+  description: "Correct extracted fields of a receipt. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
   inputSchema: {
     id: z6.string().uuid().describe("Receipt id."),
     vendor: z6.string().min(1).optional().describe("Legal vendor name."),
@@ -284,18 +357,31 @@ var update_receipt_default = defineTool6({
     category: z6.string().min(1).optional().describe("One of the user's existing categories."),
     description: z6.string().optional().describe("Short description."),
     skonto_amount: z6.number().min(0).optional().describe("Manual cash discount (Skonto) in EUR deducted at payment; 0 removes it. Original invoice amounts stay unchanged."),
-    skonto_percent: z6.number().min(0).max(100).optional().describe("Manual cash discount in percent of gross; 0 removes it.")
+    skonto_percent: z6.number().min(0).max(100).optional().describe("Manual cash discount in percent of gross; 0 removes it."),
+    tags: z6.array(z6.string().trim().min(1)).optional().describe("Complete list of existing tag names for this receipt. Replaces all current tags; [] removes every tag. Unknown names are rejected and never created.")
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  handler: async ({ id, ...input }, ctx) => {
+  handler: async ({ id, tags: requestedTags, ...input }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
     const { data: cur, error: e1 } = await sb.from("receipts").select("amount_gross, vat_rate, user_modified_fields").eq("id", id).maybeSingle();
     if (e1) return fail(e1.message);
     if (!cur) return fail("Receipt not found.");
+    let desiredTagIds;
+    let currentTagIds = [];
+    if (requestedTags !== void 0) {
+      const { data: existingTags, error: tagsError } = await sb.from("tags").select("id, name");
+      if (tagsError) return fail(tagsError.message);
+      const resolved = resolveTagIds(requestedTags, existingTags ?? []);
+      if (!resolved.ok) return fail(resolved.error);
+      desiredTagIds = resolved.tagIds;
+      const { data: currentLinks, error: linksError } = await sb.from("receipt_tags").select("tag_id").eq("receipt_id", id);
+      if (linksError) return fail(linksError.message);
+      currentTagIds = (currentLinks ?? []).map((link) => link.tag_id);
+    }
     const patch = {};
     for (const [k, v] of Object.entries(input)) if (v !== void 0) patch[k] = v;
-    if (Object.keys(patch).length === 0) return fail("No fields to update.");
+    if (Object.keys(patch).length === 0 && requestedTags === void 0) return fail("No fields to update.");
     const g = Math.abs(Number(patch.amount_gross ?? cur.amount_gross ?? 0));
     if (patch.skonto_amount !== void 0 || patch.skonto_percent !== void 0) {
       let amt = patch.skonto_amount;
@@ -325,11 +411,31 @@ var update_receipt_default = defineTool6({
         if (patch.vat_amount === void 0) patch.vat_amount = Math.round((Number(gross) - net) * 100) / 100;
       }
     }
-    const modified = /* @__PURE__ */ new Set([...cur.user_modified_fields ?? [], ...Object.keys(input).filter((k) => input[k] !== void 0)]);
+    const modified = /* @__PURE__ */ new Set([
+      ...cur.user_modified_fields ?? [],
+      ...Object.keys(input).filter((k) => input[k] !== void 0),
+      ...requestedTags !== void 0 ? ["tags"] : []
+    ]);
     patch.user_modified_fields = [...modified];
     const { data, error } = await sb.from("receipts").update(patch).eq("id", id).select(RECEIPT_FIELDS).single();
     if (error) return fail(error.message);
-    return ok(JSON.stringify(data, null, 2), { receipt: JSON.parse(JSON.stringify(data)) });
+    if (desiredTagIds !== void 0) {
+      const changes = planTagAssignmentChanges(currentTagIds, desiredTagIds);
+      if (changes.upsertTagIds.length > 0) {
+        const { error: upsertError } = await sb.from("receipt_tags").upsert(
+          changes.upsertTagIds.map((tagId) => ({ receipt_id: id, tag_id: tagId })),
+          { onConflict: "receipt_id,tag_id", ignoreDuplicates: true }
+        );
+        if (upsertError) return fail(upsertError.message);
+      }
+      if (changes.deleteTagIds.length > 0) {
+        const { error: deleteError } = await sb.from("receipt_tags").delete().eq("receipt_id", id).in("tag_id", changes.deleteTagIds);
+        if (deleteError) return fail(deleteError.message);
+      }
+    }
+    const tagged = await withReceiptTagNames(sb, [data]);
+    if (tagged.error) return fail(tagged.error);
+    return ok(JSON.stringify(tagged.receipts[0], null, 2), { receipt: tagged.receipts[0] });
   }
 });
 
@@ -379,13 +485,30 @@ var list_bank_transactions_default = defineTool8({
   }
 });
 
+// src/lib/mcp/tools/list-tags.ts
+import { defineTool as defineTool9 } from "npm:@lovable.dev/mcp-js@0.26.1";
+var list_tags_default = defineTool9({
+  name: "list_tags",
+  title: "List tags",
+  description: "List all of the signed-in user's existing tags with the number of receipts assigned to each tag.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (_args, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const { data, error } = await supabaseForUser(ctx).from("tags").select("id, name, color, is_active, receipt_tags(count)").order("sort_order", { ascending: true, nullsFirst: false }).order("name", { ascending: true });
+    if (error) return fail(error.message);
+    const tags = flattenTagCounts(data ?? []);
+    return ok(JSON.stringify(tags, null, 2), { tags, count: tags.length });
+  }
+});
+
 // src/lib/mcp/index.ts
 var projectRef = "nvvssxykygdxjywncvgd";
 var mcp_default = defineMcp({
   name: "billmonk",
   title: "BillMonk",
-  version: "0.2.0",
-  instructions: "Tools for BillMonk, a private expense management app. Review workflow: call get_review_queue, then get_receipt_document for each receipt to compare the original file with the extracted data, fix mistakes with update_receipt, and call approve_receipt only when the user asks. Prefer expense_summary for totals.",
+  version: "0.3.0",
+  instructions: "Tools for BillMonk, a private expense management app. Review workflow: call get_review_queue, then get_receipt_document for each receipt to compare the original file with the extracted data, fix mistakes with update_receipt, and call approve_receipt only when the user asks. Use list_tags to see existing tag names and counts; update_receipt accepts a complete tags list and never creates tags. Prefer expense_summary for totals.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"
@@ -398,7 +521,8 @@ var mcp_default = defineMcp({
     get_receipt_document_default,
     update_receipt_default,
     approve_receipt_default,
-    list_bank_transactions_default
+    list_bank_transactions_default,
+    list_tags_default
   ]
 });
 
