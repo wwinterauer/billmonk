@@ -399,7 +399,7 @@ import { z as z6 } from "npm:zod@^4.4.3";
 var LOCKED_RECEIPT_STATUSES = ["approved", "completed"];
 function lockedReceiptError(status) {
   if (status && LOCKED_RECEIPT_STATUSES.includes(status)) {
-    return `Receipt is ${status} and locked. Splitting and other changes are not allowed via MCP for approved receipts; only category and tags can be changed with update_receipt.`;
+    return `Receipt is ${status} and locked. Splitting and other changes are not allowed via MCP for approved receipts; only category, tags and receipt_date can be changed with update_receipt.`;
   }
   return null;
 }
@@ -409,26 +409,27 @@ async function checkReceiptEditable(sb, id) {
   if (!data) return "Receipt not found.";
   return lockedReceiptError(data.status);
 }
-var FIELDS_EDITABLE_WHEN_LOCKED = ["category", "tags"];
+var FIELDS_EDITABLE_WHEN_LOCKED = ["category", "tags", "receipt_date", "no_invoice"];
 function lockedFieldsError(status, fields) {
   if (!lockedReceiptError(status)) return null;
   const blocked = fields.filter((f) => !FIELDS_EDITABLE_WHEN_LOCKED.includes(f));
   if (blocked.length === 0) return null;
-  return `Receipt is ${status}: only category and tags can be changed. Locked fields: ${blocked.join(", ")}.`;
+  return `Receipt is ${status}: only category, tags and receipt_date can be changed. Locked fields: ${blocked.join(", ")}.`;
 }
+var NO_INVOICE_CATEGORY = "Keine Rechnung";
 
 // src/lib/mcp/tools/update-receipt.ts
 var update_receipt_default = defineTool6({
   name: "update_receipt",
   title: "Correct receipt data",
-  description: "Correct extracted fields of a receipt. On approved receipts only category and tags may be changed, all other fields are locked. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+  description: 'Correct extracted fields of a receipt. On approved receipts only category, tags and receipt_date may be changed, all other fields are locked. "Keine Rechnung" (no_invoice: true, or category "Keine Rechnung") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when "Keine Rechnung ausschlie\xDFen" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.',
   inputSchema: {
     id: z6.string().uuid().describe("Receipt id."),
     vendor: z6.string().min(1).optional().describe("Legal vendor name."),
     vendor_brand: z6.string().min(1).optional().describe("Vendor brand name."),
     receipt_date: z6.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Receipt date YYYY-MM-DD."),
     invoice_number: z6.string().optional().describe("Invoice number."),
-    amount_gross: z6.number().optional().describe("Gross amount."),
+    amount_gross: z6.number().nullable().optional().describe('Gross amount. null clears it (intended for "Keine Rechnung" entries without an amount).'),
     amount_net: z6.number().optional().describe("Net amount."),
     vat_amount: z6.number().optional().describe("VAT amount."),
     vat_rate: z6.number().min(0).max(100).optional().describe("VAT rate in percent."),
@@ -436,10 +437,11 @@ var update_receipt_default = defineTool6({
     description: z6.string().optional().describe("Short description."),
     skonto_amount: z6.number().min(0).optional().describe("Manual cash discount (Skonto) in EUR deducted at payment; 0 removes it. Original invoice amounts stay unchanged."),
     skonto_percent: z6.number().min(0).max(100).optional().describe("Manual cash discount in percent of gross; 0 removes it."),
+    no_invoice: z6.boolean().optional().describe('true marks the receipt as "Keine Rechnung" exactly like the app (category "Keine Rechnung" plus no-receipt flag). false only clears the flag; set a new category to leave "Keine Rechnung".'),
     tags: z6.array(z6.string().trim().min(1)).optional().describe("Complete list of existing tag names for this receipt. Replaces all current tags; [] removes every tag. Unknown names are rejected and never created.")
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  handler: async ({ id, tags: requestedTags, ...input }, ctx) => {
+  handler: async ({ id, tags: requestedTags, no_invoice, ...input }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
     const { data: cur, error: e1 } = await sb.from("receipts").select("amount_gross, vat_rate, user_modified_fields, status").eq("id", id).maybeSingle();
@@ -447,7 +449,8 @@ var update_receipt_default = defineTool6({
     if (!cur) return fail("Receipt not found.");
     const requestedFields = [
       ...Object.keys(input).filter((k) => input[k] !== void 0),
-      ...requestedTags !== void 0 ? ["tags"] : []
+      ...requestedTags !== void 0 ? ["tags"] : [],
+      ...no_invoice !== void 0 ? ["no_invoice"] : []
     ];
     const locked = lockedFieldsError(cur.status, requestedFields);
     if (locked) return fail(locked);
@@ -465,7 +468,12 @@ var update_receipt_default = defineTool6({
     }
     const patch = {};
     for (const [k, v] of Object.entries(input)) if (v !== void 0) patch[k] = v;
-    if (Object.keys(patch).length === 0 && requestedTags === void 0) return fail("No fields to update.");
+    if (no_invoice === true) {
+      patch.category = NO_INVOICE_CATEGORY;
+      patch.is_no_receipt_entry = true;
+    } else if (no_invoice === false) patch.is_no_receipt_entry = false;
+    if (patch.category === NO_INVOICE_CATEGORY) patch.is_no_receipt_entry = true;
+    if (Object.keys(patch).length === 0 && no_invoice === void 0 && requestedTags === void 0) return fail("No fields to update.");
     const g = Math.abs(Number(patch.amount_gross ?? cur.amount_gross ?? 0));
     if (patch.skonto_amount !== void 0 || patch.skonto_percent !== void 0) {
       let amt = patch.skonto_amount;
@@ -481,7 +489,7 @@ var update_receipt_default = defineTool6({
     if (patch.category !== void 0) {
       const { data: cats } = await sb.from("categories").select("name").not("is_hidden", "is", true);
       const names = (cats ?? []).map((c) => c.name);
-      if (names.length && !names.includes(patch.category)) {
+      if (patch.category !== NO_INVOICE_CATEGORY && names.length && !names.includes(patch.category)) {
         return fail(`Unknown category. Allowed: ${names.join(", ")}`);
       }
     }
@@ -489,7 +497,10 @@ var update_receipt_default = defineTool6({
     if (grossChanged && patch.amount_net === void 0) {
       const gross = patch.amount_gross ?? cur.amount_gross;
       const rate = patch.vat_rate ?? cur.vat_rate;
-      if (gross !== null && gross !== void 0 && rate !== null && rate !== void 0) {
+      if (patch.amount_gross === null) {
+        patch.amount_net = null;
+        patch.vat_amount = null;
+      } else if (gross !== null && gross !== void 0 && rate !== null && rate !== void 0) {
         const net = netFromGross(Number(gross), Number(rate));
         patch.amount_net = net;
         if (patch.vat_amount === void 0) patch.vat_amount = Math.round((Number(gross) - net) * 100) / 100;
