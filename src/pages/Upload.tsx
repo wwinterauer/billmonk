@@ -36,12 +36,17 @@ import { de } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageMeta } from '@/components/PageMeta';
-import { saveQueue, clearQueue, runWithConcurrency } from '@/lib/upload-queue';
+import { saveQueue, clearQueue } from '@/lib/upload-queue';
+import { UploadController, liveUploadRuns } from '@/lib/uploadController';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
 import { prepareUploadFiles } from '@/lib/uploadPreparation';
 import { UploadRunOverview } from '@/components/upload/UploadRunOverview';
 import { ProblemReceiptsBanner } from '@/components/dashboard/ProblemReceiptsBanner';
 
 const UPLOAD_CONCURRENCY = 3;
+const STALL_AFTER_MS = 2 * 60 * 1000;
+const REVIEW_DUPLICATES_KEY = 'billmonk:upload:review-duplicates';
 
 interface FileUpload extends UploadProgress {
   file: File;
@@ -102,7 +107,11 @@ const Upload = () => {
   const [uploadPhase, setUploadPhase] = useState<UploadPhase>('idle');
   const [checkProgress, setCheckProgress] = useState<CheckProgress>({ current: 0, total: 0 });
   const [duplicatesToResolve, setDuplicatesToResolve] = useState<FileCheckResult[]>([]);
-  const [nonDuplicateFiles, setNonDuplicateFiles] = useState<{ file: File; hash: string }[]>([]);
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+  const [uploadStalled, setUploadStalled] = useState(false);
+  const [reviewDuplicates, setReviewDuplicates] = useState(() => {
+    try { return localStorage.getItem(REVIEW_DUPLICATES_KEY) === '1'; } catch { return false; }
+  });
   
   // Vendor selection states
   const [showVendorSelectionDialog, setShowVendorSelectionDialog] = useState(false);
@@ -117,6 +126,8 @@ const Upload = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeRunRef = useRef<string | null>(null);
   const eventIdsRef = useRef(new WeakMap<File, string>());
+  const controllerRef = useRef<UploadController | null>(null);
+  const protocolErrorsRef = useRef(0);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { 
@@ -143,7 +154,10 @@ const Upload = () => {
     const eventId = eventIdsRef.current.get(file);
     if (!eventId) return;
     const { error } = await supabase.from('upload_file_events').update(values).eq('id', eventId);
-    if (error) console.error('Upload protocol update failed:', error);
+    if (error) {
+      protocolErrorsRef.current += 1;
+      console.error('Upload protocol update failed:', error);
+    }
     // Keep the sidebar review badge in sync as soon as a file reaches a final state.
     if (values.outcome && values.outcome !== 'pending') {
       window.dispatchEvent(new Event('refresh-review-count'));
@@ -151,33 +165,56 @@ const Upload = () => {
   }, []);
 
   const finishUploadRun = useCallback(async (runId: string) => {
-    const { data, error } = await supabase
-      .from('upload_file_events')
-      .select('outcome')
-      .eq('run_id', runId);
-    if (error || !data) {
-      console.error('Upload protocol summary failed:', error);
-      return;
+    try {
+      // A run must never stay "open": anything without a final state at this
+      // point gets an explicit failure reason instead of hanging around.
+      await supabase
+        .from('upload_file_events')
+        .update({
+          outcome: 'failed',
+          phase: 'failed',
+          reason_code: 'pipeline_error',
+          error_message: 'Kein Endzustand protokolliert – bitte in der Review prüfen, ob der Beleg angekommen ist.',
+        })
+        .eq('run_id', runId)
+        .eq('outcome', 'pending');
+      const { data, error } = await supabase
+        .from('upload_file_events')
+        .select('outcome')
+        .eq('run_id', runId);
+      const rows = error || !data ? [] : data;
+      if (error) console.error('Upload protocol summary failed:', error);
+      const summary: UploadRunSummary = {
+        total: rows.length,
+        uploaded: rows.filter(item => item.outcome === 'uploaded').length,
+        duplicates: rows.filter(item => item.outcome === 'duplicate').length,
+        rejected: rows.filter(item => item.outcome === 'rejected').length,
+        failed: rows.filter(item => item.outcome === 'failed').length,
+        pending: rows.filter(item => item.outcome === 'pending').length,
+      };
+      await supabase.from('upload_runs').update({
+        status: error || summary.pending > 0 ? 'failed' : 'completed',
+        uploaded_count: summary.uploaded,
+        duplicate_count: summary.duplicates,
+        rejected_count: summary.rejected,
+        failed_count: summary.failed,
+        pending_count: summary.pending,
+        completed_at: new Date().toISOString(),
+      }).eq('id', runId);
+      setRunSummary(summary);
+      if (protocolErrorsRef.current > 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Protokoll unvollständig',
+          description: `${protocolErrorsRef.current} Statusmeldungen konnten nicht gespeichert werden. Bitte die Review prüfen.`,
+        });
+      }
+    } finally {
+      protocolErrorsRef.current = 0;
+      if (activeRunRef.current === runId) activeRunRef.current = null;
+      liveUploadRuns.delete(runId);
     }
-    const summary: UploadRunSummary = {
-      total: data.length,
-      uploaded: data.filter(item => item.outcome === 'uploaded').length,
-      duplicates: data.filter(item => item.outcome === 'duplicate').length,
-      rejected: data.filter(item => item.outcome === 'rejected').length,
-      failed: data.filter(item => item.outcome === 'failed').length,
-      pending: data.filter(item => item.outcome === 'pending').length,
-    };
-    await supabase.from('upload_runs').update({
-      status: summary.pending > 0 ? 'failed' : 'completed',
-      uploaded_count: summary.uploaded,
-      duplicate_count: summary.duplicates,
-      rejected_count: summary.rejected,
-      failed_count: summary.failed,
-      pending_count: summary.pending,
-      completed_at: new Date().toISOString(),
-    }).eq('id', runId);
-    setRunSummary(summary);
-    activeRunRef.current = null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load pending/processing receipts from database (used on mount and as a
@@ -241,9 +278,76 @@ const Upload = () => {
         .limit(1)
         .maybeSingle();
       if (!cancelled && data?.id) setOverviewRunId(data.id);
+
+      // A run still marked active that no longer has its files in this
+      // browser was interrupted (reload / tab closed). Say so explicitly.
+      const { data: activeRuns } = await supabase
+        .from('upload_runs')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+      for (const run of activeRuns ?? []) {
+        const live = liveUploadRuns.get(run.id);
+        if (live && !live.isFinished) {
+          if (cancelled) return;
+          // Upload continues in the background after navigating away and back.
+          controllerRef.current = live;
+          activeRunRef.current = run.id;
+          setOverviewRunId(run.id);
+          setUploadPhase('uploading');
+          continue;
+        }
+        await supabase
+          .from('upload_file_events')
+          .update({
+            outcome: 'failed',
+            phase: 'interrupted',
+            reason_code: 'interrupted_reload',
+            error_message: null,
+          })
+          .eq('run_id', run.id)
+          .eq('outcome', 'pending');
+        const { data: rows } = await supabase.from('upload_file_events').select('outcome').eq('run_id', run.id);
+        const count = (o: string) => (rows ?? []).filter(r => r.outcome === o).length;
+        await supabase.from('upload_runs').update({
+          status: 'failed',
+          completed_at: new Date().toISOString(),
+          uploaded_count: count('uploaded'),
+          duplicate_count: count('duplicate'),
+          rejected_count: count('rejected'),
+          failed_count: count('failed'),
+          pending_count: 0,
+        }).eq('id', run.id);
+      }
     })();
     return () => { cancelled = true; };
   }, [user]);
+
+  // Re-attached background run: return to idle once it has finished.
+  useEffect(() => {
+    if (uploadPhase !== 'uploading') return;
+    const interval = setInterval(() => {
+      const controller = controllerRef.current;
+      if (!controller || controller.isFinished) {
+        setUploadPhase('idle');
+        setUploadStalled(false);
+        return;
+      }
+      setUploadStalled(controller.isStalled(STALL_AFTER_MS));
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [uploadPhase]);
+
+  const resumeStalledUpload = () => {
+    controllerRef.current?.resume();
+    setUploadStalled(false);
+    toast({ title: 'Upload wird fortgesetzt', description: 'Die offenen Dateien werden erneut angestoßen.' });
+  };
+
+  const toggleReviewDuplicates = (value: boolean) => {
+    setReviewDuplicates(value);
+    try { localStorage.setItem(REVIEW_DUPLICATES_KEY, value ? '1' : '0'); } catch { /* ignore */ }
+  };
 
   // Warn before leaving the page while an upload is still running.
   useEffect(() => {
@@ -485,22 +589,10 @@ const Upload = () => {
     setUploadPhase('checking');
     setCheckProgress({ current: 0, total: validFiles.length });
 
+    let checked: Awaited<ReturnType<typeof checkFilesForDuplicates>>;
     try {
-      const { duplicates, nonDuplicates } = await checkFilesForDuplicates(validFiles);
+      checked = await checkFilesForDuplicates(validFiles);
       setCheckProgress({ current: validFiles.length, total: validFiles.length });
-
-      // Store non-duplicates for later upload
-      setNonDuplicateFiles(nonDuplicates);
-
-      if (duplicates.length > 0) {
-        // Phase 2: Show dialog for all duplicates at once
-        setDuplicatesToResolve(duplicates);
-        setUploadPhase('resolving-duplicates');
-      } else {
-        // No duplicates - start uploading directly
-        setUploadPhase('uploading');
-        await startUploading(nonDuplicates, [], runId);
-      }
     } catch (error) {
       console.error('Error checking files:', error);
       setUploadPhase('idle');
@@ -514,150 +606,157 @@ const Upload = () => {
         error_message: error instanceof Error ? error.message : 'Unbekannter Fehler',
       })));
       await finishUploadRun(runId);
+      return;
     }
-  };
 
-  // Handle decisions from duplicate dialog
-  const handleDuplicateDecisions = async (decisions: Map<File, 'skip' | 'upload'>) => {
+    // Phase 2: upload new files right away. Duplicates never block them.
+    const controller = new UploadController({
+      concurrency: UPLOAD_CONCURRENCY,
+      onTaskError: (_id, error) => console.error('Upload task failed:', error),
+      onDrained: async () => {
+        try {
+          if (user) clearQueue(user.id);
+          await finishUploadRun(runId);
+        } finally {
+          if (controllerRef.current === controller) {
+            controllerRef.current = null;
+            setUploadPhase('idle');
+            setUploadStalled(false);
+          }
+        }
+      },
+    });
+    controllerRef.current = controller;
+    liveUploadRuns.set(runId, controller);
     setUploadPhase('uploading');
-    
-    // Collect files to upload based on decisions
-    const duplicatesToUpload: { file: File; hash: string; duplicateOfId: string }[] = [];
-    
-    for (const [file, decision] of decisions) {
-      if (decision === 'upload') {
-        const duplicateInfo = duplicatesToResolve.find(d => d.file === file);
-        const duplicateOfId = duplicateInfo?.existingReceipt?.id;
-        if (duplicateInfo && duplicateOfId) {
-          duplicatesToUpload.push({
-            file,
-            hash: duplicateInfo.hash,
-            duplicateOfId,
+
+    try {
+      const { duplicates, nonDuplicates } = checked;
+      if (duplicates.length > 0) {
+        if (reviewDuplicates) {
+          controller.hold('duplicates');
+          setDuplicatesToResolve(duplicates);
+          setDuplicateDialogOpen(true);
+        } else {
+          await Promise.all(duplicates.map(d => updateFileEvent(d.file, {
+            phase: 'duplicate-decision', outcome: 'duplicate', reason_code: 'existing_duplicate_skipped',
+          })));
+          toast({
+            title: `${duplicates.length} bereits vorhandene Dateien übersprungen`,
+            description: `${nonDuplicates.length} neue Dateien werden hochgeladen.`,
           });
         }
       }
-      if (decision === 'skip') {
-        await updateFileEvent(file, {
-          phase: 'duplicate-decision', outcome: 'duplicate', reason_code: 'existing_duplicate_skipped',
+      if (user && nonDuplicates.length > 0) {
+        saveQueue(user.id, {
+          startedAt: Date.now(),
+          total: nonDuplicates.length,
+          items: nonDuplicates.map(({ file, hash }) => ({ fileName: file.name, fileSize: file.size, fileHash: hash, status: 'pending' })),
         });
       }
+      await enqueueUploads(controller, nonDuplicates.map(item => ({ ...item, isDuplicate: false })));
+    } catch (error) {
+      console.error('Upload pipeline failed:', error);
+      const message = error instanceof Error ? error.message : 'Unbekannter Fehler';
+      await supabase.from('upload_file_events')
+        .update({ outcome: 'failed', phase: 'failed', reason_code: 'pipeline_error', error_message: message })
+        .eq('run_id', runId).eq('outcome', 'pending');
+      toast({ variant: 'destructive', title: 'Upload-Ablauf unterbrochen', description: message });
+      controller.release('duplicates');
+    } finally {
+      controller.release('setup');
     }
-    
-    // Clear duplicate state
-    setDuplicatesToResolve([]);
-    
-    // Start uploading all files
-    const runId = activeRunRef.current;
-    if (runId) await startUploading(nonDuplicateFiles, duplicatesToUpload, runId);
   };
 
-  // Handle cancel from duplicate dialog
-  const handleDuplicateCancel = () => {
-    const runId = activeRunRef.current;
-    void Promise.all([...nonDuplicateFiles.map(item => item.file), ...duplicatesToResolve.map(item => item.file)].map(file =>
-      updateFileEvent(file, { phase: 'cancelled', outcome: 'failed', reason_code: 'user_cancelled' })
-    )).then(() => runId && finishUploadRun(runId));
-    setUploadPhase('idle');
-    setDuplicatesToResolve([]);
-    setNonDuplicateFiles([]);
-    
-    toast({
-      title: 'Upload abgebrochen',
-      description: 'Der Vorgang wurde abgebrochen.',
-    });
-  };
-
-  // Start uploading files after duplicate resolution
-  const startUploading = async (
-    nonDuplicates: { file: File; hash: string }[],
-    duplicatesToUpload: { file: File; hash: string; duplicateOfId: string }[],
-    runId: string,
+  // Put files into the upload queue (state updates are functional so later
+  // additions from the duplicate dialog never overwrite earlier ones).
+  const enqueueUploads = async (
+    controller: UploadController,
+    items: { file: File; hash: string; isDuplicate: boolean; duplicateOfId?: string }[],
   ) => {
-    // Add all files to upload queue
-    const newUploads = new Map(uploads);
-    const filesToUpload: { upload: FileUpload; isDuplicate: boolean; duplicateOfId?: string }[] = [];
-
-    // Add non-duplicates
-    for (const { file, hash } of nonDuplicates) {
-      const id = crypto.randomUUID();
-      const upload: FileUpload = {
-        id,
-        fileName: file.name,
-        fileSize: file.size,
+    if (items.length === 0) return;
+    const prepared = items.map(item => ({
+      ...item,
+      upload: {
+        id: crypto.randomUUID(),
+        fileName: item.file.name,
+        fileSize: item.file.size,
         progress: 0,
         status: 'pending',
         statusText: 'Warten...',
-        file,
-        previewUrl: createPreviewUrl(file),
-        fileHash: hash,
-      };
-      newUploads.set(id, upload);
-      filesToUpload.push({ upload, isDuplicate: false });
+        file: item.file,
+        previewUrl: createPreviewUrl(item.file),
+        fileHash: item.hash,
+      } as FileUpload,
+    }));
+    setUploads(prev => {
+      const next = new Map(prev);
+      for (const { upload } of prepared) next.set(upload.id, upload);
+      return next;
+    });
+    const eventIds = prepared
+      .map(({ file }) => eventIdsRef.current.get(file))
+      .filter((id): id is string => Boolean(id));
+    if (eventIds.length > 0) {
+      const { error } = await supabase.from('upload_file_events').update({ phase: 'queued' }).in('id', eventIds);
+      if (error) {
+        protocolErrorsRef.current += 1;
+        console.error('Upload protocol update failed:', error);
+      }
     }
-
-    // Add duplicates that user chose to upload
-    for (const { file, hash, duplicateOfId } of duplicatesToUpload) {
-      const id = crypto.randomUUID();
-      const upload: FileUpload = {
-        id,
-        fileName: file.name,
-        fileSize: file.size,
-        progress: 0,
-        status: 'pending',
-        statusText: 'Warten...',
-        file,
-        previewUrl: createPreviewUrl(file),
-        fileHash: hash,
-      };
-      newUploads.set(id, upload);
-      filesToUpload.push({ upload, isDuplicate: true, duplicateOfId });
-    }
-
-    setUploads(newUploads);
-    setNonDuplicateFiles([]);
-    // Keep the run active while the queued files are uploaded and analysed.
-
-    // Show summary toast
-    const skippedCount = duplicatesToResolve.length - duplicatesToUpload.length;
-    if (skippedCount > 0 || duplicatesToUpload.length > 0) {
-      toast({
-        title: 'Duplikat-Prüfung abgeschlossen',
-        description: `${nonDuplicates.length + duplicatesToUpload.length} Dateien werden hochgeladen${skippedCount > 0 ? `, ${skippedCount} übersprungen` : ''}.`,
-      });
-    }
-
-    // Persist a snapshot of the planned queue so that, if the tab is reloaded
-    // or crashes mid-upload, we can show the user a recovery hint with the
-    // list of filenames that never finished.
-    if (user) {
-      saveQueue(user.id, {
-        startedAt: Date.now(),
-        total: filesToUpload.length,
-        items: filesToUpload.map(({ upload }) => ({
-          fileName: upload.fileName,
-          fileSize: upload.fileSize,
-          fileHash: upload.fileHash,
-          status: 'pending',
-        })),
-      });
-    }
-
-    // Upload with bounded concurrency instead of strictly sequential — keeps
-    // the edge function from being hammered while drastically improving
-    // throughput on large drops.
-    await runWithConcurrency(filesToUpload, UPLOAD_CONCURRENCY, async ({ upload, isDuplicate, duplicateOfId }) => {
-      await uploadFile(upload, {
+    controller.enqueue(prepared.map(({ upload, isDuplicate, duplicateOfId }) => ({
+      id: upload.id,
+      run: () => uploadFile(upload, {
         skipDuplicateCheck: false,
         markAsDuplicate: isDuplicate,
         duplicateOfId,
         fileHash: upload.fileHash,
-      });
-    });
+      }),
+    })));
+  };
 
-    // All done — drop the recovery snapshot.
-    if (user) clearQueue(user.id);
-    await finishUploadRun(runId);
-    setUploadPhase('idle');
+  // Handle decisions from duplicate dialog (only when "Duplikate einzeln prüfen" is on)
+  const handleDuplicateDecisions = async (decisions: Map<File, 'skip' | 'upload'>) => {
+    const controller = controllerRef.current;
+    const resolved = duplicatesToResolve;
+    setDuplicateDialogOpen(false);
+    setDuplicatesToResolve([]);
+    try {
+      const toUpload: { file: File; hash: string; isDuplicate: boolean; duplicateOfId?: string }[] = [];
+      const skipped: File[] = [];
+      for (const [file, decision] of decisions) {
+        const info = resolved.find(d => d.file === file);
+        if (decision === 'upload' && info?.existingReceipt?.id) {
+          toUpload.push({ file, hash: info.hash, isDuplicate: true, duplicateOfId: info.existingReceipt.id });
+        } else {
+          skipped.push(file);
+        }
+      }
+      await Promise.all(skipped.map(file => updateFileEvent(file, {
+        phase: 'duplicate-decision', outcome: 'duplicate', reason_code: 'existing_duplicate_skipped',
+      })));
+      if (controller && !controller.isFinished) await enqueueUploads(controller, toUpload);
+    } catch (error) {
+      console.error('Duplicate decision handling failed:', error);
+      toast({ variant: 'destructive', title: 'Duplikat-Entscheidung fehlgeschlagen', description: error instanceof Error ? error.message : 'Unbekannter Fehler' });
+    } finally {
+      controller?.release('duplicates');
+    }
+  };
+
+  // Cancel in the duplicate dialog only affects the duplicates; new files keep uploading.
+  const handleDuplicateCancel = () => {
+    const controller = controllerRef.current;
+    const files = duplicatesToResolve.map(item => item.file);
+    setDuplicateDialogOpen(false);
+    setDuplicatesToResolve([]);
+    void Promise.all(files.map(file =>
+      updateFileEvent(file, { phase: 'cancelled', outcome: 'duplicate', reason_code: 'existing_duplicate_skipped' })
+    )).finally(() => controller?.release('duplicates'));
+    toast({
+      title: 'Duplikate übersprungen',
+      description: 'Die bereits vorhandenen Dateien werden nicht hochgeladen; neue Dateien laufen weiter.',
+    });
   };
 
   const uploadFile = async (upload: FileUpload, options?: { skipDuplicateCheck?: boolean; markAsDuplicate?: boolean; duplicateOfId?: string; fileHash?: string }) => {
@@ -682,6 +781,7 @@ const Upload = () => {
       const fileHash = options?.fileHash || await generateFileHash(upload.file);
 
       const result = await uploadAndProcessReceipt(upload.file, (progress, statusText) => {
+        controllerRef.current?.touch();
         setUploads(prev => {
           const updated = new Map(prev);
           const current = updated.get(upload.id);
@@ -1303,6 +1403,17 @@ const Upload = () => {
         )}
 
 
+        {uploadStalled && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Upload hängt</AlertTitle>
+            <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+              <span>Seit über 2 Minuten kein Fortschritt. Die offenen Dateien sind noch im Browser und können erneut angestoßen werden.</span>
+              <Button size="sm" onClick={resumeStalledUpload}>Fortsetzen</Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* File Check Progress - shown during checking phase */}
         {uploadPhase === 'checking' && (
           <FileCheckProgress current={checkProgress.current} total={checkProgress.total} />
@@ -1351,6 +1462,12 @@ const Upload = () => {
                         <span>Dateien auswählen</span>
                       </Button>
                     </label>
+                  </div>
+                  <div className="flex items-center justify-center gap-2 mt-6 text-sm text-muted-foreground">
+                    <Switch id="review-duplicates" checked={reviewDuplicates} onCheckedChange={toggleReviewDuplicates} />
+                    <Label htmlFor="review-duplicates" className="font-normal">
+                      Bereits vorhandene Dateien einzeln prüfen (sonst automatisch überspringen)
+                    </Label>
                   </div>
                   <p className="text-sm text-muted-foreground mt-4">
                     PDF, JPG, PNG, WebP bis {MAX_FILE_SIZE / 1024 / 1024}MB • Max. {MAX_FILES} Dateien
@@ -1716,9 +1833,9 @@ const Upload = () => {
 
         {/* Duplicate Check Dialog */}
         <DuplicateCheckDialog
-          open={uploadPhase === 'resolving-duplicates'}
+          open={duplicateDialogOpen && duplicatesToResolve.length > 0}
           duplicates={duplicatesToResolve}
-          nonDuplicateCount={nonDuplicateFiles.length}
+          nonDuplicateCount={0}
           onComplete={handleDuplicateDecisions}
           onCancel={handleDuplicateCancel}
         />
