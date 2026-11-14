@@ -31,7 +31,7 @@ export const NO_INVOICE_CATEGORY = "Keine Rechnung";
 
 /** Review-only rule for delete_receipt: approved/completed receipts can never be deleted via MCP. */
 export function deleteReceiptError(status: string | null | undefined): string | null {
-  if (status === "review") return null;
-  if (lockedReceiptError(status)) return `Receipt is ${status} and cannot be deleted via MCP. Only receipts in review can be deleted.`;
-  return `Receipt has status "${status ?? "unknown"}". Only receipts in review can be deleted.`;
+  if (status === "review" || status === "duplicate") return null;
+  if (lockedReceiptError(status)) return `Receipt is ${status} and cannot be deleted via MCP. Only receipts in review or duplicate can be deleted.`;
+  return `Receipt has status "${status ?? "unknown"}". Only receipts in review or duplicate can be deleted.`;
 }
