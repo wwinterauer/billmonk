@@ -29,6 +29,13 @@
       "when": 1794665270364,
       "tag": "0003_receipt_skonto",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794666022915,
+      "tag": "0004_dashboard_notes",
+      "breakpoints": true
     }
   ]
 }
