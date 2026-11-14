@@ -1,3 +1,4 @@
+import { fetchInChunks } from '@/lib/chunkedIn';
 import { sortTags, sortTagNames, joinTagNames } from '@/lib/tagOrder';
 import { withSkontoApplied, skontoFactor, scaleLine } from '@/lib/skonto';
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -578,10 +579,12 @@ export function ExportFormatDialog({
     // Attach tags to receipts (needed for the 'tags' column)
     if (user && sortedReceipts.length > 0) {
       const receiptIds = sortedReceipts.map(r => r.id);
-      const { data: tagRows } = await supabase
-        .from('receipt_tags')
-        .select('receipt_id, tags(id, name, color)')
-        .in('receipt_id', receiptIds);
+      const tagRows = await fetchInChunks(receiptIds, (chunk) =>
+        supabase
+          .from('receipt_tags')
+          .select('receipt_id, tags(id, name, color)')
+          .in('receipt_id', chunk),
+      );
 
       if (tagRows && tagRows.length > 0) {
         const tagsByReceipt = new Map<string, Array<{ id: string; name: string; color: string }>>();
