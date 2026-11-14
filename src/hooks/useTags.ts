@@ -1,3 +1,4 @@
+import { fetchInChunks } from '@/lib/chunkedIn';
 import { sortTags, sortTagNames, joinTagNames } from '@/lib/tagOrder';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -60,12 +61,12 @@ export function useTags() {
   const getTagsForReceipts = async (receiptIds: string[]): Promise<TagWithAssignment[]> => {
     if (!user || receiptIds.length === 0) return [];
 
-    const { data, error } = await supabase
-      .from('receipt_tags')
-      .select('receipt_id, tag_id')
-      .in('receipt_id', receiptIds);
-
-    if (error) {
+    let data: { receipt_id: string; tag_id: string }[] = [];
+    try {
+      data = await fetchInChunks(receiptIds, (chunk) =>
+        supabase.from('receipt_tags').select('receipt_id, tag_id').in('receipt_id', chunk),
+      );
+    } catch (error) {
       console.error('Error fetching bulk receipt tags:', error);
       return [];
     }

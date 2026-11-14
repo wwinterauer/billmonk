@@ -1,3 +1,4 @@
+import { fetchInChunks } from '@/lib/chunkedIn';
 import { sortTags, sortTagNames, joinTagNames } from '@/lib/tagOrder';
 import { applySkonto } from '@/lib/skonto';
 import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
@@ -751,15 +752,14 @@ const Expenses = () => {
       
       // Load tags for all receipts for display
       if (data.length > 0) {
-        const tagsData = await getTagsForReceipts(data.map(r => r.id));
-        // Build cache: group by receipt
         const cache: Record<string, { id: string; name: string; color: string }[]> = {};
-        
-        // For each receipt, get its tags from the receipt_tags table
-        const { data: receiptTagsData } = await supabase
-          .from('receipt_tags')
-          .select('receipt_id, tag_id, tags(id, name, color)')
-          .in('receipt_id', data.map(r => r.id));
+        // Chunked: one request with hundreds of IDs exceeds the URL limit and silently returns nothing
+        const receiptTagsData = await fetchInChunks(data.map(r => r.id), (chunk) =>
+          supabase
+            .from('receipt_tags')
+            .select('receipt_id, tag_id, tags(id, name, color)')
+            .in('receipt_id', chunk),
+        );
         
         if (receiptTagsData) {
           for (const rt of receiptTagsData) {
