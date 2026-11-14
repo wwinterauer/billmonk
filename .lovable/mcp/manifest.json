@@ -12,14 +12,14 @@
   "mcp": {
     "server": {
       "name": "billmonk",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "title": "BillMonk"
     },
     "tools": [
       {
         "name": "list_receipts",
         "title": "List receipts",
-        "description": "List the signed-in user's expense receipts, optionally filtered by date range, vendor or status.",
+        "description": "List the signed-in user's expense receipts with tag names, optionally filtered by date range, vendor, status or one exact tag name.",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
@@ -46,6 +46,11 @@
             },
             "status": {
               "description": "Filter by receipt status, e.g. completed.",
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "description": "Filter by one exact existing tag name.",
               "type": "string",
               "minLength": 1
             },
@@ -132,7 +137,7 @@
       {
         "name": "get_review_queue",
         "title": "Get review queue",
-        "description": "List receipts waiting for review with their extracted data. Use get_receipt_document to read the original file and compare.",
+        "description": "List receipts waiting for review with their extracted data and tag names. Use get_receipt_document to read the original file and compare.",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
@@ -163,7 +168,7 @@
       {
         "name": "get_receipt_document",
         "title": "Get receipt with original file",
-        "description": "Return one receipt's extracted data plus the original PDF or image, so it can be checked against the document.",
+        "description": "Return one receipt's extracted data and tag names plus the original PDF or image, so it can be checked against the document.",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
@@ -189,7 +194,7 @@
       {
         "name": "update_receipt",
         "title": "Correct receipt data",
-        "description": "Correct extracted fields of a receipt. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+        "description": "Correct extracted fields of a receipt. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
         "annotations": {
           "readOnlyHint": false,
           "destructiveHint": false,
@@ -262,6 +267,14 @@
               "type": "number",
               "minimum": 0,
               "maximum": 100
+            },
+            "tags": {
+              "description": "Complete list of existing tag names for this receipt. Replaces all current tags; [] removes every tag. Unknown names are rejected and never created.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           },
           "required": [
@@ -338,6 +351,22 @@
               "maximum": 200
             }
           }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_tags",
+        "title": "List tags",
+        "description": "List all of the signed-in user's existing tags with the number of receipts assigned to each tag.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
         },
         "outputSchema": null
       }
