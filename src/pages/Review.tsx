@@ -2202,8 +2202,12 @@ const Review = () => {
                       );
                     })()}
 
-                    {/* Payment Method */}
-                    <div className="space-y-2">
+                    {/* Payment Method (collapsed unless set) */}
+                    <details key={`pm-${currentReceipt?.id}`} open={!!formData.payment_method} className="group">
+                      <summary className="cursor-pointer select-none text-sm text-muted-foreground hover:text-foreground">
+                        Zahlungsart{formData.payment_method ? `: ${PAYMENT_METHODS.find(m => m.value === formData.payment_method)?.label ?? formData.payment_method}` : ''}
+                      </summary>
+                    <div className="space-y-2 pt-2">
                       <div className="flex items-center gap-2">
                         <Label>Zahlungsart</Label>
                         <Tooltip>
@@ -2226,6 +2230,7 @@ const Review = () => {
                         allowClear
                       />
                     </div>
+                    </details>
 
                     {/* Tags */}
                     <div className="space-y-2">
