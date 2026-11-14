@@ -2,12 +2,13 @@ import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser } from "../supabase";
 import { RECEIPT_FIELDS, fail, netFromGross, ok } from "./_shared";
+import { ReceiptRecord, resolveTagIds, withReceiptTagNames } from "./_tags";
 
 export default defineTool({
   name: "update_receipt",
   title: "Correct receipt data",
   description:
-    "Correct extracted fields of a receipt. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+    "Correct extracted fields of a receipt. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
   inputSchema: {
     id: z.string().uuid().describe("Receipt id."),
     vendor: z.string().min(1).optional().describe("Legal vendor name."),
@@ -22,9 +23,10 @@ export default defineTool({
     description: z.string().optional().describe("Short description."),
     skonto_amount: z.number().min(0).optional().describe("Manual cash discount (Skonto) in EUR deducted at payment; 0 removes it. Original invoice amounts stay unchanged."),
     skonto_percent: z.number().min(0).max(100).optional().describe("Manual cash discount in percent of gross; 0 removes it."),
+    tags: z.array(z.string().trim().min(1)).optional().describe("Complete list of existing tag names for this receipt. Replaces all current tags; [] removes every tag. Unknown names are rejected and never created."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  handler: async ({ id, ...input }, ctx) => {
+  handler: async ({ id, tags: requestedTags, ...input }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
     const { data: cur, error: e1 } = await sb
@@ -32,13 +34,28 @@ export default defineTool({
     if (e1) return fail(e1.message);
     if (!cur) return fail("Receipt not found.");
 
+    let desiredTagIds: string[] | undefined;
+    let currentTagIds: string[] = [];
+    if (requestedTags !== undefined) {
+      const { data: existingTags, error: tagsError } = await sb.from("tags").select("id, name");
+      if (tagsError) return fail(tagsError.message);
+      const resolved = resolveTagIds(requestedTags, existingTags ?? []);
+      if (!resolved.ok) return fail(resolved.error);
+      desiredTagIds = resolved.tagIds;
+
+      const { data: currentLinks, error: linksError } = await sb
+        .from("receipt_tags").select("tag_id").eq("receipt_id", id);
+      if (linksError) return fail(linksError.message);
+      currentTagIds = (currentLinks ?? []).map((link) => link.tag_id);
+    }
+
     const patch: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(input)) if (v !== undefined) patch[k] = v;
-    if (Object.keys(patch).length === 0) return fail("No fields to update.");
+    if (Object.keys(patch).length === 0 && requestedTags === undefined) return fail("No fields to update.");
     const g = Math.abs(Number(patch.amount_gross ?? cur.amount_gross ?? 0));
     if (patch.skonto_amount !== undefined || patch.skonto_percent !== undefined) {
       let amt = patch.skonto_amount as number | undefined;
-      if (amt === undefined) amt = Math.round(g * Number(patch.skonto_percent) ) / 100;
+      if (amt === undefined) amt = Math.round(g * Number(patch.skonto_percent)) / 100;
       if (!amt) { patch.skonto_amount = null; patch.skonto_percent = null; }
       else { patch.skonto_amount = amt; patch.skonto_percent = g ? Math.round((amt / g) * 10000) / 100 : null; }
     }
@@ -62,11 +79,39 @@ export default defineTool({
       }
     }
 
-    const modified = new Set<string>([...((cur.user_modified_fields as string[] | null) ?? []), ...Object.keys(input).filter((k) => (input as Record<string, unknown>)[k] !== undefined)]);
+    const modified = new Set<string>([
+      ...((cur.user_modified_fields as string[] | null) ?? []),
+      ...Object.keys(input).filter((k) => (input as Record<string, unknown>)[k] !== undefined),
+      ...(requestedTags !== undefined ? ["tags"] : []),
+    ]);
     patch.user_modified_fields = [...modified];
 
     const { data, error } = await sb.from("receipts").update(patch).eq("id", id).select(RECEIPT_FIELDS).single();
     if (error) return fail(error.message);
-    return ok(JSON.stringify(data, null, 2), { receipt: JSON.parse(JSON.stringify(data)) });
+
+    if (desiredTagIds !== undefined) {
+      const desired = new Set(desiredTagIds);
+      const current = new Set(currentTagIds);
+      const unchanged = desired.size === current.size && [...desired].every((tagId) => current.has(tagId));
+      if (!unchanged) {
+        if (desiredTagIds.length > 0) {
+          const { error: upsertError } = await sb.from("receipt_tags").upsert(
+            desiredTagIds.map((tagId) => ({ receipt_id: id, tag_id: tagId })),
+            { onConflict: "receipt_id,tag_id", ignoreDuplicates: true },
+          );
+          if (upsertError) return fail(upsertError.message);
+        }
+        const removeIds = currentTagIds.filter((tagId) => !desired.has(tagId));
+        if (removeIds.length > 0) {
+          const { error: deleteError } = await sb
+            .from("receipt_tags").delete().eq("receipt_id", id).in("tag_id", removeIds);
+          if (deleteError) return fail(deleteError.message);
+        }
+      }
+    }
+
+    const tagged = await withReceiptTagNames(sb, [data as ReceiptRecord]);
+    if (tagged.error) return fail(tagged.error);
+    return ok(JSON.stringify(tagged.receipts[0], null, 2), { receipt: tagged.receipts[0] });
   },
 });
