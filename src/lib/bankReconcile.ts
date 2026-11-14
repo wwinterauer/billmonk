@@ -190,6 +190,7 @@ export async function createExpenseFromBankTransaction(
       vendor_id: vendorId,
       description: overrides.description ?? baseDescription,
       amount_gross: amount,
+      ...bankReceiptNetVat(amount, vatRate),
       receipt_date: txDate,
       category: overrides.category ?? kw?.category ?? null,
       tax_type: kw?.tax_type ?? null,
@@ -224,4 +225,13 @@ export async function createExpenseFromBankTransaction(
     .eq("id", tx.id);
   if (txErr) throw txErr;
   return { receiptId: newReceipt.id };
+}
+
+/** Net/VAT for receipts created from a bank transaction: rate 0 → net = gross, VAT 0. */
+export function bankReceiptNetVat(gross: number, vatRate: number | null | undefined): { amount_net: number; vat_amount: number } {
+  const g = Math.round(gross * 100) / 100;
+  const r = Number(vatRate) || 0;
+  if (r <= 0) return { amount_net: g, vat_amount: 0 };
+  const net = Math.round((g / (1 + r / 100)) * 100) / 100;
+  return { amount_net: net, vat_amount: Math.round((g - net) * 100) / 100 };
 }

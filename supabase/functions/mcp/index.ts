@@ -400,7 +400,7 @@ import { z as z6 } from "npm:zod@^4.4.3";
 var LOCKED_RECEIPT_STATUSES = ["approved", "completed"];
 function lockedReceiptError(status) {
   if (status && LOCKED_RECEIPT_STATUSES.includes(status)) {
-    return `Receipt is ${status} and locked. Splitting and other changes are not allowed via MCP for approved receipts; only category, tags, receipt_date and invoice_number can be changed with update_receipt.`;
+    return `Receipt is ${status} and locked. Splitting and other changes are not allowed via MCP for approved receipts; only category, tags, receipt_date, invoice_number and the net/VAT split (gross unchanged) can be changed with update_receipt.`;
   }
   return null;
 }
@@ -412,15 +412,28 @@ async function checkReceiptEditable(sb, id) {
 }
 var FIELDS_EDITABLE_WHEN_LOCKED = ["category", "tags", "receipt_date", "no_invoice", "invoice_number"];
 var AMOUNT_FIELDS_CLEARABLE_FOR_NO_INVOICE = ["amount_gross", "amount_net", "vat_amount"];
+var SPLIT_FIELDS_CORRECTABLE_WHEN_LOCKED = ["amount_net", "vat_amount", "vat_rate"];
+var SPLIT_TOLERANCE = 0.02;
+function splitConsistencyError(gross, net, vat) {
+  if (typeof gross !== "number" || typeof net !== "number" || typeof vat !== "number") {
+    return "On approved receipts amount_gross, amount_net and vat_amount must all be numbers after the correction.";
+  }
+  if (Math.abs(net + vat - gross) > SPLIT_TOLERANCE + 1e-9) {
+    return `amount_net (${net}) + vat_amount (${vat}) must equal amount_gross (${gross}) within 0.02.`;
+  }
+  return null;
+}
 function lockedFieldsError(status, fields, opts = {}) {
   if (!lockedReceiptError(status)) return null;
+  const grossUntouched = !fields.includes("amount_gross") && typeof opts.currentGross === "number";
   const blocked = fields.filter((f) => {
     if (FIELDS_EDITABLE_WHEN_LOCKED.includes(f)) return false;
+    if (grossUntouched && SPLIT_FIELDS_CORRECTABLE_WHEN_LOCKED.includes(f) && opts.values?.[f] !== null) return false;
     if (opts.isNoInvoice && AMOUNT_FIELDS_CLEARABLE_FOR_NO_INVOICE.includes(f) && opts.values?.[f] === null) return false;
     return true;
   });
   if (blocked.length === 0) return null;
-  return `Receipt is ${status}: only category, tags, receipt_date and invoice_number can be changed (amounts may only be cleared to null on Keine Rechnung receipts). Locked fields: ${blocked.join(", ")}.`;
+  return `Receipt is ${status}: only category, tags, receipt_date and invoice_number can be changed, plus amount_net/vat_amount/vat_rate while amount_gross stays unchanged and net + VAT = gross (amounts may only be cleared to null on Keine Rechnung receipts). Locked fields: ${blocked.join(", ")}.`;
 }
 var NO_INVOICE_CATEGORY = "Keine Rechnung";
 function deleteReceiptError(status) {
@@ -433,7 +446,7 @@ function deleteReceiptError(status) {
 var update_receipt_default = defineTool6({
   name: "update_receipt",
   title: "Correct receipt data",
-  description: 'Correct extracted fields of a receipt. On approved receipts only category, tags, receipt_date and invoice_number may be changed, all other fields are locked, except that amount_gross, amount_net and vat_amount may be set to null on approved Keine Rechnung receipts. "Keine Rechnung" (no_invoice: true, or category "Keine Rechnung") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when "Keine Rechnung ausschlie\xDFen" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.',
+  description: 'Correct extracted fields of a receipt. On approved receipts only category, tags, receipt_date and invoice_number may be changed, plus amount_net, vat_amount and vat_rate as long as amount_gross is not changed and net + VAT equals gross (tolerance 0.02; if only vat_rate is given, net and VAT are recalculated from gross); all other fields are locked, except that amount_gross, amount_net and vat_amount may be set to null on approved Keine Rechnung receipts. "Keine Rechnung" (no_invoice: true, or category "Keine Rechnung") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when "Keine Rechnung ausschlie\xDFen" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.',
   inputSchema: {
     id: z6.string().uuid().describe("Receipt id."),
     vendor: z6.string().min(1).optional().describe("Legal vendor name."),
@@ -455,7 +468,7 @@ var update_receipt_default = defineTool6({
   handler: async ({ id, tags: requestedTags, no_invoice, ...input }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
-    const { data: cur, error: e1 } = await sb.from("receipts").select("amount_gross, vat_rate, user_modified_fields, status, category, is_no_receipt_entry").eq("id", id).maybeSingle();
+    const { data: cur, error: e1 } = await sb.from("receipts").select("amount_gross, amount_net, vat_amount, vat_rate, user_modified_fields, status, category, is_no_receipt_entry").eq("id", id).maybeSingle();
     if (e1) return fail(e1.message);
     if (!cur) return fail("Receipt not found.");
     const requestedFields = [
@@ -465,7 +478,8 @@ var update_receipt_default = defineTool6({
     ];
     const locked = lockedFieldsError(cur.status, requestedFields, {
       isNoInvoice: cur.category === NO_INVOICE_CATEGORY || cur.is_no_receipt_entry === true,
-      values: input
+      values: input,
+      currentGross: cur.amount_gross
     });
     if (locked) return fail(locked);
     let desiredTagIds;
@@ -519,6 +533,14 @@ var update_receipt_default = defineTool6({
         patch.amount_net = net;
         if (patch.vat_amount === void 0) patch.vat_amount = Math.round((Number(gross) - net) * 100) / 100;
       }
+    }
+    if (lockedReceiptError(cur.status) && (patch.amount_net !== void 0 || patch.vat_amount !== void 0 || patch.vat_rate !== void 0)) {
+      const splitErr = splitConsistencyError(
+        cur.amount_gross,
+        patch.amount_net !== void 0 ? patch.amount_net : cur.amount_net,
+        patch.vat_amount !== void 0 ? patch.vat_amount : cur.vat_amount
+      );
+      if (splitErr) return fail(splitErr);
     }
     const modified = /* @__PURE__ */ new Set([
       ...cur.user_modified_fields ?? [],
@@ -1129,6 +1151,7 @@ async function createExpenseFromBankTransaction(sb, userId, tx, overrides = {}) 
     vendor_id: vendorId,
     description: overrides.description ?? baseDescription,
     amount_gross: amount,
+    ...bankReceiptNetVat(amount, vatRate),
     receipt_date: txDate,
     category: overrides.category ?? kw?.category ?? null,
     tax_type: kw?.tax_type ?? null,
@@ -1152,6 +1175,13 @@ async function createExpenseFromBankTransaction(sb, userId, tx, overrides = {}) 
   const { error: txErr } = await sb.from("bank_transactions").update({ status: "matched", receipt_id: newReceipt.id, receipt_split_line_id: null }).eq("id", tx.id);
   if (txErr) throw txErr;
   return { receiptId: newReceipt.id };
+}
+function bankReceiptNetVat(gross, vatRate) {
+  const g = Math.round(gross * 100) / 100;
+  const r = Number(vatRate) || 0;
+  if (r <= 0) return { amount_net: g, vat_amount: 0 };
+  const net = Math.round(g / (1 + r / 100) * 100) / 100;
+  return { amount_net: net, vat_amount: Math.round((g - net) * 100) / 100 };
 }
 
 // src/lib/mcp/tools/suggest-bank-matches.ts

@@ -43,6 +43,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageMeta } from '@/components/PageMeta';
+import { bankReceiptNetVat } from '@/lib/bankReconcile';
 
 const banks = [
   { value: 'erste-sparkasse', label: 'Erste Bank / Sparkasse' },
@@ -361,6 +362,7 @@ export default function BankImport() {
                   ? `${matchedKeyword.description_template} – ${tx.description}`
                   : tx.description,
                 amount_gross: tx.amount,
+                ...bankReceiptNetVat(tx.amount, matchedKeyword.tax_rate || 0),
                 receipt_date: format(tx.date, 'yyyy-MM-dd'),
                 category: matchedKeyword.category,
                 tax_type: matchedKeyword.tax_type ?? null,

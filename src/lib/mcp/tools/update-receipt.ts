@@ -2,14 +2,14 @@ import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser } from "../supabase";
 import { RECEIPT_FIELDS, fail, netFromGross, ok } from "./_shared";
-import { lockedFieldsError, NO_INVOICE_CATEGORY } from "./_locks";
+import { lockedFieldsError, lockedReceiptError, NO_INVOICE_CATEGORY, splitConsistencyError } from "./_locks";
 import { planTagAssignmentChanges, ReceiptRecord, resolveTagIds, withReceiptTagNames } from "./_tags";
 
 export default defineTool({
   name: "update_receipt",
   title: "Correct receipt data",
   description:
-    "Correct extracted fields of a receipt. On approved receipts only category, tags, receipt_date and invoice_number may be changed, all other fields are locked, except that amount_gross, amount_net and vat_amount may be set to null on approved Keine Rechnung receipts. \"Keine Rechnung\" (no_invoice: true, or category \"Keine Rechnung\") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when \"Keine Rechnung ausschließen\" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+    "Correct extracted fields of a receipt. On approved receipts only category, tags, receipt_date and invoice_number may be changed, plus amount_net, vat_amount and vat_rate as long as amount_gross is not changed and net + VAT equals gross (tolerance 0.02; if only vat_rate is given, net and VAT are recalculated from gross); all other fields are locked, except that amount_gross, amount_net and vat_amount may be set to null on approved Keine Rechnung receipts. \"Keine Rechnung\" (no_invoice: true, or category \"Keine Rechnung\") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when \"Keine Rechnung ausschließen\" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
   inputSchema: {
     id: z.string().uuid().describe("Receipt id."),
     vendor: z.string().min(1).optional().describe("Legal vendor name."),
@@ -32,7 +32,7 @@ export default defineTool({
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
     const { data: cur, error: e1 } = await sb
-      .from("receipts").select("amount_gross, vat_rate, user_modified_fields, status, category, is_no_receipt_entry").eq("id", id).maybeSingle();
+      .from("receipts").select("amount_gross, amount_net, vat_amount, vat_rate, user_modified_fields, status, category, is_no_receipt_entry").eq("id", id).maybeSingle();
     if (e1) return fail(e1.message);
     if (!cur) return fail("Receipt not found.");
     const requestedFields = [
@@ -43,6 +43,7 @@ export default defineTool({
     const locked = lockedFieldsError(cur.status as string | null, requestedFields, {
       isNoInvoice: cur.category === NO_INVOICE_CATEGORY || cur.is_no_receipt_entry === true,
       values: input as Record<string, unknown>,
+      currentGross: cur.amount_gross as number | null,
     });
     if (locked) return fail(locked);
 
@@ -93,6 +94,15 @@ export default defineTool({
         patch.amount_net = net;
         if (patch.vat_amount === undefined) patch.vat_amount = Math.round((Number(gross) - net) * 100) / 100;
       }
+    }
+
+    if (lockedReceiptError(cur.status as string | null) && (patch.amount_net !== undefined || patch.vat_amount !== undefined || patch.vat_rate !== undefined)) {
+      const splitErr = splitConsistencyError(
+        cur.amount_gross,
+        patch.amount_net !== undefined ? patch.amount_net : cur.amount_net,
+        patch.vat_amount !== undefined ? patch.vat_amount : cur.vat_amount,
+      );
+      if (splitErr) return fail(splitErr);
     }
 
     const modified = new Set<string>([
