@@ -16,7 +16,7 @@ export default defineTool({
   handler: async ({ id }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
-    const userId = await currentUserId(sb);
+    const userId = await currentUserId(sb, ctx);
     if (!userId) return fail("Not authenticated");
     const { data: r, error } = await sb
       .from("receipts").select("id, status, vendor, vendor_brand, amount_gross, receipt_date, file_name, file_url")
