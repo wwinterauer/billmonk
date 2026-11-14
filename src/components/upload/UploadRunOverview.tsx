@@ -245,7 +245,7 @@ export function UploadRunOverview({ userId, activeRunId, isActive, onRunClosed }
                   {runIsLive ? (
                     <Badge variant="secondary" className="gap-1"><Loader2 className="h-3 w-3 animate-spin" /> läuft</Badge>
                   ) : stalled ? (
-                    <Badge variant="destructive" className="gap-1"><PauseCircle className="h-3 w-3" /> abgebrochen</Badge>
+                    <Badge variant="destructive" className="gap-1"><PauseCircle className="h-3 w-3" /> ohne Fortschritt</Badge>
                   ) : (
                     <Badge variant="outline">abgeschlossen</Badge>
                   )}
@@ -298,9 +298,9 @@ export function UploadRunOverview({ userId, activeRunId, isActive, onRunClosed }
 
                     {stalled && buckets.pending.length > 0 && (
                       <p className="text-xs text-muted-foreground">
-                        {buckets.pending.filter(e => e.phase === 'selected' || e.phase === 'duplicate-check').length} Dateien
-                        wurden nie fertig verarbeitet. Zieh sie einfach erneut rein — bereits verarbeitete Belege werden
-                        automatisch als Duplikat erkannt.
+                        {buckets.pending.length} Dateien sind noch nicht abgeschlossen. Seit mindestens zwei Minuten
+                        wurde kein Fortschritt gemeldet. Falls der Upload in keinem geöffneten Fenster mehr läuft,
+                        wähle die Dateien erneut aus — vorhandene Belege werden auf Duplikate geprüft.
                       </p>
                     )}
 

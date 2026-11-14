@@ -37,6 +37,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageMeta } from '@/components/PageMeta';
 import { saveQueue, clearQueue, runWithConcurrency } from '@/lib/upload-queue';
+import { prepareUploadFiles } from '@/lib/uploadPreparation';
 import { UploadRunOverview } from '@/components/upload/UploadRunOverview';
 import { ProblemReceiptsBanner } from '@/components/dashboard/ProblemReceiptsBanner';
 
@@ -316,28 +317,26 @@ const Upload = () => {
     if (!user) throw new Error('Nicht angemeldet');
     const results: FileCheckResult[] = [];
     
-    // Calculate all hashes in parallel for speed
-    const hashPromises = files.map(async (file) => {
+    const filesWithHashes = await prepareUploadFiles(files, async file => {
+      await updateFileEvent(file, { phase: 'hashing' });
       const hash = await generateFileHash(file);
       return { file, hash };
+    }, async ({ file, hash }, completed) => {
+      setCheckProgress({ current: completed, total: files.length });
+      await updateFileEvent(file, { phase: 'hash-calculated', file_hash: hash });
     });
-    
-    const filesWithHashes = await Promise.all(hashPromises);
-    await Promise.all(filesWithHashes.map(({ file, hash }) => updateFileEvent(file, {
-      phase: 'hash-calculated',
-      file_hash: hash,
-    })));
     
     // Get all hashes to check in one query
     // Only consider certain statuses as duplicates - exclude rejected/not_a_receipt
     const hashes = filesWithHashes.map(f => f.hash);
     
-    const { data: existingReceipts } = await supabase
+    const { data: existingReceipts, error: duplicateQueryError } = await supabase
       .from('receipts')
       .select('id, file_name, file_url, file_hash, vendor, amount_gross, receipt_date, status')
       .eq('user_id', user.id)
       .in('file_hash', hashes)
       .in('status', ['pending', 'processing', 'review', 'approved', 'duplicate']);
+    if (duplicateQueryError) throw duplicateQueryError;
     
     const existingMap = new Map(
       (existingReceipts || []).map(r => [r.file_hash, r])
@@ -487,16 +486,7 @@ const Upload = () => {
     setCheckProgress({ current: 0, total: validFiles.length });
 
     try {
-      // Update progress as we check
-      let checked = 0;
-      const progressInterval = setInterval(() => {
-        checked = Math.min(checked + Math.ceil(validFiles.length / 10), validFiles.length);
-        setCheckProgress({ current: checked, total: validFiles.length });
-      }, 100);
-
       const { duplicates, nonDuplicates } = await checkFilesForDuplicates(validFiles);
-      
-      clearInterval(progressInterval);
       setCheckProgress({ current: validFiles.length, total: validFiles.length });
 
       // Store non-duplicates for later upload
@@ -625,7 +615,7 @@ const Upload = () => {
 
     setUploads(newUploads);
     setNonDuplicateFiles([]);
-    setUploadPhase('idle');
+    // Keep the run active while the queued files are uploaded and analysed.
 
     // Show summary toast
     const skippedCount = duplicatesToResolve.length - duplicatesToUpload.length;
@@ -667,6 +657,7 @@ const Upload = () => {
     // All done — drop the recovery snapshot.
     if (user) clearQueue(user.id);
     await finishUploadRun(runId);
+    setUploadPhase('idle');
   };
 
   const uploadFile = async (upload: FileUpload, options?: { skipDuplicateCheck?: boolean; markAsDuplicate?: boolean; duplicateOfId?: string; fileHash?: string }) => {
