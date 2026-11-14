@@ -1,3 +1,4 @@
+import { checkReceiptEditable } from "./_locks";
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser } from "../supabase";
@@ -27,6 +28,8 @@ export default defineTool({
     const { data: part, error } = await sb.from("receipt_split_lines").select(SPLIT_PART_FIELDS).eq("id", part_id).maybeSingle();
     if (error) return fail(error.message);
     if (!part) return fail("Split part not found.");
+    const lockErr = await checkReceiptEditable(sb, part.receipt_id as string);
+    if (lockErr) return fail(lockErr);
     if (input.category !== undefined) {
       const cats = await allowedCategoryNames(sb);
       if (cats.length && !cats.includes(input.category)) return fail(`Unknown category. Allowed: ${cats.join(", ")}`);

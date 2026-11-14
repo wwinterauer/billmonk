@@ -2,13 +2,14 @@ import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser } from "../supabase";
 import { RECEIPT_FIELDS, fail, netFromGross, ok } from "./_shared";
+import { lockedReceiptError } from "./_locks";
 import { planTagAssignmentChanges, ReceiptRecord, resolveTagIds, withReceiptTagNames } from "./_tags";
 
 export default defineTool({
   name: "update_receipt",
   title: "Correct receipt data",
   description:
-    "Correct extracted fields of a receipt. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+    "Correct extracted fields of a receipt that is not yet approved (approved receipts are locked). Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
   inputSchema: {
     id: z.string().uuid().describe("Receipt id."),
     vendor: z.string().min(1).optional().describe("Legal vendor name."),
@@ -30,9 +31,11 @@ export default defineTool({
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
     const { data: cur, error: e1 } = await sb
-      .from("receipts").select("amount_gross, vat_rate, user_modified_fields").eq("id", id).maybeSingle();
+      .from("receipts").select("amount_gross, vat_rate, user_modified_fields, status").eq("id", id).maybeSingle();
     if (e1) return fail(e1.message);
     if (!cur) return fail("Receipt not found.");
+    const locked = lockedReceiptError(cur.status as string | null);
+    if (locked) return fail(locked);
 
     let desiredTagIds: string[] | undefined;
     let currentTagIds: string[] = [];
