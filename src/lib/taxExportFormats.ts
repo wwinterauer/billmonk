@@ -24,6 +24,7 @@ export interface TaxExportConfig {
 }
 
 interface BookingRow {
+  skonto?: number;
   amount: number;
   isExpense: boolean;
   account: string;
@@ -99,6 +100,7 @@ export interface ReceiptForExport {
   category: string | null;
   currency: string | null;
   is_split_booking?: boolean;
+  skonto?: number;
 }
 
 export interface SplitLineForExport {
@@ -127,6 +129,7 @@ function receiptToRow(r: ReceiptForExport, config: TaxExportConfig): BookingRow 
   const d = r.receipt_date ? new Date(r.receipt_date) : new Date();
   return {
     amount: Math.abs(r.amount_gross || 0),
+    skonto: r.skonto || 0,
     isExpense: true,
     account: config.defaultExpenseAccount || '5000',
     counterAccount: config.bankAccount || '2800',
@@ -275,7 +278,7 @@ function rowToDATEV(row: BookingRow): string {
     row.date,                       // Belegdatum (ddMM)
     escapeCSVField(row.invoiceNumber), // Belegfeld 1
     '',                             // Belegfeld 2
-    '',                             // Skonto
+    row.skonto ? row.skonto.toFixed(2).replace('.', ',') : '', // Skonto
     escapeCSVField(row.text),       // Buchungstext
   ];
   // Pad remaining fields with empty values (DATEV expects ~116 columns)
