@@ -41,7 +41,7 @@ export function applySkonto<T extends SkontoInput>(r: T) {
   const paidGross = gross == null ? null : r2(gross - Math.sign(gross || 1) * skonto);
   const paidNet = net == null ? null : r2(net * f);
   // Keep gross = net + vat exactly
-  const paidVat = vat == null ? null : (paidGross != null && paidNet != null ? r2(paidGross - paidNet) : r2(vat * f));
+  const paidVat = vat == null ? null : (paidGross != null && paidNet != null && net != null && gross != null && Math.abs(gross - net - vat) < 0.02 ? r2(paidGross - paidNet) : r2(vat * f));
   return { skonto, factor: f, gross: paidGross, net: paidNet, vat: paidVat };
 }
 
