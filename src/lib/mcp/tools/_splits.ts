@@ -30,7 +30,7 @@ export async function withSplitInfo<T extends Rec>(sb: SupabaseClient, receipts:
         ...r,
         is_split_booking: isSplit,
         split_parts: isSplit
-          ? (partsBy.get(r.id) ?? []).map(({ receipt_id: _r, ...p }) => ({ ...p, tags: [] as string[] }))
+          ? (partsBy.get(r.id) ?? []).map(({ receipt_id: _r, ...p }) => p)
           : [],
         split_from_receipt_id: (m?.split_from_receipt_id as string | null) ?? null,
       };

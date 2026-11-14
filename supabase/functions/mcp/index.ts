@@ -175,12 +175,20 @@ async function withSplitInfo(sb, receipts) {
       return {
         ...r,
         is_split_booking: isSplit,
-        split_parts: isSplit ? (partsBy.get(r.id) ?? []).map(({ receipt_id: _r, ...p }) => ({ ...p, tags: [] })) : [],
+        split_parts: isSplit ? (partsBy.get(r.id) ?? []).map(({ receipt_id: _r, ...p }) => p) : [],
         split_from_receipt_id: m?.split_from_receipt_id ?? null
       };
     }),
     error: null
   };
+}
+async function currentUserId(sb, ctx) {
+  const { data } = await sb.auth.getUser(ctx.getToken() ?? void 0);
+  return data.user?.id ?? null;
+}
+async function allowedCategoryNames(sb) {
+  const { data } = await sb.from("categories").select("name").not("is_hidden", "is", true);
+  return (data ?? []).map((c) => c.name);
 }
 
 // src/lib/mcp/tools/list-receipts.ts
@@ -548,13 +556,320 @@ var list_tags_default = defineTool9({
   }
 });
 
+// src/lib/mcp/tools/split-receipt-ai.ts
+import { defineTool as defineTool10 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z9 } from "npm:zod@^4.4.3";
+
+// src/lib/splitBooking.ts
+var SPLIT_SUM_TOLERANCE = 0.02;
+function recalcSplitLine(line, field) {
+  const updated = { ...line };
+  if (field === "gross" || field === "vat_rate" && line._lastEdited === "gross") {
+    updated.amount_net = +(updated.amount_gross / (1 + updated.vat_rate / 100)).toFixed(2);
+    updated._lastEdited = field === "gross" ? "gross" : updated._lastEdited;
+  } else {
+    updated.amount_gross = +(updated.amount_net * (1 + updated.vat_rate / 100)).toFixed(2);
+    updated._lastEdited = field === "net" ? "net" : updated._lastEdited;
+  }
+  updated.vat_amount = +(updated.amount_gross - updated.amount_net).toFixed(2);
+  return updated;
+}
+function validateSplitSum(lines, totalGross) {
+  const sumGross = lines.reduce((s, l) => s + l.amount_gross, 0);
+  const diff = Math.abs(sumGross - totalGross);
+  return { sumGross: +sumGross.toFixed(2), diff: +diff.toFixed(2), isValid: diff <= SPLIT_SUM_TOLERANCE };
+}
+function splitLinesFromLineItems(lineItems, defaults) {
+  if (!Array.isArray(lineItems) || lineItems.length === 0) return null;
+  return lineItems.map((item, idx) => {
+    const vatRate = parseFloat(String(item.tax_rate ?? item.vat_rate ?? defaults.mainVatRate ?? 20).replace("%", "").replace(",", ".")) || 0;
+    const grossAmount = Math.abs(Number(item.total) || Number(item.amount_gross) || 0);
+    const netAmount = vatRate === 0 ? grossAmount : +(grossAmount / (1 + vatRate / 100)).toFixed(2);
+    return {
+      sort_order: idx,
+      description: item.description || "",
+      category: item.category || defaults.mainCategory || "",
+      tax_type: item.tax_type || defaults.taxType || "",
+      payment_method: "",
+      amount_gross: grossAmount,
+      amount_net: netAmount,
+      vat_rate: vatRate,
+      vat_amount: +(grossAmount - netAmount).toFixed(2),
+      is_private: false,
+      _lastEdited: "gross"
+    };
+  });
+}
+async function saveSplitLines(sb, userId, receiptId, lines) {
+  const { error: delError } = await sb.from("receipt_split_lines").delete().eq("receipt_id", receiptId);
+  if (delError) throw delError;
+  const inserts = lines.map((l, i) => ({
+    receipt_id: receiptId,
+    user_id: userId,
+    sort_order: i,
+    description: l.description || null,
+    category: l.category || null,
+    tax_type: l.tax_type || null,
+    payment_method: l.payment_method || null,
+    amount_gross: l.amount_gross,
+    amount_net: l.amount_net,
+    vat_rate: l.vat_rate,
+    vat_amount: l.vat_amount,
+    is_private: l.is_private
+  }));
+  const { error: insertError } = await sb.from("receipt_split_lines").insert(inserts);
+  if (insertError) throw insertError;
+  const { error: updError } = await sb.from("receipts").update({ is_split_booking: true }).eq("id", receiptId);
+  if (updError) throw updError;
+}
+async function removeSplitBooking(sb, receiptId) {
+  const { error: delError } = await sb.from("receipt_split_lines").delete().eq("receipt_id", receiptId);
+  if (delError) throw delError;
+  const { error } = await sb.from("receipts").update({ is_split_booking: false }).eq("id", receiptId);
+  if (error) throw error;
+}
+
+// src/lib/mcp/tools/split-receipt-ai.ts
+var split_receipt_ai_default = defineTool10({
+  name: "split_receipt_ai",
+  title: "Suggest split booking from AI line items",
+  description: "Same as the app's 'KI-Vorschl\xE4ge' button in 'Beleg aufteilen': builds split parts from the line items the AI extracted for this receipt. Returns the proposal only and saves nothing; apply it (optionally adjusted) with split_receipt. Never changes the receipt status.",
+  inputSchema: { id: z9.string().uuid().describe("Receipt id.") },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ id }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const { data: r, error } = await sb.from("receipts").select("line_items_raw, category, vat_rate, amount_gross").eq("id", id).maybeSingle();
+    if (error) return fail(error.message);
+    if (!r) return fail("Receipt not found.");
+    const parts = splitLinesFromLineItems(r.line_items_raw, {
+      mainVatRate: r.vat_rate ?? void 0,
+      mainCategory: r.category ?? void 0
+    });
+    if (!parts) {
+      return fail(r.category === "Keine Rechnung" ? "Document was not recognised as a receipt, so no AI line items exist." : "No AI line items were extracted for this receipt. Re-analyse it in the app first.");
+    }
+    const sum = validateSplitSum(parts, Number(r.amount_gross ?? 0));
+    const proposal = parts.map(({ _lastEdited: _l, ...p }) => p);
+    const result = { receipt_amount_gross: r.amount_gross, sum_gross: sum.sumGross, difference: sum.diff, sum_matches: sum.isValid, parts: proposal };
+    return ok(JSON.stringify(result, null, 2), result);
+  }
+});
+
+// src/lib/mcp/tools/split-receipt.ts
+import { defineTool as defineTool11 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z10 } from "npm:zod@^4.4.3";
+var split_receipt_default = defineTool11({
+  name: "split_receipt",
+  title: "Split booking (Beleg aufteilen)",
+  description: "Same as 'Beleg aufteilen' in the app: books one receipt onto several parts (categories/VAT rates) while the receipt and its file stay one document. Replaces existing parts. The gross sum must equal the receipt gross (\xB10.02). Never changes the receipt status.",
+  inputSchema: {
+    id: z10.string().uuid().describe("Receipt id."),
+    parts: z10.array(z10.object({
+      amount_gross: z10.number().describe("Gross amount of this part."),
+      amount_net: z10.number().optional().describe("Net amount; if omitted it is calculated from gross and VAT rate."),
+      vat_rate: z10.number().min(0).max(100).optional().describe("VAT rate in percent; defaults to the receipt's rate."),
+      category: z10.string().min(1).optional().describe("One of the user's existing categories; defaults to the receipt category."),
+      description: z10.string().optional().describe("Description of this part."),
+      is_private: z10.boolean().optional().describe("Mark this part as private (shown as tag 'Privat' in exports).")
+    }).strict()).min(1).describe("Parts of the split booking.")
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async ({ id, parts }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const { data: r, error } = await sb.from("receipts").select("id, amount_gross, vat_rate, category").eq("id", id).maybeSingle();
+    if (error) return fail(error.message);
+    if (!r) return fail("Receipt not found.");
+    const cats = await allowedCategoryNames(sb);
+    const unknown = parts.map((p) => p.category).filter((c) => !!c && cats.length > 0 && !cats.includes(c));
+    if (unknown.length) return fail(`Unknown category: ${[...new Set(unknown)].join(", ")}. Allowed: ${cats.join(", ")}`);
+    const lines = parts.map((p, i) => {
+      const base = {
+        sort_order: i,
+        description: p.description ?? "",
+        category: p.category ?? r.category ?? "",
+        tax_type: "",
+        payment_method: "",
+        amount_gross: p.amount_gross,
+        amount_net: p.amount_net ?? 0,
+        vat_rate: p.vat_rate ?? Number(r.vat_rate ?? 20),
+        vat_amount: 0,
+        is_private: p.is_private ?? false
+      };
+      return recalcSplitLine(base, p.amount_net !== void 0 ? "net" : "gross");
+    });
+    lines.forEach((l, i) => {
+      if (parts[i].amount_net !== void 0) {
+        l.amount_gross = parts[i].amount_gross;
+        l.vat_amount = +(l.amount_gross - l.amount_net).toFixed(2);
+      }
+    });
+    const total = Number(r.amount_gross ?? 0);
+    const sum = validateSplitSum(lines, total);
+    if (!sum.isValid) {
+      return fail(`Sum of parts (${sum.sumGross.toFixed(2)}) does not match the receipt gross amount (${total.toFixed(2)}); difference ${sum.diff.toFixed(2)}, allowed \xB1${SPLIT_SUM_TOLERANCE}. Nothing was saved.`);
+    }
+    const userId = await currentUserId(sb, ctx);
+    if (!userId) return fail("Not authenticated");
+    try {
+      await saveSplitLines(sb, userId, id, lines);
+    } catch (e) {
+      return fail(e.message ?? "Save failed");
+    }
+    const res = await withSplitInfo(sb, [{ id }]);
+    if (res.error) return fail(res.error);
+    return ok(JSON.stringify(res.receipts[0], null, 2), { receipt: res.receipts[0] });
+  }
+});
+
+// src/lib/mcp/tools/update-split-part.ts
+import { defineTool as defineTool12 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z11 } from "npm:zod@^4.4.3";
+var update_split_part_default = defineTool12({
+  name: "update_split_part",
+  title: "Correct one split part",
+  description: "Correct a single part of a split booking. Changing the amount must keep the parts' gross sum equal to the receipt gross (\xB10.02), otherwise use split_receipt to redistribute. Never changes the receipt status.",
+  inputSchema: {
+    part_id: z11.string().uuid().describe("Split part id (from split_parts)."),
+    amount_gross: z11.number().optional().describe("New gross amount."),
+    amount_net: z11.number().optional().describe("New net amount (gross is then derived from net and VAT rate)."),
+    vat_rate: z11.number().min(0).max(100).optional().describe("New VAT rate in percent."),
+    category: z11.string().min(1).optional().describe("One of the user's existing categories."),
+    description: z11.string().optional().describe("New description."),
+    is_private: z11.boolean().optional().describe("Mark this part as private.")
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async ({ part_id, ...input }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    if (Object.values(input).every((v) => v === void 0)) return fail("No fields to update.");
+    const sb = supabaseForUser(ctx);
+    const { data: part, error } = await sb.from("receipt_split_lines").select(SPLIT_PART_FIELDS).eq("id", part_id).maybeSingle();
+    if (error) return fail(error.message);
+    if (!part) return fail("Split part not found.");
+    if (input.category !== void 0) {
+      const cats = await allowedCategoryNames(sb);
+      if (cats.length && !cats.includes(input.category)) return fail(`Unknown category. Allowed: ${cats.join(", ")}`);
+    }
+    let line = {
+      sort_order: part.sort_order,
+      description: part.description ?? "",
+      category: part.category ?? "",
+      tax_type: part.tax_type ?? "",
+      payment_method: "",
+      amount_gross: Number(part.amount_gross),
+      amount_net: Number(part.amount_net),
+      vat_rate: Number(part.vat_rate),
+      vat_amount: Number(part.vat_amount),
+      is_private: part.is_private,
+      _lastEdited: "gross"
+    };
+    if (input.vat_rate !== void 0) line.vat_rate = input.vat_rate;
+    if (input.amount_net !== void 0) {
+      line.amount_net = input.amount_net;
+      line = recalcSplitLine(line, "net");
+    } else if (input.amount_gross !== void 0) {
+      line.amount_gross = input.amount_gross;
+      line = recalcSplitLine(line, "gross");
+    } else if (input.vat_rate !== void 0) line = recalcSplitLine(line, "vat_rate");
+    const amountsChanged = input.amount_gross !== void 0 || input.amount_net !== void 0 || input.vat_rate !== void 0;
+    if (amountsChanged) {
+      const [{ data: r }, { data: siblings }] = await Promise.all([
+        sb.from("receipts").select("amount_gross").eq("id", part.receipt_id).maybeSingle(),
+        sb.from("receipt_split_lines").select("id, amount_gross").eq("receipt_id", part.receipt_id)
+      ]);
+      const total = Number(r?.amount_gross ?? 0);
+      const all = (siblings ?? []).map((s) => ({ amount_gross: s.id === part_id ? line.amount_gross : Number(s.amount_gross) }));
+      const sum = validateSplitSum(all, total);
+      if (!sum.isValid) {
+        return fail(`Sum of parts would be ${sum.sumGross.toFixed(2)} instead of the receipt gross ${total.toFixed(2)} (difference ${sum.diff.toFixed(2)}, allowed \xB1${SPLIT_SUM_TOLERANCE}). Nothing was saved; use split_receipt to redistribute all parts.`);
+      }
+    }
+    const patch = {
+      amount_gross: line.amount_gross,
+      amount_net: line.amount_net,
+      vat_rate: line.vat_rate,
+      vat_amount: line.vat_amount
+    };
+    if (input.category !== void 0) patch.category = input.category;
+    if (input.description !== void 0) patch.description = input.description || null;
+    if (input.is_private !== void 0) patch.is_private = input.is_private;
+    const { error: uErr } = await sb.from("receipt_split_lines").update(patch).eq("id", part_id);
+    if (uErr) return fail(uErr.message);
+    const res = await withSplitInfo(sb, [{ id: part.receipt_id }]);
+    if (res.error) return fail(res.error);
+    return ok(JSON.stringify(res.receipts[0], null, 2), { receipt: res.receipts[0] });
+  }
+});
+
+// src/lib/mcp/tools/remove-split.ts
+import { defineTool as defineTool13 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z12 } from "npm:zod@^4.4.3";
+var remove_split_default = defineTool13({
+  name: "remove_split",
+  title: "Undo split booking",
+  description: "Same as 'Splitbuchung aufheben' in the app: deletes all split parts so the receipt is booked as one again. Never changes the receipt status.",
+  inputSchema: { id: z12.string().uuid().describe("Receipt id.") },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ id }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const { data: r, error } = await sb.from("receipts").select("id").eq("id", id).maybeSingle();
+    if (error) return fail(error.message);
+    if (!r) return fail("Receipt not found.");
+    try {
+      await removeSplitBooking(sb, id);
+    } catch (e) {
+      return fail(e.message ?? "Failed");
+    }
+    return ok("Split booking removed.", { id, is_split_booking: false });
+  }
+});
+
+// src/lib/mcp/tools/split-receipt-pdf.ts
+import { defineTool as defineTool14 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z13 } from "npm:zod@^4.4.3";
+var split_receipt_pdf_default = defineTool14({
+  name: "split_receipt_pdf",
+  title: "Divide PDF into separate receipts (Beleg teilen)",
+  description: "Same as 'PDF aufteilen' in the app, for a PDF that contains several invoices: cuts the PDF by page numbers into separate files, creates one new receipt per part (each is re-analysed by the AI and lands in review), and deletes the original receipt and file. Needs at least 2 parts with pages. Irreversible. Does not approve anything.",
+  inputSchema: {
+    id: z13.string().uuid().describe("Receipt id of the multi-invoice PDF."),
+    splits: z13.array(z13.object({
+      pages: z13.array(z13.number().int().min(1)).min(1).describe("1-based page numbers for this new receipt."),
+      vendor_name: z13.string().optional().describe("Optional vendor hint."),
+      invoice_number: z13.string().optional().describe("Optional invoice number hint."),
+      total_amount: z13.number().optional().describe("Optional total amount hint."),
+      date: z13.string().optional().describe("Optional date hint.")
+    }).strict()).min(2).describe("Parts, as used by the app dialog.")
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  handler: async ({ id, splits }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const { data, error } = await sb.functions.invoke("split-pdf", { body: { receiptId: id, splits } });
+    if (error) {
+      let msg = error.message;
+      try {
+        const body = await error.context?.json();
+        if (body?.error) msg = body.error;
+      } catch {
+      }
+      return fail(msg);
+    }
+    if (!data?.success) return fail(data?.error ?? "Split failed");
+    const result = { original_receipt_id: id, created_receipts: data.createdReceipts, count: data.count, message: data.message };
+    return ok(JSON.stringify(result, null, 2), result);
+  }
+});
+
 // src/lib/mcp/index.ts
 var projectRef = "nvvssxykygdxjywncvgd";
 var mcp_default = defineMcp({
   name: "billmonk",
   title: "BillMonk",
-  version: "0.3.0",
-  instructions: "Tools for BillMonk, a private expense management app. Review workflow: call get_review_queue, then get_receipt_document for each receipt to compare the original file with the extracted data, fix mistakes with update_receipt, and call approve_receipt only when the user asks. Use list_tags to see existing tag names and counts; update_receipt accepts a complete tags list and never creates tags. Prefer expense_summary for totals.",
+  version: "0.4.0",
+  instructions: "Tools for BillMonk, a private expense management app. Review workflow: call get_review_queue, then get_receipt_document for each receipt to compare the original file with the extracted data, fix mistakes with update_receipt, and call approve_receipt only when the user asks. Use list_tags to see existing tag names and counts; update_receipt accepts a complete tags list and never creates tags. Split bookings (one document, several categories/VAT rates): split_receipt_ai proposes parts from AI line items, split_receipt saves parts, update_split_part corrects one part, remove_split undoes it. split_receipt_pdf divides a multi-invoice PDF into separate new receipts. None of these approve receipts or change status. Prefer expense_summary for totals.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"
@@ -568,7 +883,12 @@ var mcp_default = defineMcp({
     update_receipt_default,
     approve_receipt_default,
     list_bank_transactions_default,
-    list_tags_default
+    list_tags_default,
+    split_receipt_ai_default,
+    split_receipt_default,
+    update_split_part_default,
+    remove_split_default,
+    split_receipt_pdf_default
   ]
 });
 
