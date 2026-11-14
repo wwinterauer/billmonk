@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { ReceiptPreviewDialog } from '@/components/receipts/ReceiptPreviewDialog';
+import { calculateMatchScore } from '@/lib/bankReconcile';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
@@ -71,54 +72,6 @@ interface SplitLine {
   amount_gross: number;
   sort_order: number;
   matched_tx_id: string | null;
-}
-
-// Calculate match score between transaction and receipt
-function calculateMatchScore(
-  transactionAmount: number,
-  transactionDate: Date,
-  receiptAmount: number | null,
-  receiptDate: string | null
-): { score: number; amountDiff: number; dateDiff: number | null } {
-  let score = 0;
-  const absTransactionAmount = Math.abs(transactionAmount);
-  const amountDiff = receiptAmount !== null 
-    ? Math.abs(absTransactionAmount - receiptAmount) / absTransactionAmount * 100
-    : 100;
-  
-  // Amount matching (up to 70 points)
-  if (receiptAmount !== null) {
-    if (amountDiff < 1) {
-      score += 70;
-    } else if (amountDiff < 5) {
-      score += 56;
-    } else if (amountDiff < 10) {
-      score += 42;
-    } else if (amountDiff < 20) {
-      score += 28;
-    } else if (amountDiff < 50) {
-      score += 14;
-    }
-  }
-  
-  // Date matching (up to 30 points)
-  let dateDiff: number | null = null;
-  if (receiptDate) {
-    dateDiff = Math.abs(differenceInDays(transactionDate, new Date(receiptDate)));
-    if (dateDiff === 0) {
-      score += 30;
-    } else if (dateDiff <= 3) {
-      score += 24;
-    } else if (dateDiff <= 7) {
-      score += 18;
-    } else if (dateDiff <= 14) {
-      score += 12;
-    } else if (dateDiff <= 30) {
-      score += 6;
-    }
-  }
-  
-  return { score, amountDiff, dateDiff };
 }
 
 // Debounce hook

@@ -12,7 +12,7 @@
   "mcp": {
     "server": {
       "name": "billmonk",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "title": "BillMonk"
     },
     "tools": [
@@ -324,7 +324,7 @@
       {
         "name": "list_bank_transactions",
         "title": "List bank transactions",
-        "description": "List imported bank transactions, optionally only unmatched ones, by date range or text.",
+        "description": "List imported bank transactions like the Kontoabgleich page: filter by status (unmatched, matched, ignored), date range or text, page with offset. Each row includes account, source, and for matched rows the linked receipt (vendor, amount, date, invoice number, status) or split line. Output is compact JSON.",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
@@ -334,6 +334,15 @@
           "$schema": "http://json-schema.org/draft-07/schema#",
           "type": "object",
           "properties": {
+            "status": {
+              "description": "Only transactions with this status. Omit for all.",
+              "type": "string",
+              "enum": [
+                "unmatched",
+                "matched",
+                "ignored"
+              ]
+            },
             "from": {
               "description": "Start date YYYY-MM-DD.",
               "type": "string",
@@ -351,7 +360,7 @@
             },
             "unmatched_only": {
               "default": false,
-              "description": "Only transactions without a linked receipt.",
+              "description": "Deprecated, same as status=unmatched.",
               "type": "boolean"
             },
             "limit": {
@@ -360,6 +369,13 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 200
+            },
+            "offset": {
+              "default": 0,
+              "description": "Rows to skip for paging.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
             }
           }
         },
@@ -648,6 +664,231 @@
           },
           "required": [
             "id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "suggest_bank_matches",
+        "title": "Suggest receipts for a bank transaction",
+        "description": "Return the same candidate receipts the app's \"Beleg zuordnen\" dialog shows for one transaction (score 0-100 from amount and date distance; default filters: only receipts without linked payment, amount within 10 %). Saves nothing.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "transaction_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "search": {
+              "description": "Vendor/description search, like the dialog's search box.",
+              "type": "string",
+              "minLength": 1
+            },
+            "include_assigned": {
+              "default": false,
+              "description": "Also consider receipts already linked to a payment (dialog toggle).",
+              "type": "boolean"
+            },
+            "similar_amount": {
+              "default": true,
+              "description": "Dialog filter: amount within 10 %.",
+              "type": "boolean"
+            },
+            "similar_date": {
+              "default": false,
+              "description": "Dialog filter: date within 7 days.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "transaction_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "match_bank_transaction",
+        "title": "Match bank transaction to receipt",
+        "description": "Link an unmatched bank transaction to a receipt exactly like \"Zuordnen\" in the app. No amount check (Skonto or small deviations are allowed) and several transactions may be linked to the same receipt (e.g. payroll journal). If the receipt is a split booking, split_line_id is required, like the app's line picker. Does not change the receipt's amounts or status.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "transaction_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "receipt_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "split_line_id": {
+              "description": "Split line of the receipt, required when the receipt has split lines.",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "transaction_id",
+            "receipt_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "unmatch_bank_transaction",
+        "title": "Unmatch bank transaction",
+        "description": "Remove the receipt link of a matched transaction like \"Zuordnung aufheben\"; it becomes unmatched. The receipt itself is kept.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "transaction_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "transaction_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "ignore_bank_transaction",
+        "title": "Ignore bank transaction",
+        "description": "Mark an unmatched transaction as ignored like \"Ignorieren\" in the app. The app has no field for a reason, so reason is only echoed back, not stored.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "transaction_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "reason": {
+              "description": "Not stored (the app has no reason field); echoed in the reply only.",
+              "type": "string",
+              "maxLength": 500
+            }
+          },
+          "required": [
+            "transaction_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "unignore_bank_transaction",
+        "title": "Restore ignored bank transaction",
+        "description": "Set an ignored transaction back to unmatched like \"Wiederherstellen\" in the app.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "transaction_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "transaction_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_receipt_from_bank_transaction",
+        "title": "Create receipt from bank transaction",
+        "description": "Create a receipt without file from an unmatched bank transaction like \"Als Ausgabe erstellen\" in the app and link it. Stored like the app: status review, source bank_import, is_no_receipt_entry true, payment_method bank_transfer, gross = absolute booking amount, date = booking date, matching bank keyword rule supplies defaults. Given vendor/category/description/tags/vat_rate replace those defaults. Not approved; use approve_receipt.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "transaction_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "vendor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One of the user's existing categories."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "tags": {
+              "default": [],
+              "description": "Existing tag names; empty list = no tags.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "vat_rate": {
+              "description": "VAT rate in percent; default from keyword rule or 0.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "transaction_id",
+            "vendor",
+            "category",
+            "description"
           ]
         },
         "outputSchema": null

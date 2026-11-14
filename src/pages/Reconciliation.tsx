@@ -61,6 +61,7 @@ import { EditableTableHead } from '@/components/expenses/EditableTableHead';
 import { useEditableColumns, type ColumnDef } from '@/hooks/useEditableColumns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { assignBankTransaction, createExpenseFromBankTransaction, setBankTransactionStatus, unmatchBankTransaction } from '@/lib/bankReconcile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePlan } from '@/hooks/usePlan';
@@ -543,15 +544,7 @@ export default function Reconciliation() {
   };
   const updateStatusMutation = useMutation({
     mutationFn: async ({ transactionId, status }: { transactionId: string; status: string }) => {
-      const updates: any = { status };
-      if (status === 'unmatched') {
-        updates.receipt_id = null;
-      }
-      const { error } = await supabase
-        .from('bank_transactions')
-        .update(updates)
-        .eq('id', transactionId);
-      if (error) throw error;
+      await setBankTransactionStatus(supabase, transactionId, status as 'ignored' | 'unmatched');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
@@ -577,24 +570,7 @@ export default function Reconciliation() {
     splitLineId?: string | null,
   ) => {
     try {
-      const { error: txError } = await supabase
-        .from('bank_transactions')
-        .update({
-          status: 'matched',
-          receipt_id: receiptId,
-          receipt_split_line_id: splitLineId ?? null,
-        })
-        .eq('id', transactionId);
-      if (txError) throw txError;
-
-      // Only attach to receipt itself for whole-receipt matches
-      if (!splitLineId) {
-        const { error: rcptError } = await supabase
-          .from('receipts')
-          .update({ bank_transaction_id: transactionId })
-          .eq('id', receiptId);
-        if (rcptError) throw rcptError;
-      }
+      await assignBankTransaction(supabase, transactionId, receiptId, splitLineId);
 
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
@@ -624,114 +600,12 @@ export default function Reconciliation() {
         || (selectedTransaction?.id === transactionId ? selectedTransaction : null);
       if (!tx) throw new Error('Buchung nicht gefunden');
 
-      const description: string = tx.description || '';
-      const amount = Math.abs(Number(tx.amount) || 0);
-      const txDate = tx.transaction_date
-        ? format(new Date(tx.transaction_date), 'yyyy-MM-dd')
-        : format(new Date(), 'yyyy-MM-dd');
-
-      // Extract vendor heuristically from bank description
-      const extractVendor = (desc: string): string => {
-        if (!desc) return 'Unbekannter Lieferant';
-        // Try common SEPA labels (DE/AT)
-        const patterns = [
-          /Empf[äa]nger:\s*([^]+?)(?=\s+(?:Verwendungszweck|Zahlungsreferenz|IBAN|BIC|Beitr\.|KtoNr|Mandat|Ref\.?|Kundendaten|Auftraggeber)|$)/i,
-          /Auftraggeber:\s*([^]+?)(?=\s+(?:Verwendungszweck|Zahlungsreferenz|IBAN|BIC|Beitr\.|KtoNr|Mandat|Ref\.?|Kundendaten|Empf)|$)/i,
-          /Zahlungspflichtiger:\s*([^]+?)(?=\s+(?:Verwendungszweck|IBAN|BIC|Ref\.?)|$)/i,
-        ];
-        for (const re of patterns) {
-          const m = desc.match(re);
-          if (m && m[1]) return m[1].trim().replace(/\s+/g, ' ').slice(0, 120);
-        }
-        // Fallback: first 60 chars without "Online Banking..." preamble
-        const cleaned = desc
-          .replace(/^Online Banking vom \d{1,2}\.\d{1,2}(?:\.\d{2,4})? um \d{1,2}:\d{2}\s*/i, '')
-          .replace(/^SEPA[- ]?(?:Überweisung|Lastschrift|Gutschrift|Dauerauftrag)[:\s]*/i, '')
-          .trim();
-        return (cleaned.split(/\s{2,}|·|\||–/)[0] || cleaned).slice(0, 80) || 'Unbekannter Lieferant';
-      };
-
-      const vendorName = extractVendor(description);
-
-      // Try matching a bank_import_keyword for category/tax defaults
-      const { data: keywords } = await supabase
-        .from('bank_import_keywords')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .eq('is_ignore', false);
-
-      const matchedKeyword = (keywords ?? []).find((kw: any) =>
-        description.toLowerCase().includes((kw.keyword || '').toLowerCase())
-      );
-
-      let vendorId: string | null = null;
-      let vendorDisplay = vendorName;
-      if (matchedKeyword?.vendor_id) {
-        vendorId = matchedKeyword.vendor_id;
-        const { data: v } = await supabase
-          .from('vendors')
-          .select('display_name')
-          .eq('id', matchedKeyword.vendor_id)
-          .maybeSingle();
-        if (v?.display_name) vendorDisplay = v.display_name;
-      }
-
-      const isIncome = (Number(tx.amount) || 0) > 0;
-
-      const { data: newReceipt, error: insertErr } = await supabase
-        .from('receipts')
-        .insert({
-          user_id: user.id,
-          vendor: vendorDisplay,
-          vendor_id: vendorId,
-          description: matchedKeyword?.description_template
-            ? `${matchedKeyword.description_template} – ${description}`.slice(0, 500)
-            : description.slice(0, 500),
-          amount_gross: amount,
-          receipt_date: txDate,
-          category: matchedKeyword?.category ?? null,
-          tax_type: matchedKeyword?.tax_type ?? null,
-          vat_rate: matchedKeyword?.tax_rate ?? 0,
-          payment_method: 'bank_transfer',
-          currency: 'EUR',
-          status: 'review',
-          source: 'bank_import',
-          is_no_receipt_entry: true,
-          bank_import_keyword_id: matchedKeyword?.id ?? null,
-          bank_transaction_reference: description.slice(0, 500),
-          bank_transaction_id: transactionId,
-          notes: isIncome
-            ? 'Aus Bankbuchung erfasst (Hinweis: Einnahme/positiver Betrag) – bitte prüfen.'
-            : 'Aus Bankbuchung erfasst – bitte vervollständigen.',
-        })
-        .select('id')
-        .single();
-
-      if (insertErr) throw insertErr;
-
-      // Assign default tags from keyword
-      const defaultTagIds: string[] = Array.isArray(matchedKeyword?.default_tag_ids)
-        ? (matchedKeyword!.default_tag_ids as any[]).filter(Boolean)
-        : [];
-      if (defaultTagIds.length > 0) {
-        await supabase
-          .from('receipt_tags')
-          .upsert(
-            defaultTagIds.map((tag_id) => ({ receipt_id: newReceipt.id, tag_id })),
-            { onConflict: 'receipt_id,tag_id', ignoreDuplicates: true }
-          );
-      }
-
-      const { error: txErr } = await supabase
-        .from('bank_transactions')
-        .update({
-          status: 'matched',
-          receipt_id: newReceipt.id,
-          receipt_split_line_id: null,
-        })
-        .eq('id', transactionId);
-      if (txErr) throw txErr;
+      const { receiptId: newReceiptId } = await createExpenseFromBankTransaction(supabase, user.id, {
+        id: tx.id,
+        description: tx.description ?? null,
+        amount: tx.amount ?? null,
+        transaction_date: tx.transaction_date ? format(new Date(tx.transaction_date), 'yyyy-MM-dd') : null,
+      });
 
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
@@ -745,7 +619,7 @@ export default function Reconciliation() {
       });
 
       setShowAssignModal(false);
-      setSelectedReceiptId(newReceipt.id);
+      setSelectedReceiptId(newReceiptId);
       setShowReceiptPanel(true);
     } catch (error: any) {
       toast({
@@ -778,17 +652,7 @@ export default function Reconciliation() {
     try {
       // Only unlink the receipt's bank_transaction_id if it was actually pointing at this tx
       // (split-line matches don't set receipts.bank_transaction_id at all).
-      if (receiptId) {
-        await supabase
-          .from('receipts')
-          .update({ bank_transaction_id: null })
-          .eq('id', receiptId)
-          .eq('bank_transaction_id', transactionId);
-      }
-      await supabase
-        .from('bank_transactions')
-        .update({ status: 'unmatched', receipt_id: null, receipt_split_line_id: null })
-        .eq('id', transactionId);
+      await unmatchBankTransaction(supabase, transactionId, receiptId);
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['bank-transactions-unmatched-count'] });
       queryClient.invalidateQueries({ queryKey: ['kpi-unmatched-payments'] });
