@@ -85,7 +85,7 @@ const Login = () => {
       <div className="w-full max-w-md">
         <Card className="border-border/50 shadow-xl">
           <CardHeader className="text-center pb-2">
-            <Link to="/" className="inline-flex items-center justify-center mb-6">
+            <Link to="/login" className="inline-flex items-center justify-center mb-6">
               <img src={logoTeal} alt="BillMonk" className="h-12" />
             </Link>
             <h1 className="text-2xl font-bold text-foreground">Willkommen zurück</h1>
@@ -156,9 +156,6 @@ const Login = () => {
                       </FormItem>
                     )}
                   />
-                  <Link to="/forgot-password" className="text-sm text-primary hover:underline">
-                    Passwort vergessen?
-                  </Link>
                 </div>
 
                 <Button 
@@ -195,13 +192,6 @@ const Login = () => {
               <Mail className="mr-2 h-4 w-4" />
               Mit Google anmelden
             </Button>
-
-            <p className="text-center text-sm text-muted-foreground">
-              Noch kein Konto?{' '}
-              <Link to="/register" className="text-primary font-medium hover:underline">
-                Registrieren
-              </Link>
-            </p>
           </CardContent>
         </Card>
       </div>
