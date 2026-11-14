@@ -1,5 +1,5 @@
 export const RECEIPT_FIELDS =
-  "id, status, file_name, file_type, receipt_date, vendor, vendor_brand, description, invoice_number, amount_gross, amount_net, vat_amount, vat_rate, is_mixed_tax_rate, tax_rate_details, line_items_raw, currency, category, tax_type, ai_confidence, is_duplicate, is_no_receipt_entry, notes";
+  "id, status, file_name, file_type, receipt_date, vendor, vendor_brand, description, invoice_number, amount_gross, amount_net, vat_amount, skonto_amount, skonto_percent, vat_rate, is_mixed_tax_rate, tax_rate_details, line_items_raw, currency, category, tax_type, ai_confidence, is_duplicate, is_no_receipt_entry, notes";
 
 export function ok(text: string, structured: Record<string, unknown>) {
   return { content: [{ type: "text" as const, text }], structuredContent: structured };
