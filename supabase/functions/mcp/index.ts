@@ -201,7 +201,7 @@ var list_receipts_default = defineTool({
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Start receipt date (YYYY-MM-DD)."),
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("End receipt date (YYYY-MM-DD)."),
     vendor: z.string().trim().min(1).optional().describe("Filter by vendor name (partial match)."),
-    status: z.string().trim().min(1).optional().describe("Filter by receipt status, e.g. completed."),
+    status: z.string().trim().min(1).optional().describe("Filter by receipt status, e.g. approved, review or not_a_receipt (documents set to Keine Rechnung by a vendor rule). Without a filter all statuses are returned."),
     tag: z.string().trim().min(1).optional().describe("Filter by one exact existing tag name."),
     limit: z.number().int().min(1).max(100).default(25).describe("Maximum number of receipts to return.")
   },
@@ -330,18 +330,19 @@ import { z as z4 } from "npm:zod@^4.4.3";
 var get_review_queue_default = defineTool4({
   name: "get_review_queue",
   title: "Get review queue",
-  description: "List receipts waiting for review with their extracted data and tag names. Use get_receipt_document to read the original file and compare.",
+  description: "List receipts waiting for review with their extracted data and tag names. Use get_receipt_document to read the original file and compare. Set include_not_a_receipt to also list documents with status not_a_receipt (e.g. Booking payout overviews set by a vendor rule), which approve_receipt can approve.",
   inputSchema: {
     limit: z4.number().int().min(1).max(50).default(10).describe("How many receipts to return."),
-    offset: z4.number().int().min(0).default(0).describe("Skip this many receipts (paging).")
+    offset: z4.number().int().min(0).default(0).describe("Skip this many receipts (paging)."),
+    include_not_a_receipt: z4.boolean().default(false).describe("Also include receipts with status not_a_receipt.")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
-  handler: async ({ limit, offset }, ctx) => {
+  handler: async ({ limit, offset, include_not_a_receipt }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const l = limit ?? 10;
     const o = offset ?? 0;
     const sb = supabaseForUser(ctx);
-    const { data, error, count } = await sb.from("receipts").select(RECEIPT_FIELDS, { count: "exact" }).eq("status", "review").order("created_at", { ascending: true }).range(o, o + l - 1);
+    const { data, error, count } = await sb.from("receipts").select(RECEIPT_FIELDS, { count: "exact" }).in("status", include_not_a_receipt ? ["review", "not_a_receipt"] : ["review"]).order("created_at", { ascending: true }).range(o, o + l - 1);
     if (error) return fail(error.message);
     const tagged = await withReceiptTagNames(sb, data ?? []);
     if (tagged.error) return fail(tagged.error);
@@ -410,11 +411,16 @@ async function checkReceiptEditable(sb, id) {
   return lockedReceiptError(data.status);
 }
 var FIELDS_EDITABLE_WHEN_LOCKED = ["category", "tags", "receipt_date", "no_invoice"];
-function lockedFieldsError(status, fields) {
+var AMOUNT_FIELDS_CLEARABLE_FOR_NO_INVOICE = ["amount_gross", "amount_net", "vat_amount"];
+function lockedFieldsError(status, fields, opts = {}) {
   if (!lockedReceiptError(status)) return null;
-  const blocked = fields.filter((f) => !FIELDS_EDITABLE_WHEN_LOCKED.includes(f));
+  const blocked = fields.filter((f) => {
+    if (FIELDS_EDITABLE_WHEN_LOCKED.includes(f)) return false;
+    if (opts.isNoInvoice && AMOUNT_FIELDS_CLEARABLE_FOR_NO_INVOICE.includes(f) && opts.values?.[f] === null) return false;
+    return true;
+  });
   if (blocked.length === 0) return null;
-  return `Receipt is ${status}: only category, tags and receipt_date can be changed. Locked fields: ${blocked.join(", ")}.`;
+  return `Receipt is ${status}: only category, tags and receipt_date can be changed (amounts may only be cleared to null on Keine Rechnung receipts). Locked fields: ${blocked.join(", ")}.`;
 }
 var NO_INVOICE_CATEGORY = "Keine Rechnung";
 function deleteReceiptError(status) {
@@ -427,7 +433,7 @@ function deleteReceiptError(status) {
 var update_receipt_default = defineTool6({
   name: "update_receipt",
   title: "Correct receipt data",
-  description: 'Correct extracted fields of a receipt. On approved receipts only category, tags and receipt_date may be changed, all other fields are locked. "Keine Rechnung" (no_invoice: true, or category "Keine Rechnung") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when "Keine Rechnung ausschlie\xDFen" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.',
+  description: 'Correct extracted fields of a receipt. On approved receipts only category, tags and receipt_date may be changed, all other fields are locked, except that amount_gross, amount_net and vat_amount may be set to null on approved Keine Rechnung receipts. "Keine Rechnung" (no_invoice: true, or category "Keine Rechnung") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when "Keine Rechnung ausschlie\xDFen" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.',
   inputSchema: {
     id: z6.string().uuid().describe("Receipt id."),
     vendor: z6.string().min(1).optional().describe("Legal vendor name."),
@@ -435,8 +441,8 @@ var update_receipt_default = defineTool6({
     receipt_date: z6.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Receipt date YYYY-MM-DD."),
     invoice_number: z6.string().optional().describe("Invoice number."),
     amount_gross: z6.number().nullable().optional().describe('Gross amount. null clears it (intended for "Keine Rechnung" entries without an amount).'),
-    amount_net: z6.number().optional().describe("Net amount."),
-    vat_amount: z6.number().optional().describe("VAT amount."),
+    amount_net: z6.number().nullable().optional().describe("Net amount. null clears it (Keine Rechnung only)."),
+    vat_amount: z6.number().nullable().optional().describe("VAT amount. null clears it (Keine Rechnung only)."),
     vat_rate: z6.number().min(0).max(100).optional().describe("VAT rate in percent."),
     category: z6.string().min(1).optional().describe("One of the user's existing categories."),
     description: z6.string().optional().describe("Short description."),
@@ -449,7 +455,7 @@ var update_receipt_default = defineTool6({
   handler: async ({ id, tags: requestedTags, no_invoice, ...input }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
-    const { data: cur, error: e1 } = await sb.from("receipts").select("amount_gross, vat_rate, user_modified_fields, status").eq("id", id).maybeSingle();
+    const { data: cur, error: e1 } = await sb.from("receipts").select("amount_gross, vat_rate, user_modified_fields, status, category, is_no_receipt_entry").eq("id", id).maybeSingle();
     if (e1) return fail(e1.message);
     if (!cur) return fail("Receipt not found.");
     const requestedFields = [
@@ -457,7 +463,10 @@ var update_receipt_default = defineTool6({
       ...requestedTags !== void 0 ? ["tags"] : [],
       ...no_invoice !== void 0 ? ["no_invoice"] : []
     ];
-    const locked = lockedFieldsError(cur.status, requestedFields);
+    const locked = lockedFieldsError(cur.status, requestedFields, {
+      isNoInvoice: cur.category === NO_INVOICE_CATEGORY || cur.is_no_receipt_entry === true,
+      values: input
+    });
     if (locked) return fail(locked);
     let desiredTagIds;
     let currentTagIds = [];
@@ -545,14 +554,14 @@ import { z as z7 } from "npm:zod@^4.4.3";
 var approve_receipt_default = defineTool7({
   name: "approve_receipt",
   title: "Approve receipt",
-  description: "Approve a receipt that is in review. Only call this when the user asked to approve it.",
+  description: "Approve a receipt that is in review or has status not_a_receipt (e.g. Booking payout overviews marked Keine Rechnung); afterwards it is approved like any other receipt. Only call this when the user asked to approve it.",
   inputSchema: { id: z7.string().uuid().describe("Receipt id.") },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async ({ id }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
-    const { data, error } = await supabaseForUser(ctx).from("receipts").update({ status: "approved" }).eq("id", id).eq("status", "review").select("id, vendor, amount_gross, receipt_date").maybeSingle();
+    const { data, error } = await supabaseForUser(ctx).from("receipts").update({ status: "approved" }).eq("id", id).in("status", ["review", "not_a_receipt"]).select("id, vendor, amount_gross, receipt_date").maybeSingle();
     if (error) return fail(error.message);
-    if (!data) return fail("Receipt not found or not in review.");
+    if (!data) return fail("Receipt not found or not in review/not_a_receipt.");
     return ok(`Approved ${data.vendor ?? "receipt"} (${data.amount_gross ?? "?"}).`, { receipt: JSON.parse(JSON.stringify(data)) });
   }
 });
