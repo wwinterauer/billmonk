@@ -38,9 +38,9 @@ export default defineTool({
     const { data, error, count } = await q;
     if (error) return fail(error.message);
     const rows = (data ?? []).map((t) => {
-      const a = t.account as { bank_name: string | null; account_name: string | null; iban: string | null } | null;
-      const r = t.receipt as { vendor: string | null; amount_gross: number | null; receipt_date: string | null; invoice_number: string | null; status: string | null; is_no_receipt_entry: boolean | null; source: string | null } | null;
-      const l = t.split_line as { description: string | null; amount_gross: number | null } | null;
+      const a = t.account as unknown as { bank_name: string | null; account_name: string | null; iban: string | null } | null;
+      const r = t.receipt as unknown as { vendor: string | null; amount_gross: number | null; receipt_date: string | null; invoice_number: string | null; status: string | null; is_no_receipt_entry: boolean | null; source: string | null } | null;
+      const l = t.split_line as unknown as { description: string | null; amount_gross: number | null } | null;
       return {
         id: t.id,
         date: t.transaction_date,
