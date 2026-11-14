@@ -27,6 +27,9 @@ const REASONS: Record<string, string> = {
   race_duplicate_preinsert: 'Beim Speichern als bereits vorhanden erkannt',
   upload_or_processing_failed: 'Upload oder Verarbeitung fehlgeschlagen',
   duplicate_check_failed: 'Duplikat-Prüfung fehlgeschlagen',
+  interrupted_reload: 'Unterbrochen – Seite wurde während des Uploads neu geladen oder geschlossen',
+  pipeline_error: 'Fehler im Upload-Ablauf',
+  user_cancelled: 'Von dir abgebrochen',
 };
 
 export function describeReason(row: UploadEventRow): string {
@@ -36,6 +39,7 @@ export function describeReason(row: UploadEventRow): string {
   if (row.error_message) return row.error_message;
   if (row.outcome === 'pending') {
     if (row.phase === 'storage-upload') return 'Wird gerade hochgeladen';
+    if (row.phase === 'queued') return 'In der Warteschlange – startet gleich';
     if (row.phase === 'selected' || row.phase === 'validated') return 'Wartet auf Dateiprüfung — noch nicht hochgeladen';
     if (row.phase === 'hashing') return 'Datei wird gelesen und auf Identität geprüft';
     if (row.phase === 'hash-calculated' || row.phase === 'duplicate-check') return 'Duplikatprüfung / wartet auf Upload';
@@ -50,6 +54,8 @@ export function hintForReason(reasonCode: string | null): string | null {
       return 'Datei ggf. ohne Endung gespeichert — als .pdf neu speichern und erneut hochladen.';
     case 'file_too_large':
       return 'Datei komprimieren oder in mehrere PDFs aufteilen.';
+    case 'interrupted_reload':
+      return 'Datei erneut hineinziehen – bereits hochgeladene Dateien werden automatisch übersprungen.';
     case 'batch_limit':
     case 'active_upload_limit':
       return 'Diese Dateien in einem zweiten Durchgang hochladen.';
