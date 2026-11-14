@@ -1,3 +1,4 @@
+import { paidGross } from "../_shared/skonto.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildGroupPairs, isProcessorTransaction, findReferenceMatch, buildSuggestions } from "../_shared/reconcileHelpers.ts";
@@ -67,7 +68,7 @@ async function buildCandidatePool(
 ): Promise<Candidate[]> {
   const { data: receipts } = await supabase
     .from("receipts")
-    .select("id, amount_gross, receipt_date, vendor, vendor_id, invoice_number, bank_transaction_id")
+    .select("id, amount_gross, skonto_amount, skonto_percent, receipt_date, vendor, vendor_id, invoice_number, bank_transaction_id")
     .eq("user_id", userId)
     .in("status", ["approved", "completed", "review"])
     .gte("receipt_date", minDate)
@@ -143,7 +144,7 @@ async function buildCandidatePool(
         key: `receipt:${r.id}`,
         receipt_id: r.id,
         split_line_id: null,
-        amount_gross: r.amount_gross,
+        amount_gross: paidGross(r as any),
         receipt_date: r.receipt_date,
         vendor: r.vendor,
         invoice_number: r.invoice_number,
@@ -183,7 +184,7 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const mode: Mode = body?.mode === "apply" ? "apply" : "preview";
-    const acceptedPairs: { transaction_id: string; receipt_id: string; split_line_id?: string | null }[] =
+    const acceptedPairs: { transaction_id: string; receipt_id: string; split_line_id?: string | null; apply_skonto?: boolean }[] =
       Array.isArray(body?.accepted_pairs) ? body.accepted_pairs : [];
 
     // --- APPLY mode: persist user-accepted skonto matches ---
@@ -194,13 +195,13 @@ serve(async (req) => {
 
         const { data: tx } = await supabase
           .from("bank_transactions")
-          .select("id, user_id, status")
+          .select("id, user_id, status, amount")
           .eq("id", p.transaction_id)
           .eq("user_id", user.id)
           .maybeSingle();
         const { data: rcpt } = await supabase
           .from("receipts")
-          .select("id, user_id, bank_transaction_id")
+          .select("id, user_id, bank_transaction_id, amount_gross, skonto_amount")
           .eq("id", p.receipt_id)
           .eq("user_id", user.id)
           .maybeSingle();
@@ -240,7 +241,16 @@ serve(async (req) => {
         if (!isSplit) {
           const { error: e2 } = await supabase
             .from("receipts")
-            .update({ bank_transaction_id: p.transaction_id })
+            .update({
+              bank_transaction_id: p.transaction_id,
+              ...(p.apply_skonto && rcpt.amount_gross != null && rcpt.skonto_amount == null
+                ? (() => {
+                    const g = Math.abs(Number(rcpt.amount_gross));
+                    const s = Math.round((g - Math.abs(Number(tx.amount ?? 0))) * 100) / 100;
+                    return s > 0 && s < g ? { skonto_amount: s, skonto_percent: Math.round((s / g) * 10000) / 100 } : {};
+                  })()
+                : {}),
+            })
             .eq("id", p.receipt_id);
           if (e2) continue;
         }

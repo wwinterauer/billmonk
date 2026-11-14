@@ -54,6 +54,7 @@ export interface AcceptedPair {
   transaction_id: string;
   receipt_id: string;
   split_line_id?: string | null;
+  apply_skonto?: boolean;
 }
 
 interface Props {
@@ -151,6 +152,7 @@ export function SkontoReconcileDialog({
         transaction_id: c.transaction_id,
         receipt_id: c.receipt_id,
         split_line_id: c.split_line_id ?? null,
+        apply_skonto: true,
       }));
     const fromSuggestions = suggestions
       .filter((s) => selectedSuggestions.has(s.transaction_id))

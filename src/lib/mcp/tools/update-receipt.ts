@@ -20,6 +20,8 @@ export default defineTool({
     vat_rate: z.number().min(0).max(100).optional().describe("VAT rate in percent."),
     category: z.string().min(1).optional().describe("One of the user's existing categories."),
     description: z.string().optional().describe("Short description."),
+    skonto_amount: z.number().min(0).optional().describe("Manual cash discount (Skonto) in EUR deducted at payment; 0 removes it. Original invoice amounts stay unchanged."),
+    skonto_percent: z.number().min(0).max(100).optional().describe("Manual cash discount in percent of gross; 0 removes it."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async ({ id, ...input }, ctx) => {
@@ -33,6 +35,13 @@ export default defineTool({
     const patch: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(input)) if (v !== undefined) patch[k] = v;
     if (Object.keys(patch).length === 0) return fail("No fields to update.");
+    const g = Math.abs(Number(patch.amount_gross ?? cur.amount_gross ?? 0));
+    if (patch.skonto_amount !== undefined || patch.skonto_percent !== undefined) {
+      let amt = patch.skonto_amount as number | undefined;
+      if (amt === undefined) amt = Math.round(g * Number(patch.skonto_percent) ) / 100;
+      if (!amt) { patch.skonto_amount = null; patch.skonto_percent = null; }
+      else { patch.skonto_amount = amt; patch.skonto_percent = g ? Math.round((amt / g) * 10000) / 100 : null; }
+    }
 
     if (patch.category !== undefined) {
       const { data: cats } = await sb.from("categories").select("name").not("is_hidden", "is", true);

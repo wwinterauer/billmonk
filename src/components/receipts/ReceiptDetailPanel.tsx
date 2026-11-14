@@ -1,3 +1,4 @@
+import { applySkonto, amountFromPercent, percentFromAmount } from '@/lib/skonto';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PAYMENT_METHODS, NO_RECEIPT_CATEGORY } from '@/lib/constants';
 import { Repeat, FileX } from 'lucide-react';
@@ -177,6 +178,8 @@ export function ReceiptDetailPanel({
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [category, setCategory] = useState('');
   const [amountGross, setAmountGross] = useState('');
+  const [skontoPercent, setSkontoPercent] = useState('');
+  const [skontoAmount, setSkontoAmount] = useState('');
   const [vatRate, setVatRate] = useState(defaultVatRate);
   const [isMixedTaxRate, setIsMixedTaxRate] = useState(false);
   const [taxRateDetails, setTaxRateDetails] = useState<TaxRateDetail[] | null>(null);
@@ -405,6 +408,8 @@ export function ReceiptDetailPanel({
           setInvoiceNumber(data.invoice_number || '');
           setCategory(data.category || '');
           setAmountGross(data.amount_gross?.toString() || '');
+          setSkontoPercent((data as any).skonto_percent != null ? String((data as any).skonto_percent) : '');
+          setSkontoAmount((data as any).skonto_amount != null ? String((data as any).skonto_amount) : '');
           setVatRate(data.vat_rate !== null && data.vat_rate !== undefined ? data.vat_rate.toString() : defaultVatRate);
           // Handle mixed tax rate fields (may not be in types yet)
           const receiptData = data as unknown as Record<string, unknown>;
@@ -827,6 +832,8 @@ export function ReceiptDetailPanel({
         vat_rate: isMixedTaxRate ? null : (vatRate !== '' && vatRate !== undefined ? parseFloat(vatRate) : null),
         is_mixed_tax_rate: isMixedTaxRate,
         tax_rate_details: isMixedTaxRate ? taxRateDetails : null,
+        skonto_amount: skontoAmount !== '' && parseFloat(skontoAmount) > 0 ? parseFloat(skontoAmount) : null,
+        skonto_percent: skontoPercent !== '' && parseFloat(skontoPercent) > 0 ? parseFloat(skontoPercent) : null,
         payment_method: paymentMethod || null,
         tax_type: taxType || null,
         notes: notes || null,
@@ -1767,6 +1774,33 @@ export function ReceiptDetailPanel({
                         />
                       </LearnableField>
                     </div>
+
+                    {/* Skonto (manual) */}
+                    {(() => {
+                      const g = amountGross !== '' ? parseFloat(amountGross) : 0;
+                      const eff = applySkonto({ amount_gross: g, amount_net: amountNetOverride ? parseFloat(amountNetOverride) : calculatedValues.net, vat_amount: vatAmountOverride ? parseFloat(vatAmountOverride) : calculatedValues.vat, skonto_amount: skontoAmount !== '' ? parseFloat(skontoAmount) : null });
+                      return (
+                        <div className="space-y-2 rounded-md border border-border p-3">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <Label htmlFor="skontoPercent">Skonto %</Label>
+                              <Input id="skontoPercent" type="number" step="0.01" min="0" value={skontoPercent} placeholder="0"
+                                onChange={(e) => { const v = e.target.value; setSkontoPercent(v); setSkontoAmount(v !== '' && g ? String(amountFromPercent(g, parseFloat(v))) : ''); }} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="skontoAmount">Skonto €</Label>
+                              <Input id="skontoAmount" type="number" step="0.01" min="0" value={skontoAmount} placeholder="0,00"
+                                onChange={(e) => { const v = e.target.value; setSkontoAmount(v); setSkontoPercent(v !== '' && g ? String(percentFromAmount(g, parseFloat(v))) : ''); }} />
+                            </div>
+                          </div>
+                          {eff.skonto > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Zahlbetrag <span className="font-medium text-foreground">€ {eff.gross?.toFixed(2)}</span> · Netto € {eff.net?.toFixed(2) ?? '—'} · MwSt € {eff.vat?.toFixed(2) ?? '—'} (anteilig gekürzt)
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Payment Method */}
                     <LearnableField

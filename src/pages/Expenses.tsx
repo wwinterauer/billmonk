@@ -1,3 +1,4 @@
+import { applySkonto } from '@/lib/skonto';
 import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { RecurringExpensesTab } from '@/components/expenses/RecurringExpensesTab';
@@ -1053,8 +1054,8 @@ const Expenses = () => {
   // Statistics (exclude "Keine Rechnung" from monetary calculations)
   const stats = useMemo(() => {
     const billableReceipts = filteredReceipts.filter(r => r.category !== NO_RECEIPT_CATEGORY);
-    const total = billableReceipts.reduce((sum, r) => sum + (r.amount_gross || 0), 0);
-    const vatSum = billableReceipts.reduce((sum, r) => sum + (r.vat_amount || 0), 0);
+    const total = billableReceipts.reduce((sum, r) => sum + (applySkonto(r as any).gross ?? 0), 0);
+    const vatSum = billableReceipts.reduce((sum, r) => sum + (applySkonto(r as any).vat ?? 0), 0);
     const count = filteredReceipts.length;
     const average = billableReceipts.length > 0 ? total / billableReceipts.length : 0;
 
@@ -1791,7 +1792,12 @@ const Expenses = () => {
       case 'amount':
         return (
           <TableCell key={key} style={cellStyle} className="text-right font-medium">
-            {formatCurrency(receipt.amount_gross)}
+            {(() => { const e = applySkonto(receipt as any); return e.skonto > 0 ? (
+              <div className="flex flex-col items-end leading-tight">
+                <span>{formatCurrency(e.gross)}</span>
+                <span className="text-[10px] font-normal text-muted-foreground" title={`Rechnung ${formatCurrency(receipt.amount_gross)}`}>Skonto −{formatCurrency(e.skonto)}</span>
+              </div>
+            ) : formatCurrency(receipt.amount_gross); })()}
           </TableCell>
         );
       case 'ai':

@@ -181,7 +181,7 @@ import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z4 } from "npm:zod@^4.4.3";
 
 // src/lib/mcp/tools/_shared.ts
-var RECEIPT_FIELDS = "id, status, file_name, file_type, receipt_date, vendor, vendor_brand, description, invoice_number, amount_gross, amount_net, vat_amount, vat_rate, is_mixed_tax_rate, tax_rate_details, line_items_raw, currency, category, tax_type, ai_confidence, is_duplicate, is_no_receipt_entry, notes";
+var RECEIPT_FIELDS = "id, status, file_name, file_type, receipt_date, vendor, vendor_brand, description, invoice_number, amount_gross, amount_net, vat_amount, skonto_amount, skonto_percent, vat_rate, is_mixed_tax_rate, tax_rate_details, line_items_raw, currency, category, tax_type, ai_confidence, is_duplicate, is_no_receipt_entry, notes";
 function ok(text, structured) {
   return { content: [{ type: "text", text }], structuredContent: structured };
 }
@@ -282,7 +282,9 @@ var update_receipt_default = defineTool6({
     vat_amount: z6.number().optional().describe("VAT amount."),
     vat_rate: z6.number().min(0).max(100).optional().describe("VAT rate in percent."),
     category: z6.string().min(1).optional().describe("One of the user's existing categories."),
-    description: z6.string().optional().describe("Short description.")
+    description: z6.string().optional().describe("Short description."),
+    skonto_amount: z6.number().min(0).optional().describe("Manual cash discount (Skonto) in EUR deducted at payment; 0 removes it. Original invoice amounts stay unchanged."),
+    skonto_percent: z6.number().min(0).max(100).optional().describe("Manual cash discount in percent of gross; 0 removes it.")
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async ({ id, ...input }, ctx) => {
@@ -294,6 +296,18 @@ var update_receipt_default = defineTool6({
     const patch = {};
     for (const [k, v] of Object.entries(input)) if (v !== void 0) patch[k] = v;
     if (Object.keys(patch).length === 0) return fail("No fields to update.");
+    const g = Math.abs(Number(patch.amount_gross ?? cur.amount_gross ?? 0));
+    if (patch.skonto_amount !== void 0 || patch.skonto_percent !== void 0) {
+      let amt = patch.skonto_amount;
+      if (amt === void 0) amt = Math.round(g * Number(patch.skonto_percent)) / 100;
+      if (!amt) {
+        patch.skonto_amount = null;
+        patch.skonto_percent = null;
+      } else {
+        patch.skonto_amount = amt;
+        patch.skonto_percent = g ? Math.round(amt / g * 1e4) / 100 : null;
+      }
+    }
     if (patch.category !== void 0) {
       const { data: cats } = await sb.from("categories").select("name").not("is_hidden", "is", true);
       const names = (cats ?? []).map((c) => c.name);

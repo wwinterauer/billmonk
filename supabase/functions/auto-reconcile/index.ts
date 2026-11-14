@@ -1,3 +1,4 @@
+import { paidGross } from "../_shared/skonto.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildGroupPairs, isProcessorTransaction, findReferenceMatch } from "../_shared/reconcileHelpers.ts";
@@ -123,7 +124,7 @@ async function buildCandidatePool(
   // is not used for them).
   const { data: receipts } = await supabase
     .from("receipts")
-    .select("id, amount_gross, receipt_date, vendor, invoice_number, bank_transaction_id")
+    .select("id, amount_gross, skonto_amount, skonto_percent, receipt_date, vendor, invoice_number, bank_transaction_id")
     .eq("user_id", userId)
     .in("status", ["approved", "completed", "review"]);
 
@@ -180,7 +181,7 @@ async function buildCandidatePool(
         key: `receipt:${r.id}`,
         receipt_id: r.id,
         split_line_id: null,
-        amount_gross: r.amount_gross,
+        amount_gross: paidGross(r as any),
         receipt_date: r.receipt_date,
         vendor: r.vendor,
         invoice_number: r.invoice_number,
