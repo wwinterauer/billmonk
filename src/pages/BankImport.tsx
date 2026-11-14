@@ -43,6 +43,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageMeta } from '@/components/PageMeta';
+import { bankReceiptNetVat } from '@/lib/bankReconcile';
 
 const banks = [
   { value: 'erste-sparkasse', label: 'Erste Bank / Sparkasse' },
