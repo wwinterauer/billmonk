@@ -4,7 +4,7 @@
 
 // Legal form suffixes for DACH + common international forms
 export const LEGAL_FORM_REGEX =
-  /\b(GmbH(?:\s*&\s*Co\.?\s*KG)?|AG|KG|OG|OHG|e\.?\s*U\.?|EU|UG(?:\s*\(haftungsbeschr[äa]nkt\))?|SE|S\.E\.|Ltd\.?|Limited|LLC|Inc\.?|Corp\.?|S\.à\s*r\.?l\.?|S\.A\.|S\.A\.S\.|S\.r\.l\.?|S\.p\.A\.|B\.V\.|N\.V\.|Co\.?\s*KG|Kft\.?|sp\.?\s*z\s*o\.?o\.?|d\.o\.o\.?|GbR|PartG|HandelsgesmbH|Handels\s?GmbH)\b/i;
+  /\b(GmbH(?:\s*&\s*Co\.?\s*KG)?|AG|KG|OG|OHG|e\.?\s*U\.?|EU|UG(?:\s*\(haftungsbeschr[äa]nkt\))?|SE|S\.E\.|Ltd\.?|Limited|LLC|Inc\.?|Corp\.?|S\.à\s*r\.?l\.?|S\.A\.|S\.A\.S\.|S\.r\.l\.?|S\.p\.A\.|B\.V\.|N\.V\.|Co\.?\s*KG|Kft\.?|sp\.?\s*z\s*o\.?o\.?|d\.o\.o\.?|GbR|PartG|HandelsgesmbH|Handels\s?GmbH|ApS|AB|Oy|Oyj|A\/S)(?![\w/])/i;
 
 export function hasLegalForm(name: string | null | undefined): boolean {
   if (!name) return false;
