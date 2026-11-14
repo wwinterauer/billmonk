@@ -15,6 +15,13 @@
       "when": 1794654195637,
       "tag": "0001_private_mode_stop_invoice_crons",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794656655570,
+      "tag": "0002_tighten_open_policies",
+      "breakpoints": true
     }
   ]
 }
