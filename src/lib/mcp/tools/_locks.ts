@@ -3,7 +3,7 @@ export const LOCKED_RECEIPT_STATUSES = ["approved", "completed"] as const;
 
 export function lockedReceiptError(status: string | null | undefined): string | null {
   if (status && (LOCKED_RECEIPT_STATUSES as readonly string[]).includes(status)) {
-    return `Receipt is ${status} and locked. Splitting and other changes are not allowed via MCP for approved receipts; only category and tags can be changed with update_receipt.`;
+    return `Receipt is ${status} and locked. Splitting and other changes are not allowed via MCP for approved receipts; only category, tags and receipt_date can be changed with update_receipt.`;
   }
   return null;
 }
@@ -17,11 +17,21 @@ export async function checkReceiptEditable(sb: any, id: string): Promise<string 
 }
 
 /** Fields update_receipt may still change on approved receipts. */
-export const FIELDS_EDITABLE_WHEN_LOCKED = ["category", "tags"] as const;
+export const FIELDS_EDITABLE_WHEN_LOCKED = ["category", "tags", "receipt_date", "no_invoice"] as const;
 
 export function lockedFieldsError(status: string | null | undefined, fields: string[]): string | null {
   if (!lockedReceiptError(status)) return null;
   const blocked = fields.filter((f) => !(FIELDS_EDITABLE_WHEN_LOCKED as readonly string[]).includes(f));
   if (blocked.length === 0) return null;
-  return `Receipt is ${status}: only category and tags can be changed. Locked fields: ${blocked.join(", ")}.`;
+  return `Receipt is ${status}: only category, tags and receipt_date can be changed. Locked fields: ${blocked.join(", ")}.`;
+}
+
+/** Category name the app uses for "Keine Rechnung" entries (excluded from totals and tax exports). */
+export const NO_INVOICE_CATEGORY = "Keine Rechnung";
+
+/** Review-only rule for delete_receipt: approved/completed receipts can never be deleted via MCP. */
+export function deleteReceiptError(status: string | null | undefined): string | null {
+  if (status === "review") return null;
+  if (lockedReceiptError(status)) return `Receipt is ${status} and cannot be deleted via MCP. Only receipts in review can be deleted.`;
+  return `Receipt has status "${status ?? "unknown"}". Only receipts in review can be deleted.`;
 }

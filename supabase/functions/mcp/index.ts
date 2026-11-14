@@ -399,7 +399,7 @@ import { z as z6 } from "npm:zod@^4.4.3";
 var LOCKED_RECEIPT_STATUSES = ["approved", "completed"];
 function lockedReceiptError(status) {
   if (status && LOCKED_RECEIPT_STATUSES.includes(status)) {
-    return `Receipt is ${status} and locked. Splitting and other changes are not allowed via MCP for approved receipts; only category and tags can be changed with update_receipt.`;
+    return `Receipt is ${status} and locked. Splitting and other changes are not allowed via MCP for approved receipts; only category, tags and receipt_date can be changed with update_receipt.`;
   }
   return null;
 }
@@ -409,26 +409,32 @@ async function checkReceiptEditable(sb, id) {
   if (!data) return "Receipt not found.";
   return lockedReceiptError(data.status);
 }
-var FIELDS_EDITABLE_WHEN_LOCKED = ["category", "tags"];
+var FIELDS_EDITABLE_WHEN_LOCKED = ["category", "tags", "receipt_date", "no_invoice"];
 function lockedFieldsError(status, fields) {
   if (!lockedReceiptError(status)) return null;
   const blocked = fields.filter((f) => !FIELDS_EDITABLE_WHEN_LOCKED.includes(f));
   if (blocked.length === 0) return null;
-  return `Receipt is ${status}: only category and tags can be changed. Locked fields: ${blocked.join(", ")}.`;
+  return `Receipt is ${status}: only category, tags and receipt_date can be changed. Locked fields: ${blocked.join(", ")}.`;
+}
+var NO_INVOICE_CATEGORY = "Keine Rechnung";
+function deleteReceiptError(status) {
+  if (status === "review") return null;
+  if (lockedReceiptError(status)) return `Receipt is ${status} and cannot be deleted via MCP. Only receipts in review can be deleted.`;
+  return `Receipt has status "${status ?? "unknown"}". Only receipts in review can be deleted.`;
 }
 
 // src/lib/mcp/tools/update-receipt.ts
 var update_receipt_default = defineTool6({
   name: "update_receipt",
   title: "Correct receipt data",
-  description: "Correct extracted fields of a receipt. On approved receipts only category and tags may be changed, all other fields are locked. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+  description: 'Correct extracted fields of a receipt. On approved receipts only category, tags and receipt_date may be changed, all other fields are locked. "Keine Rechnung" (no_invoice: true, or category "Keine Rechnung") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when "Keine Rechnung ausschlie\xDFen" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.',
   inputSchema: {
     id: z6.string().uuid().describe("Receipt id."),
     vendor: z6.string().min(1).optional().describe("Legal vendor name."),
     vendor_brand: z6.string().min(1).optional().describe("Vendor brand name."),
     receipt_date: z6.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Receipt date YYYY-MM-DD."),
     invoice_number: z6.string().optional().describe("Invoice number."),
-    amount_gross: z6.number().optional().describe("Gross amount."),
+    amount_gross: z6.number().nullable().optional().describe('Gross amount. null clears it (intended for "Keine Rechnung" entries without an amount).'),
     amount_net: z6.number().optional().describe("Net amount."),
     vat_amount: z6.number().optional().describe("VAT amount."),
     vat_rate: z6.number().min(0).max(100).optional().describe("VAT rate in percent."),
@@ -436,10 +442,11 @@ var update_receipt_default = defineTool6({
     description: z6.string().optional().describe("Short description."),
     skonto_amount: z6.number().min(0).optional().describe("Manual cash discount (Skonto) in EUR deducted at payment; 0 removes it. Original invoice amounts stay unchanged."),
     skonto_percent: z6.number().min(0).max(100).optional().describe("Manual cash discount in percent of gross; 0 removes it."),
+    no_invoice: z6.boolean().optional().describe('true marks the receipt as "Keine Rechnung" exactly like the app (category "Keine Rechnung" plus no-receipt flag). false only clears the flag; set a new category to leave "Keine Rechnung".'),
     tags: z6.array(z6.string().trim().min(1)).optional().describe("Complete list of existing tag names for this receipt. Replaces all current tags; [] removes every tag. Unknown names are rejected and never created.")
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  handler: async ({ id, tags: requestedTags, ...input }, ctx) => {
+  handler: async ({ id, tags: requestedTags, no_invoice, ...input }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
     const { data: cur, error: e1 } = await sb.from("receipts").select("amount_gross, vat_rate, user_modified_fields, status").eq("id", id).maybeSingle();
@@ -447,7 +454,8 @@ var update_receipt_default = defineTool6({
     if (!cur) return fail("Receipt not found.");
     const requestedFields = [
       ...Object.keys(input).filter((k) => input[k] !== void 0),
-      ...requestedTags !== void 0 ? ["tags"] : []
+      ...requestedTags !== void 0 ? ["tags"] : [],
+      ...no_invoice !== void 0 ? ["no_invoice"] : []
     ];
     const locked = lockedFieldsError(cur.status, requestedFields);
     if (locked) return fail(locked);
@@ -465,7 +473,12 @@ var update_receipt_default = defineTool6({
     }
     const patch = {};
     for (const [k, v] of Object.entries(input)) if (v !== void 0) patch[k] = v;
-    if (Object.keys(patch).length === 0 && requestedTags === void 0) return fail("No fields to update.");
+    if (no_invoice === true) {
+      patch.category = NO_INVOICE_CATEGORY;
+      patch.is_no_receipt_entry = true;
+    } else if (no_invoice === false) patch.is_no_receipt_entry = false;
+    if (patch.category === NO_INVOICE_CATEGORY) patch.is_no_receipt_entry = true;
+    if (Object.keys(patch).length === 0 && no_invoice === void 0 && requestedTags === void 0) return fail("No fields to update.");
     const g = Math.abs(Number(patch.amount_gross ?? cur.amount_gross ?? 0));
     if (patch.skonto_amount !== void 0 || patch.skonto_percent !== void 0) {
       let amt = patch.skonto_amount;
@@ -481,7 +494,7 @@ var update_receipt_default = defineTool6({
     if (patch.category !== void 0) {
       const { data: cats } = await sb.from("categories").select("name").not("is_hidden", "is", true);
       const names = (cats ?? []).map((c) => c.name);
-      if (names.length && !names.includes(patch.category)) {
+      if (patch.category !== NO_INVOICE_CATEGORY && names.length && !names.includes(patch.category)) {
         return fail(`Unknown category. Allowed: ${names.join(", ")}`);
       }
     }
@@ -489,7 +502,10 @@ var update_receipt_default = defineTool6({
     if (grossChanged && patch.amount_net === void 0) {
       const gross = patch.amount_gross ?? cur.amount_gross;
       const rate = patch.vat_rate ?? cur.vat_rate;
-      if (gross !== null && gross !== void 0 && rate !== null && rate !== void 0) {
+      if (patch.amount_gross === null) {
+        patch.amount_net = null;
+        patch.vat_amount = null;
+      } else if (gross !== null && gross !== void 0 && rate !== null && rate !== void 0) {
         const net = netFromGross(Number(gross), Number(rate));
         patch.amount_net = net;
         if (patch.vat_amount === void 0) patch.vat_amount = Math.round((Number(gross) - net) * 100) / 100;
@@ -901,12 +917,64 @@ var split_receipt_pdf_default = defineTool14({
   }
 });
 
+// src/lib/mcp/tools/delete-receipt.ts
+import { defineTool as defineTool15 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z14 } from "npm:zod@^4.4.3";
+
+// src/lib/receiptDelete.ts
+async function deleteReceiptAndFile(sb, userId, id, fileUrl) {
+  await sb.from("receipts").update({ is_duplicate: false, duplicate_of: null, duplicate_score: null, duplicate_checked_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("user_id", userId).eq("duplicate_of", id);
+  const { error: dbError } = await sb.from("receipts").delete().eq("id", id).eq("user_id", userId);
+  if (dbError) throw new Error(`Fehler beim L\xF6schen: ${dbError.message}`);
+  if (fileUrl) {
+    const { error: storageError } = await sb.storage.from("receipts").remove([fileUrl]);
+    if (storageError) return { storageError: storageError.message };
+  }
+  return {};
+}
+
+// src/lib/mcp/tools/delete-receipt.ts
+var delete_receipt_default = defineTool15({
+  name: "delete_receipt",
+  title: "Delete receipt",
+  description: 'Permanently delete a receipt together with its stored file, exactly like "Beleg l\xF6schen" in the review. Only allowed for receipts in review; approved receipts are refused. Cannot be undone.',
+  inputSchema: { id: z14.string().uuid().describe("Receipt id (must have status review).") },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  handler: async ({ id }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const userId = await currentUserId(sb, ctx);
+    if (!userId) return fail("Not authenticated");
+    const { data: r, error } = await sb.from("receipts").select("id, status, vendor, vendor_brand, amount_gross, receipt_date, file_name, file_url").eq("id", id).maybeSingle();
+    if (error) return fail(error.message);
+    if (!r) return fail("Receipt not found.");
+    const blocked = deleteReceiptError(r.status);
+    if (blocked) return fail(blocked);
+    let storageError;
+    try {
+      ({ storageError } = await deleteReceiptAndFile(sb, userId, id, r.file_url ?? null));
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : String(e));
+    }
+    const deleted = {
+      id,
+      vendor: r.vendor_brand ?? r.vendor ?? null,
+      amount_gross: r.amount_gross ?? null,
+      receipt_date: r.receipt_date ?? null,
+      file_name: r.file_name ?? null,
+      file_deleted: !storageError && !!r.file_url,
+      ...storageError ? { storage_warning: storageError } : {}
+    };
+    return ok(`Deleted receipt: ${JSON.stringify(deleted)}`, { deleted });
+  }
+});
+
 // src/lib/mcp/index.ts
 var projectRef = "nvvssxykygdxjywncvgd";
 var mcp_default = defineMcp({
   name: "billmonk",
   title: "BillMonk",
-  version: "0.4.0",
+  version: "0.5.0",
   instructions: "Tools for BillMonk, a private expense management app. Review workflow: call get_review_queue, then get_receipt_document for each receipt to compare the original file with the extracted data, fix mistakes with update_receipt, and call approve_receipt only when the user asks. Use list_tags to see existing tag names and counts; update_receipt accepts a complete tags list and never creates tags. Split bookings (one document, several categories/VAT rates): split_receipt_ai proposes parts from AI line items, split_receipt saves parts, update_split_part corrects one part, remove_split undoes it. split_receipt_pdf divides a multi-invoice PDF into separate new receipts. None of these approve receipts or change status. Prefer expense_summary for totals.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
@@ -926,7 +994,8 @@ var mcp_default = defineMcp({
     split_receipt_default,
     update_split_part_default,
     remove_split_default,
-    split_receipt_pdf_default
+    split_receipt_pdf_default,
+    delete_receipt_default
   ]
 });
 

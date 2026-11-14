@@ -1,10 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { lockedReceiptError, lockedFieldsError } from "@/lib/mcp/tools/_locks";
+import { lockedFieldsError, deleteReceiptError } from "@/lib/mcp/tools/_locks";
 
-describe("MCP receipt lock", () => {
-  it("blocks splitting approved receipts", () => { expect(lockedReceiptError("approved")).not.toBeNull(); });
-  it("allows review receipts", () => { expect(lockedReceiptError("review")).toBeNull(); });
-  it("allows category and tags on approved", () => { expect(lockedFieldsError("approved", ["category", "tags"])).toBeNull(); });
-  it("blocks amounts on approved", () => { expect(lockedFieldsError("approved", ["tags", "amount_gross"])).toMatch(/amount_gross/); });
-  it("allows any field on review", () => { expect(lockedFieldsError("review", ["vendor"])).toBeNull(); });
+describe("MCP locks", () => {
+  it("approved receipts allow category, tags and receipt_date", () => {
+    expect(lockedFieldsError("approved", ["category", "tags", "receipt_date"])).toBeNull();
+  });
+  it("approved receipts still lock amounts, vendor, invoice number, description", () => {
+    for (const f of ["amount_gross", "vat_rate", "vendor", "invoice_number", "description"]) {
+      expect(lockedFieldsError("approved", [f])).toContain(f);
+    }
+  });
+  it("delete only allowed in review", () => {
+    expect(deleteReceiptError("review")).toBeNull();
+    expect(deleteReceiptError("approved")).toMatch(/cannot be deleted/);
+    expect(deleteReceiptError("processing")).not.toBeNull();
+  });
 });
