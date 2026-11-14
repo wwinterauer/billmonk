@@ -251,6 +251,17 @@
             "description": {
               "description": "Short description.",
               "type": "string"
+            },
+            "skonto_amount": {
+              "description": "Manual cash discount (Skonto) in EUR deducted at payment; 0 removes it. Original invoice amounts stay unchanged.",
+              "type": "number",
+              "minimum": 0
+            },
+            "skonto_percent": {
+              "description": "Manual cash discount in percent of gross; 0 removes it.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
             }
           },
           "required": [
