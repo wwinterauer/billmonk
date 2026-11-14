@@ -2982,6 +2982,8 @@ export type Database = {
           payment_method: string | null
           prompt_version: string | null
           receipt_date: string | null
+          skonto_amount: number | null
+          skonto_percent: number | null
           source: string | null
           special_vat_case: string | null
           split_from_receipt_id: string | null
@@ -3039,6 +3041,8 @@ export type Database = {
           payment_method?: string | null
           prompt_version?: string | null
           receipt_date?: string | null
+          skonto_amount?: number | null
+          skonto_percent?: number | null
           source?: string | null
           special_vat_case?: string | null
           split_from_receipt_id?: string | null
@@ -3096,6 +3100,8 @@ export type Database = {
           payment_method?: string | null
           prompt_version?: string | null
           receipt_date?: string | null
+          skonto_amount?: number | null
+          skonto_percent?: number | null
           source?: string | null
           special_vat_case?: string | null
           split_from_receipt_id?: string | null

@@ -1,0 +1,1 @@
+ALTER TABLE public.receipts ADD COLUMN IF NOT EXISTS skonto_percent numeric, ADD COLUMN IF NOT EXISTS skonto_amount numeric;
