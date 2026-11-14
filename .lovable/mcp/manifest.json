@@ -12,7 +12,7 @@
   "mcp": {
     "server": {
       "name": "billmonk",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "title": "BillMonk"
     },
     "tools": [
@@ -194,7 +194,7 @@
       {
         "name": "update_receipt",
         "title": "Correct receipt data",
-        "description": "Correct extracted fields of a receipt. On approved receipts only category and tags may be changed, all other fields are locked. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+        "description": "Correct extracted fields of a receipt. On approved receipts only category, tags and receipt_date may be changed, all other fields are locked. \"Keine Rechnung\" (no_invoice: true, or category \"Keine Rechnung\") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when \"Keine Rechnung ausschließen\" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
         "annotations": {
           "readOnlyHint": false,
           "destructiveHint": false,
@@ -231,8 +231,15 @@
               "type": "string"
             },
             "amount_gross": {
-              "description": "Gross amount.",
-              "type": "number"
+              "description": "Gross amount. null clears it (intended for \"Keine Rechnung\" entries without an amount).",
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "amount_net": {
               "description": "Net amount.",
@@ -267,6 +274,10 @@
               "type": "number",
               "minimum": 0,
               "maximum": 100
+            },
+            "no_invoice": {
+              "description": "true marks the receipt as \"Keine Rechnung\" exactly like the app (category \"Keine Rechnung\" plus no-receipt flag). false only clears the flag; set a new category to leave \"Keine Rechnung\".",
+              "type": "boolean"
             },
             "tags": {
               "description": "Complete list of existing tag names for this receipt. Replaces all current tags; [] removes every tag. Unknown names are rejected and never created.",
@@ -610,6 +621,33 @@
           "required": [
             "id",
             "splits"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "delete_receipt",
+        "title": "Delete receipt",
+        "description": "Permanently delete a receipt together with its stored file, exactly like \"Beleg löschen\" in the review. Only allowed for receipts in review; approved receipts are refused. Cannot be undone.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "Receipt id (must have status review)."
+            }
+          },
+          "required": [
+            "id"
           ]
         },
         "outputSchema": null
