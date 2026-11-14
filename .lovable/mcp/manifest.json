@@ -644,7 +644,7 @@
       {
         "name": "delete_receipt",
         "title": "Delete receipt",
-        "description": "Permanently delete a receipt together with its stored file, exactly like \"Beleg löschen\" in the review. Only allowed for receipts in review; approved receipts are refused. Cannot be undone.",
+        "description": "Permanently delete a receipt together with its stored file, exactly like \"Beleg löschen\" in the review. Only allowed for receipts with status review or duplicate; approved receipts are refused. Cannot be undone.",
         "annotations": {
           "readOnlyHint": false,
           "destructiveHint": true,
@@ -659,7 +659,7 @@
               "type": "string",
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "description": "Receipt id (must have status review)."
+              "description": "Receipt id (must have status review or duplicate)."
             }
           },
           "required": [
