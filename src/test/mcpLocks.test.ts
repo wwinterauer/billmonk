@@ -17,3 +17,16 @@ describe("MCP locks", () => {
     expect(deleteReceiptError("processing")).not.toBeNull();
   });
 });
+
+import { lockedFieldsError as lfe } from "@/lib/mcp/tools/_locks";
+describe("approved Keine Rechnung amounts", () => {
+  it("allows clearing amounts to null on approved Keine Rechnung", () => {
+    expect(lfe("approved", ["amount_gross", "amount_net", "vat_amount"], { isNoInvoice: true, values: { amount_gross: null, amount_net: null, vat_amount: null } })).toBeNull();
+  });
+  it("blocks non-null amounts even on Keine Rechnung", () => {
+    expect(lfe("approved", ["amount_gross"], { isNoInvoice: true, values: { amount_gross: 5 } })).not.toBeNull();
+  });
+  it("blocks clearing amounts on normal approved receipts", () => {
+    expect(lfe("approved", ["amount_gross"], { isNoInvoice: false, values: { amount_gross: null } })).not.toBeNull();
+  });
+});

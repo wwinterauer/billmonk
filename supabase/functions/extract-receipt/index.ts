@@ -1249,7 +1249,13 @@ LINE_ITEMS: Jede Rechnungsposition einzeln erfassen mit Kategorie. Keine Summenz
             await supabase.from('receipts').update({
               status: 'not_a_receipt',
               category: 'Keine Rechnung',
+              is_no_receipt_entry: true,
               vendor_id: vendorId ?? null,
+              // Keep document identity so the proof stays findable/exportable.
+              vendor: extractedData.vendor ?? null,
+              vendor_brand: extractedData.vendor_brand ?? null,
+              receipt_date: extractedData.receipt_date ?? null,
+              invoice_number: extractedData.invoice_number ?? null,
               description: (extractedData.description || 'Kein Rechnungsdokument').substring(0, 100),
               ai_confidence: extractedData.confidence ?? 0.5,
               notes: `Regel: Lieferant "${finalVendorMatch.display_name}" ist als "Keine Rechnung" hinterlegt.`,

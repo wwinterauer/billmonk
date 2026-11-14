@@ -6,16 +6,16 @@ import { fail, ok } from "./_shared";
 export default defineTool({
   name: "approve_receipt",
   title: "Approve receipt",
-  description: "Approve a receipt that is in review. Only call this when the user asked to approve it.",
+  description: "Approve a receipt that is in review or has status not_a_receipt (e.g. Booking payout overviews marked Keine Rechnung); afterwards it is approved like any other receipt. Only call this when the user asked to approve it.",
   inputSchema: { id: z.string().uuid().describe("Receipt id.") },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async ({ id }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const { data, error } = await supabaseForUser(ctx)
-      .from("receipts").update({ status: "approved" }).eq("id", id).eq("status", "review")
+      .from("receipts").update({ status: "approved" }).eq("id", id).in("status", ["review", "not_a_receipt"])
       .select("id, vendor, amount_gross, receipt_date").maybeSingle();
     if (error) return fail(error.message);
-    if (!data) return fail("Receipt not found or not in review.");
+    if (!data) return fail("Receipt not found or not in review/not_a_receipt.");
     return ok(`Approved ${data.vendor ?? "receipt"} (${data.amount_gross ?? "?"}).`, { receipt: JSON.parse(JSON.stringify(data)) });
   },
 });

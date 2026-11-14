@@ -17,7 +17,7 @@ export default defineTool({
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Start receipt date (YYYY-MM-DD)."),
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("End receipt date (YYYY-MM-DD)."),
     vendor: z.string().trim().min(1).optional().describe("Filter by vendor name (partial match)."),
-    status: z.string().trim().min(1).optional().describe("Filter by receipt status, e.g. completed."),
+    status: z.string().trim().min(1).optional().describe("Filter by receipt status, e.g. approved, review or not_a_receipt (documents set to Keine Rechnung by a vendor rule). Without a filter all statuses are returned."),
     tag: z.string().trim().min(1).optional().describe("Filter by one exact existing tag name."),
     limit: z.number().int().min(1).max(100).default(25).describe("Maximum number of receipts to return."),
   },

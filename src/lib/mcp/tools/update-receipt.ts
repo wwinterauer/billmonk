@@ -9,7 +9,7 @@ export default defineTool({
   name: "update_receipt",
   title: "Correct receipt data",
   description:
-    "Correct extracted fields of a receipt. On approved receipts only category, tags and receipt_date may be changed, all other fields are locked. \"Keine Rechnung\" (no_invoice: true, or category \"Keine Rechnung\") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when \"Keine Rechnung ausschließen\" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+    "Correct extracted fields of a receipt. On approved receipts only category, tags and receipt_date may be changed, all other fields are locked, except that amount_gross, amount_net and vat_amount may be set to null on approved Keine Rechnung receipts. \"Keine Rechnung\" (no_invoice: true, or category \"Keine Rechnung\") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when \"Keine Rechnung ausschließen\" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
   inputSchema: {
     id: z.string().uuid().describe("Receipt id."),
     vendor: z.string().min(1).optional().describe("Legal vendor name."),
@@ -17,8 +17,8 @@ export default defineTool({
     receipt_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Receipt date YYYY-MM-DD."),
     invoice_number: z.string().optional().describe("Invoice number."),
     amount_gross: z.number().nullable().optional().describe("Gross amount. null clears it (intended for \"Keine Rechnung\" entries without an amount)."),
-    amount_net: z.number().optional().describe("Net amount."),
-    vat_amount: z.number().optional().describe("VAT amount."),
+    amount_net: z.number().nullable().optional().describe("Net amount. null clears it (Keine Rechnung only)."),
+    vat_amount: z.number().nullable().optional().describe("VAT amount. null clears it (Keine Rechnung only)."),
     vat_rate: z.number().min(0).max(100).optional().describe("VAT rate in percent."),
     category: z.string().min(1).optional().describe("One of the user's existing categories."),
     description: z.string().optional().describe("Short description."),
@@ -32,7 +32,7 @@ export default defineTool({
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
     const { data: cur, error: e1 } = await sb
-      .from("receipts").select("amount_gross, vat_rate, user_modified_fields, status").eq("id", id).maybeSingle();
+      .from("receipts").select("amount_gross, vat_rate, user_modified_fields, status, category, is_no_receipt_entry").eq("id", id).maybeSingle();
     if (e1) return fail(e1.message);
     if (!cur) return fail("Receipt not found.");
     const requestedFields = [
@@ -40,7 +40,10 @@ export default defineTool({
       ...(requestedTags !== undefined ? ["tags"] : []),
       ...(no_invoice !== undefined ? ["no_invoice"] : []),
     ];
-    const locked = lockedFieldsError(cur.status as string | null, requestedFields);
+    const locked = lockedFieldsError(cur.status as string | null, requestedFields, {
+      isNoInvoice: cur.category === NO_INVOICE_CATEGORY || cur.is_no_receipt_entry === true,
+      values: input as Record<string, unknown>,
+    });
     if (locked) return fail(locked);
 
     let desiredTagIds: string[] | undefined;
