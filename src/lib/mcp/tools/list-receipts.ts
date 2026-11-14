@@ -41,7 +41,7 @@ export default defineTool({
     const { data, error } = await query;
     if (error) return fail(error.message);
     const rows = (data ?? []).map((row) => {
-      const receipt = { ...row } as Record<string, unknown>;
+      const receipt = { ...(row as Record<string, unknown>) };
       delete receipt.receipt_tags;
       return receipt as ReceiptRecord;
     });
