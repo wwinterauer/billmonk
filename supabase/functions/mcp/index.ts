@@ -563,25 +563,54 @@ import { z as z8 } from "npm:zod@^4.4.3";
 var list_bank_transactions_default = defineTool8({
   name: "list_bank_transactions",
   title: "List bank transactions",
-  description: "List imported bank transactions, optionally only unmatched ones, by date range or text.",
+  description: "List imported bank transactions like the Kontoabgleich page: filter by status (unmatched, matched, ignored), date range or text, page with offset. Each row includes account, source, and for matched rows the linked receipt (vendor, amount, date, invoice number, status) or split line. Output is compact JSON.",
   inputSchema: {
+    status: z8.enum(["unmatched", "matched", "ignored"]).optional().describe("Only transactions with this status. Omit for all."),
     from: z8.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Start date YYYY-MM-DD."),
     to: z8.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("End date YYYY-MM-DD."),
     search: z8.string().min(1).optional().describe("Text contained in the booking description."),
-    unmatched_only: z8.boolean().default(false).describe("Only transactions without a linked receipt."),
-    limit: z8.number().int().min(1).max(200).default(50).describe("Maximum rows.")
+    unmatched_only: z8.boolean().default(false).describe("Deprecated, same as status=unmatched."),
+    limit: z8.number().int().min(1).max(200).default(50).describe("Maximum rows."),
+    offset: z8.number().int().min(0).default(0).describe("Rows to skip for paging.")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
-  handler: async ({ from, to, search, unmatched_only, limit }, ctx) => {
+  handler: async ({ status, from, to, search, unmatched_only, limit, offset }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
-    let q = supabaseForUser(ctx).from("bank_transactions").select("id, transaction_date, description, amount, is_expense, status, receipt_id").order("transaction_date", { ascending: false }).limit(limit ?? 50);
+    const lim = limit ?? 50;
+    const off = offset ?? 0;
+    let q = supabaseForUser(ctx).from("bank_transactions").select(
+      "id, transaction_date, value_date, description, amount, is_expense, status, source, receipt_id, receipt_split_line_id, created_at, account:bank_account_id(bank_name, account_name, iban), receipt:receipt_id(vendor, amount_gross, receipt_date, invoice_number, status, is_no_receipt_entry, source), split_line:receipt_split_line_id(description, amount_gross)",
+      { count: "exact" }
+    ).order("transaction_date", { ascending: false }).range(off, off + lim - 1);
+    const st = status ?? (unmatched_only ? "unmatched" : void 0);
+    if (st) q = q.eq("status", st);
     if (from) q = q.gte("transaction_date", from);
     if (to) q = q.lte("transaction_date", to);
     if (search) q = q.ilike("description", `%${search}%`);
-    if (unmatched_only) q = q.is("receipt_id", null);
-    const { data, error } = await q;
+    const { data, error, count } = await q;
     if (error) return fail(error.message);
-    return ok(JSON.stringify(data ?? [], null, 2), { transactions: JSON.parse(JSON.stringify(data ?? [])) });
+    const rows = (data ?? []).map((t) => {
+      const a = t.account;
+      const r = t.receipt;
+      const l = t.split_line;
+      return {
+        id: t.id,
+        date: t.transaction_date,
+        value_date: t.value_date,
+        amount: t.amount,
+        is_expense: t.is_expense,
+        status: t.status,
+        source: t.source,
+        account: a ? [a.bank_name, a.account_name, a.iban].filter(Boolean).join(" ") || null : null,
+        description: t.description,
+        imported_at: t.created_at,
+        receipt_id: t.receipt_id,
+        receipt: r ? { vendor: r.vendor, amount: r.amount_gross, date: r.receipt_date, invoice_number: r.invoice_number, status: r.status, without_file: r.is_no_receipt_entry, source: r.source } : null,
+        split_line: t.receipt_split_line_id && l ? { id: t.receipt_split_line_id, description: l.description, amount: l.amount_gross } : null
+      };
+    });
+    const result = { total: count ?? rows.length, offset: off, returned: rows.length, transactions: rows };
+    return ok(JSON.stringify(result), result);
   }
 });
 
@@ -969,13 +998,384 @@ var delete_receipt_default = defineTool15({
   }
 });
 
+// src/lib/mcp/tools/suggest-bank-matches.ts
+import { defineTool as defineTool16 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z15 } from "npm:zod@^4.4.3";
+
+// src/lib/mcp/tools/_bank.ts
+async function loadTx(sb, id) {
+  const { data, error } = await sb.from("bank_transactions").select("id, user_id, status, receipt_id, receipt_split_line_id, amount, description, transaction_date").eq("id", id).maybeSingle();
+  if (error) return { error: fail(error.message) };
+  if (!data) return { error: fail("Bank transaction not found.") };
+  return { tx: data };
+}
+
+// src/lib/bankReconcile.ts
+function calculateMatchScore(transactionAmount, transactionDate, receiptAmount, receiptDate) {
+  let score = 0;
+  const absTx = Math.abs(transactionAmount);
+  const amountDiff = receiptAmount !== null ? Math.abs(absTx - receiptAmount) / absTx * 100 : 100;
+  if (receiptAmount !== null) {
+    if (amountDiff < 1) score += 70;
+    else if (amountDiff < 5) score += 56;
+    else if (amountDiff < 10) score += 42;
+    else if (amountDiff < 20) score += 28;
+    else if (amountDiff < 50) score += 14;
+  }
+  let dateDiff = null;
+  if (receiptDate) {
+    const a = Date.UTC(transactionDate.getFullYear(), transactionDate.getMonth(), transactionDate.getDate());
+    const rd = new Date(receiptDate);
+    const b = Date.UTC(rd.getFullYear(), rd.getMonth(), rd.getDate());
+    dateDiff = Math.abs(Math.round((a - b) / 864e5));
+    if (dateDiff === 0) score += 30;
+    else if (dateDiff <= 3) score += 24;
+    else if (dateDiff <= 7) score += 18;
+    else if (dateDiff <= 14) score += 12;
+    else if (dateDiff <= 30) score += 6;
+  }
+  return { score, amountDiff, dateDiff };
+}
+function rankAssignmentCandidates(receipts, txAmount, txDate, opts = {}) {
+  const similarAmount = opts.similarAmount ?? true;
+  const similarDate = opts.similarDate ?? false;
+  const scored = receipts.map((r) => {
+    const s = calculateMatchScore(txAmount, txDate, r.amount_gross, r.receipt_date);
+    return { ...r, matchScore: s.score, amountDiff: s.amountDiff, dateDiff: s.dateDiff };
+  });
+  const passes = (r) => (!similarAmount || r.amountDiff <= 10) && (!similarDate || r.dateDiff !== null && r.dateDiff <= 7);
+  const byScore = (a, b) => b.matchScore - a.matchScore;
+  const matching = scored.filter(passes).sort(byScore).slice(0, 10);
+  const others = !similarAmount && !similarDate ? [] : scored.filter((r) => !passes(r)).sort(byScore).slice(0, 5);
+  return { matching, others };
+}
+async function fetchAssignmentReceipts(sb, userId, opts = {}) {
+  let q = sb.from("receipts").select("id, receipt_date, vendor, amount_gross, file_url, category, bank_transaction_id, invoice_number, status").eq("user_id", userId).order("receipt_date", { ascending: false }).limit(100);
+  if (opts.unassignedOnly ?? true) q = q.is("bank_transaction_id", null);
+  if (opts.search) q = q.or(`vendor.ilike.%${opts.search}%,description.ilike.%${opts.search}%`);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data ?? [];
+}
+async function assignBankTransaction(sb, transactionId, receiptId, splitLineId) {
+  const { error: txError } = await sb.from("bank_transactions").update({ status: "matched", receipt_id: receiptId, receipt_split_line_id: splitLineId ?? null }).eq("id", transactionId);
+  if (txError) throw txError;
+  if (!splitLineId) {
+    const { error } = await sb.from("receipts").update({ bank_transaction_id: transactionId }).eq("id", receiptId);
+    if (error) throw error;
+  }
+}
+async function unmatchBankTransaction(sb, transactionId, receiptId) {
+  if (receiptId) {
+    const { error: error2 } = await sb.from("receipts").update({ bank_transaction_id: null }).eq("id", receiptId).eq("bank_transaction_id", transactionId);
+    if (error2) throw error2;
+  }
+  const { error } = await sb.from("bank_transactions").update({ status: "unmatched", receipt_id: null, receipt_split_line_id: null }).eq("id", transactionId);
+  if (error) throw error;
+}
+async function setBankTransactionStatus(sb, transactionId, status) {
+  const updates = { status };
+  if (status === "unmatched") updates.receipt_id = null;
+  const { error } = await sb.from("bank_transactions").update(updates).eq("id", transactionId);
+  if (error) throw error;
+}
+function extractVendorFromBankDescription(desc) {
+  if (!desc) return "Unbekannter Lieferant";
+  const patterns = [
+    /Empf[äa]nger:\s*([^]+?)(?=\s+(?:Verwendungszweck|Zahlungsreferenz|IBAN|BIC|Beitr\.|KtoNr|Mandat|Ref\.?|Kundendaten|Auftraggeber)|$)/i,
+    /Auftraggeber:\s*([^]+?)(?=\s+(?:Verwendungszweck|Zahlungsreferenz|IBAN|BIC|Beitr\.|KtoNr|Mandat|Ref\.?|Kundendaten|Empf)|$)/i,
+    /Zahlungspflichtiger:\s*([^]+?)(?=\s+(?:Verwendungszweck|IBAN|BIC|Ref\.?)|$)/i
+  ];
+  for (const re of patterns) {
+    const m = desc.match(re);
+    if (m && m[1]) return m[1].trim().replace(/\s+/g, " ").slice(0, 120);
+  }
+  const cleaned = desc.replace(/^Online Banking vom \d{1,2}\.\d{1,2}(?:\.\d{2,4})? um \d{1,2}:\d{2}\s*/i, "").replace(/^SEPA[- ]?(?:Überweisung|Lastschrift|Gutschrift|Dauerauftrag)[:\s]*/i, "").trim();
+  return (cleaned.split(/\s{2,}|·|\||–/)[0] || cleaned).slice(0, 80) || "Unbekannter Lieferant";
+}
+async function createExpenseFromBankTransaction(sb, userId, tx, overrides = {}) {
+  const description = tx.description || "";
+  const amount = Math.abs(Number(tx.amount) || 0);
+  const txDate = tx.transaction_date ? tx.transaction_date.slice(0, 10) : (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const { data: keywords } = await sb.from("bank_import_keywords").select("*").eq("user_id", userId).eq("is_active", true).eq("is_ignore", false);
+  const kw = (keywords ?? []).find((k) => description.toLowerCase().includes((k.keyword || "").toLowerCase()));
+  let vendorId = null;
+  let vendorDisplay = extractVendorFromBankDescription(description);
+  if (kw?.vendor_id) {
+    vendorId = kw.vendor_id;
+    const { data: v } = await sb.from("vendors").select("display_name").eq("id", kw.vendor_id).maybeSingle();
+    if (v?.display_name) vendorDisplay = v.display_name;
+  }
+  if (overrides.vendor) {
+    vendorDisplay = overrides.vendor;
+    const { data: v } = await sb.from("vendors").select("id").eq("user_id", userId).ilike("display_name", overrides.vendor).limit(1);
+    vendorId = v?.[0]?.id ?? null;
+  }
+  const isIncome = (Number(tx.amount) || 0) > 0;
+  const vatRate = overrides.vat_rate ?? kw?.tax_rate ?? 0;
+  const baseDescription = kw?.description_template ? `${kw.description_template} \u2013 ${description}`.slice(0, 500) : description.slice(0, 500);
+  const { data: newReceipt, error: insertErr } = await sb.from("receipts").insert({
+    user_id: userId,
+    vendor: vendorDisplay,
+    vendor_id: vendorId,
+    description: overrides.description ?? baseDescription,
+    amount_gross: amount,
+    receipt_date: txDate,
+    category: overrides.category ?? kw?.category ?? null,
+    tax_type: kw?.tax_type ?? null,
+    vat_rate: vatRate,
+    payment_method: "bank_transfer",
+    currency: "EUR",
+    status: "review",
+    source: "bank_import",
+    is_no_receipt_entry: true,
+    bank_import_keyword_id: kw?.id ?? null,
+    bank_transaction_reference: description.slice(0, 500),
+    bank_transaction_id: tx.id,
+    notes: isIncome ? "Aus Bankbuchung erfasst (Hinweis: Einnahme/positiver Betrag) \u2013 bitte pr\xFCfen." : "Aus Bankbuchung erfasst \u2013 bitte vervollst\xE4ndigen."
+  }).select("id").single();
+  if (insertErr) throw insertErr;
+  const tagIds = overrides.tagIds ?? (Array.isArray(kw?.default_tag_ids) ? kw.default_tag_ids.filter(Boolean) : []);
+  if (tagIds.length > 0) {
+    const { error } = await sb.from("receipt_tags").upsert(tagIds.map((tag_id) => ({ receipt_id: newReceipt.id, tag_id })), { onConflict: "receipt_id,tag_id", ignoreDuplicates: true });
+    if (error) throw error;
+  }
+  const { error: txErr } = await sb.from("bank_transactions").update({ status: "matched", receipt_id: newReceipt.id, receipt_split_line_id: null }).eq("id", tx.id);
+  if (txErr) throw txErr;
+  return { receiptId: newReceipt.id };
+}
+
+// src/lib/mcp/tools/suggest-bank-matches.ts
+var suggest_bank_matches_default = defineTool16({
+  name: "suggest_bank_matches",
+  title: "Suggest receipts for a bank transaction",
+  description: `Return the same candidate receipts the app's "Beleg zuordnen" dialog shows for one transaction (score 0-100 from amount and date distance; default filters: only receipts without linked payment, amount within 10 %). Saves nothing.`,
+  inputSchema: {
+    transaction_id: z15.string().uuid(),
+    search: z15.string().min(1).optional().describe("Vendor/description search, like the dialog's search box."),
+    include_assigned: z15.boolean().default(false).describe("Also consider receipts already linked to a payment (dialog toggle)."),
+    similar_amount: z15.boolean().default(true).describe("Dialog filter: amount within 10 %."),
+    similar_date: z15.boolean().default(false).describe("Dialog filter: date within 7 days.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ transaction_id, search, include_assigned, similar_amount, similar_date }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const r = await loadTx(sb, transaction_id);
+    if (r.error) return r.error;
+    const tx = r.tx;
+    if (!tx.amount || !tx.transaction_date) return fail("Transaction has no amount or date.");
+    const receipts = await fetchAssignmentReceipts(sb, tx.user_id, { search, unassignedOnly: !include_assigned });
+    const { matching, others } = rankAssignmentCandidates(receipts, Number(tx.amount), new Date(tx.transaction_date), {
+      similarAmount: similar_amount,
+      similarDate: similar_date
+    });
+    const ids = [...matching, ...others].map((x) => x.id);
+    const splitIds = /* @__PURE__ */ new Set();
+    if (ids.length) {
+      const { data } = await sb.from("receipt_split_lines").select("receipt_id").in("receipt_id", ids);
+      for (const l of data ?? []) splitIds.add(l.receipt_id);
+    }
+    const map = (x) => ({
+      receipt_id: x.id,
+      score: x.matchScore,
+      amount_diff_pct: Math.round(x.amountDiff * 100) / 100,
+      date_diff_days: x.dateDiff,
+      vendor: x.vendor ?? null,
+      amount: x.amount_gross,
+      date: x.receipt_date,
+      invoice_number: x.invoice_number ?? null,
+      status: x.status ?? null,
+      category: x.category ?? null,
+      already_linked: !!x.bank_transaction_id,
+      has_split_lines: splitIds.has(x.id)
+    });
+    const result = {
+      transaction: { id: tx.id, date: tx.transaction_date, amount: tx.amount, status: tx.status, description: tx.description },
+      suggestions: matching.map(map),
+      other_candidates: others.map(map)
+    };
+    return ok(JSON.stringify(result), result);
+  }
+});
+
+// src/lib/mcp/tools/match-bank-transaction.ts
+import { defineTool as defineTool17 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z16 } from "npm:zod@^4.4.3";
+var match_bank_transaction_default = defineTool17({
+  name: "match_bank_transaction",
+  title: "Match bank transaction to receipt",
+  description: `Link an unmatched bank transaction to a receipt exactly like "Zuordnen" in the app. No amount check (Skonto or small deviations are allowed) and several transactions may be linked to the same receipt (e.g. payroll journal). If the receipt is a split booking, split_line_id is required, like the app's line picker. Does not change the receipt's amounts or status.`,
+  inputSchema: {
+    transaction_id: z16.string().uuid(),
+    receipt_id: z16.string().uuid(),
+    split_line_id: z16.string().uuid().optional().describe("Split line of the receipt, required when the receipt has split lines.")
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async ({ transaction_id, receipt_id, split_line_id }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const r = await loadTx(sb, transaction_id);
+    if (r.error) return r.error;
+    if (r.tx.status !== "unmatched") return fail(`Transaction is ${r.tx.status}; only unmatched transactions can be matched (use unmatch/unignore first).`);
+    const { data: rc, error } = await sb.from("receipts").select("id, vendor, amount_gross, receipt_date, invoice_number, bank_transaction_id").eq("id", receipt_id).maybeSingle();
+    if (error) return fail(error.message);
+    if (!rc) return fail("Receipt not found.");
+    const { data: lines } = await sb.from("receipt_split_lines").select("id, description, amount_gross").eq("receipt_id", receipt_id).order("sort_order");
+    if ((lines ?? []).length > 0) {
+      if (!split_line_id) return fail(`Receipt is a split booking; pass split_line_id. Lines: ${JSON.stringify(lines)}`);
+      if (!lines.some((l) => l.id === split_line_id)) return fail("split_line_id does not belong to this receipt.");
+    } else if (split_line_id) return fail("Receipt has no split lines.");
+    try {
+      await assignBankTransaction(sb, transaction_id, receipt_id, split_line_id ?? null);
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : String(e));
+    }
+    const diff = rc.amount_gross != null && r.tx.amount != null ? Math.round((Math.abs(Number(r.tx.amount)) - Math.abs(Number(rc.amount_gross))) * 100) / 100 : null;
+    const result = {
+      matched: true,
+      transaction_id,
+      receipt_id,
+      split_line_id: split_line_id ?? null,
+      receipt: { vendor: rc.vendor, amount: rc.amount_gross, date: rc.receipt_date, invoice_number: rc.invoice_number },
+      amount_difference: diff,
+      receipt_previously_linked_to: rc.bank_transaction_id && rc.bank_transaction_id !== transaction_id ? rc.bank_transaction_id : null
+    };
+    return ok(JSON.stringify(result), result);
+  }
+});
+
+// src/lib/mcp/tools/unmatch-bank-transaction.ts
+import { defineTool as defineTool18 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z17 } from "npm:zod@^4.4.3";
+var unmatch_bank_transaction_default = defineTool18({
+  name: "unmatch_bank_transaction",
+  title: "Unmatch bank transaction",
+  description: 'Remove the receipt link of a matched transaction like "Zuordnung aufheben"; it becomes unmatched. The receipt itself is kept.',
+  inputSchema: { transaction_id: z17.string().uuid() },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async ({ transaction_id }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const r = await loadTx(sb, transaction_id);
+    if (r.error) return r.error;
+    if (r.tx.status !== "matched") return fail(`Transaction is ${r.tx.status}, not matched.`);
+    try {
+      await unmatchBankTransaction(sb, transaction_id, r.tx.receipt_id);
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : String(e));
+    }
+    const result = { transaction_id, status: "unmatched", previous_receipt_id: r.tx.receipt_id };
+    return ok(JSON.stringify(result), result);
+  }
+});
+
+// src/lib/mcp/tools/ignore-bank-transaction.ts
+import { defineTool as defineTool19 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z18 } from "npm:zod@^4.4.3";
+var ignore_bank_transaction_default = defineTool19({
+  name: "ignore_bank_transaction",
+  title: "Ignore bank transaction",
+  description: 'Mark an unmatched transaction as ignored like "Ignorieren" in the app. The app has no field for a reason, so reason is only echoed back, not stored.',
+  inputSchema: {
+    transaction_id: z18.string().uuid(),
+    reason: z18.string().max(500).optional().describe("Not stored (the app has no reason field); echoed in the reply only.")
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async ({ transaction_id, reason }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const r = await loadTx(sb, transaction_id);
+    if (r.error) return r.error;
+    if (r.tx.status !== "unmatched") return fail(`Transaction is ${r.tx.status}; only unmatched transactions can be ignored.`);
+    try {
+      await setBankTransactionStatus(sb, transaction_id, "ignored");
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : String(e));
+    }
+    const result = { transaction_id, status: "ignored", reason_stored: false, reason: reason ?? null };
+    return ok(JSON.stringify(result), result);
+  }
+});
+
+// src/lib/mcp/tools/unignore-bank-transaction.ts
+import { defineTool as defineTool20 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z19 } from "npm:zod@^4.4.3";
+var unignore_bank_transaction_default = defineTool20({
+  name: "unignore_bank_transaction",
+  title: "Restore ignored bank transaction",
+  description: 'Set an ignored transaction back to unmatched like "Wiederherstellen" in the app.',
+  inputSchema: { transaction_id: z19.string().uuid() },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async ({ transaction_id }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const r = await loadTx(sb, transaction_id);
+    if (r.error) return r.error;
+    if (r.tx.status !== "ignored") return fail(`Transaction is ${r.tx.status}, not ignored.`);
+    try {
+      await setBankTransactionStatus(sb, transaction_id, "unmatched");
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : String(e));
+    }
+    const result = { transaction_id, status: "unmatched" };
+    return ok(JSON.stringify(result), result);
+  }
+});
+
+// src/lib/mcp/tools/create-receipt-from-bank-transaction.ts
+import { defineTool as defineTool21 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z20 } from "npm:zod@^4.4.3";
+var create_receipt_from_bank_transaction_default = defineTool21({
+  name: "create_receipt_from_bank_transaction",
+  title: "Create receipt from bank transaction",
+  description: 'Create a receipt without file from an unmatched bank transaction like "Als Ausgabe erstellen" in the app and link it. Stored like the app: status review, source bank_import, is_no_receipt_entry true, payment_method bank_transfer, gross = absolute booking amount, date = booking date, matching bank keyword rule supplies defaults. Given vendor/category/description/tags/vat_rate replace those defaults. Not approved; use approve_receipt.',
+  inputSchema: {
+    transaction_id: z20.string().uuid(),
+    vendor: z20.string().min(1).max(200),
+    category: z20.string().min(1).describe("One of the user's existing categories."),
+    description: z20.string().min(1).max(500),
+    tags: z20.array(z20.string().min(1)).default([]).describe("Existing tag names; empty list = no tags."),
+    vat_rate: z20.number().min(0).max(100).optional().describe("VAT rate in percent; default from keyword rule or 0.")
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async ({ transaction_id, vendor, category, description, tags, vat_rate }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const r = await loadTx(sb, transaction_id);
+    if (r.error) return r.error;
+    if (r.tx.status !== "unmatched") return fail(`Transaction is ${r.tx.status}; only unmatched transactions can be turned into a receipt.`);
+    const { data: cats } = await sb.from("categories").select("name").not("is_hidden", "is", true);
+    const names = (cats ?? []).map((c) => c.name);
+    if (category !== NO_INVOICE_CATEGORY && names.length && !names.includes(category)) return fail(`Unknown category. Allowed: ${names.join(", ")}`);
+    const { data: existingTags, error: te } = await sb.from("tags").select("id, name");
+    if (te) return fail(te.message);
+    const resolved = resolveTagIds(tags ?? [], existingTags ?? []);
+    if (!resolved.ok) return fail(resolved.error);
+    try {
+      const { receiptId } = await createExpenseFromBankTransaction(sb, r.tx.user_id, r.tx, {
+        vendor,
+        category,
+        description,
+        vat_rate,
+        tagIds: resolved.tagIds
+      });
+      const { data: rc } = await sb.from("receipts").select("id, status, source, is_no_receipt_entry, vendor, vendor_id, category, description, amount_gross, vat_rate, receipt_date, payment_method, bank_transaction_id").eq("id", receiptId).single();
+      const result = { receipt: rc, tags: tags ?? [], transaction_status: "matched" };
+      return ok(JSON.stringify(result), result);
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : String(e));
+    }
+  }
+});
+
 // src/lib/mcp/index.ts
 var projectRef = "nvvssxykygdxjywncvgd";
 var mcp_default = defineMcp({
   name: "billmonk",
   title: "BillMonk",
-  version: "0.5.0",
-  instructions: "Tools for BillMonk, a private expense management app. Review workflow: call get_review_queue, then get_receipt_document for each receipt to compare the original file with the extracted data, fix mistakes with update_receipt, and call approve_receipt only when the user asks. Use list_tags to see existing tag names and counts; update_receipt accepts a complete tags list and never creates tags. Split bookings (one document, several categories/VAT rates): split_receipt_ai proposes parts from AI line items, split_receipt saves parts, update_split_part corrects one part, remove_split undoes it. split_receipt_pdf divides a multi-invoice PDF into separate new receipts. None of these approve receipts or change status. Prefer expense_summary for totals.",
+  version: "0.6.0",
+  instructions: "Tools for BillMonk, a private expense management app. Review workflow: call get_review_queue, then get_receipt_document for each receipt to compare the original file with the extracted data, fix mistakes with update_receipt, and call approve_receipt only when the user asks. Use list_tags to see existing tag names and counts; update_receipt accepts a complete tags list and never creates tags. Split bookings (one document, several categories/VAT rates): split_receipt_ai proposes parts from AI line items, split_receipt saves parts, update_split_part corrects one part, remove_split undoes it. split_receipt_pdf divides a multi-invoice PDF into separate new receipts. None of these approve receipts or change status. Bank reconciliation (Kontoabgleich): list_bank_transactions, suggest_bank_matches (read-only), match_bank_transaction / unmatch_bank_transaction, ignore_bank_transaction / unignore_bank_transaction, create_receipt_from_bank_transaction. Prefer expense_summary for totals.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"
@@ -995,7 +1395,13 @@ var mcp_default = defineMcp({
     update_split_part_default,
     remove_split_default,
     split_receipt_pdf_default,
-    delete_receipt_default
+    delete_receipt_default,
+    suggest_bank_matches_default,
+    match_bank_transaction_default,
+    unmatch_bank_transaction_default,
+    ignore_bank_transaction_default,
+    unignore_bank_transaction_default,
+    create_receipt_from_bank_transaction_default
   ]
 });
 

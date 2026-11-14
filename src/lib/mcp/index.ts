@@ -14,15 +14,21 @@ import updateSplitPartTool from "./tools/update-split-part";
 import removeSplitTool from "./tools/remove-split";
 import splitReceiptPdfTool from "./tools/split-receipt-pdf";
 import deleteReceiptTool from "./tools/delete-receipt";
+import suggestBankMatchesTool from "./tools/suggest-bank-matches";
+import matchBankTransactionTool from "./tools/match-bank-transaction";
+import unmatchBankTransactionTool from "./tools/unmatch-bank-transaction";
+import ignoreBankTransactionTool from "./tools/ignore-bank-transaction";
+import unignoreBankTransactionTool from "./tools/unignore-bank-transaction";
+import createReceiptFromBankTransactionTool from "./tools/create-receipt-from-bank-transaction";
 
 const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "project-ref-unset";
 
 export default defineMcp({
   name: "billmonk",
   title: "BillMonk",
-  version: "0.5.0",
+  version: "0.6.0",
   instructions:
-    "Tools for BillMonk, a private expense management app. Review workflow: call get_review_queue, then get_receipt_document for each receipt to compare the original file with the extracted data, fix mistakes with update_receipt, and call approve_receipt only when the user asks. Use list_tags to see existing tag names and counts; update_receipt accepts a complete tags list and never creates tags. Split bookings (one document, several categories/VAT rates): split_receipt_ai proposes parts from AI line items, split_receipt saves parts, update_split_part corrects one part, remove_split undoes it. split_receipt_pdf divides a multi-invoice PDF into separate new receipts. None of these approve receipts or change status. Prefer expense_summary for totals.",
+    "Tools for BillMonk, a private expense management app. Review workflow: call get_review_queue, then get_receipt_document for each receipt to compare the original file with the extracted data, fix mistakes with update_receipt, and call approve_receipt only when the user asks. Use list_tags to see existing tag names and counts; update_receipt accepts a complete tags list and never creates tags. Split bookings (one document, several categories/VAT rates): split_receipt_ai proposes parts from AI line items, split_receipt saves parts, update_split_part corrects one part, remove_split undoes it. split_receipt_pdf divides a multi-invoice PDF into separate new receipts. None of these approve receipts or change status. Bank reconciliation (Kontoabgleich): list_bank_transactions, suggest_bank_matches (read-only), match_bank_transaction / unmatch_bank_transaction, ignore_bank_transaction / unignore_bank_transaction, create_receipt_from_bank_transaction. Prefer expense_summary for totals.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",
@@ -43,5 +49,11 @@ export default defineMcp({
     removeSplitTool,
     splitReceiptPdfTool,
     deleteReceiptTool,
+    suggestBankMatchesTool,
+    matchBankTransactionTool,
+    unmatchBankTransactionTool,
+    ignoreBankTransactionTool,
+    unignoreBankTransactionTool,
+    createReceiptFromBankTransactionTool,
   ],
 });
