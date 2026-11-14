@@ -1,3 +1,4 @@
+import { withSkontoApplied } from '@/lib/skonto';
 import { useState, useMemo } from 'react';
 import { NO_RECEIPT_CATEGORY } from '@/lib/constants';
 import { useCategories } from '@/hooks/useCategories';
@@ -168,7 +169,7 @@ const Reports = () => {
       if (error) throw error;
       
       // Transform tags into flat array
-      return (data || []).map(r => ({
+      return (data || []).map(r0 => withSkontoApplied(r0)).map(r => ({
         ...r,
         tags: (r.receipt_tags || [])
           .map((rt: { tag: { id: string; name: string; color: string } | null }) => rt.tag)
@@ -360,7 +361,7 @@ const Reports = () => {
         .eq('status', 'approved');
       
       if (error) throw error;
-      return data || [];
+      return (data || []).map(r => withSkontoApplied(r));
     },
     enabled: !!user && !!previousPeriodRange?.from && !!previousPeriodRange?.to,
   });
