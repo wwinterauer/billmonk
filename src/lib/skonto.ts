@@ -47,3 +47,18 @@ export function applySkonto<T extends SkontoInput>(r: T) {
 
 /** Effective paid gross (used for bank matching and totals). */
 export const paidGross = (r: SkontoInput) => applySkonto(r).gross;
+
+/** Returns a copy with gross/net/vat replaced by the paid amounts.
+ *  Original invoice gross kept as `invoice_gross`, discount as `skonto`. */
+export function withSkontoApplied<T extends SkontoInput>(r: T): T & { invoice_gross: number | null; skonto: number } {
+  const e = applySkonto(r);
+  if (e.skonto === 0) return { ...r, invoice_gross: r.amount_gross ?? null, skonto: 0 };
+  return { ...r, amount_gross: e.gross, amount_net: e.net, vat_amount: e.vat, invoice_gross: r.amount_gross ?? null, skonto: e.skonto };
+}
+
+/** Scale a split/line amount by the receipt's skonto factor. */
+export function scaleLine<L extends { amount_gross?: number | null; amount_net?: number | null; vat_amount?: number | null }>(line: L, factor: number): L {
+  if (factor === 1) return line;
+  const s = (n: number | null | undefined) => (n == null ? n : r2(n * factor));
+  return { ...line, amount_gross: s(line.amount_gross), amount_net: s(line.amount_net), vat_amount: s(line.vat_amount) };
+}
