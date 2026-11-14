@@ -2,7 +2,7 @@ import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser } from "../supabase";
 import { RECEIPT_FIELDS, fail, netFromGross, ok } from "./_shared";
-import { ReceiptRecord, resolveTagIds, withReceiptTagNames } from "./_tags";
+import { planTagAssignmentChanges, ReceiptRecord, resolveTagIds, withReceiptTagNames } from "./_tags";
 
 export default defineTool({
   name: "update_receipt",

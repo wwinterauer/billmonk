@@ -51,6 +51,15 @@ export function resolveTagIds(requestedNames: string[], existingTags: Array<{ id
   };
 }
 
+export function planTagAssignmentChanges(currentTagIds: string[], desiredTagIds: string[]) {
+  const current = new Set(currentTagIds);
+  const desired = new Set(desiredTagIds);
+  return {
+    upsertTagIds: [...desired].filter((tagId) => !current.has(tagId)),
+    deleteTagIds: [...current].filter((tagId) => !desired.has(tagId)),
+  };
+}
+
 export function flattenTagCounts(rows: Array<{
   id: string;
   name: string;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { flattenTagCounts, mergeReceiptTagNames, resolveTagIds } from "@/lib/mcp/tools/_tags";
+import { flattenTagCounts, mergeReceiptTagNames, planTagAssignmentChanges, resolveTagIds } from "@/lib/mcp/tools/_tags";
 
 describe("MCP receipt tags", () => {
   it("attaches sorted tag names and keeps untagged receipts as an empty list", () => {
