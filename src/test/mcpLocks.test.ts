@@ -10,6 +10,7 @@ describe("MCP locks", () => {
       expect(lockedFieldsError("approved", [f])).toContain(f);
     }
   });
+  it("delete allowed for duplicate", () => { expect(deleteReceiptError("duplicate")).toBeNull(); expect(deleteReceiptError("approved")).not.toBeNull(); });
   it("delete only allowed in review", () => {
     expect(deleteReceiptError("review")).toBeNull();
     expect(deleteReceiptError("approved")).toMatch(/cannot be deleted/);

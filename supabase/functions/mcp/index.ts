@@ -966,8 +966,8 @@ async function deleteReceiptAndFile(sb, userId, id, fileUrl) {
 var delete_receipt_default = defineTool15({
   name: "delete_receipt",
   title: "Delete receipt",
-  description: 'Permanently delete a receipt together with its stored file, exactly like "Beleg l\xF6schen" in the review. Only allowed for receipts in review; approved receipts are refused. Cannot be undone.',
-  inputSchema: { id: z14.string().uuid().describe("Receipt id (must have status review).") },
+  description: 'Permanently delete a receipt together with its stored file, exactly like "Beleg l\xF6schen" in the review. Only allowed for receipts with status review or duplicate; approved receipts are refused. Cannot be undone.',
+  inputSchema: { id: z14.string().uuid().describe("Receipt id (must have status review or duplicate).") },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   handler: async ({ id }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
