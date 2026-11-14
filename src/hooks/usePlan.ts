@@ -84,35 +84,13 @@ export function usePlan(): PlanData {
     fetchData();
   }, [user, fetchProfile]);
 
-  // Periodically check subscription (every 60s) and on mount
-  useEffect(() => {
-    if (!user) return;
-
-    const checkSub = async () => {
-      try {
-        await supabase.functions.invoke('check-subscription');
-        // Re-fetch profile to get updated plan
-        await fetchProfile();
-      } catch {
-        // Silent fail - subscription check is best-effort
-      }
-    };
-
-    // Initial check
-    checkSub();
-
-    const interval = setInterval(checkSub, 60_000);
-    return () => clearInterval(interval);
-  }, [user, fetchProfile]);
-
-  const effectivePlan: PlanType = isAdmin
-    ? (adminViewPlan || 'business')
-    : plan;
+  // Private single-user install: every feature is unlocked, no subscription checks.
+  const effectivePlan: PlanType = 'business';
 
   const limits = PLAN_LIMITS[effectivePlan];
-  const receiptsLimit = limits.receiptsPerMonth + receiptsCredit;
+  const receiptsLimit = Number.MAX_SAFE_INTEGER; void limits;
   const receiptsAvailable = Math.max(0, receiptsLimit - receiptsUsed);
-  const documentsLimit = limits.documentsPerMonth + documentsCredit;
+  const documentsLimit = Number.MAX_SAFE_INTEGER;
   const documentsAvailable = Math.max(0, documentsLimit - documentsUsed);
 
   const setAdminViewPlan = useCallback(async (newPlan: PlanType | null) => {

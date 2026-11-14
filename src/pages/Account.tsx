@@ -143,7 +143,7 @@ const Account = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const tabFromUrl = searchParams.get('tab');
-  const validTabs = ['profile', 'address', 'security', 'subscription', 'invoices', 'support'];
+  const validTabs = ['profile', 'address', 'security'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'profile';
 
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -346,7 +346,7 @@ const Account = () => {
       <div className="p-6 lg:p-8 max-w-4xl">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-foreground">Mein Konto</h1>
-          <p className="text-muted-foreground">Verwalte dein Profil, deine Adresse und dein Abonnement</p>
+          <p className="text-muted-foreground">Verwalte dein Profil und deine Adresse</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
@@ -362,18 +362,6 @@ const Account = () => {
             <TabsTrigger value="security" className="gap-2">
               <Lock className="h-4 w-4" />
               <span className="hidden sm:inline">Sicherheit</span>
-            </TabsTrigger>
-            <TabsTrigger value="subscription" className="gap-2">
-              <Crown className="h-4 w-4" />
-              <span className="hidden sm:inline">Abo</span>
-            </TabsTrigger>
-            <TabsTrigger value="invoices" className="gap-2">
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Rechnungen</span>
-            </TabsTrigger>
-            <TabsTrigger value="support" className="gap-2">
-              <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline">Support</span>
             </TabsTrigger>
           </TabsList>
 
@@ -708,26 +696,6 @@ const Account = () => {
             </motion.div>
           </TabsContent>
 
-          {/* Subscription Tab */}
-          <TabsContent value="subscription">
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <SubscriptionSettings />
-            </motion.div>
-          </TabsContent>
-
-          {/* Invoices Tab */}
-          <TabsContent value="invoices">
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <InvoiceHistory />
-            </motion.div>
-          </TabsContent>
-
-          {/* Support Tab */}
-          <TabsContent value="support">
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <SupportContactForm />
-            </motion.div>
-          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>

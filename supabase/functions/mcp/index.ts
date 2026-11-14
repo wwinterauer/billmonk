@@ -149,51 +149,16 @@ var expense_summary_default = defineTool2({
   }
 });
 
-// src/lib/mcp/tools/list-invoices.ts
+// src/lib/mcp/tools/list-vendors.ts
 import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z3 } from "npm:zod@^4.4.3";
-var list_invoices_default = defineTool3({
-  name: "list_invoices",
-  title: "List invoices",
-  description: "List the signed-in user's outgoing documents (invoices, quotes, orders, delivery notes) with status and totals.",
-  inputSchema: {
-    status: z3.string().trim().min(1).optional().describe("Filter by status, e.g. draft, sent, paid."),
-    document_type: z3.string().trim().min(1).optional().describe("Filter by document type, e.g. invoice, quote."),
-    from: z3.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Earliest invoice date (YYYY-MM-DD)."),
-    to: z3.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Latest invoice date (YYYY-MM-DD)."),
-    limit: z3.number().int().min(1).max(100).default(25).describe("Maximum number of documents to return.")
-  },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
-  handler: async ({ status, document_type, from, to, limit }, ctx) => {
-    if (!ctx.isAuthenticated()) {
-      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
-    }
-    let query = supabaseForUser(ctx).from("invoices").select(
-      "id, invoice_number, document_type, status, invoice_date, due_date, paid_at, subtotal, vat_total, total, currency, customer_id"
-    ).order("invoice_date", { ascending: false, nullsFirst: false }).limit(limit ?? 25);
-    if (status) query = query.eq("status", status);
-    if (document_type) query = query.eq("document_type", document_type);
-    if (from) query = query.gte("invoice_date", from);
-    if (to) query = query.lte("invoice_date", to);
-    const { data, error } = await query;
-    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
-    return {
-      content: [{ type: "text", text: JSON.stringify(data ?? [], null, 2) }],
-      structuredContent: { invoices: data ?? [], count: data?.length ?? 0 }
-    };
-  }
-});
-
-// src/lib/mcp/tools/list-vendors.ts
-import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.26.1";
-import { z as z4 } from "npm:zod@^4.4.3";
-var list_vendors_default = defineTool4({
+var list_vendors_default = defineTool3({
   name: "list_vendors",
   title: "List vendors",
   description: "List the signed-in user's vendors with receipt counts and accumulated totals.",
   inputSchema: {
-    search: z4.string().trim().min(1).optional().describe("Filter by vendor display name (partial match)."),
-    limit: z4.number().int().min(1).max(100).default(50).describe("Maximum number of vendors to return.")
+    search: z3.string().trim().min(1).optional().describe("Filter by vendor display name (partial match)."),
+    limit: z3.number().int().min(1).max(100).default(50).describe("Maximum number of vendors to return.")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ search, limit }, ctx) => {
@@ -211,34 +176,192 @@ var list_vendors_default = defineTool4({
   }
 });
 
-// src/lib/mcp/tools/list-customers.ts
-import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@0.26.1";
-import { z as z5 } from "npm:zod@^4.4.3";
-var list_customers_default = defineTool5({
-  name: "list_customers",
-  title: "List customers",
-  description: "List the signed-in user's customers with contact and billing defaults.",
+// src/lib/mcp/tools/get-review-queue.ts
+import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z4 } from "npm:zod@^4.4.3";
+
+// src/lib/mcp/tools/_shared.ts
+var RECEIPT_FIELDS = "id, status, file_name, file_type, receipt_date, vendor, vendor_brand, description, invoice_number, amount_gross, amount_net, vat_amount, vat_rate, is_mixed_tax_rate, tax_rate_details, line_items_raw, currency, category, tax_type, ai_confidence, is_duplicate, is_no_receipt_entry, notes";
+function ok(text, structured) {
+  return { content: [{ type: "text", text }], structuredContent: structured };
+}
+function fail(text) {
+  return { content: [{ type: "text", text }], isError: true };
+}
+function toBase64(bytes) {
+  let binary = "";
+  const chunk = 32768;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+function mimeFor(fileType, fileName) {
+  const t = (fileType ?? fileName?.split(".").pop() ?? "").toLowerCase();
+  if (t.includes("pdf")) return "application/pdf";
+  if (t.includes("png")) return "image/png";
+  if (t.includes("webp")) return "image/webp";
+  if (t.includes("jp")) return "image/jpeg";
+  return "application/octet-stream";
+}
+function netFromGross(gross, vatRate) {
+  if (vatRate <= 0) return gross;
+  return Math.round(gross / (1 + vatRate / 100) * 100) / 100;
+}
+
+// src/lib/mcp/tools/get-review-queue.ts
+var get_review_queue_default = defineTool4({
+  name: "get_review_queue",
+  title: "Get review queue",
+  description: "List receipts waiting for review with their extracted data. Use get_receipt_document to read the original file and compare.",
   inputSchema: {
-    search: z5.string().trim().min(1).optional().describe("Filter by display name (partial match)."),
-    include_archived: z5.boolean().default(false).describe("Include archived customers."),
-    limit: z5.number().int().min(1).max(100).default(50).describe("Maximum number of customers to return.")
+    limit: z4.number().int().min(1).max(50).default(10).describe("How many receipts to return."),
+    offset: z4.number().int().min(0).default(0).describe("Skip this many receipts (paging).")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
-  handler: async ({ search, include_archived, limit }, ctx) => {
-    if (!ctx.isAuthenticated()) {
-      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+  handler: async ({ limit, offset }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const l = limit ?? 10;
+    const o = offset ?? 0;
+    const { data, error, count } = await supabaseForUser(ctx).from("receipts").select(RECEIPT_FIELDS, { count: "exact" }).eq("status", "review").order("created_at", { ascending: true }).range(o, o + l - 1);
+    if (error) return fail(error.message);
+    return ok(JSON.stringify({ total_in_review: count ?? 0, receipts: data ?? [] }, null, 2), {
+      total_in_review: count ?? 0,
+      receipts: JSON.parse(JSON.stringify(data ?? []))
+    });
+  }
+});
+
+// src/lib/mcp/tools/get-receipt-document.ts
+import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z5 } from "npm:zod@^4.4.3";
+var MAX_BYTES = 8 * 1024 * 1024;
+var get_receipt_document_default = defineTool5({
+  name: "get_receipt_document",
+  title: "Get receipt with original file",
+  description: "Return one receipt's extracted data plus the original PDF or image, so it can be checked against the document.",
+  inputSchema: { id: z5.string().uuid().describe("Receipt id.") },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ id }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const { data: r, error } = await sb.from("receipts").select(`${RECEIPT_FIELDS}, file_url`).eq("id", id).maybeSingle();
+    if (error) return fail(error.message);
+    if (!r) return fail("Receipt not found.");
+    const { file_url, ...fields } = r;
+    const text = { type: "text", text: JSON.stringify(fields, null, 2) };
+    if (!file_url) return { content: [text, { type: "text", text: "No original file stored." }] };
+    const { data: blob, error: dlErr } = await sb.storage.from("receipts").download(file_url);
+    if (dlErr || !blob) return { content: [text, { type: "text", text: `File could not be loaded: ${dlErr?.message ?? "unknown"}` }] };
+    if (blob.size > MAX_BYTES) {
+      return { content: [text, { type: "text", text: `File is too large to attach (${Math.round(blob.size / 1024 / 1024)} MB). Check it in the app.` }] };
     }
-    let query = supabaseForUser(ctx).from("customers").select(
-      "id, display_name, company_name, contact_person, email, phone, city, country, customer_number, payment_terms_days, default_currency, is_archived"
-    ).order("display_name", { ascending: true }).limit(limit ?? 50);
-    if (!include_archived) query = query.eq("is_archived", false);
-    if (search) query = query.ilike("display_name", `%${search}%`);
-    const { data, error } = await query;
-    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
-    return {
-      content: [{ type: "text", text: JSON.stringify(data ?? [], null, 2) }],
-      structuredContent: { customers: data ?? [], count: data?.length ?? 0 }
-    };
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const mimeType = mimeFor(fields.file_type, fields.file_name);
+    const data = toBase64(bytes);
+    const fileContent = mimeType.startsWith("image/") ? { type: "image", data, mimeType } : { type: "resource", resource: { uri: `billmonk://receipts/${id}`, mimeType, blob: data } };
+    return { content: [text, fileContent] };
+  }
+});
+
+// src/lib/mcp/tools/update-receipt.ts
+import { defineTool as defineTool6 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z6 } from "npm:zod@^4.4.3";
+var update_receipt_default = defineTool6({
+  name: "update_receipt",
+  title: "Correct receipt data",
+  description: "Correct extracted fields of a receipt. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+  inputSchema: {
+    id: z6.string().uuid().describe("Receipt id."),
+    vendor: z6.string().min(1).optional().describe("Legal vendor name."),
+    vendor_brand: z6.string().min(1).optional().describe("Vendor brand name."),
+    receipt_date: z6.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Receipt date YYYY-MM-DD."),
+    invoice_number: z6.string().optional().describe("Invoice number."),
+    amount_gross: z6.number().optional().describe("Gross amount."),
+    amount_net: z6.number().optional().describe("Net amount."),
+    vat_amount: z6.number().optional().describe("VAT amount."),
+    vat_rate: z6.number().min(0).max(100).optional().describe("VAT rate in percent."),
+    category: z6.string().min(1).optional().describe("One of the user's existing categories."),
+    description: z6.string().optional().describe("Short description.")
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async ({ id, ...input }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const { data: cur, error: e1 } = await sb.from("receipts").select("amount_gross, vat_rate, user_modified_fields").eq("id", id).maybeSingle();
+    if (e1) return fail(e1.message);
+    if (!cur) return fail("Receipt not found.");
+    const patch = {};
+    for (const [k, v] of Object.entries(input)) if (v !== void 0) patch[k] = v;
+    if (Object.keys(patch).length === 0) return fail("No fields to update.");
+    if (patch.category !== void 0) {
+      const { data: cats } = await sb.from("categories").select("name").not("is_hidden", "is", true);
+      const names = (cats ?? []).map((c) => c.name);
+      if (names.length && !names.includes(patch.category)) {
+        return fail(`Unknown category. Allowed: ${names.join(", ")}`);
+      }
+    }
+    const grossChanged = patch.amount_gross !== void 0 || patch.vat_rate !== void 0;
+    if (grossChanged && patch.amount_net === void 0) {
+      const gross = patch.amount_gross ?? cur.amount_gross;
+      const rate = patch.vat_rate ?? cur.vat_rate;
+      if (gross !== null && gross !== void 0 && rate !== null && rate !== void 0) {
+        const net = netFromGross(Number(gross), Number(rate));
+        patch.amount_net = net;
+        if (patch.vat_amount === void 0) patch.vat_amount = Math.round((Number(gross) - net) * 100) / 100;
+      }
+    }
+    const modified = /* @__PURE__ */ new Set([...cur.user_modified_fields ?? [], ...Object.keys(input).filter((k) => input[k] !== void 0)]);
+    patch.user_modified_fields = [...modified];
+    const { data, error } = await sb.from("receipts").update(patch).eq("id", id).select(RECEIPT_FIELDS).single();
+    if (error) return fail(error.message);
+    return ok(JSON.stringify(data, null, 2), { receipt: JSON.parse(JSON.stringify(data)) });
+  }
+});
+
+// src/lib/mcp/tools/approve-receipt.ts
+import { defineTool as defineTool7 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z7 } from "npm:zod@^4.4.3";
+var approve_receipt_default = defineTool7({
+  name: "approve_receipt",
+  title: "Approve receipt",
+  description: "Approve a receipt that is in review. Only call this when the user asked to approve it.",
+  inputSchema: { id: z7.string().uuid().describe("Receipt id.") },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async ({ id }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const { data, error } = await supabaseForUser(ctx).from("receipts").update({ status: "approved" }).eq("id", id).eq("status", "review").select("id, vendor, amount_gross, receipt_date").maybeSingle();
+    if (error) return fail(error.message);
+    if (!data) return fail("Receipt not found or not in review.");
+    return ok(`Approved ${data.vendor ?? "receipt"} (${data.amount_gross ?? "?"}).`, { receipt: JSON.parse(JSON.stringify(data)) });
+  }
+});
+
+// src/lib/mcp/tools/list-bank-transactions.ts
+import { defineTool as defineTool8 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z8 } from "npm:zod@^4.4.3";
+var list_bank_transactions_default = defineTool8({
+  name: "list_bank_transactions",
+  title: "List bank transactions",
+  description: "List imported bank transactions, optionally only unmatched ones, by date range or text.",
+  inputSchema: {
+    from: z8.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Start date YYYY-MM-DD."),
+    to: z8.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("End date YYYY-MM-DD."),
+    search: z8.string().min(1).optional().describe("Text contained in the booking description."),
+    unmatched_only: z8.boolean().default(false).describe("Only transactions without a linked receipt."),
+    limit: z8.number().int().min(1).max(200).default(50).describe("Maximum rows.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ from, to, search, unmatched_only, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    let q = supabaseForUser(ctx).from("bank_transactions").select("id, transaction_date, description, amount, is_expense, status, receipt_id").order("transaction_date", { ascending: false }).limit(limit ?? 50);
+    if (from) q = q.gte("transaction_date", from);
+    if (to) q = q.lte("transaction_date", to);
+    if (search) q = q.ilike("description", `%${search}%`);
+    if (unmatched_only) q = q.is("receipt_id", null);
+    const { data, error } = await q;
+    if (error) return fail(error.message);
+    return ok(JSON.stringify(data ?? [], null, 2), { transactions: JSON.parse(JSON.stringify(data ?? [])) });
   }
 });
 
@@ -247,13 +370,22 @@ var projectRef = "nvvssxykygdxjywncvgd";
 var mcp_default = defineMcp({
   name: "billmonk",
   title: "BillMonk",
-  version: "0.1.0",
-  instructions: "Tools for BillMonk, a document management and accounting automation app. Read the signed-in user's receipts, expense summaries, outgoing invoices, vendors and customers. All amounts are stored gross/net/VAT per receipt; prefer `expense_summary` for aggregated reporting over summing `list_receipts` yourself.",
+  version: "0.2.0",
+  instructions: "Tools for BillMonk, a private expense management app. Review workflow: call get_review_queue, then get_receipt_document for each receipt to compare the original file with the extracted data, fix mistakes with update_receipt, and call approve_receipt only when the user asks. Prefer expense_summary for totals.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"
   }),
-  tools: [list_receipts_default, expense_summary_default, list_invoices_default, list_vendors_default, list_customers_default]
+  tools: [
+    list_receipts_default,
+    expense_summary_default,
+    list_vendors_default,
+    get_review_queue_default,
+    get_receipt_document_default,
+    update_receipt_default,
+    approve_receipt_default,
+    list_bank_transactions_default
+  ]
 });
 
 // lovable-mcp-supabase-entry.ts
