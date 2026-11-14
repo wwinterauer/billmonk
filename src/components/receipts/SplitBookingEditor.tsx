@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { recalcSplitLine, validateSplitSum, splitLinesFromLineItems, saveSplitLines, removeSplitBooking } from '@/lib/splitBooking';
 import { useVatRates } from '@/hooks/useVatRates';
 
 import { useVendorFieldDefaults } from '@/hooks/useVendorFieldDefaults';
@@ -60,18 +61,7 @@ const createEmptyLine = (sortOrder: number, category = '', vatRate = 20, taxType
   _lastEdited: 'gross',
 });
 
-const recalcLine = (line: SplitLine, field: 'gross' | 'net' | 'vat_rate'): SplitLine => {
-  const updated = { ...line };
-  if (field === 'gross' || (field === 'vat_rate' && line._lastEdited === 'gross')) {
-    updated.amount_net = +(updated.amount_gross / (1 + updated.vat_rate / 100)).toFixed(2);
-    updated._lastEdited = field === 'gross' ? 'gross' : updated._lastEdited;
-  } else {
-    updated.amount_gross = +(updated.amount_net * (1 + updated.vat_rate / 100)).toFixed(2);
-    updated._lastEdited = field === 'net' ? 'net' : updated._lastEdited;
-  }
-  updated.vat_amount = +(updated.amount_gross - updated.amount_net).toFixed(2);
-  return updated;
-};
+const recalcLine = (line: SplitLine, field: 'gross' | 'net' | 'vat_rate'): SplitLine => recalcSplitLine(line, field);
 
 export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVatRate, onSplitChange, vendorId }: SplitBookingEditorProps) {
   const { user } = useAuth();
@@ -191,46 +181,14 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
 
   // Sum validation
   const totals = useMemo(() => {
-    const sumGross = lines.reduce((s, l) => s + l.amount_gross, 0);
-    const diff = Math.abs(sumGross - totalGross);
-    const isValid = diff <= 0.02;
-    return { sumGross: +sumGross.toFixed(2), diff: +diff.toFixed(2), isValid };
+    return validateSplitSum(lines, totalGross);
   }, [lines, totalGross]);
 
   const handleSave = async () => {
     if (!user || !receiptId) return;
     setSaving(true);
     try {
-      await supabase
-        .from('receipt_split_lines')
-        .delete()
-        .eq('receipt_id', receiptId);
-
-      const inserts = lines.map((l, i) => ({
-        receipt_id: receiptId,
-        user_id: user.id,
-        sort_order: i,
-        description: l.description || null,
-        category: l.category || null,
-        tax_type: l.tax_type || null,
-        payment_method: l.payment_method || null,
-        amount_gross: l.amount_gross,
-        amount_net: l.amount_net,
-        vat_rate: l.vat_rate,
-        vat_amount: l.vat_amount,
-        is_private: l.is_private,
-      }));
-
-      const { error: insertError } = await supabase
-        .from('receipt_split_lines')
-        .insert(inserts);
-
-      if (insertError) throw insertError;
-
-      await supabase
-        .from('receipts')
-        .update({ is_split_booking: true } as any)
-        .eq('id', receiptId);
+      await saveSplitLines(supabase, user.id, receiptId, lines);
 
       // Vendor learning: track field changes per split line
       if (vendorId) {
@@ -255,15 +213,7 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
     if (!user || !receiptId) return;
     setSaving(true);
     try {
-      await supabase
-        .from('receipt_split_lines')
-        .delete()
-        .eq('receipt_id', receiptId);
-
-      await supabase
-        .from('receipts')
-        .update({ is_split_booking: false } as any)
-        .eq('id', receiptId);
+      await removeSplitBooking(supabase, receiptId);
 
       setLines([]);
       setIsActive(false);
@@ -300,27 +250,7 @@ export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVa
         return;
       }
 
-      const newLines: SplitLine[] = lineItems.map((item: any, idx: number) => {
-        const vatRate = parseFloat(String(item.tax_rate ?? item.vat_rate ?? mainVatRate ?? 20).replace('%', '').replace(',', '.')) || 0;
-        const grossAmount = Math.abs(Number(item.total) || Number(item.amount_gross) || 0);
-        const netAmount = vatRate === 0
-          ? grossAmount
-          : +(grossAmount / (1 + vatRate / 100)).toFixed(2);
-        const vatAmount = +(grossAmount - netAmount).toFixed(2);
-        return {
-          sort_order: idx,
-          description: item.description || '',
-          category: item.category || mainCategory || '',
-          tax_type: item.tax_type || vendorDefaults.tax_type || '',
-          payment_method: '',
-          amount_gross: grossAmount,
-          amount_net: netAmount,
-          vat_rate: vatRate,
-          vat_amount: vatAmount,
-          is_private: false,
-          _lastEdited: 'gross' as const,
-        };
-      });
+      const newLines: SplitLine[] = splitLinesFromLineItems(lineItems, { mainVatRate, mainCategory, taxType: vendorDefaults.tax_type || '' }) ?? [];
 
       setLines(newLines);
       toast({ title: 'KI-Vorschläge geladen', description: `${newLines.length} Positionen aus der KI-Analyse übernommen.` });
