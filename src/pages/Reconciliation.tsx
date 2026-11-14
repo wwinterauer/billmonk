@@ -66,7 +66,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePlan } from '@/hooks/usePlan';
 import { PageMeta } from '@/components/PageMeta';
-import { detectRecurringGroups, type RecurringGroup } from '@/lib/recurring-detection';
+import { detectRecurringGroups, filterRecurringSuggestions, patternKeyOf, type RecurringGroup } from '@/lib/recurring-detection';
+import { useRecurringDismissals } from '@/hooks/useRecurringDismissals';
 import { RecurringSuggestionsPanel } from '@/components/reconciliation/RecurringSuggestionsPanel';
 
 type StatusFilter = 'all' | 'unmatched' | 'matched' | 'ignored';
@@ -479,7 +480,7 @@ export default function Reconciliation() {
   });
 
   // ===== Recurring (Akonto) detection =====
-  const [dismissedRecurring, setDismissedRecurring] = useState<Set<string>>(new Set());
+  const { patterns: dismissedPatterns, dismiss: dismissRecurring } = useRecurringDismissals();
   const [bulkIgnoreBusy, setBulkIgnoreBusy] = useState(false);
 
   const { data: allUnmatchedTxs } = useQuery({
@@ -500,19 +501,38 @@ export default function Reconciliation() {
     enabled: !!user?.id,
   });
 
+  const { data: matchedExpenseDescs } = useQuery({
+    queryKey: ['bank-transactions-matched-descs', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('bank_transactions')
+        .select('description')
+        .eq('user_id', user.id)
+        .eq('status', 'matched')
+        .eq('is_expense', true)
+        .limit(5000);
+      if (error) throw error;
+      return (data || []).map((d) => d.description);
+    },
+    enabled: !!user?.id,
+  });
+
   const recurringGroups: RecurringGroup[] = useMemo(
-    () => (allUnmatchedTxs ? detectRecurringGroups(allUnmatchedTxs) : []),
-    [allUnmatchedTxs]
+    () => (allUnmatchedTxs && matchedExpenseDescs
+      ? filterRecurringSuggestions(detectRecurringGroups(allUnmatchedTxs), dismissedPatterns, matchedExpenseDescs)
+      : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allUnmatchedTxs, matchedExpenseDescs, [...dismissedPatterns].join(',')]
   );
 
   const recurringTxIds = useMemo(() => {
     const set = new Set<string>();
     for (const g of recurringGroups) {
-      if (dismissedRecurring.has(g.key)) continue;
       for (const t of g.transactions) set.add(t.id);
     }
     return set;
-  }, [recurringGroups, dismissedRecurring]);
+  }, [recurringGroups]);
 
   const handleBulkIgnoreRecurring = async (group: RecurringGroup) => {
     setBulkIgnoreBusy(true);
@@ -939,14 +959,14 @@ export default function Reconciliation() {
               {/* Recurring (Akonto) suggestions */}
               <RecurringSuggestionsPanel
                 groups={recurringGroups}
-                dismissedKeys={dismissedRecurring}
-                onDismiss={(key) =>
-                  setDismissedRecurring(prev => {
-                    const next = new Set(prev);
-                    next.add(key);
-                    return next;
-                  })
-                }
+                dismissedKeys={new Set()}
+                onDismiss={(key) => {
+                  const g = recurringGroups.find((x) => x.key === key);
+                  dismissRecurring.mutate(
+                    { patternKey: patternKeyOf({ key }), label: g?.vendorLabel ?? key },
+                    { onError: () => toast({ title: 'Fehler', description: 'Ablehnung konnte nicht gespeichert werden.', variant: 'destructive' }) },
+                  );
+                }}
                 onIgnoreAll={handleBulkIgnoreRecurring}
                 isBusy={bulkIgnoreBusy}
               />
