@@ -152,21 +152,27 @@ var list_receipts_default = defineTool({
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ from, to, vendor, status, tag, limit }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
-    const select = tag ? `${RECEIPT_LIST_FIELDS}, receipt_tags!inner(tag:tags!inner(name))` : RECEIPT_LIST_FIELDS;
-    let query = supabaseForUser(ctx).from("receipts").select(select).order("receipt_date", { ascending: false, nullsFirst: false }).limit(limit ?? 25);
+    const sb = supabaseForUser(ctx);
+    let receiptIdsForTag;
+    if (tag) {
+      const { data: matchingTags, error: tagError } = await sb.from("tags").select("id").eq("name", tag);
+      if (tagError) return fail(tagError.message);
+      const tagIds = (matchingTags ?? []).map((row) => row.id);
+      if (tagIds.length === 0) return ok("[]", { receipts: [], count: 0 });
+      const { data: links, error: linksError } = await sb.from("receipt_tags").select("receipt_id").in("tag_id", tagIds);
+      if (linksError) return fail(linksError.message);
+      receiptIdsForTag = [...new Set((links ?? []).map((row) => row.receipt_id))];
+      if (receiptIdsForTag.length === 0) return ok("[]", { receipts: [], count: 0 });
+    }
+    let query = sb.from("receipts").select(RECEIPT_LIST_FIELDS).order("receipt_date", { ascending: false, nullsFirst: false }).limit(limit ?? 25);
     if (from) query = query.gte("receipt_date", from);
     if (to) query = query.lte("receipt_date", to);
     if (vendor) query = query.ilike("vendor", `%${vendor}%`);
     if (status) query = query.eq("status", status);
-    if (tag) query = query.eq("receipt_tags.tag.name", tag);
+    if (receiptIdsForTag) query = query.in("id", receiptIdsForTag);
     const { data, error } = await query;
     if (error) return fail(error.message);
-    const rows = (data ?? []).map((row) => {
-      const receipt = { ...row };
-      delete receipt.receipt_tags;
-      return receipt;
-    });
-    const tagged = await withReceiptTagNames(supabaseForUser(ctx), rows);
+    const tagged = await withReceiptTagNames(sb, data ?? []);
     if (tagged.error) return fail(tagged.error);
     return ok(JSON.stringify(tagged.receipts, null, 2), {
       receipts: tagged.receipts,
