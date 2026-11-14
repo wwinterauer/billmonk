@@ -1,3 +1,4 @@
+import { sortTagNames } from "../../tagOrder";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type ReceiptRecord = Record<string, unknown> & { id: string };
@@ -19,7 +20,7 @@ export function mergeReceiptTagNames(receipts: ReceiptRecord[], links: ReceiptTa
 
   return receipts.map((receipt) => ({
     ...receipt,
-    tags: [...(namesByReceipt.get(receipt.id) ?? [])].sort((a, b) => a.localeCompare(b, "de")),
+    tags: sortTagNames([...(namesByReceipt.get(receipt.id) ?? [])]),
   }));
 }
 

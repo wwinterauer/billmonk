@@ -1,3 +1,4 @@
+import { sortTags, sortTagNames, joinTagNames } from '@/lib/tagOrder';
 import { useState, useEffect, useRef } from 'react';
 import { Check, Minus, Settings } from 'lucide-react';
 import { useTags } from '@/hooks/useTags';
@@ -92,7 +93,7 @@ export function TagSelector({
             tagCounts.set(item.tag_id, count + 1);
           });
 
-          const states: TagState[] = activeTags.map(tag => ({
+          const states: TagState[] = sortTags(activeTags).map(tag => ({
             ...tag,
             isAssigned: tagCounts.get(tag.id) === targetReceiptIds.length,
             assignmentCount: tagCounts.get(tag.id) || 0,
@@ -109,7 +110,7 @@ export function TagSelector({
           if (error) throw error;
           
           const assignedIds = new Set((data || []).map(item => item.tag_id));
-          const states: TagState[] = activeTags.map(tag => ({
+          const states: TagState[] = sortTags(activeTags).map(tag => ({
             ...tag,
             isAssigned: assignedIds.has(tag.id),
           }));
