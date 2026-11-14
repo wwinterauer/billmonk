@@ -346,7 +346,7 @@ const Account = () => {
       <div className="p-6 lg:p-8 max-w-4xl">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-foreground">Mein Konto</h1>
-          <p className="text-muted-foreground">Verwalte dein Profil, deine Adresse und dein Abonnement</p>
+          <p className="text-muted-foreground">Verwalte dein Profil und deine Adresse</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
@@ -696,26 +696,6 @@ const Account = () => {
             </motion.div>
           </TabsContent>
 
-          {/* Subscription Tab */}
-          <TabsContent value="subscription">
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <SubscriptionSettings />
-            </motion.div>
-          </TabsContent>
-
-          {/* Invoices Tab */}
-          <TabsContent value="invoices">
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <InvoiceHistory />
-            </motion.div>
-          </TabsContent>
-
-          {/* Support Tab */}
-          <TabsContent value="support">
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <SupportContactForm />
-            </motion.div>
-          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
