@@ -124,3 +124,36 @@ export function detectRecurringGroups(txs: RecurringTx[]): RecurringGroup[] {
   );
   return groups;
 }
+
+/** Recipient/pattern a dismissal applies to (independent of amount, so new bookings stay hidden). */
+export function patternKeyOf(group: Pick<RecurringGroup, 'key'>): string {
+  return group.key.split('|')[0];
+}
+
+/**
+ * Hide groups whose recipient was dismissed, or whose earlier expense bookings
+ * are mostly (>50 %) already matched to receipts.
+ */
+export function filterRecurringSuggestions(
+  groups: RecurringGroup[],
+  dismissedPatterns: Set<string>,
+  matchedDescriptions: (string | null)[],
+): RecurringGroup[] {
+  const matchedByToken = new Map<string, number>();
+  for (const d of matchedDescriptions) {
+    const t = vendorTokenOf(d);
+    if (t) matchedByToken.set(t, (matchedByToken.get(t) ?? 0) + 1);
+  }
+  const unmatchedByToken = new Map<string, number>();
+  for (const g of groups) {
+    const t = patternKeyOf(g);
+    unmatchedByToken.set(t, (unmatchedByToken.get(t) ?? 0) + g.count);
+  }
+  return groups.filter((g) => {
+    const t = patternKeyOf(g);
+    if (dismissedPatterns.has(t)) return false;
+    const matched = matchedByToken.get(t) ?? 0;
+    const open = unmatchedByToken.get(t) ?? 0;
+    return !(matched > open);
+  });
+}
