@@ -295,7 +295,7 @@ var update_receipt_default = defineTool6({
     for (const [k, v] of Object.entries(input)) if (v !== void 0) patch[k] = v;
     if (Object.keys(patch).length === 0) return fail("No fields to update.");
     if (patch.category !== void 0) {
-      const { data: cats } = await sb.from("categories").select("name").eq("is_hidden", false);
+      const { data: cats } = await sb.from("categories").select("name").not("is_hidden", "is", true);
       const names = (cats ?? []).map((c) => c.name);
       if (names.length && !names.includes(patch.category)) {
         return fail(`Unknown category. Allowed: ${names.join(", ")}`);

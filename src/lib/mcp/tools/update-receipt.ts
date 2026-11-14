@@ -35,7 +35,7 @@ export default defineTool({
     if (Object.keys(patch).length === 0) return fail("No fields to update.");
 
     if (patch.category !== undefined) {
-      const { data: cats } = await sb.from("categories").select("name").eq("is_hidden", false);
+      const { data: cats } = await sb.from("categories").select("name").not("is_hidden", "is", true);
       const names = (cats ?? []).map((c: { name: string }) => c.name);
       if (names.length && !names.includes(patch.category as string)) {
         return fail(`Unknown category. Allowed: ${names.join(", ")}`);
