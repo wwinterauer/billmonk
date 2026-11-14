@@ -62,16 +62,6 @@ const createEmptyLine = (sortOrder: number, category = '', vatRate = 20, taxType
 });
 
 const recalcLine = (line: SplitLine, field: 'gross' | 'net' | 'vat_rate'): SplitLine => recalcSplitLine(line, field);
-  if (field === 'gross' || (field === 'vat_rate' && line._lastEdited === 'gross')) {
-    updated.amount_net = +(updated.amount_gross / (1 + updated.vat_rate / 100)).toFixed(2);
-    updated._lastEdited = field === 'gross' ? 'gross' : updated._lastEdited;
-  } else {
-    updated.amount_gross = +(updated.amount_net * (1 + updated.vat_rate / 100)).toFixed(2);
-    updated._lastEdited = field === 'net' ? 'net' : updated._lastEdited;
-  }
-  updated.vat_amount = +(updated.amount_gross - updated.amount_net).toFixed(2);
-  return updated;
-};
 
 export function SplitBookingEditor({ receiptId, totalGross, mainCategory, mainVatRate, onSplitChange, vendorId }: SplitBookingEditorProps) {
   const { user } = useAuth();
