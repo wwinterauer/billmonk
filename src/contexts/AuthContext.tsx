@@ -43,18 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const checkSubscription = useCallback(async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('check-subscription');
-      if (error) {
-        console.error('[Auth] Subscription check failed:', error.message);
-        return;
-      }
-      // Subscription status loaded
-    } catch (err) {
-      console.error('[Auth] Subscription check error:', err);
-    }
-  }, []);
+  // Private install: no subscriptions, so nothing to check.
+  const checkSubscription = useCallback(async () => {}, []);
 
   // Start periodic subscription check
   const startSubscriptionPolling = useCallback(() => {
