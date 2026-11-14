@@ -90,23 +90,18 @@ export default defineTool({
     if (error) return fail(error.message);
 
     if (desiredTagIds !== undefined) {
-      const desired = new Set(desiredTagIds);
-      const current = new Set(currentTagIds);
-      const unchanged = desired.size === current.size && [...desired].every((tagId) => current.has(tagId));
-      if (!unchanged) {
-        if (desiredTagIds.length > 0) {
-          const { error: upsertError } = await sb.from("receipt_tags").upsert(
-            desiredTagIds.map((tagId) => ({ receipt_id: id, tag_id: tagId })),
-            { onConflict: "receipt_id,tag_id", ignoreDuplicates: true },
-          );
-          if (upsertError) return fail(upsertError.message);
-        }
-        const removeIds = currentTagIds.filter((tagId) => !desired.has(tagId));
-        if (removeIds.length > 0) {
-          const { error: deleteError } = await sb
-            .from("receipt_tags").delete().eq("receipt_id", id).in("tag_id", removeIds);
-          if (deleteError) return fail(deleteError.message);
-        }
+      const changes = planTagAssignmentChanges(currentTagIds, desiredTagIds);
+      if (changes.upsertTagIds.length > 0) {
+        const { error: upsertError } = await sb.from("receipt_tags").upsert(
+          changes.upsertTagIds.map((tagId) => ({ receipt_id: id, tag_id: tagId })),
+          { onConflict: "receipt_id,tag_id", ignoreDuplicates: true },
+        );
+        if (upsertError) return fail(upsertError.message);
+      }
+      if (changes.deleteTagIds.length > 0) {
+        const { error: deleteError } = await sb
+          .from("receipt_tags").delete().eq("receipt_id", id).in("tag_id", changes.deleteTagIds);
+        if (deleteError) return fail(deleteError.message);
       }
     }
 

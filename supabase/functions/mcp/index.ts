@@ -125,6 +125,14 @@ function resolveTagIds(requestedNames, existingTags) {
     tagIds: [...new Set(requestedNames.map((name) => idsByName.get(name)))]
   };
 }
+function planTagAssignmentChanges(currentTagIds, desiredTagIds) {
+  const current = new Set(currentTagIds);
+  const desired = new Set(desiredTagIds);
+  return {
+    upsertTagIds: [...desired].filter((tagId) => !current.has(tagId)),
+    deleteTagIds: [...current].filter((tagId) => !desired.has(tagId))
+  };
+}
 function flattenTagCounts(rows) {
   return rows.map((row) => ({
     id: row.id,
@@ -412,22 +420,17 @@ var update_receipt_default = defineTool6({
     const { data, error } = await sb.from("receipts").update(patch).eq("id", id).select(RECEIPT_FIELDS).single();
     if (error) return fail(error.message);
     if (desiredTagIds !== void 0) {
-      const desired = new Set(desiredTagIds);
-      const current = new Set(currentTagIds);
-      const unchanged = desired.size === current.size && [...desired].every((tagId) => current.has(tagId));
-      if (!unchanged) {
-        if (desiredTagIds.length > 0) {
-          const { error: upsertError } = await sb.from("receipt_tags").upsert(
-            desiredTagIds.map((tagId) => ({ receipt_id: id, tag_id: tagId })),
-            { onConflict: "receipt_id,tag_id", ignoreDuplicates: true }
-          );
-          if (upsertError) return fail(upsertError.message);
-        }
-        const removeIds = currentTagIds.filter((tagId) => !desired.has(tagId));
-        if (removeIds.length > 0) {
-          const { error: deleteError } = await sb.from("receipt_tags").delete().eq("receipt_id", id).in("tag_id", removeIds);
-          if (deleteError) return fail(deleteError.message);
-        }
+      const changes = planTagAssignmentChanges(currentTagIds, desiredTagIds);
+      if (changes.upsertTagIds.length > 0) {
+        const { error: upsertError } = await sb.from("receipt_tags").upsert(
+          changes.upsertTagIds.map((tagId) => ({ receipt_id: id, tag_id: tagId })),
+          { onConflict: "receipt_id,tag_id", ignoreDuplicates: true }
+        );
+        if (upsertError) return fail(upsertError.message);
+      }
+      if (changes.deleteTagIds.length > 0) {
+        const { error: deleteError } = await sb.from("receipt_tags").delete().eq("receipt_id", id).in("tag_id", changes.deleteTagIds);
+        if (deleteError) return fail(deleteError.message);
       }
     }
     const tagged = await withReceiptTagNames(sb, [data]);

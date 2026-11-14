@@ -29,6 +29,17 @@ describe("MCP receipt tags", () => {
     expect(resolveTagIds([], [{ id: "t1", name: "Wohnung" }])).toEqual({ ok: true, tagIds: [] });
   });
 
+  it("replaces the complete assignment by adding missing and removing old tags", () => {
+    expect(planTagAssignmentChanges(["old", "kept"], ["kept", "new"])).toEqual({
+      upsertTagIds: ["new"],
+      deleteTagIds: ["old"],
+    });
+    expect(planTagAssignmentChanges(["old", "kept"], [])).toEqual({
+      upsertTagIds: [],
+      deleteTagIds: ["old", "kept"],
+    });
+  });
+
   it("preserves a zero receipt count in list_tags", () => {
     const result = flattenTagCounts([{
       id: "t1",
