@@ -1,3 +1,4 @@
+import { checkReceiptEditable } from "./_locks";
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser } from "../supabase";
@@ -22,6 +23,8 @@ export default defineTool({
   handler: async ({ id, splits }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
+    const lockErr = await checkReceiptEditable(sb, id);
+    if (lockErr) return fail(lockErr);
     const { data, error } = await sb.functions.invoke("split-pdf", { body: { receiptId: id, splits } });
     if (error) {
       let msg = error.message;

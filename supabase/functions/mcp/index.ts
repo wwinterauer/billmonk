@@ -394,10 +394,27 @@ var get_receipt_document_default = defineTool5({
 // src/lib/mcp/tools/update-receipt.ts
 import { defineTool as defineTool6 } from "npm:@lovable.dev/mcp-js@0.26.1";
 import { z as z6 } from "npm:zod@^4.4.3";
+
+// src/lib/mcp/tools/_locks.ts
+var LOCKED_RECEIPT_STATUSES = ["approved", "completed"];
+function lockedReceiptError(status) {
+  if (status && LOCKED_RECEIPT_STATUSES.includes(status)) {
+    return `Receipt is ${status} and locked. Approved receipts cannot be changed via MCP; edit it in the app if really needed.`;
+  }
+  return null;
+}
+async function checkReceiptEditable(sb, id) {
+  const { data, error } = await sb.from("receipts").select("status").eq("id", id).maybeSingle();
+  if (error) return error.message;
+  if (!data) return "Receipt not found.";
+  return lockedReceiptError(data.status);
+}
+
+// src/lib/mcp/tools/update-receipt.ts
 var update_receipt_default = defineTool6({
   name: "update_receipt",
   title: "Correct receipt data",
-  description: "Correct extracted fields of a receipt. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+  description: "Correct extracted fields of a receipt that is not yet approved (approved receipts are locked). Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
   inputSchema: {
     id: z6.string().uuid().describe("Receipt id."),
     vendor: z6.string().min(1).optional().describe("Legal vendor name."),
@@ -418,9 +435,11 @@ var update_receipt_default = defineTool6({
   handler: async ({ id, tags: requestedTags, ...input }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
-    const { data: cur, error: e1 } = await sb.from("receipts").select("amount_gross, vat_rate, user_modified_fields").eq("id", id).maybeSingle();
+    const { data: cur, error: e1 } = await sb.from("receipts").select("amount_gross, vat_rate, user_modified_fields, status").eq("id", id).maybeSingle();
     if (e1) return fail(e1.message);
     if (!cur) return fail("Receipt not found.");
+    const locked = lockedReceiptError(cur.status);
+    if (locked) return fail(locked);
     let desiredTagIds;
     let currentTagIds = [];
     if (requestedTags !== void 0) {
@@ -678,6 +697,8 @@ var split_receipt_default = defineTool11({
   handler: async ({ id, parts }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
+    const lockErr = await checkReceiptEditable(sb, id);
+    if (lockErr) return fail(lockErr);
     const { data: r, error } = await sb.from("receipts").select("id, amount_gross, vat_rate, category").eq("id", id).maybeSingle();
     if (error) return fail(error.message);
     if (!r) return fail("Receipt not found.");
@@ -747,6 +768,8 @@ var update_split_part_default = defineTool12({
     const { data: part, error } = await sb.from("receipt_split_lines").select(SPLIT_PART_FIELDS).eq("id", part_id).maybeSingle();
     if (error) return fail(error.message);
     if (!part) return fail("Split part not found.");
+    const lockErr = await checkReceiptEditable(sb, part.receipt_id);
+    if (lockErr) return fail(lockErr);
     if (input.category !== void 0) {
       const cats = await allowedCategoryNames(sb);
       if (cats.length && !cats.includes(input.category)) return fail(`Unknown category. Allowed: ${cats.join(", ")}`);
@@ -814,6 +837,8 @@ var remove_split_default = defineTool13({
   handler: async ({ id }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
+    const lockErr = await checkReceiptEditable(sb, id);
+    if (lockErr) return fail(lockErr);
     const { data: r, error } = await sb.from("receipts").select("id").eq("id", id).maybeSingle();
     if (error) return fail(error.message);
     if (!r) return fail("Receipt not found.");
@@ -847,6 +872,8 @@ var split_receipt_pdf_default = defineTool14({
   handler: async ({ id, splits }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
+    const lockErr = await checkReceiptEditable(sb, id);
+    if (lockErr) return fail(lockErr);
     const { data, error } = await sb.functions.invoke("split-pdf", { body: { receiptId: id, splits } });
     if (error) {
       let msg = error.message;

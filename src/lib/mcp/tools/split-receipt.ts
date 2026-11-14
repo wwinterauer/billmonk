@@ -1,3 +1,4 @@
+import { checkReceiptEditable } from "./_locks";
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser } from "../supabase";
@@ -25,6 +26,8 @@ export default defineTool({
   handler: async ({ id, parts }, ctx) => {
     if (!ctx.isAuthenticated()) return fail("Not authenticated");
     const sb = supabaseForUser(ctx);
+    const lockErr = await checkReceiptEditable(sb, id);
+    if (lockErr) return fail(lockErr);
     const { data: r, error } = await sb.from("receipts").select("id, amount_gross, vat_rate, category").eq("id", id).maybeSingle();
     if (error) return fail(error.message);
     if (!r) return fail("Receipt not found.");
