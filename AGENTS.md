@@ -2,4 +2,5 @@
 
 - Resolve Stripe billing periods through the shared subscription-details helper, preferring item-level dates with a legacy subscription-level fallback; Basil API payloads no longer carry subscription-level periods.- Single-owner private install: no signup, subscription, plan gating or invoicing UI; `usePlan` always reports full access so legacy gates stay inert. Why: app is used privately by its owner only.
 - External assistants access data only through the OAuth-protected MCP server in `src/lib/mcp`; keep login for that reason. Why: the app URL stays publicly reachable.
-- Bound upload preparation to three file reads at a time and report actual completed hashes; keep the run active through upload completion. Why: large selections must not exhaust browser memory or appear complete before upload starts.
+- Bound upload preparation to three file reads at a time and report actual completed hashes. Why: large selections must not exhaust browser memory.
+- Run uploads through `UploadController` (`src/lib/uploadController.ts`): new files are queued immediately and never wait for duplicate decisions; every run ends in a final state via the controller's drain callback, and leftover pending events are marked failed with a reason. Why: a broken step must surface as an error, never as a silent stall.

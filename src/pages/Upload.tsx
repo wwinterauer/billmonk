@@ -287,6 +287,7 @@ const Upload = () => {
         .eq('user_id', user.id)
         .eq('status', 'active');
       for (const run of activeRuns ?? []) {
+        if (run.id === activeRunRef.current) continue; // started in this page instance
         const live = liveUploadRuns.get(run.id);
         if (live && !live.isFinished) {
           if (cancelled) return;
