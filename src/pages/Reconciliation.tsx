@@ -1,3 +1,4 @@
+import { paidGross } from '@/lib/skonto';
 import { useState, useEffect, useMemo } from 'react';
 import { FeatureGate } from '@/components/FeatureGate';
 import { motion } from 'framer-motion';
@@ -271,7 +272,7 @@ export default function Reconciliation() {
       if (!user?.id) return { count: 0, total: 0 };
       const { data: receipts, error } = await supabase
         .from('receipts')
-        .select('id, amount_gross, bank_transaction_id, is_split_booking')
+        .select('id, amount_gross, skonto_amount, skonto_percent, bank_transaction_id, is_split_booking')
         .eq('user_id', user.id)
         .in('status', ['approved', 'completed']);
       if (error) throw error;
@@ -314,7 +315,7 @@ export default function Reconciliation() {
             // No lines defined yet → fall back to whole-receipt rule
             if (!r.bank_transaction_id) {
               count += 1;
-              total += r.amount_gross || 0;
+              total += paidGross(r as any) ?? 0;
             }
             continue;
           }
@@ -326,7 +327,7 @@ export default function Reconciliation() {
         } else {
           if (!r.bank_transaction_id) {
             count += 1;
-            total += r.amount_gross || 0;
+            total += paidGross(r as any) ?? 0;
           }
         }
       }
