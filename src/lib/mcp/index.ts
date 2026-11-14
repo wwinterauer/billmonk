@@ -42,5 +42,6 @@ export default defineMcp({
     updateSplitPartTool,
     removeSplitTool,
     splitReceiptPdfTool,
+    deleteReceiptTool,
   ],
 });

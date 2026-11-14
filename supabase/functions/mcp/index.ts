@@ -417,6 +417,11 @@ function lockedFieldsError(status, fields) {
   return `Receipt is ${status}: only category, tags and receipt_date can be changed. Locked fields: ${blocked.join(", ")}.`;
 }
 var NO_INVOICE_CATEGORY = "Keine Rechnung";
+function deleteReceiptError(status) {
+  if (status === "review") return null;
+  if (lockedReceiptError(status)) return `Receipt is ${status} and cannot be deleted via MCP. Only receipts in review can be deleted.`;
+  return `Receipt has status "${status ?? "unknown"}". Only receipts in review can be deleted.`;
+}
 
 // src/lib/mcp/tools/update-receipt.ts
 var update_receipt_default = defineTool6({
@@ -912,6 +917,58 @@ var split_receipt_pdf_default = defineTool14({
   }
 });
 
+// src/lib/mcp/tools/delete-receipt.ts
+import { defineTool as defineTool15 } from "npm:@lovable.dev/mcp-js@0.26.1";
+import { z as z14 } from "npm:zod@^4.4.3";
+
+// src/lib/receiptDelete.ts
+async function deleteReceiptAndFile(sb, userId, id, fileUrl) {
+  await sb.from("receipts").update({ is_duplicate: false, duplicate_of: null, duplicate_score: null, duplicate_checked_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("user_id", userId).eq("duplicate_of", id);
+  const { error: dbError } = await sb.from("receipts").delete().eq("id", id).eq("user_id", userId);
+  if (dbError) throw new Error(`Fehler beim L\xF6schen: ${dbError.message}`);
+  if (fileUrl) {
+    const { error: storageError } = await sb.storage.from("receipts").remove([fileUrl]);
+    if (storageError) return { storageError: storageError.message };
+  }
+  return {};
+}
+
+// src/lib/mcp/tools/delete-receipt.ts
+var delete_receipt_default = defineTool15({
+  name: "delete_receipt",
+  title: "Delete receipt",
+  description: 'Permanently delete a receipt together with its stored file, exactly like "Beleg l\xF6schen" in the review. Only allowed for receipts in review; approved receipts are refused. Cannot be undone.',
+  inputSchema: { id: z14.string().uuid().describe("Receipt id (must have status review).") },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  handler: async ({ id }, ctx) => {
+    if (!ctx.isAuthenticated()) return fail("Not authenticated");
+    const sb = supabaseForUser(ctx);
+    const userId = await currentUserId(sb, ctx);
+    if (!userId) return fail("Not authenticated");
+    const { data: r, error } = await sb.from("receipts").select("id, status, vendor, vendor_brand, amount_gross, receipt_date, file_name, file_url").eq("id", id).maybeSingle();
+    if (error) return fail(error.message);
+    if (!r) return fail("Receipt not found.");
+    const blocked = deleteReceiptError(r.status);
+    if (blocked) return fail(blocked);
+    let storageError;
+    try {
+      ({ storageError } = await deleteReceiptAndFile(sb, userId, id, r.file_url ?? null));
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : String(e));
+    }
+    const deleted = {
+      id,
+      vendor: r.vendor_brand ?? r.vendor ?? null,
+      amount_gross: r.amount_gross ?? null,
+      receipt_date: r.receipt_date ?? null,
+      file_name: r.file_name ?? null,
+      file_deleted: !storageError && !!r.file_url,
+      ...storageError ? { storage_warning: storageError } : {}
+    };
+    return ok(`Deleted receipt: ${JSON.stringify(deleted)}`, { deleted });
+  }
+});
+
 // src/lib/mcp/index.ts
 var projectRef = "nvvssxykygdxjywncvgd";
 var mcp_default = defineMcp({
@@ -937,7 +994,8 @@ var mcp_default = defineMcp({
     split_receipt_default,
     update_split_part_default,
     remove_split_default,
-    split_receipt_pdf_default
+    split_receipt_pdf_default,
+    delete_receipt_default
   ]
 });
 
