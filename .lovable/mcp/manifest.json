@@ -45,7 +45,7 @@
               "minLength": 1
             },
             "status": {
-              "description": "Filter by receipt status, e.g. completed.",
+              "description": "Filter by receipt status, e.g. approved, review or not_a_receipt (documents set to Keine Rechnung by a vendor rule). Without a filter all statuses are returned.",
               "type": "string",
               "minLength": 1
             },
@@ -137,7 +137,7 @@
       {
         "name": "get_review_queue",
         "title": "Get review queue",
-        "description": "List receipts waiting for review with their extracted data and tag names. Use get_receipt_document to read the original file and compare.",
+        "description": "List receipts waiting for review with their extracted data and tag names. Use get_receipt_document to read the original file and compare. Set include_not_a_receipt to also list documents with status not_a_receipt (e.g. Booking payout overviews set by a vendor rule), which approve_receipt can approve.",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
@@ -160,6 +160,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 9007199254740991
+            },
+            "include_not_a_receipt": {
+              "default": false,
+              "description": "Also include receipts with status not_a_receipt.",
+              "type": "boolean"
             }
           }
         },
@@ -194,7 +199,7 @@
       {
         "name": "update_receipt",
         "title": "Correct receipt data",
-        "description": "Correct extracted fields of a receipt. On approved receipts only category, tags and receipt_date may be changed, all other fields are locked. \"Keine Rechnung\" (no_invoice: true, or category \"Keine Rechnung\") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when \"Keine Rechnung ausschließen\" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
+        "description": "Correct extracted fields of a receipt. On approved receipts only category, tags and receipt_date may be changed, all other fields are locked, except that amount_gross, amount_net and vat_amount may be set to null on approved Keine Rechnung receipts. \"Keine Rechnung\" (no_invoice: true, or category \"Keine Rechnung\") marks documents that are not invoices, e.g. Booking payout or Airbnb booking overviews: the receipt keeps its data but is left out of all expense/VAT totals, dashboards and the tax/DATEV export, and is skipped in other exports when \"Keine Rechnung ausschließen\" is selected; amount_gross may be set to null for such entries. This does not approve the receipt; use approve_receipt for that. Always double-check the id matches the document you compared. The optional tags list replaces all tag assignments and accepts only existing tag names. If gross and VAT rate change but net is not given, net and VAT amount are recalculated.",
         "annotations": {
           "readOnlyHint": false,
           "destructiveHint": false,
@@ -242,12 +247,26 @@
               ]
             },
             "amount_net": {
-              "description": "Net amount.",
-              "type": "number"
+              "description": "Net amount. null clears it (Keine Rechnung only).",
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "vat_amount": {
-              "description": "VAT amount.",
-              "type": "number"
+              "description": "VAT amount. null clears it (Keine Rechnung only).",
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "vat_rate": {
               "description": "VAT rate in percent.",
@@ -297,7 +316,7 @@
       {
         "name": "approve_receipt",
         "title": "Approve receipt",
-        "description": "Approve a receipt that is in review. Only call this when the user asked to approve it.",
+        "description": "Approve a receipt that is in review or has status not_a_receipt (e.g. Booking payout overviews marked Keine Rechnung); afterwards it is approved like any other receipt. Only call this when the user asked to approve it.",
         "annotations": {
           "readOnlyHint": false,
           "destructiveHint": false,
