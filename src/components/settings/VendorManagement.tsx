@@ -1988,8 +1988,8 @@ export function VendorManagement() {
 
       {/* Detailed Merge Dialog */}
       <Dialog open={showMergeDialog} onOpenChange={setShowMergeDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-6xl flex-col overflow-hidden">
+          <DialogHeader className="shrink-0 pr-6">
             <DialogTitle className="flex items-center gap-2">
               <Merge className="w-5 h-5 text-primary" />
               Lieferanten zusammenführen
@@ -1999,9 +1999,9 @@ export function VendorManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4 space-y-4">
+          <div className="min-h-0 overflow-y-auto py-4 space-y-4 [overflow-wrap:anywhere]">
             {/* Before/After Comparison */}
-            <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-stretch">
+            <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2 items-stretch">
               {/* Left: Will be deleted */}
               <Card className="border-destructive/30 bg-destructive/5">
                 <CardHeader className="pb-2">
@@ -2085,18 +2085,18 @@ export function VendorManagement() {
                         <Badge
                           key={`${name}-${i}`}
                           variant={isPrimary ? 'default' : 'secondary'}
-                          className="text-xs cursor-pointer gap-1"
+                          className="max-w-full whitespace-normal text-xs cursor-pointer gap-1"
                           onClick={() =>
                             setMergePreview((prev) =>
                               prev ? { ...prev, primary_legal_name: name } : null
                             )
                           }
                         >
-                          {isPrimary && <Check className="w-3 h-3" />}
+                          {isPrimary && <Check className="w-3 h-3 shrink-0" />}
                           {name}
                           <button
                             type="button"
-                            className="ml-1 hover:text-destructive"
+                            className="ml-1 shrink-0 hover:text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
                               setMergePreview((prev) => {
@@ -2178,10 +2178,10 @@ export function VendorManagement() {
                   <Label className="text-xs text-muted-foreground">Erkannte Varianten</Label>
                   <div className="flex flex-wrap gap-1 p-2 bg-muted/30 rounded-lg min-h-[40px]">
                     {mergePreview?.detected_names.map((name, i) => (
-                      <Badge key={i} variant="secondary" className="text-xs">
+                      <Badge key={i} variant="secondary" className="max-w-full whitespace-normal text-xs">
                         {name}
                         <button
-                          className="ml-1 hover:text-destructive"
+                          className="ml-1 shrink-0 hover:text-destructive"
                           onClick={() => {
                             setMergePreview(prev => prev ? {
                               ...prev,
@@ -2220,7 +2220,7 @@ export function VendorManagement() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t pt-4">
             <Button variant="outline" onClick={() => setShowMergeDialog(false)}>
               Abbrechen
             </Button>
